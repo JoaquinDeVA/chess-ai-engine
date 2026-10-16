@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the tactical-pattern diagrams used by ``docs/TACTICAL_PATTERNS.md`` as SVG files.
 
-    python scripts/render_pattern_boards.py
+python scripts/render_pattern_boards.py
 """
 
 from pathlib import Path
@@ -32,8 +32,10 @@ def render(name: str, fen: str, arrows) -> Path:
     svg = chess.svg.board(
         board,
         size=320,
-        arrows=[chess.svg.Arrow(chess.parse_square(a), chess.parse_square(b), color="#d9480fcc")
-                for a, b in arrows],
+        arrows=[
+            chess.svg.Arrow(chess.parse_square(a), chess.parse_square(b), color="#d9480fcc")
+            for a, b in arrows
+        ],
     )
     path = OUTPUT_DIR / f"{name}.svg"
     path.write_text(svg, encoding="utf-8")

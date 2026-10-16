@@ -25,6 +25,7 @@ class TreeState(GameState):
         self.tree = tree
         self.utilities = utilities
         self.to_move = to_move
+        self._undo_stack: List[Any] = []
 
     def get_legal_moves(self) -> List[Any]:
         return list(self.tree.get(self.name, {}).keys())
@@ -33,6 +34,13 @@ class TreeState(GameState):
         self.name = self.tree[self.name][move]
         self.to_move = 1 - self.to_move
         return self
+
+    def apply_move(self, move: Any) -> None:
+        self._undo_stack.append((self.name, self.to_move))
+        self.make_move(move)
+
+    def undo_move(self) -> None:
+        self.name, self.to_move = self._undo_stack.pop()
 
     def is_over(self) -> bool:
         return not self.tree.get(self.name)

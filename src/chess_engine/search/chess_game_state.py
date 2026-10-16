@@ -4,7 +4,7 @@ Chess game state implementation for adversarial search.
 This module implements the GameState interface for chess using the python-chess library.
 """
 
-from typing import Any, Optional
+from typing import Any, Hashable, Optional
 
 import chess
 from chess import Outcome, Termination
@@ -39,6 +39,7 @@ class ChessGameState(GameState):
         self._history, self._has_repeated = self._build_history(self.board)
         self._outcome: Optional[Outcome] = None
         self._outcome_known = False
+        self._undo_stack: list[tuple] = []
 
     @staticmethod
     def _build_history(board: chess.Board) -> tuple[tuple, bool]:
@@ -87,6 +88,20 @@ class ChessGameState(GameState):
         if move not in self.board.legal_moves:
             raise ValueError(f"Move {move} is not legal in current position")
 
+        self.apply_move(move)
+        self._undo_stack.pop()  # a move made with make_move is not meant to be undone
+        return self
+
+    def apply_move(self, move: Any) -> None:
+        """
+        Apply a legal move in place without checking it, keeping the history and caches updated.
+
+        :param move: A legal chess move of this position
+        :type move: chess.Move
+        """
+        self._undo_stack.append(
+            (self._history, self._has_repeated, self._outcome, self._outcome_known)
+        )
         irreversible = self.board.is_irreversible(move)
         self.board.push(move)
         key = self.board._transposition_key()
@@ -97,7 +112,13 @@ class ChessGameState(GameState):
             self._has_repeated = self._has_repeated or key in self._history
             self._history += (key,)
         self._outcome_known = False
-        return self
+
+    def undo_move(self) -> None:
+        """Revert the last move applied with :meth:`apply_move`, restoring history and caches."""
+        self.board.pop()
+        self._history, self._has_repeated, self._outcome, self._outcome_known = (
+            self._undo_stack.pop()
+        )
 
     def _compute_outcome(self) -> Optional[Outcome]:
         """
@@ -200,6 +221,7 @@ class ChessGameState(GameState):
         clone._has_repeated = self._has_repeated
         clone._outcome = self._outcome
         clone._outcome_known = self._outcome_known
+        clone._undo_stack = []
         return clone
 
     def __str__(self) -> str:
@@ -229,11 +251,15 @@ class ChessGameState(GameState):
         """
         return self.board.fen()
 
-    def key(self) -> str:
+    def key(self) -> Hashable:
         """
-        Return the hashable identity of the state: its FEN string.
+        Return the hashable identity of the state.
 
-        :return: FEN of the position (the move counters are part of it).
-        :rtype: str
+        It identifies the same positions as the FEN string (pieces, turn, castling rights, legal
+        en passant square, halfmove clock and fullmove number) without building the string.
+
+        :return: Tuple of the board transposition key and the two move counters.
+        :rtype: Hashable
         """
-        return self.get_fen()
+        board = self.board
+        return (board._transposition_key(), board.halfmove_clock, board.fullmove_number)

@@ -1,0 +1,131 @@
+{
+  "depth": 3,
+  "results": [
+    {
+      "position": "opening",
+      "bot": "heuristic_h3",
+      "time": 0.4278990529710427,
+      "nodes": 1205,
+      "nodes_per_second": 2816.084755582636,
+      "max_depth": 3,
+      "move": "e2e3"
+    },
+    {
+      "position": "opening",
+      "bot": "model_mlp_features",
+      "time": 0.3165291210170835,
+      "nodes": 1173,
+      "nodes_per_second": 3705.8201666591413,
+      "max_depth": 3,
+      "move": "d2d4"
+    },
+    {
+      "position": "middlegame",
+      "bot": "heuristic_h3",
+      "time": 1.2683659860049374,
+      "nodes": 3331,
+      "nodes_per_second": 2626.2135982468967,
+      "max_depth": 3,
+      "move": "f3e5"
+    },
+    {
+      "position": "middlegame",
+      "bot": "model_mlp_features",
+      "time": 0.7677505759638734,
+      "nodes": 4038,
+      "nodes_per_second": 5259.520639148317,
+      "max_depth": 3,
+      "move": "b2b4"
+    },
+    {
+      "position": "kiwipete",
+      "bot": "heuristic_h3",
+      "time": 0.6983909059781581,
+      "nodes": 2533,
+      "nodes_per_second": 3626.9086242643866,
+      "max_depth": 3,
+      "move": "e2a6"
+    },
+    {
+      "position": "kiwipete",
+      "bot": "model_mlp_features",
+      "time": 0.46291154000209644,
+      "nodes": 2356,
+      "nodes_per_second": 5089.5253118756345,
+      "max_depth": 3,
+      "move": "e2a6"
+    },
+    {
+      "position": "endgame",
+      "bot": "heuristic_h3",
+      "time": 0.0762243089848198,
+      "nodes": 495,
+      "nodes_per_second": 6493.991307924878,
+      "max_depth": 3,
+      "move": "d4d1"
+    },
+    {
+      "position": "endgame",
+      "bot": "model_mlp_features",
+      "time": 0.060645196004770696,
+      "nodes": 487,
+      "nodes_per_second": 8030.314552230811,
+      "max_depth": 3,
+      "move": "d4d1"
+    },
+    {
+      "position": "repetition_claim_next_move",
+      "bot": "heuristic_h3",
+      "time": 0.3363753409939818,
+      "nodes": 1439,
+      "nodes_per_second": 4277.9592456087485,
+      "max_depth": 3,
+      "move": "d2d4"
+    },
+    {
+      "position": "repetition_claim_next_move",
+      "bot": "model_mlp_features",
+      "time": 0.27931431704200804,
+      "nodes": 1564,
+      "nodes_per_second": 5599.426540547791,
+      "max_depth": 3,
+      "move": "d2d4"
+    },
+    {
+      "position": "repetition_endgame",
+      "bot": "heuristic_h3",
+      "time": 0.060099028050899506,
+      "nodes": 315,
+      "nodes_per_second": 5241.349323207322,
+      "max_depth": 3,
+      "move": "a1a6"
+    },
+    {
+      "position": "repetition_endgame",
+      "bot": "model_mlp_features",
+      "time": 0.06566867895890027,
+      "nodes": 360,
+      "nodes_per_second": 5482.065509880462,
+      "max_depth": 3,
+      "move": "a1a6"
+    },
+    {
+      "position": "fifty_move_clock",
+      "bot": "heuristic_h3",
+      "time": 0.009155848005320877,
+      "nodes": 123,
+      "nodes_per_second": 13434.036904994398,
+      "max_depth": 2,
+      "move": "d4e5"
+    },
+    {
+      "position": "fifty_move_clock",
+      "bot": "model_mlp_features",
+      "time": 0.009783521003555506,
+      "nodes": 123,
+      "nodes_per_second": 12572.160876978707,
+      "max_depth": 2,
+      "move": "d4e5"
+    }
+  ]
+}

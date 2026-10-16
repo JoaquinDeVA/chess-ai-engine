@@ -35,6 +35,27 @@ class GameState(ABC):
         """
         pass
 
+    def apply_move(self, move: Any) -> None:
+        """
+        Apply a move known to be legal to this state in place, so that it can be undone.
+
+        Unlike :meth:`make_move` it does not check legality. Used by the searches that walk the
+        tree on a single state; states that do not support it keep the default.
+
+        :param move: A legal move of this state (for example one of :meth:`get_legal_moves`)
+        :type move: Any
+        :raises NotImplementedError: If the state does not support undoing moves
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support apply_move")
+
+    def undo_move(self) -> None:
+        """
+        Revert the last move applied with :meth:`apply_move`, restoring the state exactly.
+
+        :raises NotImplementedError: If the state does not support undoing moves
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support undo_move")
+
     @abstractmethod
     def is_over(self) -> bool:
         """

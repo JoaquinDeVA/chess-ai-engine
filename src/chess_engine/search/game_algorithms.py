@@ -537,7 +537,11 @@ def advanced_heuristic_alphabeta_search(
         best_value = float("-inf")
         best_move = None
         for action in ordered_actions(node, depth_remaining):
-            child = min_value(game.result(node, action), alpha, beta, depth_remaining - 1)
+            node.apply_move(action)
+            try:
+                child = min_value(node, alpha, beta, depth_remaining - 1)
+            finally:
+                node.undo_move()
             if child.value > best_value:
                 best_value = child.value
                 best_move = action
@@ -562,7 +566,11 @@ def advanced_heuristic_alphabeta_search(
         best_value = float("inf")
         best_move = None
         for action in ordered_actions(node, depth_remaining):
-            child = max_value(game.result(node, action), alpha, beta, depth_remaining - 1)
+            node.apply_move(action)
+            try:
+                child = max_value(node, alpha, beta, depth_remaining - 1)
+            finally:
+                node.undo_move()
             if child.value < best_value:
                 best_value = child.value
                 best_move = action

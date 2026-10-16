@@ -2,6 +2,10 @@
 
 from collections import defaultdict
 
+import chess
+
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.chess_problem import ChessProblem
 from chess_engine.search.game_algorithms import (
     SearchStatistics,
     advanced_heuristic_alphabeta_search,
@@ -196,3 +200,62 @@ class TestIterativeDeepening:
             time_limit=0.2,
         )
         assert move == "a"
+
+
+def test_tree_state_is_restored_after_the_search_also_on_cutoffs():
+    tree = {"root": {"a": "x", "b": "y"}, "x": {"c": "p", "d": "q"}, "y": {"c": "p", "d": "q"}}
+    utilities = {"p": 1.0, "q": 0.0}
+    for cutoff in (never_cutoff, lambda state, depth, elapsed: depth == 1):
+        state = build_state(tree, utilities)
+        advanced_heuristic_alphabeta_search(TreeGame(), state, zero_eval, cutoff, max_depth=3)
+        assert (state.name, state.to_move, state._undo_stack) == ("root", 0, [])
+
+
+def test_state_is_restored_when_the_search_raises():
+    tree = {"root": {"a": "x"}, "x": {"c": "p"}}
+    state = build_state(tree, {"p": 1.0})
+
+    def failing_eval(node, player):
+        raise RuntimeError("boom")
+
+    try:
+        advanced_heuristic_alphabeta_search(
+            TreeGame(), state, failing_eval, never_cutoff, max_depth=1
+        )
+    except RuntimeError:
+        pass
+    assert (state.name, state.to_move) == ("root", 0)
+
+
+def test_chess_root_state_is_exactly_restored_by_iterative_deepening():
+    board = chess.Board("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+    for uci in ["a1b1", "a8b8", "b1a1", "b8a8"]:
+        board.push_uci(uci)
+    state = ChessGameState(board)
+    state.is_over()
+    before = (
+        state.board.fen(),
+        list(state.board.move_stack),
+        state._history,
+        state._has_repeated,
+        state._outcome,
+        state._outcome_known,
+    )
+
+    def material(node, player):
+        return 0.5 + 0.01 * len(node.board.piece_map()) * (1 if player else -1)
+
+    move, _ = heuristic_alphabeta_iterative_deepening_search(
+        ChessProblem(board), state, material, never_cutoff, max_depth=3, time_limit=60.0
+    )
+    assert move in board.legal_moves
+    after = (
+        state.board.fen(),
+        list(state.board.move_stack),
+        state._history,
+        state._has_repeated,
+        state._outcome,
+        state._outcome_known,
+    )
+    assert after == before
+    assert state._undo_stack == []

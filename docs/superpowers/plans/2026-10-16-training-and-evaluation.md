@@ -224,6 +224,42 @@
 - [ ] **Step 2-4:** Fail, implement, pass; ruff.
 - [ ] **Step 5:** Commit `feat: model cards and history table for the trade-off comparison`.
 
+## Track D — second phase: the best model against fewer-mates variants (after Tasks 4, 11 and the main tournament decision)
+
+User request: after the main tournament, the best new model plays a **variant of itself trained with only 5% / 10% of the mate rows** of the data. *Assumption (confirm or correct):* "5/10% of the mates" = keep 5% (resp. 10%) of the rows whose evaluation is a forced mate, so mates drop from ~17.7% of the data to ~0.9% / ~1.8%; the alternative reading (mates making up 5-10% of the training data) is a one-number change of `mate_keep` and is not built.
+
+### Task 13: Mate-undersampled variants (`mate_keep`) and tagged models
+
+**Files:**
+- Modify: `src/chess_engine/training/representation.py`, `src/chess_engine/training/sidecar.py`, `src/chess_engine/training/train.py`, `src/chess_engine/models/registry.py`, `src/chess_engine/models/linear_eval.py`, `src/chess_engine/training/cards.py`, `src/chess_engine/training/tradeoff.py`, `src/chess_engine/training/tournament.py`, `scripts/run_tournament.py`
+- Test: `tests/test_representation.py`, `tests/test_sidecar.py`, `tests/test_training.py`, `tests/test_tournament.py`, `tests/test_models.py`
+
+**Interfaces:**
+- Consumes: Tasks 1, 2, 4, 10, 11.
+- Produces:
+  - `Representation.mate_keep: float = 1.0` (validated in `(0, 1]`; part of `name`, e.g. `...-mates5`, `to_dict`/`from_dict`).
+  - `def keep_mate_rows(fens: pd.Series, mate_keep: float, seed: int = 42) -> np.ndarray` (bool mask: non-mate rows must be passed through by the caller; selection is a CRC32 hash of the FEN against `mate_keep`, so the 5% set is a subset of the 10% set).
+  - `load_sample(..., mate_keep: float = 1.0)` and `iter_batches(..., mate_keep: float = 1.0)`: rows with `mate` set are kept only where `keep_mate_rows` is true; `n` counts rows after the filter. Default 1.0 = unchanged behaviour.
+  - `train.py`: `--mate-keep FLOAT` (default 1.0; applied to the TRAIN stream and to the validation set used for early stopping, **never** to judge / profile / tournament samples, which always see all rows) and `--tag TAG`. With a tag, the artifact is `<name>@<tag><suffix>` and the card `<name>@<tag>.json`.
+  - Model spec syntax `name@tag` everywhere a model is named by a string (`registry.split_spec(spec) -> (name, tag | None)`, `load_model("pst_tapered@mates5")`, `make_player`, tournament `check_specs`); a tagged model loads its tagged artifact and reports itself with the full spec string as its bot name.
+  - `scripts/run_tournament.py --anchor SPEC` (default `h3`): the Elo anchor and the player required in `--players`; `parse_args` no longer requires `h3` when another anchor is given.
+
+- [ ] **Step 1: Write failing tests**: `test_mate_keep_is_nested` (5% set subset of 10% set subset of all; share kept within ±1% of the target on 200,000 synthetic FENs), `test_load_sample_mate_keep_filters_only_mates` (non-mate rows untouched, mate share drops), `test_iter_batches_mate_keep`, `test_train_cli_mate_keep_and_tag_write_tagged_artifact_and_card` (fixture shards with mates, `--tag mates5 --mate-keep 0.05`, artifact `pst_tapered@mates5.npz`, card records `mate_keep`), `test_judge_sample_ignores_mate_keep` (the evaluation path takes no `mate_keep`), `test_tagged_spec_round_trip` (`split_spec`, `load_model("pst_tapered@x")` loads the tagged file and not the untagged one), `test_tournament_accepts_tagged_players_and_custom_anchor`.
+- [ ] **Step 2:** Run them — FAIL.
+- [ ] **Step 3:** Implement as specified above; one line per touched module in the commit message body.
+- [ ] **Step 4:** Run the new tests, the full suite, ruff — PASS.
+- [ ] **Step 5:** Commit `feat: mate-undersampled model variants and tagged model specs`.
+
+### Task 14: Execution runbook for a light executor
+
+**Files:** Create `docs/training/RUNBOOK.md`.
+
+**Interfaces:** Consumes the final CLIs of Tasks 4, 6, 10, 11, 12, 13 (read their `--help`, do not guess flags). Produces a runbook that a Haiku-level executor can follow with direct command execution and log reading only.
+
+- [ ] **Step 1:** After Tasks 4, 6, 12 and 13 are merged, write the runbook: for every run (R1-R7 and the Track D phase) a **LAUNCH** step (exact command, detached with `nohup setsid`, log path, the healthy-start check and what an unhealthy start looks like) and a **COLLECT** step (which JSON / log lines to read, the exact numbers to copy, how to interpret them with fixed rules such as "an Elo difference is significant only if the 95% interval excludes 0", and the exact section of which `.md` file to fill: `DATA.md`, `BAKEOFF.md`, `MODELS_HISTORY.md`, `TRADEOFF.md`, `TOURNAMENT.md`, `RESULTS.md`). Decision points (bake-off choice, which model is "best", deleting dominated models) are marked **STOP: report to the supervisor**; the executor never decides them.
+- [ ] **Step 2:** Dry-run every command of the runbook on small fixture data (`--help` for each and one tiny real call where cheap) and fix what does not run.
+- [ ] **Step 3:** Commit `docs: execution runbook for training and tournaments`.
+
 ## Runs (coordinator; on real data, after the full download and Tracks A-C)
 
 - [ ] **R1:** `scripts/prepare_dataset.py` on the full raw data; record counts (split sizes, quiet share) in `docs/training/DATA.md`.
@@ -232,4 +268,5 @@
 - [ ] **R4:** `evaluate` all models (including the four existing ones as accuracy records; for the CNNs lower `agreement_n` if the run is too slow and note it in the card).
 - [ ] **R5:** `profile_tradeoff.py` for all models at 1, 3, 10 s.
 - [ ] **R6:** Overnight `run_tournament.py` (~10 h) with `pst_tapered, pst_terms, h2, h3` at 60 s + 1 s (the default `TimeManager` has a 1.5 s minimum per move, which would turn a 10 s clock into scrambles and make depth-at-equal-time meaningless). `material_linear` is trained and measured in accuracy / depth profiles but does not play the tournament.
+- [ ] **R8 (Track D, after R6/R7):** train the best new model as `<best>@mates5` and `<best>@mates10` with `--mate-keep 0.05` / `0.10` and the same effort; judge and profile them with the full model; run `run_tournament.py --players <best>,<best>@mates5,<best>@mates10 --anchor <best>` (~3-4 h, same time control) and document the head-to-head in `TOURNAMENT.md` and the accuracy / depth effect in `RESULTS.md`.
 - [ ] **R7:** Apply the decision rule (strength at equal time decides; existing models are kept as records); remove dominated new models; regenerate `MODELS_HISTORY.md`; commit.

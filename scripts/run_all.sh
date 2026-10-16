@@ -12,11 +12,11 @@ DATA="${DATA:-data/evaluations.csv}"
 PYTHON="${PYTHON:-python}"
 
 # Models trained from scratch by this repository, cheapest first.
-TRAIN=(linear_baseline ridge_features mlp_features)
+TRAIN=(ridge_features mlp_features)
 if [ "${TRAIN_CNN:-0}" = "1" ]; then TRAIN+=(cnn_resnet); fi
 
 # Every model that has a saved file gets benchmarked (cnn_light is a frozen course artifact).
-EVALUATE=(linear_baseline ridge_features mlp_features cnn_light cnn_resnet)
+EVALUATE=(ridge_features mlp_features cnn_light cnn_resnet)
 
 for model in "${TRAIN[@]}"; do
   echo "=== train ${model}"

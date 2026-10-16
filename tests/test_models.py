@@ -2,6 +2,7 @@
 
 import chess
 import numpy as np
+import pandas as pd
 import pytest
 
 from chess_engine.models import (
@@ -142,23 +143,23 @@ class TestRegistry:
             "ridge_features",
             "mlp_features",
             "cnn_resnet",
-            "linear_baseline",
+            "material_linear",
         } <= set(available_models())
 
     def test_unknown_model_lists_the_valid_names(self):
-        with pytest.raises(KeyError, match="available:.*linear_baseline"):
+        with pytest.raises(KeyError, match="available:.*material_linear"):
             get_model_class("nope")
 
     def test_registering_a_name_twice_is_an_error(self):
         with pytest.raises(ValueError, match="already registered"):
 
-            @register_model("linear_baseline")
+            @register_model("material_linear")
             class Impostor(EvaluationModel):  # pragma: no cover - never instantiated
                 pass
 
     def test_missing_artifact_raises_file_not_found(self, tmp_path):
         with pytest.raises(FileNotFoundError):
-            load_model("linear_baseline", tmp_path / "missing.pkl")
+            load_model("material_linear", tmp_path / "missing.npz")
 
     def test_frozen_models_cannot_be_retrained(self):
         assert not get_model_class("cnn_light").trainable
@@ -199,28 +200,32 @@ class TestShippedModels:
         np.testing.assert_allclose(batch, single, atol=1e-2)
 
 
-class TestLinearBaseline:
+class TestMaterialLinear:
     def test_fit_save_load_roundtrip_learns_material(self, tmp_path, sample_boards):
-        from tests.conftest import random_positions
-
         boards = random_positions(400, seed=5)
-        model = get_model_class("linear_baseline").new()
-        inputs = model.extractor.encode_batch(boards)
-        targets = np.clip(np.array([material_cp(b) for b in boards]) / CP_SCALE, -1, 1)
-        summary = model.fit(inputs, targets)
-        assert summary["train_samples"] == 400
+        train = pd.DataFrame(
+            {
+                "fen": [b.fen() for b in boards],
+                "cp": [material_cp(b) for b in boards],
+                "mate": np.nan,
+                "white_to_move": [b.turn == chess.WHITE for b in boards],
+            }
+        )
+        model = get_model_class("material_linear")()
+        summary = model.fit_stream(
+            [train], train.head(100), {"l2": 0.0, "lr": 0.05, "max_epochs": 40, "patience": 40}
+        )
+        assert summary["train_rows"] == 400
 
-        path = model.save(tmp_path / "baseline.pkl")
-        loaded = get_model_class("linear_baseline").load(path)
+        path = model.save(tmp_path / "material.npz")
+        loaded = get_model_class("material_linear").load(path)
         predictions = loaded.predict_cp_batch(sample_boards)
         truth = np.clip([material_cp(b) for b in sample_boards], -CP_SCALE, CP_SCALE)
         assert np.corrcoef(predictions, truth)[0, 1] > 0.9
-        assert loaded.count_parameters() == 7  # 6 coefficients + intercept
+        assert loaded.count_parameters() == 6  # 5 coefficients + intercept
 
     def test_predictions_are_clipped_to_the_cp_scale(self):
-        model = get_model_class("linear_baseline").new()
-        boards = [chess.Board(WHITE_UP_A_QUEEN), chess.Board(BLACK_UP_A_QUEEN)]
-        model.fit(model.extractor.encode_batch(boards), np.array([1.0, -1.0]))
+        model = get_model_class("material_linear")(weights=np.full(5, 10.0))
         extreme = chess.Board("4k3/8/8/8/8/8/PPPPPPPP/QQQQKQQQ w - - 0 1")
         assert abs(model.predict_cp(extreme)) <= CP_SCALE
 

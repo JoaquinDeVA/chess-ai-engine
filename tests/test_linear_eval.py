@@ -9,8 +9,8 @@ import pandas as pd
 import pytest
 
 from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.linear_features import PstFeatures, phase
-from chess_engine.models.registry import get_model_class
+from chess_engine.models.linear_features import MaterialCountFeatures, PstFeatures, phase
+from chess_engine.models.registry import available_models, get_model_class
 from chess_engine.training.representation import Representation
 from tests.conftest import material_cp, random_positions
 
@@ -156,3 +156,35 @@ def test_load_rejects_weights_of_the_wrong_size(tmp_path):
         )
     with pytest.raises(ValueError, match="expected 768 weights.*found 10"):
         get_model_class("pst_tapered").load(path)
+
+
+MATERIAL_BOARD = "4k3/8/8/8/8/8/PPB5/R3K3 w - - 0 1"  # white: 2 pawns, 1 bishop, 1 rook
+
+
+def test_material_features_count_differences():
+    board = chess.Board(MATERIAL_BOARD)
+    # Order: P, N, B, R, Q. Under "white" a turn entry (index 5) follows: +1, White to move.
+    indices, values = MaterialCountFeatures().active(board, "white")
+    assert indices == [0, 1, 2, 3, 4, 5]
+    assert values == [2.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+    # Under "side_to_move" the counts are seen from the mover; no turn entry is needed.
+    indices, values = MaterialCountFeatures().active(board, "side_to_move")
+    assert indices == [0, 1, 2, 3, 4]
+    assert values == [2.0, 0.0, 1.0, 1.0, 0.0]
+    black_to_move = chess.Board(MATERIAL_BOARD)
+    black_to_move.turn = chess.BLACK
+    indices, values = MaterialCountFeatures().active(black_to_move, "side_to_move")
+    assert values == [-2.0, 0.0, -1.0, -1.0, 0.0]
+
+
+def test_material_model_mirror_complement():
+    model = get_model_class("material_linear")(weights=np.array([0.3, 0.1, 0.2, 0.5, 0.9]))
+    model.bias = 0.05
+    for board in random_positions(20, seed=11):
+        assert model.expected_score(board) == pytest.approx(
+            1.0 - model.expected_score(board.mirror())
+        )
+
+
+def test_linear_baseline_is_gone():
+    assert "linear_baseline" not in available_models()

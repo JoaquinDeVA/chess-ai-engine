@@ -115,3 +115,48 @@ class PstFeatures(LinearFeatures):
             indices.append(self._TURN_INDEX)
             values.append(1.0 if mover == chess.WHITE else -1.0)
         return indices, values
+
+
+class MaterialCountFeatures(LinearFeatures):
+    """Piece-count differences: one weight per piece type (P, N, B, R, Q), no phase split.
+
+    Under ``"side_to_move"`` each piece type contributes its count of the player to move minus
+    the opponent's count. Under ``"white"`` the count is White's minus Black's, and one extra
+    entry ``+1`` (White to move) or ``-1`` (Black to move) is added at index 5.
+
+    :cvar name: ``"material5"``.
+    """
+
+    name = "material5"
+    _TURN_INDEX = 5
+
+    def size(self, perspective: str) -> int:
+        """Five counts, plus one turn weight under ``"white"``.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``5`` or ``6``.
+        """
+        return 5 + (1 if perspective == "white" else 0)
+
+    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
+        """One entry per piece type with its signed count, plus the turn feature.
+
+        :param board: The position.
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: Two parallel lists of length ``5`` (or ``6`` under ``"white"``).
+        """
+        mover = board.turn
+        counts = [0.0] * 5
+        for piece in board.piece_map().values():
+            if piece.piece_type == chess.KING:
+                continue
+            if perspective == "white":
+                sign = 1.0 if piece.color == chess.WHITE else -1.0
+            else:
+                sign = 1.0 if piece.color == mover else -1.0
+            counts[piece.piece_type - 1] += sign
+        indices = list(range(5))
+        if perspective == "white":
+            indices.append(self._TURN_INDEX)
+            counts.append(1.0 if mover == chess.WHITE else -1.0)
+        return indices, counts

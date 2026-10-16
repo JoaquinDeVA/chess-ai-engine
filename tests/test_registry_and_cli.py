@@ -102,9 +102,9 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
 
     from main import bot_options
 
-    args = argparse.Namespace(model="linear_baseline", depth=3)
+    args = argparse.Namespace(model="material_linear", depth=3)
     assert bot_options(registry, "IterativeModelBookBot", args) == {
-        "model": "linear_baseline",
+        "model": "material_linear",
         "max_depth": 3,
     }
     assert bot_options(registry, "IterativeHeuristicBot", args) == {"max_depth": 3}

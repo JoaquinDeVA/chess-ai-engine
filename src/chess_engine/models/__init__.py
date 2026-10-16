@@ -16,7 +16,6 @@ are only imported when a model is actually loaded or trained.
 # Importing the modules below registers the built-in models.
 from . import (
     architectures,  # noqa: F401,E402
-    linear_baseline,  # noqa: F401,E402
     linear_eval,  # noqa: F401,E402
 )
 from .base import CP_SCALE, EvaluationModel, cp_to_expected_score  # noqa: F401

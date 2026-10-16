@@ -11,7 +11,7 @@ Checklist to (re)train and benchmark the models and refresh `MODELS_HISTORY.md`.
   - `ln -s /path/to/evaluations.csv data/evaluations.csv`
   - `python scripts/download_lichess_evals.py --rows 1000000` (public Lichess database, CC0)
 - [ ] `bash scripts/run_all.sh` (about 1–2 h on CPU)
-  - trains `linear_baseline`, `ridge_features`, `mlp_features` (minutes)
+  - trains `ridge_features`, `mlp_features` (minutes)
   - benchmarks all five models: error and agreement with Stockfish, time per evaluation
   - regenerates the table in `MODELS_HISTORY.md` and the plots in `docs/img/`
 - [ ] Look at `MODELS_HISTORY.md` and `docs/img/*.png`, then `git add src/chess_engine/models docs && git commit`.

@@ -26,7 +26,7 @@ import pandas as pd
 from chess_engine.training.representation import Representation, score_to_cp, target
 
 from .base import CP_SCALE, EvaluationModel
-from .linear_features import LinearFeatures, PstFeatures
+from .linear_features import LinearFeatures, MaterialCountFeatures, PstFeatures
 from .registry import register_model
 
 #: Hyper-parameters used when the training configuration leaves a key out.
@@ -465,3 +465,11 @@ class PstTaperedModel(LinearEvalModel):
 
     features = PstFeatures()
     architecture = "Tapered piece-square tables (768 weights), logistic"
+
+
+@register_model("material_linear")
+class MaterialLinearModel(LinearEvalModel):
+    """Logistic regression on five piece-count differences (and the turn under ``"white"``)."""
+
+    features = MaterialCountFeatures()
+    architecture = "Logistic regression on 5 material counts (own minus opponent)"

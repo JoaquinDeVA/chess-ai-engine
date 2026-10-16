@@ -12,6 +12,7 @@ from chess_engine.evaluation.heuristics import h1, h2, h3, h4
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models.base import ARTIFACTS_DIR
 from chess_engine.models.evaluator import ModelEvaluator
+from chess_engine.models.registry import get_model_class
 from tests.conftest import MATE_IN_ONE
 
 MATE_MOVE = chess.Move.from_uci("a1a8")
@@ -165,9 +166,12 @@ class TestMLBots:
         bot.on_game_start(chess.WHITE, "opponent")
         assert bot.get_move(chess.Board(), 10.0) == chess.Move.from_uci("e2e4")
 
-    def test_models_can_be_selected_by_name(self):
-        bot = IterativeModelBookBot(model="linear_baseline", max_depth=1)
-        assert bot.get_info()["model"] == "linear_baseline"
+    def test_models_can_be_selected_by_name(self, tmp_path, monkeypatch):
+        model_class = get_model_class("material_linear")
+        saved = model_class().save(tmp_path / "material_linear.npz")
+        monkeypatch.setattr(model_class, "default_path", classmethod(lambda cls: saved))
+        bot = IterativeModelBookBot(model="material_linear", max_depth=1)
+        assert bot.get_info()["model"] == "material_linear"
 
     @pytest.mark.skipif(
         not (ARTIFACTS_DIR / "mlp_features.keras").exists(), reason="mlp_features not trained"

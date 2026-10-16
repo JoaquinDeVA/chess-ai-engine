@@ -30,7 +30,7 @@ flowchart LR
 
 `models/sklearn_model.py` and `models/keras_model.py` already implement the plumbing for scikit-learn
 estimators and Keras networks; a new model is usually a small subclass that chooses the extractor
-and builds the estimator or network. `models/linear_baseline.py` is the smallest complete example.
+and builds the estimator or network. `MaterialLinearModel` in `models/linear_eval.py` is the smallest complete example.
 
 ## Workflow
 

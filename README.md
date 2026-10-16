@@ -126,7 +126,7 @@ Details, flowcharts and the conventions used by the cut-off test are in
 
 Models estimate the evaluation of a position (centipawns, White's point of view) the way Stockfish
 would. Four are included (`ridge_features`, `mlp_features`, `cnn_light`, `cnn_resnet`), plus a minimal
-`linear_baseline` that demonstrates how to add one. Their comparison is generated in
+`material_linear` that demonstrates how to add one. Their comparison is generated in
 [MODELS_HISTORY.md](docs/training/MODELS_HISTORY.md). This part of the project is still being designed: the interface
 is stable, the internals are not ([docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md)).
 

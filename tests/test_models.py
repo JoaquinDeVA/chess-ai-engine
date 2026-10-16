@@ -12,9 +12,11 @@ from chess_engine.models import (
     load_model,
 )
 from chess_engine.models.base import ARTIFACTS_DIR, EvaluationModel
+from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.features import BitboardFeatures, MaterialFeatures, VectorFeatures
 from chess_engine.models.registry import register_model
-from tests.conftest import material_cp
+from chess_engine.search.chess_game_state import ChessGameState
+from tests.conftest import material_cp, random_positions
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
@@ -232,3 +234,13 @@ def test_trained_mlp_agrees_with_material_on_clear_cases():
     assert model.predict_cp(chess.Board(WHITE_UP_A_QUEEN)) > model.predict_cp(
         chess.Board(BLACK_UP_A_QUEEN)
     )
+
+
+def test_evaluator_unchanged_for_existing_models(stub_model):
+    evaluator = ModelEvaluator(stub_model)
+    for board in random_positions(30, seed=21):
+        cp = stub_model.predict_cp(board)
+        for player in (chess.WHITE, chess.BLACK):
+            expected = cp_to_expected_score(cp if player == chess.WHITE else -cp)
+            value = evaluator(ChessGameState(board), player)
+            assert value == pytest.approx(expected, abs=1e-12)

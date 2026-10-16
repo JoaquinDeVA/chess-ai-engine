@@ -4,7 +4,7 @@ import chess
 
 from chess_engine.search.chess_game_state import ChessGameState
 
-from .base import EvaluationModel, cp_to_expected_score
+from .base import EXPECTED_SCORE_MARGIN, EvaluationModel
 
 
 class ModelEvaluator:
@@ -23,5 +23,7 @@ class ModelEvaluator:
         :param player: Player whose expected score is returned.
         :return: Value in ``[0.01, 0.99]``: 0.5 is equal, higher is better for ``player``.
         """
-        cp = self.model.predict_cp(state.get_board())
-        return cp_to_expected_score(cp if player == chess.WHITE else -cp)
+        score = self.model.expected_score(state.get_board())
+        if player != chess.WHITE:
+            score = 1.0 - score
+        return min(1.0 - EXPECTED_SCORE_MARGIN, max(EXPECTED_SCORE_MARGIN, score))

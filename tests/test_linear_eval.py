@@ -1,0 +1,100 @@
+"""Tests of the linear evaluation core and of the tapered piece-square-table model."""
+
+import chess
+import numpy as np
+import pandas as pd
+import pytest
+
+from chess_engine.models.linear_eval import LinearEvalModel
+from chess_engine.models.linear_features import PstFeatures, phase
+from chess_engine.models.registry import get_model_class
+from chess_engine.training.representation import Representation
+from tests.conftest import material_cp, random_positions
+
+WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
+
+
+def frame(boards: list[chess.Board]) -> pd.DataFrame:
+    """Raw-shard-like rows whose White-POV centipawns are the material balance."""
+    return pd.DataFrame(
+        {
+            "fen": [board.fen() for board in boards],
+            "cp": [material_cp(board) for board in boards],
+            "mate": np.full(len(boards), np.nan),
+            "best_move": [None] * len(boards),
+            "quiet": [True] * len(boards),
+            "white_to_move": [board.turn == chess.WHITE for board in boards],
+        }
+    )
+
+
+def random_model(seed: int = 0, rep: Representation | None = None) -> LinearEvalModel:
+    """Pst model with random weights, so that scores are not trivially 0.5."""
+    model = get_model_class("pst_tapered")(rep=rep)
+    rng = np.random.default_rng(seed)
+    model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
+    model.bias = 0.1
+    return model
+
+
+def test_phase_is_one_at_start_and_zero_with_bare_kings():
+    assert phase(chess.Board()) == pytest.approx(1.0)
+    assert phase(chess.Board("8/8/8/4k3/8/8/8/4K3 w - - 0 1")) == pytest.approx(0.0)
+
+
+def test_pst_features_are_antisymmetric():
+    for board in random_positions(20, seed=7):
+        indices, values = PstFeatures().active(board, "side_to_move")
+        m_indices, m_values = PstFeatures().active(board.mirror(), "side_to_move")
+        assert sorted(zip(indices, values, strict=True)) == sorted(
+            zip(m_indices, m_values, strict=True)
+        )
+
+
+def test_mirrored_position_gets_complementary_white_score():
+    model = random_model(seed=3)
+    for board in random_positions(20, seed=11):
+        assert model.expected_score(board) == pytest.approx(
+            1.0 - model.expected_score(board.mirror())
+        )
+
+
+def test_fit_learns_material():
+    model = get_model_class("pst_tapered")()
+    boards = random_positions(3000, seed=5)
+    batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
+    config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
+    summary = model.fit_stream(batches, frame(random_positions(300, seed=9)), config)
+
+    assert summary["epochs"] >= 1
+    assert model.expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.9
+    assert model.expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.1
+
+
+def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
+    rep = Representation(scale="cp_linear", perspective="white", filter="quiet")
+    model = random_model(seed=4, rep=rep)
+    path = model.save(tmp_path / "model.npz")
+
+    loaded = get_model_class("pst_tapered").load(path)
+
+    assert loaded.rep == rep
+    assert loaded.count_parameters() == model.count_parameters() == 769 + 1
+    for board in random_positions(10, seed=2):
+        assert loaded.expected_score(board) == pytest.approx(model.expected_score(board))
+        assert loaded.predict_cp(board) == pytest.approx(model.predict_cp(board))
+
+
+def test_logit_matches_dense_computation():
+    model = random_model(seed=6)
+    for board in random_positions(10, seed=8):
+        indices, values = model.features.active(board, model.rep.perspective)
+        dense = np.zeros(model.weights.shape)
+        for index, value in zip(indices, values, strict=True):
+            dense[index] += value
+        assert model.logit(board) == pytest.approx(float(model.weights @ dense + model.bias))
+
+
+def test_count_parameters_matches_size_plus_bias():
+    assert get_model_class("pst_tapered")().count_parameters() == 768 + 1

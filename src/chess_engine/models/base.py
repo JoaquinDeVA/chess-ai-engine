@@ -122,6 +122,15 @@ class EvaluationModel(ABC):
         target = float(self.predict_target(batch)[0])
         return float(np.clip(target, -1.0, 1.0) * CP_SCALE)
 
+    def expected_score(self, board: chess.Board) -> float:
+        """Expected score of White in ``[0, 1]``.
+
+        :param board: Position to evaluate.
+        :return: Expected score for White in ``[0, 1]``; by default the centipawns of
+            :meth:`predict_cp` mapped by :func:`cp_to_expected_score`.
+        """
+        return cp_to_expected_score(self.predict_cp(board))
+
     def predict_cp_batch(self, boards: Iterable[chess.Board]) -> np.ndarray:
         """Evaluate many positions at once.
 

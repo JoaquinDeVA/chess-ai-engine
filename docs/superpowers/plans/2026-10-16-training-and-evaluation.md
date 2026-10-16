@@ -1,0 +1,235 @@
+# Training and Evaluation Redesign Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Fast linear evaluation models (material, piece-square tables, tables + classical terms) trained on the Lichess evaluations with an effort level, a bake-off that picks the data representation, and a comparison centred on the depth-accuracy trade-off decided by a large round-robin.
+
+**Architecture:** Raw Parquet shards (already fetched) get an aligned sidecar with the split and a quiet flag; targets are derived on the fly from `cp`/`mate` by a `Representation`, so there is one stored dataset. A shared linear-model core (sparse features -> logit -> sigmoid, numpy Adam trainer, pure-Python fast evaluation) backs the three new models. Comparison tools measure accuracy (static and of the search), depth at fixed time per move, and play a parallel round-robin.
+
+**Tech Stack:** Python 3.12, python-chess, numpy, pyarrow, pytest, ruff. No new dependencies.
+
+**Spec:** `docs/superpowers/specs/2026-10-16-training-and-evaluation-design.md`
+
+## Global Constraints
+
+- Code, comments, docstrings in English; reST docstrings (`:param x:` / `:return:`); line length 100; `ruff check .` and `ruff format --check .` clean; run tools from `.venv/bin/`; `export TF_CPP_MIN_LOG_LEVEL=3`.
+- Package code under `src/chess_engine/`; tests are plain pytest functions in `tests/`.
+- The search consumes an expected score in `[0.01, 0.99]` for a given player; terminal values are 0 / 0.5 / 1.
+- Every model converts from its own training target inside the model, with the constants saved in its artifact; training and playing cannot disagree.
+- Existing models (`ridge_features`, `mlp_features`, `cnn_light`, `cnn_resnet`) are not retrained, do not play matches and are never deleted; they only get accuracy and cost metrics.
+- One stored dataset: raw shards plus an aligned sidecar. No per-variant copies.
+- Do not change the search algorithm (only add statistics).
+- Data budget ~10 GB for Lichess data; machine 6 cores, no GPU, ~6 GB RAM free in practice: stream, never load the whole dataset.
+- The full download (`data/lichess/raw/`, ~410M rows) is in progress; tasks must work on small fixtures, and runs on real data happen in the Runs section.
+- Do not commit generated data under `data/`.
+
+## Review Focus
+
+1. Black to move with `perspective="side_to_move"`: the target, the features and the model output must all flip consistently; a mirrored position must get the complementary score (tested in Tasks 1 and 3).
+2. Mate rows (`cp` null): targets must be exactly 1/0 by mover, never NaN, and `cp_linear` must not divide by a null (Task 1).
+3. Positions with no legal moves or a terminal state inside the 1-ply judge: checkmate counts as a win for the mover, stalemate as 0.5 (Task 5).
+4. Raw shards whose row count differs from their sidecar (interrupted prepare run): the sampler must refuse, not silently misalign (Task 2).
+5. A parallel tournament where one game crashes: the run must record the game as failed and continue, not lose the other results (Task 11).
+
+---
+
+## Track A — foundations and the representation bake-off (sequential)
+
+### Task 1: Representation and targets
+
+**Files:**
+- Create: `src/chess_engine/training/representation.py`
+- Test: `tests/test_representation.py`
+
+**Interfaces:**
+- Produces:
+  - `LICHESS_K = 0.00368208`, `CP_LINEAR_SCALE = 1267.0`
+  - `@dataclass(frozen=True) class Representation: scale: str = "winprob"; k: float = LICHESS_K; perspective: str = "side_to_move"; filter: str = "all"` with `scale in {"winprob", "cp_linear"}`, `perspective in {"white", "side_to_move"}`, `filter in {"all", "quiet"}`; `name` property (e.g. `"winprob-k0.00368-stm-all"`); `to_dict()` / `from_dict(d)`.
+  - `def white_score(cp: np.ndarray, mate: np.ndarray, rep: Representation) -> np.ndarray` — expected score for White in `[0, 1]` from White-POV `cp`/`mate` (nullable as NaN): mates -> 1.0 if `mate > 0` else 0.0; `winprob`: `1 / (1 + exp(-k * cp))`; `cp_linear`: `0.5 + 0.5 * clip(cp / 1267, -1, 1)`.
+  - `def target(cp, mate, white_to_move: np.ndarray, rep) -> np.ndarray` — `white_score`, flipped to `1 - s` where Black moves if `rep.perspective == "side_to_move"`.
+  - `def score_to_cp(score: float | np.ndarray, rep) -> ...` — inverse of `white_score` for non-mate scores (clip score to `[1e-6, 1-1e-6]`), used for `predict_cp`.
+  - `def is_quiet(board: chess.Board, best_move: str | None) -> bool` — not in check and best move (if any) is neither a capture (incl. en passant) nor a promotion.
+
+- [ ] **Step 1: Write failing tests**: `test_winprob_zero_cp_is_half` (`white_score([0], [nan])==0.5`), `test_winprob_matches_lichess_curve` (cp=300 -> `1/(1+exp(-0.00368208*300))`), `test_cp_linear_clips_at_1267` (cp=5000 -> 1.0, cp=-1267 -> 0.0), `test_mates_are_one_or_zero_without_nan` (mate=+3 -> 1.0, mate=-1 -> 0.0, both scales), `test_side_to_move_flips_for_black` (same cp, white_to_move False -> `1 - s`), `test_white_perspective_never_flips`, `test_score_to_cp_inverts_white_score` (round trip for cp in [-800, 800], both scales), `test_is_quiet` (check -> False; capture `e4d5` -> False; promotion -> False; quiet move -> True; `None` best move in quiet position -> True), `test_representation_round_trips_through_dict`.
+- [ ] **Step 2:** Run `.venv/bin/python -m pytest tests/test_representation.py -q` — FAIL (module missing).
+- [ ] **Step 3:** Implement the module (vectorized numpy; `np.where` on `isnan(mate)`).
+- [ ] **Step 4:** Run the tests — PASS; ruff clean.
+- [ ] **Step 5:** Commit `feat: data representation and training targets`.
+
+### Task 2: Sidecar (split + quiet flag) and sampler
+
+**Files:**
+- Create: `src/chess_engine/training/sidecar.py`, `scripts/prepare_dataset.py`
+- Test: `tests/test_sidecar.py`
+
+**Interfaces:**
+- Consumes: raw shards `data/lichess/raw/part-NNNNN.parquet` (schema `RAW_SCHEMA` in `training/lichess_raw.py`: `fen, cp, mate, depth, knodes, best_move, n_evals, n_pvs`), `assign_split` and `TRAIN/VALIDATION/TEST` from `training/dataset.py`, `is_quiet` (Task 1).
+- Produces:
+  - `def build_sidecar(shard: Path, out_dir: Path) -> Path` — writes `out_dir/<shard stem>.sidecar.parquet` with columns `split: int8`, `quiet: bool`, `white_to_move: bool`, same row order and count as the shard; metadata `{"rows": n, "source": shard.name}`.
+  - `scripts/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 5`: builds missing sidecars in parallel (one shard per worker), skips existing ones, prints progress.
+  - `def load_sample(raw_dir: Path, sidecar_dir: Path, split: int, n: int, seed: int = 42, quiet_only: bool = False) -> pd.DataFrame` — columns `fen, cp, mate, best_move, quiet, white_to_move`; uniform over all shards (sample row indices per shard proportionally to its size, read only the needed row groups); deterministic for a seed; raises `ValueError` if a shard and its sidecar disagree on row count or a sidecar is missing.
+  - `def iter_batches(raw_dir, sidecar_dir, split, batch_size, n: int | None, seed, quiet_only=False) -> Iterator[pd.DataFrame]` — streaming version for training (shuffled shard order, shuffled within row groups), stops after `n` rows if given.
+
+- [ ] **Step 1: Write failing tests** with a tmp dir holding two tiny raw shards written via `training.lichess_raw.write_shard`: `test_sidecar_aligns_with_shard` (row count, `split` equals `assign_split` of the FENs, `quiet`/`white_to_move` correct on hand-picked FENs), `test_load_sample_is_deterministic_and_respects_split`, `test_load_sample_quiet_only`, `test_misaligned_sidecar_raises` (truncate a sidecar -> `ValueError`), `test_iter_batches_yields_n_rows_in_total`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement (pyarrow; `chess.Board(fen)` per row for `quiet`; parallel script via `concurrent.futures.ProcessPoolExecutor`).
+- [ ] **Step 4:** Run — PASS; ruff clean.
+- [ ] **Step 5:** Commit `feat: dataset sidecar with split and quiet flag, sampler`.
+
+### Task 3: Linear model core, PST features, scale contract
+
+**Files:**
+- Create: `src/chess_engine/models/linear_eval.py`, `src/chess_engine/models/linear_features.py`
+- Modify: `src/chess_engine/models/base.py` (add `expected_score`), `src/chess_engine/models/evaluator.py`, `src/chess_engine/models/__init__.py` (import `linear_eval` to register)
+- Test: `tests/test_linear_eval.py`, extend `tests/test_models.py` for the evaluator change
+
+**Interfaces:**
+- Consumes: `Representation`, `target`, `score_to_cp` (Task 1); `iter_batches` (Task 2).
+- Produces:
+  - `EvaluationModel.expected_score(self, board: chess.Board) -> float` — expected score for **White** in `[0, 1]`; default implementation `cp_to_expected_score(self.predict_cp(board))` (unchanged behaviour of the existing models).
+  - `ModelEvaluator.__call__` uses `model.expected_score(board)` and flips for Black, then clamps to `[0.01, 0.99]` (same results as today for existing models — test with the stub model).
+  - In `linear_features.py`: `phase(board) -> float` in `[0, 1]` (1 = opening: `min(24, minors + 2*rooks + 4*queens) / 24`); `class LinearFeatures` (abstract): `name`, `size: int`, `def active(self, board: chess.Board, perspective: str) -> tuple[list[int], list[float]]` (sparse indices and values, already multiplied by phase for the middlegame block and by `1 - phase` for the endgame block); `class PstFeatures(LinearFeatures)`: per piece, index `block + piece_type_index * 64 + oriented_square`, value `+1` for the "own" side and `-1` for the other side with the square mirrored by rank, where "own" is the side to move (`perspective="side_to_move"`) or White (`"white"`, plus one turn feature `+1/-1`); blocks: middlegame `[0, 384)`, endgame `[384, 768)`; `size = 768` (+1 for the white perspective turn feature).
+  - In `linear_eval.py`: `class LinearEvalModel(EvaluationModel)` with class attributes `features: LinearFeatures`, `artifact_suffix = ".npz"`; instance fields `weights: np.ndarray (size,)`, `bias: float`, `rep: Representation`; `logit(board) -> float` (pure Python sum over `active` with weights held as a Python list); `expected_score(board)` -> sigmoid, converted to White POV; `predict_cp(board)` via `score_to_cp`; `predict_cp_batch(boards)`; `save/load` (npz with `weights`, `bias`, and `rep`/`features.name` as JSON); `count_parameters() == size + 1`; `fit_stream(batches: Iterable[pd.DataFrame], validation: pd.DataFrame, config: dict) -> dict` (Adam on binary cross-entropy with soft targets from `target(...)`, L2 `config["l2"]`, `lr`, `batch_size`, `max_epochs`, `patience` on validation loss; returns summary with epochs, losses, seconds). The base-class `fit`/`predict_target` raise `NotImplementedError` with a pointer to `fit_stream`.
+  - Registered model `@register_model("pst_tapered") class PstTaperedModel(LinearEvalModel)` with `features = PstFeatures()`, `architecture = "Tapered piece-square tables (768 weights), logistic"`.
+
+- [ ] **Step 1: Write failing tests**: `test_phase_is_one_at_start_and_zero_with_bare_kings`; `test_pst_features_are_antisymmetric` (a position and its `board.mirror()` give the same active features under `side_to_move`); `test_mirrored_position_gets_complementary_white_score` (random weights: `expected_score(b) == pytest.approx(1 - expected_score(b.mirror()))`); `test_fit_learns_material` (synthetic batches whose target is the material balance through the Lichess curve: after fitting, a position up a queen scores > 0.9 for its owner); `test_save_load_round_trip_keeps_scores_and_representation`; `test_evaluator_unchanged_for_existing_models` (stub model: same values as before the change); `test_logit_matches_dense_computation` (pure-Python path equals `weights @ dense_vector + bias`).
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement. Fast path: precompute per-board the active indices with `board.piece_map()`; no numpy in `logit`.
+- [ ] **Step 4:** Run the new tests and the full suite — PASS; ruff clean.
+- [ ] **Step 5:** Commit `feat: linear evaluation core and tapered piece-square-table model`.
+
+### Task 4: Training CLI for linear models (effort levels)
+
+**Files:**
+- Create: `src/chess_engine/training/effort.py`
+- Modify: `src/chess_engine/training/train.py`
+- Test: `tests/test_effort.py`, extend `tests/test_training.py`
+
+**Interfaces:**
+- Consumes: `LinearEvalModel.fit_stream` (Task 3), `iter_batches`, `load_sample` (Task 2), `update_card`, `today`, `current_commit` (`training/cards.py`).
+- Produces:
+  - `def effort_config(effort: int, available: int) -> dict` — keys `positions` (`round(100_000 * (available / 100_000) ** (effort / 100))`, capped by `available`), `max_epochs` (`1 + effort // 10`), `patience` (`2`), `trials` (`0` if `effort < 40` else `1 + (effort - 40) // 15`), `batch_size` (`4096`); monotonic in `effort`; raises `ValueError` outside `0..100`.
+  - `train.py`: new options `--effort INT`, `--representation JSON-or-name` (default the default `Representation`), `--raw DIR` and `--sidecar DIR` (defaults `data/lichess/raw`, `data/lichess/sidecar`). When the model class is a `LinearEvalModel`, it: computes `effort_config`; runs a timed calibration on 50,000 positions and prints the configuration plus an estimated total duration; runs `trials` random-search trials (`l2` log-uniform `[1e-7, 1e-3]`, `lr` log-uniform `[1e-3, 3e-2]`) on 10% of `positions`, keeps the best by validation loss, then the final fit; saves; writes a card with `representation`, `effort`, `effort_config`, `seconds`, `train_samples`. The existing CSV path for the old models is untouched.
+
+- [ ] **Step 1: Write failing tests**: `test_effort_bounds` (`effort_config(0, 10**9)["positions"] == 100_000`, `effort_config(100, 10**9)["positions"] == 10**9`), `test_effort_is_monotonic`, `test_effort_rejects_out_of_range`, `test_train_cli_trains_pst_on_fixture_shards` (tmp raw + sidecar from Task 2 fixtures, `--effort 0`, artifact and card written with `effort == 0` and the representation).
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run — PASS; full suite; ruff.
+- [ ] **Step 5:** Commit `feat: effort-based training for linear models`.
+
+### Task 5: Judge (static accuracy and 1-ply best-move agreement)
+
+**Files:**
+- Create: `src/chess_engine/training/judge.py`
+- Test: `tests/test_judge.py`
+
+**Interfaces:**
+- Consumes: `EvaluationModel.expected_score`, `predict_cp_batch`; `white_score`, `LICHESS_K` (Task 1); `load_sample` (Task 2).
+- Produces:
+  - `def static_metrics(pred_white: np.ndarray, true_white: np.ndarray) -> dict` — `spearman`, `mae` (expected-score units), `n`.
+  - `def one_ply_choice(model, board: chess.Board) -> chess.Move` — the legal move maximizing the mover's evaluation of the resulting position, computed with ONE `predict_cp_batch` call over the non-terminal children (works for every model, also the slow CNNs; any monotonic scale ranks the same); a move that mates ranks first, stalemate or other draw ranks as 0 cp.
+  - `def judge(model, test: pd.DataFrame, agreement_n: int = 20_000) -> dict` — `static_metrics` on all of `test` (predictions from `predict_cp_batch` in chunks, converted with `white_score(pred_cp, nan, Representation())`) using Stockfish truth `white_score(cp, mate, Representation())` (always the Lichess winprob scale, whatever the model's own representation), plus `best_move_agreement` on the first `agreement_n` rows; every metric also reported for the `quiet` and `non_quiet` slices: `{"all": {...}, "quiet": {...}, "non_quiet": {...}}`.
+
+- [ ] **Step 1: Write failing tests**: `test_spearman_perfect_and_reversed`; `test_one_ply_takes_mate_in_one` (fixture `MATE_IN_ONE` from `tests/conftest.py` -> `a1a8` with any model); `test_one_ply_prefers_winning_the_queen` (material stub model); `test_judge_reports_slices` (keys and `n` add up).
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement (scipy is not a dependency: Spearman via ranks with numpy).
+- [ ] **Step 4:** Run — PASS; ruff.
+- [ ] **Step 5:** Commit `feat: judge with rank correlation and best-move agreement by slice`.
+
+### Task 6: Bake-off script
+
+**Files:**
+- Create: `scripts/bakeoff_representation.py`
+- Test: extend `tests/test_scripts.py` (fixture run)
+
+**Interfaces:**
+- Consumes: Tasks 1-5; `run_round_robin` (Task 11) for the tie-break.
+- Produces: `scripts/bakeoff_representation.py --raw --sidecar --train-positions 5000000 --test-positions 200000 --effort 30 --out docs/training/bakeoff.json` which trains `pst_tapered` for the variants below (one axis changed at a time from the default), judges each, writes JSON and `docs/training/BAKEOFF.md` (table: variant, spearman/MAE/agreement for all / quiet / non_quiet, training seconds), then plays a tie-break round-robin at fixed depth 3 between the two best variants by `all` best-move agreement (`--tiebreak-games 200`), and STOPS (no automatic choice; the report ends with "Decision: pending").
+  Variants: `winprob k=0.00368 stm all` (default), `cp_linear stm all`, `winprob k=0.0025 stm all`, `winprob k=0.005 stm all`, `winprob k=0.00368 white all`, `winprob k=0.00368 stm quiet` (trained on quiet, judged on everything).
+- [ ] **Step 1:** Failing test `test_bakeoff_runs_on_fixture` (tiny shards, `--train-positions 2000 --test-positions 500 --tiebreak-games 2`, report written with 6 rows).
+- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS; ruff.
+- [ ] **Step 5:** Commit `feat: representation bake-off script`.
+
+## Track B — the other two models (after Task 3; parallel with Tasks 4-6)
+
+### Task 7: Material model
+
+**Files:** Modify `src/chess_engine/models/linear_features.py`, `src/chess_engine/models/linear_eval.py`; remove `src/chess_engine/models/linear_baseline.py`, its card/artifact/config and references (`models/__init__.py`, docs, `scripts/run_all.sh`, tests); Test `tests/test_linear_eval.py`.
+
+**Interfaces:** Produces `class MaterialCountFeatures(LinearFeatures)` named `"material5"` (own-minus-other count of P, N, B, R, Q; one block, no phase split; `+1` tempo/turn as in PST) and `@register_model("material_linear") class MaterialLinearModel(LinearEvalModel)`.
+
+- [ ] **Step 1:** Failing tests `test_material_features_count_differences`, `test_material_model_mirror_complement`, `test_linear_baseline_is_gone` (`"linear_baseline" not in available_models()`).
+- [ ] **Step 2-4:** Run fail, implement, run pass; full suite (update tests that used `linear_baseline` to use `material_linear` trained on fixtures, or the stub); ruff.
+- [ ] **Step 5:** Commit `feat: material linear model; remove linear_baseline`.
+
+### Task 8: PST + classical terms model
+
+**Files:** Modify `src/chess_engine/models/linear_features.py`, `src/chess_engine/models/linear_eval.py`; Test `tests/test_linear_eval.py`.
+
+**Interfaces:** Produces `class PstTermsFeatures(LinearFeatures)` = PST blocks + one middlegame and one endgame weight per term (own minus other, oriented by perspective): passed pawns, doubled pawns, isolated pawns, bishop pair, rook on open file, rook on half-open file, king shield pawns (own pawns on the 3 files around the king, 1-2 ranks ahead), mobility per piece type N/B/R/Q (popcount of `board.attacks_mask(sq) & ~own_occupancy`). Pawn-structure terms are cached by `(board.pawns, board.occupied_co[WHITE], board.occupied_co[BLACK]) & pawns` in an LRU dict (max 100,000 entries). `@register_model("pst_terms") class PstTermsModel(LinearEvalModel)`.
+
+- [ ] **Step 1:** Failing tests: one per term on a hand-made FEN (`test_passed_pawn_term`, `test_doubled_and_isolated`, `test_bishop_pair`, `test_rook_open_and_half_open_file`, `test_king_shield`, `test_mobility_counts_attacks_not_legal_moves`), `test_pst_terms_mirror_complement`, `test_pawn_cache_hit_returns_same_features`.
+- [ ] **Step 2-4:** Run fail, implement, run pass; ruff.
+- [ ] **Step 5:** Commit `feat: piece-square tables plus classical terms model`.
+
+## Track C — comparison tooling (parallel with Tracks A and B; uses only existing interfaces plus `expected_score`)
+
+### Task 9: Completed depth statistic
+
+**Files:** Modify `src/chess_engine/search/game_algorithms.py` (`SearchStatistics` gains `completed_depth: int = 0` as the last field; `heuristic_alphabeta_iterative_deepening_search` sets it to the deepest iteration that was not truncated); Test `tests/test_advanced_search.py`.
+
+- [ ] **Step 1:** Failing test `test_completed_depth_excludes_truncated_iteration` (tree fixture where the cut-off fires during depth 3 -> `completed_depth == 2`, `max_depth_reached == 3`), and `test_completed_depth_equals_max_depth_without_cutoff`.
+- [ ] **Step 2-4:** Fail, implement, pass; `scripts/benchmark_search.py --compare docs/benchmarks/search_baseline.json` still identical; ruff.
+- [ ] **Step 5:** Commit `feat: record the deepest completed iteration`.
+
+### Task 10: Depth-accuracy profiler
+
+**Files:** Create `src/chess_engine/training/tradeoff.py`, `scripts/profile_tradeoff.py`; Test `tests/test_tradeoff.py`.
+
+**Interfaces:**
+- Consumes: `IterativeModelBookBot` and `IterativeHeuristicBot`, `TimeManager`, `OpeningBook`, `SearchStatistics.completed_depth` (Task 9), `load_sample` (Task 2).
+- Produces:
+  - `def fixed_time_manager(seconds: float) -> TimeManager` — budget exactly `seconds`: `TimeManager(move_fraction=1.0, min_turn_time=seconds, max_turn_time=seconds, max_clock_share=1.0, extension=1.0, safety_margin=0.0)`; the bot is called with `time_limit=seconds`.
+  - `def make_player(spec: str, time_manager: TimeManager, max_depth: int = 30)` — `spec` is a registered model name (-> `IterativeModelBookBot(model=spec, opening_book=OpeningBook({}), max_depth=max_depth, time_manager=time_manager)`) or `"h2"` / `"h3"` (-> `IterativeHeuristicBot` with that heuristic and the same time manager). The profiler passes `fixed_time_manager(seconds)`.
+  - `def profile(spec: str, positions: pd.DataFrame, seconds: float) -> dict` — mean and median `completed_depth`, mean nodes/s, and `search_agreement` (share of positions where the chosen move equals `best_move`), overall and for quiet / non_quiet.
+  - `scripts/profile_tradeoff.py --players pst_tapered,pst_terms,material_linear,h2,h3,mlp_features,... --seconds 1,3,10 --positions 300 --out docs/training/tradeoff.json` writes JSON and `docs/training/TRADEOFF.md` with the table and a plot `docs/img/depth_vs_accuracy.png` (x = completed depth, y = static best-move agreement from the cards or search agreement, one point per model and time; matplotlib, already in the `ml` extra). Accepts `--parallel N` (one player/time per process).
+- [ ] **Step 1:** Failing tests `test_fixed_time_manager_budget_is_exact`, `test_make_player_builds_model_and_heuristic_players` (stub model registered in the test), `test_profile_reports_depth_and_agreement` (2 positions, 0.2 s, stub model).
+- [ ] **Step 2-4:** Fail, implement, pass; ruff.
+- [ ] **Step 5:** Commit `feat: depth-accuracy profiler at fixed time per move`.
+
+### Task 11: Parallel round-robin
+
+**Files:** Create `src/chess_engine/training/tournament.py`, `scripts/run_tournament.py`; remove `src/chess_engine/training/strength.py` and `--strength` from `training/evaluate.py` (superseded) with their tests; Test `tests/test_tournament.py`.
+
+**Interfaces:**
+- Consumes: `make_player` (Task 10), `GameManager(BotRegistry()).play_game(white, black, time_limit, time_increment, starting_position=fen)` -> `GameResult` with `winner in {"white", "black", None}`.
+- Produces:
+  - `def paired_openings(n_pairs: int, plies: int = 6, seed: int = 0) -> list[str]` — distinct FENs after `plies` random legal plies, none terminal.
+  - `def run_round_robin(specs: list[str], openings: list[str], base: float, increment: float, workers: int, out: Path) -> dict` — every unordered pair plays every opening twice with colours swapped; games run in a `ProcessPoolExecutor(workers)`, each worker builds its own players (`make_player(spec, TimeManager())`: the default clock-aware budget, since games use a real clock); results appended to `out` as JSON lines as they finish (resumable: games already in `out` are skipped); a crashed game is recorded with `"error"` and excluded from scores.
+  - `def summarize(results: list[dict]) -> dict` — per player score %, W-D-L, Elo relative to `h3` (`-400*log10(1/s - 1)` per pairing vs h3 and a simple iterative fit across all pairs), 95% intervals (normal approximation of the score).
+  - `def size_for_budget(hours: float, workers: int, n_players: int, seconds_per_game: float) -> int` — openings per pair that fit the budget.
+  - `scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 --base 10 --increment 0.1 --workers 5 --hours 10 --out data/tournament/games.jsonl` sizes the openings with a short calibration, runs, and writes `docs/training/TOURNAMENT.md` (cross table, scores, Elo, intervals).
+- [ ] **Step 1:** Failing tests `test_paired_openings_are_distinct_and_playable`, `test_every_pair_plays_both_colours`, `test_resume_skips_finished_games` (pre-filled JSONL), `test_crashed_game_is_recorded_not_fatal` (player spec that raises), `test_summarize_scores_and_elo` (hand-made results), `test_size_for_budget`. Use tiny `base` (e.g. 2 s) and 2 workers with `h2`/`h3` players.
+- [ ] **Step 2-4:** Fail, implement, pass; full suite; ruff.
+- [ ] **Step 5:** Commit `feat: parallel round-robin tournament`.
+
+### Task 12: Cards, history table, docs
+
+**Files:** Modify `src/chess_engine/training/report.py`, `src/chess_engine/training/evaluate.py`, `docs/training/TRAINING_TASKS.md`, `scripts/run_all.sh`, `docs/ADDING_A_MODEL.md`, `README.md` (models section); Test `tests/test_training.py`.
+
+**Interfaces:**
+- Consumes: `judge` (Task 5), `profile` (Task 10), `summarize` (Task 11).
+- Produces: `python -m chess_engine.training.evaluate --model NAME --raw ... --sidecar ...` writes card section `accuracy` (= `judge(...)` on the fixed test sample: first 200,000 test rows by `load_sample(..., seed=42)`) and `cost` (`us_per_eval`, median single-position `expected_score` time); `scripts/profile_tradeoff.py` and `scripts/run_tournament.py` write `tradeoff` and `tournament` sections into the cards of the models they cover; `report.py` renders one table: model, kind (`plays` / `accuracy record`), params, representation, effort, Spearman, MAE, best-move agreement (all / non-quiet), µs/eval, completed depth at 1/3/10 s, search agreement, round-robin score and Elo ± interval; models without a section show "—". `run_all.sh` becomes: prepare sidecars -> train the three linear models at `EFFORT` -> evaluate all models -> profile -> tournament -> report.
+- [ ] **Step 1:** Failing tests `test_report_renders_new_columns` (cards fixture with all sections), `test_accuracy_record_models_marked` (old models).
+- [ ] **Step 2-4:** Fail, implement, pass; ruff.
+- [ ] **Step 5:** Commit `feat: model cards and history table for the trade-off comparison`.
+
+## Runs (coordinator; on real data, after the full download and Tracks A-C)
+
+- [ ] **R1:** `scripts/prepare_dataset.py` on the full raw data; record counts (split sizes, quiet share) in `docs/training/DATA.md`.
+- [ ] **R2:** Bake-off (Task 6) on real data. Coordinator reads `BAKEOFF.md`; user confirms the representation; record "Decision" in `BAKEOFF.md`.
+- [ ] **R3:** Train `material_linear`, `pst_tapered`, `pst_terms` with the chosen representation at the effort the user picks (training prints the estimate first).
+- [ ] **R4:** `evaluate` all models (including the four existing ones as accuracy records; for the CNNs lower `agreement_n` if the run is too slow and note it in the card).
+- [ ] **R5:** `profile_tradeoff.py` for all models at 1, 3, 10 s.
+- [ ] **R6:** Overnight `run_tournament.py` (~10 h) with `material_linear, pst_tapered, pst_terms, h2, h3`.
+- [ ] **R7:** Apply the decision rule (strength at equal time decides; existing models are kept as records); remove dominated new models; regenerate `MODELS_HISTORY.md`; commit.

@@ -251,7 +251,7 @@ User request: after the main tournament, the best new model plays a **variant of
 - [ ] **Step 4:** Run the new tests, the full suite, ruff — PASS.
 - [ ] **Step 5:** Commit `feat: mate-undersampled model variants and tagged model specs`.
 
-### Task 14: Execution runbook for a light executor
+### Task 14: Execution runbook for a light executor (after Task 15, so paths and module names are final)
 
 **Files:** Create `docs/training/RUNBOOK.md`.
 
@@ -260,6 +260,24 @@ User request: after the main tournament, the best new model plays a **variant of
 - [ ] **Step 1:** After Tasks 4, 6, 12 and 13 are merged, write the runbook: for every run (R1-R7 and the Track D phase) a **LAUNCH** step (exact command, detached with `nohup setsid`, log path, the healthy-start check and what an unhealthy start looks like) and a **COLLECT** step (which JSON / log lines to read, the exact numbers to copy, how to interpret them with fixed rules such as "an Elo difference is significant only if the 95% interval excludes 0", and the exact section of which `.md` file to fill: `DATA.md`, `BAKEOFF.md`, `MODELS_HISTORY.md`, `TRADEOFF.md`, `TOURNAMENT.md`, `RESULTS.md`). Decision points (bake-off choice, which model is "best", deleting dominated models) are marked **STOP: report to the supervisor**; the executor never decides them.
 - [ ] **Step 2:** Dry-run every command of the runbook on small fixture data (`--help` for each and one tiny real call where cheap) and fix what does not run.
 - [ ] **Step 3:** Commit `docs: execution runbook for training and tournaments`.
+
+### Task 15: Repository restructure and final documentation pass (runs BEFORE Task 14, after Tasks 6 and 13 are reviewed)
+
+**Files:** moves and edits across `src/chess_engine/{training,comparison,models}`, `scripts/`, `tests/`, `docs/`, `README.md`, `.gitignore`, `.github/workflows/ci.yml`, `pyproject.toml`.
+
+**Interfaces:**
+- Consumes: everything built so far.
+- Produces (pure moves plus import / path / doc updates; no behaviour change):
+  - New package `chess_engine.comparison` holding what compares models: `judge.py`, `tradeoff.py`, `tournament.py`, `evaluate.py`, `report.py`, `metrics.py`. `chess_engine.training` keeps what trains and prepares data: `configs/`, `dataset.py`, `effort.py`, `lichess.py`, `lichess_raw.py`, `representation.py`, `sidecar.py`, `stockfish.py`, `targets.py`, `train.py`. `cards.py` moves to `chess_engine.models.cards` (used by both). Dependency direction: `comparison` may import `training` and `models`; `training` and `models` never import `comparison`.
+  - Module commands become `python -m chess_engine.training.train`, `python -m chess_engine.comparison.evaluate`, `python -m chess_engine.comparison.report`.
+  - `scripts/` split into `scripts/data/` (`download_lichess_evals.py`, `fetch_lichess_raw.py`, `prepare_dataset.py`, `label_with_stockfish.py`), `scripts/bench/` (`benchmark_search.py`, `profile_tradeoff.py`, `run_tournament.py`, `bakeoff_representation.py`), `scripts/docs/` (`render_pattern_boards.py`); `run_all.sh` stays in `scripts/`. `scripts/plot_models.py` and its test are deleted (dead: reads the legacy benchmark section). The `sys.path.insert(... "src")` hacks in scripts are removed (the package is installed with `pip install -e`), every script keeps its `if __name__ == "__main__":` guard. All default paths computed from `__file__` still point at the same files (repo root moves by one level for scripts in subfolders).
+  - Tests that take more than ~30 s (`tests/test_tournament.py` pool tests, the bake-off fixture test in `tests/test_scripts.py`) are marked `@pytest.mark.slow`; CI still runs everything.
+  - Cleanups carried from reviews: `evaluate` uses `artifact_path(args.model)` for `size_kb`; wrap `tests/test_training.py` line 237; `docs/TACTICAL_PATTERNS.md` no longer names the removed `TacticalAlphaBetaBot` (say the detector is kept for a cheaper use); `docs/training/DATA.md` and the `training/__init__.py` docstring describe the raw-Parquet flow; `docs/ADDING_A_MODEL.md` says `--representation` takes a JSON object or `default`; `.gitignore`: replace the stale `models/artifacts/*.tmp` with `src/chess_engine/models/artifacts/*.tmp`, keep `*@bake-*`, and confirm with `git status --ignored` that `data/lichess/`, `.superpowers/` and egg-info are ignored while `data/opening_book.json`, `data/README.md`, `docs/benchmarks/*.json` and model artifacts/cards are tracked.
+  - Final docs pass: README (layout section matches the tree, commands copy-pasteable), `docs/ARCHITECTURE.md` (package table and diagrams include `comparison`, `training` contents, `models.linear_*`), `docs/SEARCH_ALGORITHMS.md` (make/unmake, fast terminal detection, `completed_depth`), `docs/training/*.md`, `CHANGELOG.md`; every command quoted in the docs is run with `--help` and every internal link resolves (script check).
+
+- [ ] **Step 1:** Run the full suite and `ruff` first (baseline green), then do the moves with `git mv`, fix imports with a scripted rewrite, run the suite and ruff after every group of moves (training/comparison split; scripts split; test markers), commit per group (`refactor: ...`).
+- [ ] **Step 2:** Add `tests/test_docs.py`: every relative Markdown link in `README.md` and `docs/**/*.md` (outside `docs/superpowers/`) resolves to an existing file; every `python -m chess_engine.<module>` quoted in the docs imports; every `scripts/...` path quoted exists.
+- [ ] **Step 3:** Docs pass and cleanups above; run everything; commit `docs: final documentation pass and repository cleanup`.
 
 ## Runs (coordinator; on real data, after the full download and Tracks A-C)
 

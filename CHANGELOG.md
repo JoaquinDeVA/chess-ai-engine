@@ -22,6 +22,9 @@ logical reasoning, machine learning, optional extension) and then reworked.
 - ML evaluation: centipawn-to-score scaling squeezed all evaluations into a tiny band, and the
   signs of the shipped CNN weights were inverted.
 
+- Game manager: verbose output always showed UCI instead of algebraic notation, and games lost on
+  time, by an illegal move or by an exception were exported to PGN with result `*`.
+
 ### Changed
 - Tactical bot restored as an optional bot (needs SWI-Prolog).
 - Bots find shared modules through an underscore convention (`bots/_*.py` are not registered).

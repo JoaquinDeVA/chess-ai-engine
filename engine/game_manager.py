@@ -22,6 +22,9 @@ from bots.chess_bot import ChessBot
 from bots.human_player import HumanPlayer
 from engine.data_classes import GameResult, TournamentConfig, TournamentResult
 
+#: Terminations in which a player loses without the game ending on the board.
+FORFEIT_TERMINATIONS = ("time_forfeit", "illegal_move", "player_error")
+
 
 class GameManager:
     """
@@ -217,16 +220,12 @@ class GameManager:
                     termination = "illegal_move"
                     break
 
-                # Make the move
+                # Make the move (the algebraic notation must be computed before pushing it)
+                move_desc = board.san(move) if verbose else move.uci()
                 moves.append(move.uci())
                 board.push(move)
 
                 if verbose:
-                    move_desc = f"{move.uci()}"
-                    try:
-                        move_desc = board.san(move)  # Get algebraic notation
-                    except ValueError:
-                        pass  # keep the UCI notation
                     print(f"Move: {move_desc} (took {move_time:.2f}s)")
 
             # Game finished
@@ -244,9 +243,12 @@ class GameManager:
                     termination = "ongoing"
 
             # Create game result
-            game_result = (
-                board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
-            )
+            if termination in FORFEIT_TERMINATIONS:
+                game_result = "1-0" if winner == "white" else "0-1"
+            elif board.is_game_over(claim_draw=True):
+                game_result = board.result(claim_draw=True)
+            else:
+                game_result = "*"
 
             result = GameResult(
                 white_name=white_player.name,

@@ -1,0 +1,12 @@
+{
+  "name": "cnn_resnet",
+  "architecture": "ResNet-style CNN (Conv32-64, two dilated residual blocks, Conv256, GAP) + dense branch on 9 extras -> Dense256-128-64-1",
+  "features": "bitboard8x8x12+9",
+  "parameters": 572353,
+  "size_kb": 2352.4,
+  "status": "current",
+  "training": {
+    "dataset": "course dataset (Stockfish evaluations, mirror-augmented)",
+    "note": "weights from the university course"
+  }
+}

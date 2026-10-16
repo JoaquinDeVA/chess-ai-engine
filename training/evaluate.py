@@ -18,7 +18,7 @@ import models  # noqa: F401  (registers the built-in models)
 from models.base import CP_SCALE, EvaluationModel
 from models.registry import available_models, load_model
 
-from .cards import current_commit, today, update_card
+from .cards import current_commit, load_card, today, update_card
 from .dataset import SPLIT_SEED, encode_positions, load_evaluations, split_dataset
 from .metrics import compute_metrics
 from .report import update_history_file
@@ -146,6 +146,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     saved = args.path or model.default_path()
     if saved.exists():
         sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
+    if "status" not in load_card(args.model):
+        sections["status"] = "current"
     update_card(args.model, **sections)
 
     if args.strength:

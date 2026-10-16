@@ -1,7 +1,7 @@
 {
   "name": "mlp_features",
   "status": "current",
-  "architecture": "MLP 29 -> 32 -> 16 -> 1 (ReLU)",
+  "architecture": "MLP 29 -> 32 -> 16 -> 1 (ReLU), NumPy inference",
   "features": "vector29",
   "parameters": 1505,
   "size_kb": 45.0,

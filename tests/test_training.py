@@ -468,3 +468,50 @@ class TestMateKeepAndTags:
         with pytest.raises(StopAfterCallError):
             evaluate_cli.sample_benchmark(stub_model, tmp_path, tmp_path)
         assert calls and calls[0].get("mate_keep", 1.0) == 1.0
+
+
+class TestMateKeepGuards:
+    def test_mate_keep_without_tag_is_refused_and_writes_nothing(
+        self, isolated_cards, tmp_path, monkeypatch
+    ):
+        from chess_engine.models import base as models_base
+
+        monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
+        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        write_mate_shards(raw, side)
+        shards = ["--raw", str(raw), "--sidecar", str(side)]
+
+        flag = ["--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05", *shards]
+        assert train_cli.main(flag) == 2
+        representation = [
+            "--model", "pst_tapered", "--effort", "0", "--representation",
+            '{"mate_keep": 0.05}', *shards,
+        ]  # fmt: skip
+        assert train_cli.main(representation) == 2
+        assert not list(tmp_path.glob("pst_tapered*.npz"))
+        assert cards.load_card("pst_tapered") == {"name": "pst_tapered"}
+
+    def test_evaluate_accepts_a_tagged_spec_and_writes_its_card(
+        self, isolated_cards, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        write_mate_shards(raw, side)
+        shards = ["--raw", str(raw), "--sidecar", str(side)]
+        tagged = ["--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05",
+                  "--tag", "mates5", *shards]  # fmt: skip
+        assert train_cli.main(tagged) == 0
+
+        assert (
+            evaluate_cli.main(
+                ["--model", "pst_tapered@mates5", "--path",
+                 str(tmp_path / "pst_tapered@mates5.npz"), *shards, "--agreement-n", "50"]
+            )
+            == 0
+        )  # fmt: skip
+        card = cards.load_card("pst_tapered@mates5")
+        assert card["accuracy"]["sample"]["rows"] > 0 and card["cost"]["us_per_eval"] > 0
+        assert "accuracy" not in cards.load_card("pst_tapered")
+        with pytest.raises(SystemExit):
+            evaluate_cli.parse_args(["--model", "no_such_model@x"])

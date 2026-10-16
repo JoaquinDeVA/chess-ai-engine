@@ -22,7 +22,7 @@ import numpy as np
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.models.base import CP_SCALE, EvaluationModel
-from chess_engine.models.registry import available_models, load_model
+from chess_engine.models.registry import available_models, load_model, split_spec
 
 from .cards import current_commit, load_card, today, update_card
 from .dataset import SPLIT_SEED, TEST, encode_positions, load_evaluations, split_dataset
@@ -158,6 +158,24 @@ def features_name(model: EvaluationModel) -> str:
     return features.name if features is not None else "—"
 
 
+def model_spec_arg(text: str) -> str:
+    """Argument type of ``--model``: a registered name, or ``name@tag``.
+
+    :param text: The command-line value.
+    :return: The value, unchanged.
+    :raises argparse.ArgumentTypeError: If the name is not registered or the spec is malformed.
+    """
+    try:
+        name, _ = split_spec(text)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+    if name not in available_models():
+        raise argparse.ArgumentTypeError(
+            f"invalid choice: {name!r} (choose from {', '.join(available_models())})"
+        )
+    return text
+
+
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse the command line.
 
@@ -165,7 +183,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     :return: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", required=True, choices=available_models())
+    parser.add_argument(
+        "--model", required=True, type=model_spec_arg, help="model name, or name@tag"
+    )
     parser.add_argument("--path", type=Path, help="saved model file (default: models/artifacts)")
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
     parser.add_argument(

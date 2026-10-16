@@ -4,6 +4,7 @@ import importlib.util
 import json
 import math
 import os
+import zlib
 from pathlib import Path
 
 import chess
@@ -205,30 +206,56 @@ def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
     assert read_records(out) == []
 
 
-def test_rebuild_counter_resets_after_each_finished_game(tmp_path, monkeypatch):
-    """Two culprits, each killing two pools: the run only survives if progress resets the count."""
+def _dies_once_as_h2_white(job):
+    """Kill the worker the first time h2 plays White from either opening; later attempts play.
+
+    The first attempt is recorded by a marker file in ``$TOURNAMENT_TEST_MARKERS``, which the
+    spawned workers inherit.
+    """
+    if job[0] == "h2" and job[2] in paired_openings(2, seed=2):
+        marker = Path(os.environ["TOURNAMENT_TEST_MARKERS"]) / str(zlib.crc32(job[2].encode()))
+        if not marker.exists():
+            marker.touch()
+            os._exit(1)
+    return tournament._play_game(job)
+
+
+def test_rebuild_counter_resets_after_each_game_played(tmp_path, monkeypatch):
+    """Two broken pools, one per opening, with a game played in between: the limit of 1 holds."""
+    markers = tmp_path / "markers"
+    markers.mkdir()
+    monkeypatch.setenv("TOURNAMENT_TEST_MARKERS", str(markers))
     monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
     out = tmp_path / "games.jsonl"
-    openings = paired_openings(2, seed=2)
     summary = run_round_robin(
         ["h2", "h3"],
-        openings,
+        paired_openings(2, seed=2),
         base=2.0,
         increment=0.0,
         workers=1,
         out=out,
-        play=_dies_on_h2_white_in_both_openings,
+        play=_dies_once_as_h2_white,
     )
     records = read_records(out)
-    assert len(records) == 4
-    assert summary["errors"] == 2 and summary["played"] == 4
+    assert len(records) == 4 and all("error" not in r for r in records)
+    assert summary["errors"] == 0 and summary["played"] == 4
 
 
-def _dies_on_h2_white_in_both_openings(job):
-    """Kill the worker when h2 plays White from either opening of ``paired_openings(2, 2)``."""
-    if job[0] == "h2" and job[2] in paired_openings(2, seed=2):
-        os._exit(1)
-    return tournament._play_game(job)
+def test_run_gives_up_when_every_game_dies(tmp_path, monkeypatch):
+    """Error records do not reset the count, so a systemic failure ends the run."""
+    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 2)
+    out = tmp_path / "games.jsonl"
+    with pytest.raises(RuntimeError, match="giving up"):
+        run_round_robin(
+            ["h2", "h3"],
+            paired_openings(2, seed=2),
+            base=2.0,
+            increment=0.0,
+            workers=2,
+            out=out,
+            play=_dies_on_every_game,
+        )
+    assert all("error" in r for r in read_records(out))
 
 
 def test_truncated_last_line_is_ignored_and_repaired(tmp_path, caplog):

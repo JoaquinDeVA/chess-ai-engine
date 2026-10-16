@@ -161,8 +161,16 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     """
     started = time.perf_counter()
     rep = effort_representation(args)
+    if rep.mate_keep < 1.0 and not args.tag:
+        print(
+            "a mate-undersampled model needs --tag: without it the untagged model would be "
+            "overwritten"
+        )
+        return 2
     quiet = rep.filter == "quiet"
-    available = available_rows(args.sidecar, quiet_only=quiet)
+    available = available_rows(
+        args.sidecar, quiet_only=quiet, raw_dir=args.raw, mate_keep=rep.mate_keep
+    )
     if available == 0:
         print(f"no TRAIN rows found in {args.sidecar}")
         return 2

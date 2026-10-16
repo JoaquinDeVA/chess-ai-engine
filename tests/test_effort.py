@@ -131,3 +131,31 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
     search(PstTaperedModel, Representation(), raw, side, validation, plan, log=lines.append)
     assert splits and set(splits) == {TRAIN}
     assert len(lines) == 1 and lines[0].startswith("trial 1/1")
+
+
+def write_mate_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> None:
+    """One raw shard with ``count`` random positions, every third one a mate, and its sidecar."""
+    raw.mkdir(parents=True, exist_ok=True)
+    records = []
+    for index, board in enumerate(random_positions(count, seed=seed)):
+        record = {"fen": " ".join(board.fen().split()[:4]), "cp": material_cp(board),
+                  "mate": None, "depth": 20, "knodes": 1, "best_move": None,
+                  "n_evals": 1, "n_pvs": 1}  # fmt: skip
+        if index % 3 == 0:
+            record.update(cp=None, mate=2)
+        records.append(record)
+    write_shard(shard_path(raw, 0), records, {"perspective": "white"})
+    build_sidecar(shard_path(raw, 0), side)
+
+
+def test_available_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    write_mate_fixture_shards(raw, side, 900, seed=4)
+    full = available_rows(side)
+    kept = available_rows(side, raw_dir=raw, mate_keep=0.2)
+    assert 0 < kept < full
+    # The planned count is the number of rows the TRAIN stream yields.
+    assert kept == len(load_sample(raw, side, TRAIN, 10**6, mate_keep=0.2))
+    assert available_rows(side, raw_dir=raw, mate_keep=1.0) == full
+    with pytest.raises(ValueError):
+        available_rows(side, mate_keep=0.2)

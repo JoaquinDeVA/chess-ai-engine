@@ -307,8 +307,9 @@ def run_round_robin(
     A game that was in flight for :data:`MAX_DEATHS_PER_GAME` broken pools is recorded as an error
     and not retried. While such a suspect is unfinished, games run one at a time, so that the blame
     is unambiguous. After :data:`MAX_POOL_REBUILDS` rebuilds in a row with games still pending, the
-    run stops with a ``RuntimeError``; rerun it to resume. Every finished game (also an errored one)
-    resets that count, so a long run only gives up after consecutive broken pools without progress.
+    run stops with a ``RuntimeError``; rerun it to resume. A game played to a result resets that
+    count, so a long run only gives up after consecutive broken pools without progress; error
+    records do not reset it, so a systemic failure (every worker dies) ends the run.
     Errored games are excluded from the scores.
 
     The workers are started with ``OMP_NUM_THREADS``, ``OPENBLAS_NUM_THREADS``, ``MKL_NUM_THREADS``,
@@ -354,7 +355,8 @@ def run_round_robin(
 
     def emit(record: Dict[str, Any]) -> None:
         nonlocal rebuilds
-        rebuilds = 0  # progress: only consecutive broken pools count towards the limit
+        if "error" not in record:  # a game played to a result is progress; a crash is not
+            rebuilds = 0
         counts["errors"] += "error" in record
         handle.write(json.dumps(record) + "\n")
         handle.flush()

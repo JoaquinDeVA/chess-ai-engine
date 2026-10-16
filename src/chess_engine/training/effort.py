@@ -23,7 +23,11 @@ from chess_engine.models.linear_eval import (
     _scores,
     encode_frame,
 )
-from chess_engine.training.representation import Representation
+from chess_engine.training.representation import (
+    Representation,
+    keep_mate_rows,
+    validate_mate_keep,
+)
 
 from .dataset import TRAIN
 from .sidecar import iter_batches
@@ -67,20 +71,47 @@ def effort_config(effort: int, available: int) -> Dict[str, int]:
     }
 
 
-def available_rows(sidecar_dir: Path, quiet_only: bool = False) -> int:
-    """Number of TRAIN rows in the sidecars (only the ``split`` and ``quiet`` columns are read).
+SIDECAR_SUFFIX = ".sidecar.parquet"
+
+
+def available_rows(
+    sidecar_dir: Path,
+    quiet_only: bool = False,
+    raw_dir: Path | None = None,
+    mate_keep: float = 1.0,
+) -> int:
+    """Number of TRAIN rows the stream yields: the sidecars, then the mate undersampling.
+
+    Only the ``split`` and ``quiet`` columns are read from the sidecars. With ``mate_keep < 1``
+    the ``fen`` and ``mate`` columns of the raw shards are read too, and the mates are counted
+    after the same :func:`~.representation.keep_mate_rows` filter the stream applies.
 
     :param sidecar_dir: Directory with the ``part-*.sidecar.parquet`` files.
     :param quiet_only: Count only the quiet positions.
+    :param raw_dir: Directory with the raw shards; required when ``mate_keep < 1``.
+    :param mate_keep: Share of the mate positions kept, in ``(0, 1]``.
     :return: The row count (0 if there are no sidecars).
+    :raises ValueError: If ``mate_keep`` is outside ``(0, 1]``, or it is below 1 without
+        ``raw_dir``.
     """
+    validate_mate_keep(mate_keep)
+    if mate_keep < 1.0 and raw_dir is None:
+        raise ValueError("raw_dir is needed to count the mates when mate_keep < 1")
     total = 0
     columns = ["split", "quiet"] if quiet_only else ["split"]
-    for path in sorted(sidecar_dir.glob("part-*.sidecar.parquet")):
+    for path in sorted(sidecar_dir.glob(f"part-*{SIDECAR_SUFFIX}")):
         table = pq.read_table(path, columns=columns)
         mask = table["split"].to_numpy() == TRAIN
         if quiet_only:
             mask &= table["quiet"].to_numpy(zero_copy_only=False)
+        if mate_keep < 1.0:
+            raw_path = raw_dir / (path.name.removesuffix(SIDECAR_SUFFIX) + ".parquet")
+            raw = pq.read_table(raw_path, columns=["fen", "mate"]).to_pandas()
+            is_mate = raw["mate"].notna().to_numpy()
+            keep = np.ones(len(mask), dtype=bool)
+            mates = np.flatnonzero(is_mate)
+            keep[mates] = keep_mate_rows(raw["fen"].to_numpy(dtype=object)[mates], mate_keep)
+            mask &= keep
         total += int(mask.sum())
     return total
 

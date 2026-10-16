@@ -7,7 +7,7 @@ python scripts/bakeoff_representation.py --train-positions 5000000 --test-positi
 Every variant changes one axis of the default representation and is trained as a tagged model
 ``pst_tapered@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
 ``--tag-prefix`` says otherwise). The variants are judged on the same test sample
-with :func:`~chess_engine.training.judge.judge`. The two best by ``all`` best-move agreement then
+with :func:`~chess_engine.comparison.judge.judge`. The two best by ``all`` best-move agreement then
 play a round-robin at equal time per move. The script stops there: it writes the report, which
 ends with ``Decision: pending``, and deletes the tagged models it created unless ``--keep-models`` is given. The script refuses
 to start if one of its tagged models or cards already exists, so it never overwrites or deletes
@@ -35,21 +35,21 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel  # noqa: E402
-from chess_engine.models.registry import artifact_path, get_model_class  # noqa: E402
-from chess_engine.training.cards import card_path, current_commit, today, update_card  # noqa: E402
-from chess_engine.training.dataset import TEST, TRAIN, VALIDATION  # noqa: E402
-from chess_engine.training.effort import SAMPLE_SEED, effort_config, fit_config  # noqa: E402
-from chess_engine.training.judge import judge  # noqa: E402
-from chess_engine.training.representation import Representation  # noqa: E402
-from chess_engine.training.sidecar import iter_batches, load_sample  # noqa: E402
-from chess_engine.training.tournament import (  # noqa: E402
+from chess_engine.comparison.judge import judge  # noqa: E402
+from chess_engine.comparison.tournament import (  # noqa: E402
     paired_openings,
     read_games,
     record_cards,
     run_round_robin,
     summarize,
 )
+from chess_engine.models.cards import card_path, current_commit, today, update_card  # noqa: E402
+from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel  # noqa: E402
+from chess_engine.models.registry import artifact_path, get_model_class  # noqa: E402
+from chess_engine.training.dataset import TEST, TRAIN, VALIDATION  # noqa: E402
+from chess_engine.training.effort import SAMPLE_SEED, effort_config, fit_config  # noqa: E402
+from chess_engine.training.representation import Representation  # noqa: E402
+from chess_engine.training.sidecar import iter_batches, load_sample  # noqa: E402
 from chess_engine.training.train import (  # noqa: E402
     DEFAULT_RAW_DIR,
     DEFAULT_SIDECAR_DIR,

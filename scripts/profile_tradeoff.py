@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from chess_engine.training.tradeoff import record_cards, run_profiles  # noqa: E402
+from chess_engine.comparison.tradeoff import record_cards, run_profiles  # noqa: E402
 
 DEFAULT_PLAYERS = "pst_tapered,pst_terms,material_linear,h2,h3,mlp_features"
 

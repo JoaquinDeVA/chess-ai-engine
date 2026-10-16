@@ -14,10 +14,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.models.cards import current_commit, today, update_card
 from chess_engine.models.linear_eval import LinearEvalModel
 from chess_engine.models.registry import artifact_path, available_models, get_model_class
 
-from .cards import current_commit, today, update_card
 from .dataset import SPLIT_SEED, VALIDATION, encode_positions, load_evaluations, split_dataset
 from .effort import (
     SAMPLE_SEED,
@@ -305,7 +305,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         },
     )
     print(
-        f"Saved {path}. Next: python -m chess_engine.training.evaluate --model {args.model} --data {args.data}"
+        f"Saved {path}. Next: python -m chess_engine.comparison.evaluate --model {args.model} --data {args.data}"
     )
     return 0
 

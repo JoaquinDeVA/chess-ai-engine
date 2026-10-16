@@ -8,9 +8,10 @@ import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.comparison import tradeoff
+from chess_engine.comparison.tradeoff import fixed_time_manager, make_player, profile
 from chess_engine.evaluation.heuristics import h2, h3
-from chess_engine.training import cards, tradeoff
-from chess_engine.training.tradeoff import fixed_time_manager, make_player, profile
+from chess_engine.models import cards
 
 
 def test_fixed_time_manager_budget_is_exact():
@@ -96,8 +97,8 @@ def cards_dir(tmp_path, monkeypatch):
 
 
 def test_profile_writes_tradeoff_sections_shown_by_the_history(cards_dir):
+    from chess_engine.comparison import report
     from chess_engine.models.linear_eval import PstTaperedModel
-    from chess_engine.training import report
 
     PstTaperedModel().save(cards_dir / "pst_tapered@t.npz")
     cards.update_card("pst_tapered@t", status="current", architecture="PST", parameters=769)

@@ -24,10 +24,10 @@ from typing import Any, Callable, Deque, Dict, Iterator, List, Sequence, Tuple
 import chess
 
 from chess_engine.bots.bot_registry import BotRegistry
+from chess_engine.comparison.tradeoff import HEURISTICS, make_player
 from chess_engine.engine.game_manager import GameManager
+from chess_engine.models.cards import card_path, update_card
 from chess_engine.search.time_management import TimeManager
-from chess_engine.training.cards import card_path, update_card
-from chess_engine.training.tradeoff import HEURISTICS, make_player
 
 logger = logging.getLogger(__name__)
 

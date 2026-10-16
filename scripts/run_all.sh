@@ -31,7 +31,7 @@ done
 
 for model in "${EVALUATED[@]}"; do
   echo "=== evaluate ${model}"
-  "$PYTHON" -m chess_engine.training.evaluate --model "$model" \
+  "$PYTHON" -m chess_engine.comparison.evaluate --model "$model" \
     --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"
 done
 
@@ -42,5 +42,5 @@ echo "=== tournament (${HOURS} h)"
 "$PYTHON" scripts/run_tournament.py --hours "$HOURS"
 
 echo "=== report"
-"$PYTHON" -m chess_engine.training.report
+"$PYTHON" -m chess_engine.comparison.report
 echo "Done. Review docs/training/ (MODELS_HISTORY.md, TRADEOFF.md, TOURNAMENT.md) and commit."

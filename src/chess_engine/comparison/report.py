@@ -1,9 +1,9 @@
 """Render the model cards into the table of ``MODELS_HISTORY.md``.
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
-this module regenerates: ``python -m chess_engine.training.report``.
+this module regenerates: ``python -m chess_engine.comparison.report``.
 
-Each row reads the card sections ``accuracy`` and ``cost`` (written by ``training.evaluate``),
+Each row reads the card sections ``accuracy`` and ``cost`` (written by ``comparison.evaluate``),
 ``tradeoff`` (depth and search agreement per time per move, from the profiler) and ``tournament``
 (score and Elo, from the round-robin). A missing section shows a dash.
 """
@@ -12,9 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (loads models first: avoids an import cycle)
-
-from .cards import PROJECT_ROOT, load_all_cards
-from .representation import Representation
+from chess_engine.models.cards import PROJECT_ROOT, load_all_cards
+from chess_engine.training.representation import Representation
 
 HISTORY_FILE = PROJECT_ROOT / "docs" / "training" / "MODELS_HISTORY.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"

@@ -24,10 +24,9 @@ from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h2, h3
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, get_model_class
+from chess_engine.models.cards import card_path, update_card
 from chess_engine.models.registry import split_spec
 from chess_engine.search.time_management import TimeManager
-
-from .cards import card_path, update_card
 
 logger = logging.getLogger(__name__)
 

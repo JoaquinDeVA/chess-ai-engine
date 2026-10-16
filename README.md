@@ -138,7 +138,7 @@ move) and `TOURNAMENT.md` (round-robin at equal time per move, the verdict).
 python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst  # raw shards
 python scripts/prepare_dataset.py                                                    # sidecars
 python -m chess_engine.training.train    --model pst_tapered --effort 40
-python -m chess_engine.training.evaluate --model pst_tapered
+python -m chess_engine.comparison.evaluate --model pst_tapered
 python scripts/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10
 python scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 --hours 10
 ```

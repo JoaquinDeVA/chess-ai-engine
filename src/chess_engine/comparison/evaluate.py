@@ -1,4 +1,4 @@
-"""Evaluate a model: ``python -m chess_engine.training.evaluate --model <name>``.
+"""Evaluate a model: ``python -m chess_engine.comparison.evaluate --model <name>``.
 
 By default the model is judged on the fixed test sample of the raw shards (``--raw``,
 ``--sidecar``): the ``accuracy`` section (:func:`~.judge.judge`) and the ``cost`` section (median
@@ -6,9 +6,9 @@ microseconds per single-position evaluation, as the search calls it). Every mode
 evaluated this way, including the older ones that are not retrained.
 
 The older CSV-era models keep their benchmark on a CSV (``--data``), which writes the
-``benchmark`` section with the centipawn metrics of :mod:`training.metrics`.
+``benchmark`` section with the centipawn metrics of :mod:`comparison.metrics`.
 
-Playing strength is measured by :mod:`training.tournament` instead.
+Playing strength is measured by :mod:`comparison.tournament` instead.
 """
 
 import argparse
@@ -22,14 +22,20 @@ import numpy as np
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.models.base import CP_SCALE, EvaluationModel
+from chess_engine.models.cards import current_commit, load_card, today, update_card
 from chess_engine.models.registry import available_models, load_model, split_spec
+from chess_engine.training.dataset import (
+    SPLIT_SEED,
+    TEST,
+    encode_positions,
+    load_evaluations,
+    split_dataset,
+)
+from chess_engine.training.sidecar import load_sample
 
-from .cards import current_commit, load_card, today, update_card
-from .dataset import SPLIT_SEED, TEST, encode_positions, load_evaluations, split_dataset
 from .judge import judge
 from .metrics import compute_metrics
 from .report import update_history_file
-from .sidecar import load_sample
 
 PREDICTION_BATCH = 4096
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).

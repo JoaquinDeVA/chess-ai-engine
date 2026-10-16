@@ -7,9 +7,10 @@ import pandas as pd
 import pytest
 
 from chess_engine import models
-from chess_engine.models import registry
-from chess_engine.training import cards, report
-from chess_engine.training import evaluate as evaluate_cli
+from chess_engine.comparison import evaluate as evaluate_cli
+from chess_engine.comparison import report
+from chess_engine.comparison.metrics import compute_metrics, outcome_class
+from chess_engine.models import cards, registry
 from chess_engine.training import train as train_cli
 from chess_engine.training.dataset import (
     TEST,
@@ -21,7 +22,6 @@ from chess_engine.training.dataset import (
     split_dataset,
 )
 from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.metrics import compute_metrics, outcome_class
 from chess_engine.training.representation import Representation
 from chess_engine.training.sidecar import build_sidecar
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets

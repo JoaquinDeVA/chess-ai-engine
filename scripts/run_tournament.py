@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from chess_engine.training.tournament import (  # noqa: E402
+from chess_engine.comparison.tournament import (  # noqa: E402
     ANCHOR,
     paired_openings,
     read_games,

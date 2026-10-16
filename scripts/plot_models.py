@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from chess_engine.training.cards import PROJECT_ROOT, load_all_cards  # noqa: E402
+from chess_engine.models.cards import PROJECT_ROOT, load_all_cards  # noqa: E402
 
 OUTPUT_DIR = PROJECT_ROOT / "docs" / "img"
 
@@ -94,7 +94,7 @@ def main() -> int:
     cards = benchmarked(load_all_cards())
     if not cards:
         print(
-            "No benchmarked models yet: run python -m chess_engine.training.evaluate first",
+            "No benchmarked models yet: run python -m chess_engine.comparison.evaluate first",
             file=sys.stderr,
         )
         return 1

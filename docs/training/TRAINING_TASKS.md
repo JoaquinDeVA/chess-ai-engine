@@ -30,10 +30,10 @@ not retrained and do not play.
 
 - [ ] Follow `docs/ADDING_A_MODEL.md` (a feature set and a model class, registered by name).
 - [ ] `python -m chess_engine.training.train --model <name> --effort <0-100>`
-- [ ] `python -m chess_engine.training.evaluate --model <name>`
+- [ ] `python -m chess_engine.comparison.evaluate --model <name>`
 - [ ] `python scripts/profile_tradeoff.py --players <name>,h2,h3 --seconds 1,3,10`
 - [ ] `python scripts/run_tournament.py --players <name>,h3,...` (must include `h3`, the Elo anchor)
-- [ ] `python -m chess_engine.training.report` and commit.
+- [ ] `python -m chess_engine.comparison.report` and commit.
 
 ## Optional
 

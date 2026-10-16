@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.training.judge import judge, one_ply_choice, static_metrics
+from chess_engine.comparison.judge import judge, one_ply_choice, static_metrics
 from tests.conftest import MATE_IN_ONE, MaterialStubModel, material_cp, random_positions
 
 

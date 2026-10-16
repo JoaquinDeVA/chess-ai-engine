@@ -8,9 +8,9 @@ from pathlib import Path
 import chess
 import pytest
 
-from chess_engine.models import registry
+from chess_engine.models import cards, registry
 from chess_engine.models.registry import artifact_path
-from chess_engine.training import cards, effort
+from chess_engine.training import effort
 from chess_engine.training.lichess import (
     SIDE_TO_MOVE,
     WHITE,

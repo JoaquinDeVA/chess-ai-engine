@@ -10,8 +10,8 @@ from pathlib import Path
 import chess
 import pytest
 
-from chess_engine.training import tournament
-from chess_engine.training.tournament import (
+from chess_engine.comparison import tournament
+from chess_engine.comparison.tournament import (
     paired_openings,
     run_round_robin,
     size_for_budget,
@@ -439,7 +439,8 @@ def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, m
 
 
 def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, monkeypatch):
-    from chess_engine.training import cards, report
+    from chess_engine.comparison import report
+    from chess_engine.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     cards.update_card("m", status="current", architecture="A")

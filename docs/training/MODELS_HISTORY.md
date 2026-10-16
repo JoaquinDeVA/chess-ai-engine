@@ -1,7 +1,7 @@
 # Models
 
 One row per model. The table is generated from `models/cards/*.json` by
-`python -m chess_engine.training.report`; `bash scripts/run_all.sh` regenerates the cards and the
+`python -m chess_engine.comparison.report`; `bash scripts/run_all.sh` regenerates the cards and the
 table (see [TRAINING_TASKS.md](TRAINING_TASKS.md)). A dash means the model has no result yet for
 that column.
 

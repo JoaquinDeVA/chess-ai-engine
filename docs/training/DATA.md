@@ -46,17 +46,36 @@ Code: `src/chess_engine/training/lichess_raw.py` (parser, shard writer),
 
 ## Running
 
+The streaming of the whole file over one HTTP connection is slow (about 1 MB/s) and fragile, so
+the file is downloaded first with `aria2c` (resumable) and then converted from the local copy:
+
 ```bash
-python scripts/fetch_lichess_raw.py --rows 1000000 --output-dir data/lichess/raw
+aria2c -x 4 -s 4 -k 64M --continue=true --auto-file-renaming=false --file-allocation=none \
+    --max-tries=0 --retry-wait=30 -d data/lichess -o lichess_db_eval.jsonl.zst \
+    https://database.lichess.org/lichess_db_eval.jsonl.zst
+python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst \
+    --output-dir data/lichess/raw --log-file data/lichess/progress.log
 ```
 
-Options: `--rows` (database lines to read, the first ones), `--output-dir`, `--url`,
-`--shard-rows` (lines per shard, default 1,000,000). The compressed file is never stored; the
-connection is closed after `--rows` lines. Shards are written to a `.tmp` file and renamed, so
-a shard exists complete or not at all. Restarting with the same options skips the finished shards
-(their lines are decompressed but not parsed; the stream cannot be seeked). Memory is bounded
-by one row group. Network stalls raise after 60 s; the script then exits non-zero and can simply
-be run again. If the stream ends before `--rows` lines the exit code is 1.
+The downloaded `lichess_db_eval.jsonl.zst` (22,423,777,007 bytes) is a **temporary file**: delete
+it after the conversion has finished and the shards are checked. Lichess answers HTTP 429 when
+too many connections are opened at once (16 were refused), hence 4.
+
+Options: `--input` (local `.zst`) or `--url` (stream over HTTP, the default), `--rows` (database
+lines to read, the first ones; without it the whole file is converted), `--output-dir`,
+`--shard-rows` (lines per shard, default 1,000,000), `--workers` (parsing processes, default
+cores - 2), `--log-file` and `--progress-seconds` (a progress line with lines, compressed
+GB read/total, percentage, MB/s, ETA and counters is printed and appended to the log every 60 s).
+The compressed file is never decompressed to disk. Only legal standard-chess positions are kept
+(`chess.Board(fen).is_valid()`; Chess960 setups, more than 32 pieces, ...); they are counted
+separately from unusable lines (no valid evaluation) in the logs and in the shard metadata
+(`dropped`, `illegal`). Building the board is the expensive part (about 22,000 FENs/s per core;
+the validity checks themselves 210,000/s), so parsing and the check run in a pool of processes
+while the main process decompresses; memory stays bounded (about 200 MB in the main process).
+Shards are written to a `.tmp` file and renamed, so a shard exists complete or not at all.
+Restarting with the same options skips the finished shards (their lines are decompressed but not
+parsed). Network stalls on `--url` raise after 60 s; with `--input` there is no network. If the
+stream ends before `--rows` lines the exit code is 1.
 
 ## Trial run: first 1,000,000 positions
 

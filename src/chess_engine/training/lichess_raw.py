@@ -10,6 +10,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
+import chess
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -71,6 +72,38 @@ def parse_raw_record(line: str) -> dict[str, Any] | None:
         return None
 
 
+def is_legal_position(fen: str) -> bool:
+    """Tell whether a FEN is a legal standard-chess position (``chess.Board.is_valid``).
+
+    :param fen: Position as stored in the database.
+    :return: False for unparsable FENs and for positions such as Chess960 setups or boards with
+        more than 32 pieces.
+    """
+    try:
+        return chess.Board(fen).is_valid()
+    except ValueError:
+        return False
+
+
+def parse_chunk(lines: list[str]) -> tuple[pa.Table, int, int]:
+    """Parse lines and keep the legal positions (the unit of work of the parallel conversion).
+
+    :param lines: Lines of the database.
+    :return: Table of the kept records, number of unusable lines and number of lines whose
+        position is not legal (see :func:`is_legal_position`).
+    """
+    records, unusable, illegal = [], 0, 0
+    for line in lines:
+        record = parse_raw_record(line)
+        if record is None:
+            unusable += 1
+        elif is_legal_position(record["fen"]):
+            records.append(record)
+        else:
+            illegal += 1
+    return to_table(records), unusable, illegal
+
+
 def parse_lines(lines: Iterable[str]) -> Iterator[dict[str, Any] | None]:
     """Parse every line; unusable ones yield None so the caller can count them.
 
@@ -115,7 +148,15 @@ class ShardWriter:
         :param records: Records from :func:`parse_raw_record`.
         """
         if records:
-            self.writer.write_table(to_table(records), row_group_size=ROW_GROUP_SIZE)
+            self.write_table(to_table(records))
+
+    def write_table(self, table: pa.Table) -> None:
+        """Append a table as row groups.
+
+        :param table: Table with :data:`RAW_SCHEMA`.
+        """
+        if table.num_rows:
+            self.writer.write_table(table, row_group_size=ROW_GROUP_SIZE)
 
     def close(self, metadata: dict[str, Any]) -> None:
         """Store the metadata, close the file and move it into place.

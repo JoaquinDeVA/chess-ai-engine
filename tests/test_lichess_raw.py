@@ -7,6 +7,7 @@ import pytest
 
 from chess_engine.training.lichess_raw import (
     RAW_COLUMNS,
+    is_legal_position,
     parse_raw_record,
     read_metadata,
     shard_path,
@@ -54,6 +55,22 @@ class TestParseRawRecord:
         assert parse_raw_record(text) is None
 
 
+ILLEGAL_FEN = "8/8/8/8/8/8/8/KK5k w - -"
+
+
+@pytest.mark.parametrize(
+    "fen, legal",
+    [
+        (FEN, True),
+        (ILLEGAL_FEN, False),
+        ("garbage", False),
+        ("rnbqkbnr/8/8/8/8/8/8/8 w - -", False),
+    ],
+)
+def test_is_legal_position(fen, legal):
+    assert is_legal_position(fen) is legal
+
+
 def test_shard_roundtrip(tmp_path):
     records = [
         parse_raw_record(
@@ -91,20 +108,30 @@ def test_fetch_is_sharded_and_restartable(tmp_path):
         pv = {"cp": cp, "line": "e2e4"}
         lines.append(json.dumps({"fen": fen, "evals": [{"pvs": [pv], "knodes": 1, "depth": 5}]}))
     lines.insert(10, "garbage")
+    illegal = json.dumps(
+        {"fen": ILLEGAL_FEN, "evals": [{"pvs": [{"cp": 0, "line": "a1a2"}], "depth": 5}]}
+    )
+    lines.insert(20, illegal)
     source = tmp_path / "db.jsonl.zst"
     source.write_bytes(zstandard.ZstdCompressor().compress(("\n".join(lines) + "\n").encode()))
+    log = tmp_path / "progress.log"
 
     out = tmp_path / "raw"
-    first = module.fetch(source.as_uri(), 300, out, 150)
-    assert (first["lines"], first["kept"], first["dropped"]) == (300, 299, 1)
+    first = module.fetch(str(source), 300, out, 150, workers=2, log_file=log)
+    assert (first["lines"], first["kept"], first["dropped"], first["illegal"]) == (300, 298, 1, 1)
     assert sorted(p.name for p in out.glob("*.parquet")) == [
         f"part-0000{i}.parquet" for i in range(2)
     ]
-    assert sum(pq.read_metadata(p).num_rows for p in out.glob("*.parquet")) == 299
+    assert sum(pq.read_metadata(p).num_rows for p in out.glob("*.parquet")) == 298
+    assert "ETA" in log.read_text() and "100.0%" in log.read_text()
     mtime = shard_path(out, 0).stat().st_mtime_ns
 
     shard_path(out, 1).unlink()
     again = module.fetch(source.as_uri(), 300, out, 150)
-    assert (again["kept"], again["dropped"]) == (299, 1)
+    assert (again["kept"], again["dropped"], again["illegal"]) == (298, 1, 1)
     assert shard_path(out, 0).stat().st_mtime_ns == mtime
     assert read_metadata(shard_path(out, 0))["perspective"] == again["perspective"]
+
+    whole = module.fetch(str(source), None, tmp_path / "all", 150, workers=2)
+    assert (whole["lines"], whole["kept"], whole["dropped"], whole["illegal"]) == (402, 400, 1, 1)
+    assert len(list((tmp_path / "all").glob("*.parquet"))) == 3

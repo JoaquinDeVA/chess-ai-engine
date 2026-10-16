@@ -237,8 +237,8 @@ class TestCardsAndReport:
         )
         text = report.render_tables()
         assert (
-            "| `ridge_features` | accuracy record | 30 | — | — | 0.912 | 0.083 | 34.5% / 28.0% | 12.5 "
-            "| — | — | — | — | — | — |"
+            "| `ridge_features` | accuracy record | 30 | — | — | 0.912 | 0.083 | 34.5% / 28.0% "
+            "| 12.5 | — | — | — | — | — | — |"
         ) in text
 
     def test_models_without_sections_show_dashes(self, isolated_cards):

@@ -57,25 +57,35 @@ flowchart TD
 * **Killer moves**: up to three moves per depth that recently caused a cut-off are searched first.
 * **Move ordering**: `order_moves_callback(board, moves)`; the bots use MVV-LVA (captures first,
   most valuable victim and least valuable attacker first; en passant counts as a pawn capture).
+* **Make / unmake**: the advanced search walks the tree on one state with `apply_move` and
+  `undo_move` instead of copying the position at every node. `ChessGameState` keeps its own undo
+  stack (the position history and the cached outcome), so an undo restores them exactly.
+* **Fast terminal detection**: `is_over()` caches the outcome of the state. The threefold repetition
+  is read from the transposition keys of the positions since the last irreversible move (kept in
+  the state and extended in constant time per move), not by replaying the game as python-chess does;
+  the rules are the same as `board.outcome(claim_draw=True)`.
 
 ## Iterative deepening and time
 
 ```mermaid
 flowchart TD
-    A["depth = 1"] --> B{"estimated time of this depth<br/>fits in the remaining budget?"}
-    B -- no --> Z["return best move so far"]
-    B -- yes --> C["run advanced search at depth"]
+    A["depth = 1, 2"] --> C["run advanced search at depth"]
     C --> D{"truncated by the clock?"}
-    D -- yes --> Z
-    D -- no --> E["keep its move"]
-    E --> F{"budget used up or depth == max?"}
+    D -- yes --> Z["return best move so far"]
+    D -- no --> E["keep its move: completed_depth = depth"]
+    E --> F{"depth == max?"}
     F -- yes --> Z
-    F -- no --> G["depth += 1"] --> B
+    F -- no --> B{"from the third iteration on:<br/>estimated time of depth + 1<br/>fits in the remaining budget?"}
+    B -- no --> Z
+    B -- yes --> G["depth += 1"] --> C
 ```
 
-The estimate multiplies the duration of the last iteration by the ratio of the last two. An
+The first two iterations always run. From the third on, the estimate multiplies the duration of
+the last iteration by the growth between the last two (1.5 when they are too short to measure), and
+the iteration is skipped when the estimate exceeds the remaining time by more than 15%. An
 interrupted iteration is discarded unless it is the first one (some move is always needed).
-`elapsed` is measured from the start of the move, not of each iteration.
+`completed_depth` in the statistics is the depth of the last finished iteration, the move the bot
+returns. `elapsed` is measured from the start of the move, not of each iteration.
 
 `TimeManager` turns the clock into a budget: 15% of the remaining time, between 1.5 s and 40 s and never
 more than half the clock; the hard limit is `1.5 × budget − 0.3 s`.

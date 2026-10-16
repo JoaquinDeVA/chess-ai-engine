@@ -38,7 +38,7 @@ results/
 last_game.pgn
 last_tournament/
 tournament_results_*.json
-models/artifacts/*.tmp
+src/chess_engine/models/artifacts/*.tmp
 
 # Representation bake-off models (scripts/bakeoff_representation.py; tags @<prefix>-<i>)
 src/chess_engine/models/artifacts/*@*bake-*

@@ -58,18 +58,27 @@ flowchart TB
     REG --> EVAL["evaluation/<br/>features, heuristics"]
     REG --> MODELS["models/<br/>learned evaluators"]
     REG --> KNOW["knowledge/<br/>opening book, Prolog"]
-    TRAIN["training/"] --> MODELS
+    TRAIN["training/<br/>data preparation, training"] --> MODELS
+    COMP["comparison/<br/>judge, tradeoff, tournament, report"] --> TRAIN
+    COMP --> MODELS
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for class diagrams and the life of a move.
 
 ```
-src/chess_engine/   the engine: search, bots, engine, evaluation, knowledge, models, training, config
+.github/workflows/  continuous integration (ruff, pytest)
 data/               opening book (versioned) and downloaded datasets (ignored by git)
-docs/               guides and diagrams; docs/training/ holds the training checklist and model history
-scripts/            dataset download and labelling, plots, run_all.sh
+docs/               guides, diagrams and the training records (docs/training/)
+scripts/
+  data/             Lichess download and conversion, sidecars, Stockfish labelling
+  bench/            search benchmark, depth profile, tournament, representation bake-off
+  docs/             pattern diagrams
+  run_all.sh        the whole training and comparison flow
+src/chess_engine/   the package: bots, comparison, config, engine, evaluation, knowledge,
+                    models, search, training
 tests/              pytest suite
 main.py             command-line interface
+pyproject.toml      packaging, dependencies and tool configuration
 ```
 
 ## Installation
@@ -158,11 +167,13 @@ is the checklist and [ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md) explains how to
 
 ```bash
 pytest                       # whole suite (tests needing SWI-Prolog or Stockfish skip if absent)
+pytest -m "not slow"         # skips the tests marked slow (tournament pools, bake-off fixture, linear fit)
 ruff check . && ruff format --check .
 ```
 
 The suite covers the search algorithms (with hand-made game trees), every bot, the registry and CLI,
-the model layer, the training pipeline and the dataset scripts.
+the model layer, the training and comparison pipelines, the dataset scripts and the links and
+commands quoted in the documentation (`tests/test_docs.py`).
 
 ## Project history
 

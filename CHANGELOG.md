@@ -19,6 +19,8 @@
   counts between two runs.
 - Model cards carry accuracy, cost, trade-off and tournament sections; `MODELS_HISTORY.md` is
   generated from them.
+- `tests/test_docs.py` checks the relative links, the `python -m chess_engine.*` commands and the
+  `scripts/` paths quoted in the documentation; the slow tests are marked `slow`.
 - Search speed-ups: fast transposition key and make/unmake in the advanced search, fast terminal
   detection with the same draw rules.
 
@@ -26,6 +28,7 @@
 - `RandomBot`, `HeuristicAlphaBetaBot`, `MLBot`, `TacticalAlphaBetaBot`, `NonTacticalAlphaBetaBot`
   and the `FixedDepthBot` base. `PrologPatternDetector` moved to `knowledge/pattern_detector.py`.
 - `linear_baseline`, superseded by `material_linear`.
+- `scripts/plot_models.py` (it read the legacy benchmark section of the cards).
 - The strength matches in `comparison.evaluate` and the "Playing strength" column: playing strength
   now comes from the round-robin tournament.
 
@@ -35,8 +38,14 @@
 - `comparison.evaluate` judges every model on a fixed test sample (200,000 positions of the raw
   shards); the CSV benchmark stays available with `--data`.
 - Code moved to an installable package in `src/chess_engine/` (`adversarial_search` is now
-  `chess_engine.search`); module commands are `python -m chess_engine.training.<command>`.
+  `chess_engine.search`); module commands are `python -m chess_engine.training.train` and
+  `python -m chess_engine.comparison.{evaluate,report}`.
   `ROADMAP.md` moved to `docs/`, `TRAINING_TASKS.md` and `MODELS_HISTORY.md` to `docs/training/`.
+- Comparison tools (`judge`, `tradeoff`, `tournament`, `evaluate`, `report`, `metrics`) moved from
+  `training` to `chess_engine.comparison`; the model cards module moved to `chess_engine.models.cards`.
+  `training` no longer depends on `comparison`.
+- Scripts are grouped by purpose: `scripts/data/`, `scripts/bench/`, `scripts/docs/`; `run_all.sh`
+  stays in `scripts/`.
 - `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now
   `IterativeModelBookBot`. Strength matches play against H2 and H3 only.
 

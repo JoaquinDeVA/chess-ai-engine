@@ -142,14 +142,16 @@ more balanced positions come first. The first 1M rows are not a uniform sample o
 | time if network were not the limit | about 2.3 h of CPU (51k lines/s) |
 | memory | about 220 MB |
 
-## Open questions for the next phase
+## From raw shards to training
 
-- Keep everything (about 9 GB) or a subset? A sample spread over the whole file avoids the
-  ordering bias but needs reading all 22.4 GB anyway.
-- Filter: minimum depth (e.g. >= 20), drop positions with abs(cp) > 1000 or mates, positions
-  in check or with a capture as best move (quiet-position training), cap on piece count (63
-  pieces is not a normal position).
-- Target definition: clip cp to +-1000? map mates to a fixed value? WDL-style transform?
-- Sign: convert to side-to-move perspective for training, or keep White's?
-- Does a shard-level shuffle suffice for training, or is a global shuffle needed?
-- Check the odd positions (more than 32 pieces, depth 245) before training on them.
+1. `scripts/data/fetch_lichess_raw.py` writes the shards (above).
+2. `scripts/data/prepare_dataset.py` writes one sidecar per shard (`part-NNNNN.sidecar.parquet`,
+   same rows and row groups as the shard). Each position gets its split (train, validation or
+   test, from a seeded hash of its FEN, `chess_engine.training.dataset.assign_split`), its quiet
+   flag (not in check and the best move is neither a capture nor a promotion) and its side to move.
+   Shards that already have a sidecar are skipped.
+3. `chess_engine.training.train` streams the training rows from the sidecars and the raw shards.
+   `chess_engine.comparison.evaluate` judges a model on a seeded sample of 200,000 test rows
+   (seed 42).
+
+The models trained on these data and their results are in [MODELS_HISTORY.md](MODELS_HISTORY.md).

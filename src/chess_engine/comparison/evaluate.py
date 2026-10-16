@@ -23,7 +23,7 @@ import numpy as np
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.models.base import CP_SCALE, EvaluationModel
 from chess_engine.models.cards import current_commit, load_card, today, update_card
-from chess_engine.models.registry import available_models, load_model, split_spec
+from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
 from chess_engine.training.dataset import (
     SPLIT_SEED,
     TEST,
@@ -236,7 +236,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         sections["benchmark"] = benchmark(
             model, args.data, args.max_test_rows, args.latency_samples, args.jobs
         )
-    saved = args.path or model.default_path()
+    saved = args.path or artifact_path(args.model)
     if saved.exists():
         sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
     if "status" not in load_card(args.model):

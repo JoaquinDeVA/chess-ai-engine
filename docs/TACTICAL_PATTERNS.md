@@ -5,9 +5,9 @@
 moment.
 
 > **Cost.** Loading a position into Prolog takes about 2 ms. Used as move ordering in every node of an
-> alpha-beta search (the former `TacticalAlphaBetaBot`), a depth-3 move took several seconds against
-> about one second without it, and quiet middlegame positions could even visit *more* nodes. That bot
-> was removed; the detector is kept for a cheaper use (near the root only, or cached).
+> alpha-beta search, a depth-3 move took several seconds against about one second without it, and
+> quiet middlegame positions could even visit *more* nodes. The bot that did this was removed; the
+> detector is kept for a cheaper use (near the root only, or cached).
 
 The detector loads the position once as facts (`piece/4`,
 `to_move/1`, `can_castle/2`, `en_passant/2`, `move/4`), queries each predicate once for all moves

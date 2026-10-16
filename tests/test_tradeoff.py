@@ -9,7 +9,7 @@ import pytest
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h2, h3
-from chess_engine.training import tradeoff
+from chess_engine.training import cards, tradeoff
 from chess_engine.training.tradeoff import fixed_time_manager, make_player, profile
 
 
@@ -81,3 +81,38 @@ def test_parallel_workers_are_single_threaded_and_env_restored(monkeypatch):
     assert len(outcome["results"]) == 2
     assert os.environ["OMP_NUM_THREADS"] == "7"
     assert "TF_NUM_INTRAOP_THREADS" not in os.environ
+
+
+@pytest.fixture
+def cards_dir(tmp_path, monkeypatch):
+    """Model cards in a temporary directory, with the artifacts of the tests in it too."""
+    from chess_engine.models import base as models_base
+    from chess_engine.models import registry
+
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+    return tmp_path
+
+
+def test_profile_writes_tradeoff_sections_shown_by_the_history(cards_dir):
+    from chess_engine.models.linear_eval import PstTaperedModel
+    from chess_engine.training import report
+
+    PstTaperedModel().save(cards_dir / "pst_tapered@t.npz")
+    cards.update_card("pst_tapered@t", status="current", architecture="PST", parameters=769)
+    results = tradeoff.run_profiles(["pst_tapered@t", "h2"], [1, 0.5], _positions())["results"]
+
+    assert tradeoff.record_cards(results) == ["pst_tapered@t"]
+    section = cards.load_card("pst_tapered@t")["tradeoff"]
+    assert set(section) == {"1", "0.5"}
+    for seconds in ("1", "0.5"):
+        assert section[seconds]["mean_depth"] >= 1
+        assert 0.0 <= section[seconds]["search_agreement"] <= 1.0
+    assert not cards.card_path("h2").exists()
+
+    text = report.render_tables()
+    row = next(line for line in text.splitlines() if line.startswith("| `pst_tapered@t`"))
+    cells = [cell.strip() for cell in row.split("|")[1:-1]]
+    assert float(cells[9]) == pytest.approx(section["1"]["mean_depth"], abs=0.05)
+    assert cells[10] == "—"  # no profile at 3 s

@@ -409,3 +409,37 @@ def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, m
     assert summary["players"]["pst_tapered@x"]["elo_vs_anchor"] == pytest.approx(0.0)
     with pytest.raises(ValueError, match="'m'"):
         summarize([game("h2", "h3", "white")], anchor="m")
+
+
+def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, monkeypatch):
+    from chess_engine.training import cards, report
+
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    cards.update_card("m", status="current", architecture="A")
+    results = [
+        game("m", "h3", "white"),
+        game("h3", "m", "white"),
+        game("m", "h2", None),
+        game("h2", "m", "black"),
+        game("h3", "h2", "white"),
+        game("m2", "h3", "black"),
+    ]
+    summary = summarize(results)
+    assert summary["players"]["m"]["elo_interval"] > 0
+
+    recorded = tournament.record_cards(summary, ["h2", "h3", "m", "m2"], "h3", 10.0, 0.1)
+    assert recorded == ["m"]
+    section = cards.load_card("m")["tournament"]
+    entry = summary["players"]["m"]
+    assert section == {
+        "games": entry["games"],
+        "score": entry["score"],
+        "elo": entry["elo"],
+        "elo_interval": entry["elo_interval"],
+        "anchor": "h3",
+        "base": 10.0,
+        "increment": 0.1,
+    }
+    assert not cards.card_path("m2").exists() and not cards.card_path("h3").exists()
+    row = next(line for line in report.render_tables().splitlines() if "`m`" in line)
+    assert f"{entry['score']:.1f}%" in row and "±" in row

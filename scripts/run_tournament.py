@@ -6,7 +6,8 @@ python scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
 the number of openings to fit ``--hours``. The games go to ``--out`` (resumable) and the results
-to ``docs/training/TOURNAMENT.md``.
+to ``docs/training/TOURNAMENT.md``. The ``tournament`` section of the model cards of the players
+(those that have a card) is updated too.
 """
 
 import argparse
@@ -24,6 +25,7 @@ from chess_engine.training.tournament import (  # noqa: E402
     ANCHOR,
     paired_openings,
     read_games,
+    record_cards,
     run_round_robin,
     size_for_budget,
     summarize,
@@ -190,6 +192,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_markdown(summary, specs, meta, args.anchor))
     print(f"Wrote {args.report}")
+    recorded = record_cards(summary, specs, args.anchor, args.base, args.increment)
+    if recorded:
+        print("Model cards updated: " + ", ".join(recorded))
     return 0
 
 

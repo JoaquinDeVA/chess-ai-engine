@@ -26,7 +26,8 @@ import chess
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.engine.game_manager import GameManager
 from chess_engine.search.time_management import TimeManager
-from chess_engine.training.tradeoff import make_player
+from chess_engine.training.cards import card_path, update_card
+from chess_engine.training.tradeoff import HEURISTICS, make_player
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +433,8 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
     Crashed games (records with ``"error"``) are left out. For each player the score is
     ``wins + draws / 2`` over games. ``elo_vs_anchor`` uses the player's score against ``anchor``
     alone; ``elo`` is the Bradley-Terry fit over all pairs. The 95% interval of the score is the
-    normal approximation from the variance of the per-game points.
+    normal approximation from the variance of the per-game points; ``elo_interval`` is the
+    half-width of the Elo implied by that score interval (an approximation, not a fitted interval).
 
     Caveats: scores entering the Elo formulas are clipped to ``[0.01, 0.99]``. The intervals treat
     games as independent, but the two games of a paired opening are correlated, so they are
@@ -441,8 +443,9 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
     :param results: Game records as written by :func:`run_round_robin`.
     :param anchor: Player whose Elo is 0.
     :return: ``players`` (per player: games, wins, draws, losses, score in percent, ``ci95`` in
-        percent, ``elo_vs_anchor``, ``elo``), ``head_to_head`` (``[wins, draws, losses]`` of the
-        row player against the column player) and ``errors`` (number of crashed games).
+        percent, ``elo_vs_anchor``, ``elo``, ``elo_interval``), ``head_to_head`` (``[wins, draws,
+        losses]`` of the row player against the column player) and ``errors`` (number of crashed
+        games).
     :raises ValueError: If ``anchor`` takes part in none of the records.
     """
     if not any(anchor in (r["white"], r["black"]) for r in results):
@@ -486,6 +489,7 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
             "ci95": None,
             "elo_vs_anchor": None,
             "elo": fitted.get(p),
+            "elo_interval": None,
         }
         if n:
             mean = points[p] / n
@@ -494,6 +498,7 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
             entry["score"] = 100 * mean
             low, high = max(0.0, mean - margin), min(1.0, mean + margin)
             entry["ci95"] = [100 * low, 100 * high]
+            entry["elo_interval"] = (_elo_from_score(high) - _elo_from_score(low)) / 2
             if p == anchor:
                 entry["elo_vs_anchor"] = 0.0
             elif counts.get((p, anchor)):
@@ -507,6 +512,45 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
         "head_to_head": head,
         "errors": errors,
     }
+
+
+def record_cards(
+    summary: Dict[str, Any], specs: Sequence[str], anchor: str, base: float, increment: float
+) -> List[str]:
+    """Write the ``tournament`` section of the model cards of the players.
+
+    Heuristic players (``h2``, ``h3``) have no card and are skipped; so is a model whose card does
+    not exist yet (cards are written by training, not created here) or that played no game.
+
+    :param summary: Output of :func:`summarize`.
+    :param specs: Players of the tournament.
+    :param anchor: Elo anchor of the summary.
+    :param base: Starting clock, in seconds.
+    :param increment: Seconds per move.
+    :return: The players whose card was updated.
+    """
+    recorded = []
+    for spec in specs:
+        entry = summary["players"].get(spec)
+        if spec in HEURISTICS or not entry or not entry["games"]:
+            continue
+        if not card_path(spec).exists():
+            logger.warning("no model card for %s: tournament section not written", spec)
+            continue
+        update_card(
+            spec,
+            tournament={
+                "games": entry["games"],
+                "score": entry["score"],
+                "elo": entry["elo"],
+                "elo_interval": entry["elo_interval"],
+                "anchor": anchor,
+                "base": base,
+                "increment": increment,
+            },
+        )
+        recorded.append(spec)
+    return recorded
 
 
 def size_for_budget(hours: float, workers: int, n_players: int, seconds_per_game: float) -> int:

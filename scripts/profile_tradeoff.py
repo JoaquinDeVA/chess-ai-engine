@@ -7,6 +7,8 @@ Use ``--parallel 1`` (the default) for published numbers: parallel workers are l
 thread each but still compete for the machine.
 
 Writes the JSON results, ``docs/training/TRADEOFF.md`` and ``docs/img/depth_vs_accuracy.png``.
+The ``tradeoff`` section of the model cards of the profiled models (those that have a card) is
+updated too.
 """
 
 import argparse
@@ -23,7 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from chess_engine.training.tradeoff import run_profiles  # noqa: E402
+from chess_engine.training.tradeoff import record_cards, run_profiles  # noqa: E402
 
 DEFAULT_PLAYERS = "pst_tapered,pst_terms,material_linear,h2,h3,mlp_features"
 
@@ -124,6 +126,9 @@ def main() -> None:
     render_markdown(results, args.markdown)
     plot(results, args.plot)
     print(f"Wrote {args.out}, {args.markdown} and {args.plot}")
+    recorded = record_cards(results)
+    if recorded:
+        print("Model cards updated: " + ", ".join(recorded))
     if outcome["skipped"]:
         print("SKIPPED (no saved model): " + ", ".join(outcome["skipped"]))
 

@@ -7,12 +7,13 @@ depth in the same time per move. :func:`profile` measures both sides for one pla
 """
 
 import logging
+import math
 import multiprocessing
 import os
 import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import chess
 import pandas as pd
@@ -25,6 +26,8 @@ from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, get_model_class
 from chess_engine.models.registry import split_spec
 from chess_engine.search.time_management import TimeManager
+
+from .cards import card_path, update_card
 
 logger = logging.getLogger(__name__)
 
@@ -193,3 +196,36 @@ def run_profiles(
             logger.warning("skipping %s: no saved model artifact", spec)
             skipped.append(spec)
     return {"results": [o for o in outcomes if o is not None], "skipped": skipped}
+
+
+def record_cards(results: Sequence[Dict[str, Any]]) -> List[str]:
+    """Write the ``tradeoff`` section of the model cards of the profiled players.
+
+    Each section maps the seconds per move (as in ``"1"``, ``"0.5"``) to the mean completed depth
+    and the overall search agreement of the player. Heuristic players and models without a card
+    are skipped, as are results without any measured position.
+
+    :param results: Output of :func:`run_profiles`.
+    :return: The players whose card was updated.
+    """
+    recorded: List[str] = []
+    for result in results:
+        spec, overall = str(result["player"]), result["overall"]
+        if spec in HEURISTICS or "mean_depth" not in overall:
+            continue
+        if not card_path(spec).exists():
+            logger.warning("no model card for %s: tradeoff section not written", spec)
+            continue
+        agreement = overall["search_agreement"]
+        if isinstance(agreement, float) and math.isnan(agreement):  # no position judged
+            agreement = None
+        seconds = f"{float(result['seconds']):g}"
+        update_card(
+            spec,
+            tradeoff={
+                seconds: {"mean_depth": overall["mean_depth"], "search_agreement": agreement}
+            },
+        )
+        if spec not in recorded:
+            recorded.append(spec)
+    return recorded

@@ -27,6 +27,7 @@ from chess_engine.training.representation import Representation, score_to_cp, ta
 
 from .base import CP_SCALE, EvaluationModel
 from .linear_features import (
+    KingBucketFeatures,
     LinearFeatures,
     MaterialCountFeatures,
     PstFeatures,
@@ -486,3 +487,11 @@ class MaterialLinearModel(LinearEvalModel):
 
     features = MaterialCountFeatures()
     architecture = "Logistic regression on 5 material counts (own minus opponent)"
+
+
+@register_model("pst_kb")
+class KingBucketModel(LinearEvalModel):
+    """King-bucketed piece-square features (10,368 weights), logistic."""
+
+    features = KingBucketFeatures()
+    architecture = "King-bucketed piece-square features (10,368 weights), logistic"

@@ -13,9 +13,11 @@ from chess_engine.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
     TERM_NAMES,
+    KingBucketFeatures,
     MaterialCountFeatures,
     PstFeatures,
     PstTermsFeatures,
+    SlottedPstFeatures,
     _pawn_terms,
     phase,
 )
@@ -283,3 +285,120 @@ def test_pawn_cache_hit_returns_same_features():
     cached = _pawn_terms(first)
     assert _pawn_terms(second) is cached
     assert len(_PAWN_CACHE) == 1
+
+
+def test_slotted_features_are_one_hot_and_mover_relative():
+    features = SlottedPstFeatures()
+    indices, values = features.active(chess.Board(), "side_to_move")
+    assert len(indices) == 32
+    assert values == [1.0] * 32
+    assert features.size("side_to_move") == 768
+    assert features.max_active == 32
+    assert sorted(indices) == sorted(features.active(chess.Board().mirror(), "side_to_move")[0])
+    for board in random_positions(20, seed=21):
+        indices, _ = features.active(board, "side_to_move")
+        m_indices, _ = features.active(board.mirror(), "side_to_move")
+        assert sorted(indices) == sorted(m_indices)
+
+
+def test_slotted_white_perspective_has_turn_entry():
+    features = SlottedPstFeatures()
+    assert features.size("white") == 769
+    indices, values = features.active(chess.Board(), "white")
+    assert len(indices) == 33
+    assert sum(1 for index in indices if index < 384) == 16  # White pieces
+    assert sum(1 for index in indices if 384 <= index < 768) == 16  # Black pieces
+    assert indices[-1] == 768
+    assert values[-1] == 1.0
+    black_to_move = chess.Board()
+    black_to_move.turn = chess.BLACK
+    assert SlottedPstFeatures().active(black_to_move, "white")[1][-1] == 0.0
+
+
+def test_king_bucket_mirror_invariance():
+    features = KingBucketFeatures()
+    for board in random_positions(50, seed=22):
+        indices, _ = features.active(board, "side_to_move")
+        m_indices, _ = features.active(board.mirror(), "side_to_move")
+        assert sorted(indices) == sorted(m_indices)
+
+
+def test_king_bucket_file_mirror_symmetry():
+    # Castling rights and en passant are not features: clear them so that the file mirror of a
+    # position is a position of the same kind.
+    features = KingBucketFeatures()
+    for board in random_positions(50, seed=23):
+        board.castling_rights = chess.BB_EMPTY
+        board.ep_square = None
+        mirrored = board.transform(chess.flip_horizontal)
+        indices, _ = features.active(board, "side_to_move")
+        m_indices, _ = features.active(mirrored, "side_to_move")
+        assert sorted(indices) == sorted(m_indices)
+
+
+def test_king_bucket_counts_and_bounds():
+    features = KingBucketFeatures()
+    assert features.size("side_to_move") == 10368
+    assert features.max_active == 64
+    indices, values = features.active(chess.Board(), "side_to_move")
+    assert len(indices) == 2 * 30 + 2
+    assert values == [1.0] * len(indices)
+    assert all(0 <= index < 10368 for index in indices)
+    for board in random_positions(200, seed=31):
+        indices, _ = features.active(board, "side_to_move")
+        non_king = len(board.piece_map()) - 2
+        assert len(indices) == 2 * non_king + 2
+        assert len(indices) <= features.max_active
+        assert all(0 <= index < 10368 for index in indices)
+
+
+def test_king_bucket_rejects_white_perspective():
+    with pytest.raises(ValueError, match="side_to_move"):
+        KingBucketFeatures().size("white")
+    with pytest.raises(ValueError, match="side_to_move"):
+        KingBucketFeatures().active(chess.Board(), "white")
+
+
+def test_pst_kb_mirror_complement():
+    model = get_model_class("pst_kb")()
+    rng = np.random.default_rng(5)
+    model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
+    model.bias = 0.1
+    for board in random_positions(20, seed=24):
+        assert model.expected_score(board) == pytest.approx(
+            1.0 - model.expected_score(board.mirror())
+        )
+
+
+@pytest.mark.slow
+def test_pst_kb_fit_learns_material():
+    model = get_model_class("pst_kb")()
+    boards = random_positions(3000, seed=25)
+    batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
+    config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
+    model.fit_stream(batches, frame(random_positions(300, seed=26)), config)
+
+    # Looser than the PST test: each king-bucket weight sees fewer examples, so it fits slower.
+    assert model.expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.8
+    assert model.expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.2
+
+
+def test_pst_kb_save_load_round_trip(tmp_path):
+    model = get_model_class("pst_kb")()
+    rng = np.random.default_rng(8)
+    model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
+    model.bias = -0.2
+    path = model.save(tmp_path / "kb.npz")
+
+    loaded = get_model_class("pst_kb").load(path)
+
+    assert loaded.count_parameters() == model.count_parameters() == 10368 + 1
+    for board in random_positions(10, seed=27):
+        assert loaded.expected_score(board) == pytest.approx(model.expected_score(board))
+
+
+def test_pst_kb_is_registered():
+    assert "pst_kb" in available_models()
+    model = get_model_class("pst_kb")
+    assert isinstance(model.features, KingBucketFeatures)
+    assert model.architecture == "King-bucketed piece-square features (10,368 weights), logistic"

@@ -340,3 +340,160 @@ class PstTermsFeatures(LinearFeatures):
             indices.append(self._TURN_INDEX)
             values.append(1.0 if board.turn == chess.WHITE else -1.0)
         return indices, values
+
+
+#: Offset of the opponent's piece block in :class:`SlottedPstFeatures`.
+_OPPONENT_PIECE_BLOCK = 6 * 64
+
+
+class SlottedPstFeatures(LinearFeatures):
+    """One-hot piece-square features with one entry per piece, for neural inputs.
+
+    Under ``"side_to_move"`` a piece of the player to move gets index ``type * 64 + square`` and a
+    piece of the opponent gets ``384 + type * 64 + square``, the square seen from the home rank of
+    its colour (mirrored by rank for Black). Every value is ``1.0``, so the vector has at most
+    :attr:`max_active` non-zero entries.
+
+    Under ``"white"`` no mirroring is applied: White pieces use the first block, Black pieces the
+    second, and one turn entry at index 768 follows, ``1.0`` when White is to move and ``0.0``
+    otherwise.
+
+    :cvar name: ``"pst_slotted"``.
+    :cvar max_active: Most entries under ``"side_to_move"`` (one per piece, 32 at most).
+    """
+
+    name = "pst_slotted"
+    max_active = 32
+    _TURN_INDEX = 2 * _OPPONENT_PIECE_BLOCK
+
+    def size(self, perspective: str) -> int:
+        """Two blocks of 384 piece-square weights, plus one turn weight under ``"white"``.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``768`` or ``769``.
+        """
+        return self._TURN_INDEX + (1 if perspective == "white" else 0)
+
+    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
+        """Index of every piece, all values ``1.0``, plus the turn entry under ``"white"``.
+
+        :param board: The position.
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: Two parallel lists; one entry per piece (plus the turn entry under ``"white"``).
+        """
+        mover = board.turn
+        indices: List[int] = []
+        for square, piece in board.piece_map().items():
+            offset = (piece.piece_type - 1) * 64
+            if perspective == "white":
+                if piece.color == chess.BLACK:
+                    offset += _OPPONENT_PIECE_BLOCK
+                indices.append(offset + square)
+                continue
+            if piece.color != mover:
+                offset += _OPPONENT_PIECE_BLOCK
+            oriented = chess.square_mirror(square) if piece.color == chess.BLACK else square
+            indices.append(offset + oriented)
+        values = [1.0] * len(indices)
+        if perspective == "white":
+            indices.append(self._TURN_INDEX)
+            values.append(1.0 if mover == chess.WHITE else 0.0)
+        return indices, values
+
+
+_KB_BUCKETS = 8
+_KB_PIECE_CLASSES = 10
+#: Features of one (slot, bucket) block: ten piece classes times 64 squares.
+_KB_BLOCK = _KB_PIECE_CLASSES * 64
+_KB_KING_BASE = 2 * _KB_BUCKETS * _KB_BLOCK
+_KB_SIZE = _KB_KING_BASE + 2 * 64
+_KB_WHITE_ERROR = (
+    "king_bucket features are defined for the side_to_move perspective only, not for white"
+)
+#: Square maps indexed by ``2 * black + flip``: rank-oriented to the home rank (Black mirrored by
+#: rank), then mirrored in file when ``flip`` is set (the king sits on files a to d).
+_KB_SQUARE_MAPS = tuple(
+    tuple((chess.square_mirror(sq) if black else sq) ^ (7 if flip else 0) for sq in range(64))
+    for black in (0, 1)
+    for flip in (0, 1)
+)
+#: Bucket of a king square, indexed by ``black`` then square: 2 file classes, home or advanced.
+_KB_KING_BUCKET = tuple(
+    tuple(
+        2 * min(sq & 7, 7 - (sq & 7))
+        + (1 if (chess.square_mirror(sq) if black else sq) >> 3 >= 2 else 0)
+        for sq in range(64)
+    )
+    for black in (0, 1)
+)
+
+
+class KingBucketFeatures(LinearFeatures):
+    """King-bucketed one-hot piece-square features, one set per side (HalfKP-like).
+
+    Two slots are filled: slot 0 for the player to move and slot 1 for the opponent. Each is seen
+    from its own home rank, and the king of the slot selects a bucket: ``2 * min(file, 7 - file)``
+    plus one when the king is advanced (rank 3 or higher from its home rank). Every non-king piece
+    adds one entry at ``(((slot * 8 + bucket) * 10 + piece_class) * 64 + square)``, where
+    ``piece_class`` is the piece type (P, N, B, R, Q) for a friend of the slot and that type plus
+    five for an enemy. The square is mirrored in file when the king of the slot stands on files
+    e to h, so the king always lies on files a to d. Each slot adds one more entry for its king,
+    at ``10240 + slot * 64 + square`` with the same file mirror. All values are ``1.0``.
+
+    Only ``"side_to_move"`` is supported: the features are defined from the point of view of the
+    player to move.
+
+    :cvar name: ``"king_bucket"``.
+    :cvar max_active: Most entries: two per non-king piece (at most 30 pieces per side) plus two
+        king entries, which is 62; 64 leaves room.
+    """
+
+    name = "king_bucket"
+    max_active = 64
+
+    def size(self, perspective: str) -> int:
+        """The number of king-bucketed weights, under ``"side_to_move"`` only.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``10368``.
+        :raises ValueError: If ``perspective`` is ``"white"``.
+        """
+        if perspective == "white":
+            raise ValueError(_KB_WHITE_ERROR)
+        return _KB_SIZE
+
+    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
+        """Indices of the non-king pieces of both slots and of the two kings; all values ``1.0``.
+
+        :param board: The position.
+        :param perspective: ``"side_to_move"``.
+        :return: Two parallel lists of length ``2 * (non-king pieces) + 2``.
+        :raises ValueError: If ``perspective`` is ``"white"``.
+        """
+        if perspective == "white":
+            raise ValueError(_KB_WHITE_ERROR)
+        mover = board.turn
+        indices: List[int] = []
+        squares = []  # square map of each slot
+        bases = []  # offset of the (slot, bucket) block of each slot
+        for slot, color in enumerate((mover, not mover)):
+            black = 0 if color == chess.WHITE else 1
+            king = board.king(color)
+            flip = 1 if (king & 7) >= 4 else 0
+            square_map = _KB_SQUARE_MAPS[2 * black + flip]
+            squares.append(square_map)
+            bases.append((slot * _KB_BUCKETS + _KB_KING_BUCKET[black][king]) * _KB_BLOCK)
+            indices.append(_KB_KING_BASE + slot * 64 + square_map[king])
+        mover_map, opponent_map = squares
+        mover_base, opponent_base = bases
+        for square, piece in board.piece_map().items():
+            if piece.piece_type == chess.KING:
+                continue
+            kind = piece.piece_type - 1
+            if piece.color == mover:
+                indices.append(mover_base + kind * 64 + mover_map[square])
+                indices.append(opponent_base + (kind + 5) * 64 + opponent_map[square])
+            else:
+                indices.append(mover_base + (kind + 5) * 64 + mover_map[square])
+                indices.append(opponent_base + kind * 64 + opponent_map[square])
+        return indices, [1.0] * len(indices)

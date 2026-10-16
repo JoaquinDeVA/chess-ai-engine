@@ -7,6 +7,7 @@ import pytest
 
 from chess_engine.training.dataset import TEST, TRAIN, VALIDATION, assign_split
 from chess_engine.training.lichess_raw import read_metadata, shard_path, write_shard
+from chess_engine.training.representation import is_quiet
 from chess_engine.training.sidecar import build_sidecar, iter_batches, load_sample
 
 START = chess.STARTING_FEN
@@ -118,3 +119,19 @@ def test_iter_batches_yields_n_rows_in_total(dirs):
     pd.testing.assert_frame_equal(pd.concat(batches), pd.concat(again))
     everything = sum(len(b) for b in iter_batches(raw, side, TRAIN, 64, None, seed=3))
     assert everything == (assign_split(pd.Series(random_fens(400))) == TRAIN).sum()
+
+
+def test_sampled_flags_match_own_fen(dirs):
+    raw, side = dirs
+    sample = load_sample(raw, side, TRAIN, 10_000)
+    assert len(sample) > 100
+    for row in sample.itertuples():
+        board = chess.Board(row.fen)
+        assert row.quiet == is_quiet(board, row.best_move)
+        assert row.white_to_move == (board.turn == chess.WHITE)
+
+
+def test_iter_batches_n_zero_yields_nothing(dirs):
+    raw, side = dirs
+    assert list(iter_batches(raw, side, TRAIN, 16, 0, seed=1)) == []
+    assert all(len(b) for b in iter_batches(raw, side, TRAIN, 16, None, seed=1))

@@ -129,6 +129,9 @@ def load_sample(
 ) -> pd.DataFrame:
     """Uniform random sample of ``n`` positions of a split, without loading whole shards.
 
+    Memory scales with one shard (the per-shard sample sizes are drawn from eligible counts). The
+    sampling is uniform by row, so most row groups are read once per call: the cost is I/O.
+
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
     :param split: ``TRAIN``, ``VALIDATION`` or ``TEST``.
@@ -139,19 +142,16 @@ def load_sample(
     :raises ValueError: If a sidecar is missing or misaligned with its shard.
     """
     pairs = _open_pairs(raw_dir, sidecar_dir)
-    eligible = [_eligible(side, split, quiet_only) for _, side in pairs]
-    sizes = np.array([len(e) for e in eligible])
+    sizes = np.array([len(_eligible(side, split, quiet_only)) for _, side in pairs], dtype=np.int64)
     total = int(sizes.sum())
     rng = np.random.default_rng(seed)
-    picks = np.sort(rng.choice(total, size=min(n, total), replace=False))
-    ends = np.cumsum(sizes)
-    owner = np.searchsorted(ends, picks, side="right")
+    wanted = rng.multivariate_hypergeometric(sizes, min(n, total)) if total else sizes
     parts = []
-    for index, (pair, rows) in enumerate(zip(pairs, eligible, strict=True)):
-        chosen = picks[owner == index]
-        if not len(chosen):
+    for pair, count in zip(pairs, wanted, strict=True):
+        if not count:
             continue
-        local = rows[chosen - (ends[index] - sizes[index])]
+        rows = _eligible(pair[1], split, quiet_only)
+        local = np.sort(rng.choice(rows, size=int(count), replace=False))
         bounds = _group_bounds(pair[0])
         groups = np.searchsorted(bounds, local, side="right") - 1
         for group in np.unique(groups):
@@ -186,6 +186,8 @@ def iter_batches(
     """
     pairs = _open_pairs(raw_dir, sidecar_dir)
     rng = np.random.default_rng(seed)
+    if n == 0:
+        return
     remaining = n
     buffer = pd.DataFrame(columns=SAMPLE_COLUMNS)
     for shard_index in rng.permutation(len(pairs)):

@@ -39,3 +39,7 @@ last_game.pgn
 last_tournament/
 tournament_results_*.json
 models/artifacts/*.tmp
+
+# Representation bake-off models (scripts/bakeoff_representation.py deletes them unless kept)
+src/chess_engine/models/artifacts/*@bake-*
+src/chess_engine/models/cards/*@bake-*

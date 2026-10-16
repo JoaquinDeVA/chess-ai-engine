@@ -21,9 +21,9 @@ from .representation import is_quiet, keep_mate_rows, validate_mate_keep
 SIDECAR_SCHEMA = pa.schema(
     [("split", pa.int8()), ("quiet", pa.bool_()), ("white_to_move", pa.bool_())]
 )
-#: Columns returned by the samplers.
-SAMPLE_COLUMNS = ["fen", "cp", "mate", "best_move", "quiet", "white_to_move"]
-_RAW_COLUMNS = ["fen", "cp", "mate", "best_move"]
+#: Columns returned by the samplers; ``depth`` is the raw search depth of the evaluation.
+SAMPLE_COLUMNS = ["fen", "cp", "mate", "best_move", "quiet", "white_to_move", "depth"]
+_RAW_COLUMNS = ["fen", "cp", "mate", "best_move", "depth"]
 
 
 def sidecar_path(shard: Path, out_dir: Path) -> Path:

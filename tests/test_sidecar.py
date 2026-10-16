@@ -81,7 +81,7 @@ def test_load_sample_is_deterministic_and_respects_split(dirs):
     c = load_sample(raw, side, VALIDATION, 20, seed=2)
     pd.testing.assert_frame_equal(a, b)
     assert not a["fen"].equals(c["fen"])
-    assert list(a.columns) == ["fen", "cp", "mate", "best_move", "quiet", "white_to_move"]
+    assert list(a.columns) == ["fen", "cp", "mate", "best_move", "quiet", "white_to_move", "depth"]
     assert len(a) == 20
     assert (assign_split(a["fen"]) == VALIDATION).all()
     assert a["fen"].is_unique
@@ -186,3 +186,31 @@ def test_iter_batches_mate_keep(mate_dirs):
     assert kept["mate"].isna().sum() == everything["mate"].isna().sum()
     capped = list(iter_batches(raw, side, TRAIN, 16, 40, seed=3, mate_keep=0.2))
     assert sum(len(b) for b in capped) == 40
+
+
+def test_samplers_return_the_raw_depth(tmp_path):
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    raw.mkdir()
+    side.mkdir()
+    fens = random_fens(120)
+    records = [
+        dict(record(fen, "e7e5" if " b " in fen else "e2e4"), depth=10 + 5 * (index % 3))
+        for index, fen in enumerate(fens)
+    ]
+    write_shard(shard_path(raw, 0), records, {"perspective": "white"})
+    build_sidecar(shard_path(raw, 0), side)
+    depth_of = {r["fen"]: r["depth"] for r in records}
+
+    sample = load_sample(raw, side, TRAIN, 10_000)
+    assert list(sample.columns)[-1] == "depth"
+    assert len(set(sample["depth"])) > 1
+    assert all(
+        depth_of[fen] == depth for fen, depth in zip(sample["fen"], sample["depth"], strict=True)
+    )
+
+    streamed = pd.concat(iter_batches(raw, side, TRAIN, 16, None, seed=3))
+    assert list(streamed.columns)[-1] == "depth"
+    assert all(
+        depth_of[fen] == depth
+        for fen, depth in zip(streamed["fen"], streamed["depth"], strict=True)
+    )

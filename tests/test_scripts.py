@@ -8,7 +8,8 @@ from pathlib import Path
 import chess
 import pytest
 
-from chess_engine.training import cards
+from chess_engine.models.registry import artifact_path
+from chess_engine.training import cards, effort
 from chess_engine.training.lichess import (
     SIDE_TO_MOVE,
     WHITE,
@@ -18,6 +19,8 @@ from chess_engine.training.lichess import (
     to_row,
     write_csv,
 )
+from chess_engine.training.lichess_raw import shard_path, write_shard
+from chess_engine.training.sidecar import build_sidecar
 from chess_engine.training.stockfish import find_stockfish, label_positions
 from tests.conftest import material_cp, random_positions
 
@@ -143,3 +146,66 @@ def test_write_csv_header():
     handle = io.StringIO()
     write_csv([], handle)
     assert handle.getvalue().strip() == "fen,cp,is_mate,mate_distance"
+
+
+def bakeoff_fixture(raw: Path, side: Path, count: int = 1500) -> None:
+    """One shard with mates (every ninth position) and mixed depths, and its sidecar."""
+    raw.mkdir(parents=True)
+    side.mkdir(parents=True)
+    records = []
+    for index, board in enumerate(random_positions(count, seed=8)):
+        mate = 3 if index % 9 == 0 else None
+        best = next(iter(board.legal_moves), None)
+        records.append(
+            {
+                "fen": " ".join(board.fen().split()[:4]),
+                "cp": None if mate else material_cp(board),
+                "mate": mate,
+                "depth": 12 + 8 * (index % 2),
+                "knodes": 1,
+                "best_move": best.uci() if best else None,
+                "n_evals": 1,
+                "n_pvs": 1,
+            }
+        )
+    write_shard(shard_path(raw, 0), records, {"perspective": "white"})
+    build_sidecar(shard_path(raw, 0), side)
+
+
+def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
+    module = load_script("bakeoff_representation")
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    bakeoff_fixture(raw, side)
+    variant = next(v for v in module.VARIANTS if v.min_depth == 20)
+    batches = list(module.training_batches(variant, raw, side, 100, 16, quiet=False))
+    rows = sum(len(b) for b in batches)
+    assert rows == 100
+    assert all((b["depth"] >= 20).all() for b in batches)
+
+
+def test_bakeoff_runs_on_fixture(tmp_path, monkeypatch, capsys):
+    module = load_script("bakeoff_representation")
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    monkeypatch.setattr(effort, "WORKERS", 2)
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    bakeoff_fixture(raw, side)
+    report, out = tmp_path / "BAKEOFF.md", tmp_path / "bakeoff.json"
+
+    code = module.main(
+        [
+            "--raw", str(raw), "--sidecar", str(side),
+            "--train-positions", "2000", "--test-positions", "500", "--effort", "10",
+            "--tiebreak-games", "1", "--base", "10", "--increment", "0.1", "--workers", "2",
+            "--out", str(out), "--report", str(report),
+        ]
+    )  # fmt: skip
+    assert code == 0
+    data = json.loads(out.read_text())
+    assert len(data["variants"]) == 8
+    assert len(data["tiebreak"]["players"]) == 2
+    text = report.read_text()
+    assert all(variant.label in text for variant in module.VARIANTS)
+    assert text.rstrip().splitlines()[-1] == "Decision: pending"
+    # Temporary models and cards are deleted unless --keep-models is given.
+    assert not artifact_path("pst_tapered@bake-0").exists()
+    assert list((tmp_path / "cards").glob("*@bake-*.json")) == []

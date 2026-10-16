@@ -22,6 +22,7 @@ packages = ["adversarial_search", "bots", "config", "engine", "models", "trainin
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 markers = [
     "prolog: requires SWI-Prolog (skipped when it is not installed)",

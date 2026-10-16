@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-Chess Engine - Main Entry Point
-AI Course - Python Fundamentals Lab
+Chess AI Engine - command-line interface.
 
-This module provides the command-line interface for the chess engine.
+Play a game between any two players (humans or bots), or run a round-robin tournament between
+all the bots. The CLI skeleton comes from the AI course framework (CEU San Pablo University);
+``--model`` and ``--depth`` are additions.
 """
+import argparse
+import inspect
+import logging
 import random
 import sys
 import traceback
 from typing import Optional
-
-import argparse
 
 from bots.human_player import HumanPlayer
 
@@ -35,6 +37,7 @@ Examples:
   %(prog)s --player1 RandomBot --player2 StrongBot      # RandomBot(White) vs StrongBot(Black)
   %(prog)s --player1 RandomBot --random-color           # Human vs RandomBot (random colors)
   %(prog)s --player2 RandomBot                          # Human vs RandomBot (human=white)
+  %(prog)s --player1 MLBot --model legacy_mlp --player2 HeuristicAlphaBetaBot --depth 2
   %(prog)s --mode tournament
   %(prog)s --list-bots
         """,
@@ -67,6 +70,20 @@ Examples:
 
     parser.add_argument(
         "--position", type=str, help="FEN string or path to file with starting position"
+    )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Evaluation model for the machine-learning bots (see docs/ADDING_A_MODEL.md)",
+    )
+
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Search depth (maximum depth for the iterative-deepening bots)",
     )
 
     parser.add_argument(
@@ -115,13 +132,9 @@ def list_available_bots(bot_registry: BotRegistry) -> None:
     for i, bot_name in enumerate(available_bots, 1):
         print(f"{i:2d}. {bot_name}")
 
-        try:
-            bot_info = bot_registry.get_bot_info(bot_name)
-            if bot_info and "author" in bot_info:
-                print(f"     Author: {bot_info['author']}")
-        except Exception as e:
-            print(e)
-            raise e
+        bot_info = bot_registry.get_bot_info(bot_name)
+        if bot_info and "author" in bot_info:
+            print(f"     Author: {bot_info['author']}")
 
     print(f"\nTotal: {len(available_bots)} bots available")
 
@@ -138,18 +151,37 @@ def load_position_from_argument(position_arg: str) -> Optional[str]:
     # A FEN string has 6 parts separated by spaces
     parts = position_arg.split()
     if len(parts) == 6:
-        # Looks like a FEN string, validate it's reasonable
-        try:
-            # Basic validation - just check first part has chess pieces
-            board_part = parts[0]
-            valid_chars = set("rnbqkpRNBQKP12345678/")
-            if all(c in valid_chars for c in board_part):
-                return position_arg
-        except Exception as e:
-            print(e)
-            raise e
+        # Basic validation: the placement field may only contain pieces, digits and slashes
+        valid_chars = set("rnbqkpRNBQKP12345678/")
+        if all(c in valid_chars for c in parts[0]):
+            return position_arg
 
     return None
+
+
+def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespace) -> dict:
+    """
+    Build the constructor options requested on the command line for a bot.
+
+    ``--model`` and ``--depth`` are only passed to bots whose constructor accepts them
+    (``model`` and ``max_depth``), so they can be given freely in a mixed match.
+
+    :param bot_registry: The bot registry instance
+    :type bot_registry: BotRegistry
+    :param bot_name: Name of the bot
+    :type bot_name: str
+    :param args: Parsed command line arguments
+    :type args: argparse.Namespace
+    :return: Keyword arguments for :meth:`BotRegistry.get_bot`
+    :rtype: dict
+    """
+    parameters = inspect.signature(bot_registry.bot_classes[bot_name].__init__).parameters
+    options = {}
+    if args.model is not None and "model" in parameters:
+        options["model"] = args.model
+    if args.depth is not None and "max_depth" in parameters:
+        options["max_depth"] = args.depth
+    return options
 
 
 def run_single_game(
@@ -187,7 +219,10 @@ def run_single_game(
             print(f"Error: Bot '{player1_name}' not found")
             print("Use --list-bots to see available bots")
             return False
-        player1 = bot_registry.get_bot(player1_name)
+        player1 = bot_registry.get_bot(player1_name, **bot_options(bot_registry, player1_name, args))
+        if player1 is None:
+            print(f"Error: Bot '{player1_name}' could not be loaded (see the log above)")
+            return False
 
     # Player 2
     if is_human_player(player2_name):
@@ -197,7 +232,10 @@ def run_single_game(
             print(f"Error: Bot '{player2_name}' not found")
             print("Use --list-bots to see available bots")
             return False
-        player2 = bot_registry.get_bot(player2_name)
+        player2 = bot_registry.get_bot(player2_name, **bot_options(bot_registry, player2_name, args))
+        if player2 is None:
+            print(f"Error: Bot '{player2_name}' could not be loaded (see the log above)")
+            return False
 
     # Assign colors
     if args.random_color:
@@ -396,6 +434,9 @@ def main() -> int:
     """
     parser = setup_argument_parser()
     args = parser.parse_args()
+    logging.basicConfig(
+        level=logging.INFO if args.verbose else logging.WARNING, format="%(levelname)s: %(message)s"
+    )
 
     if args.list_bots:
         try:

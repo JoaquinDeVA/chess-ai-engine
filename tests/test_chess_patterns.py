@@ -11,7 +11,7 @@ def prolog():
     pl = Prolog()
 
     # Cargar el archivo principal de patrones
-    pl.consult("bots/chess_patterns.pl")
+    pl.consult("knowledge/chess_patterns.pl")
 
     # Definir solo predicados completamente nuevos (no sobrescribir estáticos)
     try:

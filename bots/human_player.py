@@ -10,7 +10,6 @@ class HumanPlayer(ChessBot):
     Human player interface for single-player games.
 
     This handles getting moves from human players through the console.
-    Students don't need to modify this class.
     """
 
     def __init__(self, name: str = "Human Player"):
@@ -20,7 +19,7 @@ class HumanPlayer(ChessBot):
         :param name: Name for the human player
         :type name: str
         """
-        super().__init__(name, "AI Course")
+        super().__init__(name, "Chess AI Engine")
 
     def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:
         """

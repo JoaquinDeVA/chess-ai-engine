@@ -11,7 +11,7 @@ import pytest
 from adversarial_search.chess_game_state import ChessGameState
 from adversarial_search.chess_problem import ChessProblem
 from adversarial_search.game_algorithms import heuristic_alphabeta_search
-from bots.features import get_position_features
+from evaluation.features import get_position_features
 
 
 def simple_average_heuristic(state, player):

@@ -1,8 +1,5 @@
 """
-Simple Tournament Configuration
-AI Course - Python Fundamentals Lab
-
-Basic configuration loading for tournament settings.
+Tournament configuration presets (bullet and blitz) and their loader.
 """
 # Import from the shared data classes
 from engine.data_classes import TournamentConfig

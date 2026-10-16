@@ -1,8 +1,11 @@
 """
 Data Classes for Chess Engine
-AI Course - Python Fundamentals Lab
 
-This module contains all the data structures used throughout the chess engine.
+This module contains all the data structures used throughout the chess engine
+(tournament configuration, game and tournament results, PGN export).
+
+Based on the AI course framework (Inteligencia Artificial e Ingeniería del Conocimiento,
+CEU San Pablo University).
 """
 
 import json

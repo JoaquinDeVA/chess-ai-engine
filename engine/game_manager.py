@@ -1,10 +1,11 @@
 """
 Game Manager - Chess Game Orchestration
-AI Course - Python Fundamentals Lab
 
 This module manages chess games, tournaments, and coordinates between
-bots, time controls, and game rules. Students don't need to modify this
-but should understand how it works.
+bots, time controls, and game rules.
+
+Based on the AI course framework (Inteligencia Artificial e Ingeniería del Conocimiento,
+CEU San Pablo University).
 """
 import itertools
 import json
@@ -515,7 +516,6 @@ class ActiveGame:
     Represents a game currently in progress.
 
     Used internally by GameManager to track active games.
-    Students don't need to modify this.
     """
     
     def __init__(self, white_bot: ChessBot, black_bot: ChessBot, config: TournamentConfig):

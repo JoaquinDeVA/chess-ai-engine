@@ -1,20 +1,25 @@
 """
 Bot Registry - Automatic Bot Discovery and Loading
-AI Course - Python Fundamentals Lab
 
-This module automatically discovers and loads all student bot implementations.
-Students just need to create their bot files in the bots/ directory and
-the registry will find them automatically for tournaments.
+Discovers every :class:`~bots.chess_bot.ChessBot` subclass defined in a public module of the
+``bots/`` directory, so adding a bot is just adding a file (see ``docs/ADDING_A_BOT.md``).
+Modules whose name starts with an underscore are ignored.
+
+Originally part of the AI course framework (CEU San Pablo University); extended with
+``get_bot(name, **options)``, logging instead of printing, and the underscore convention.
 """
 
 import importlib.util
 import inspect
+import logging
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Type, Any
 
 # Import the base bot class
 from .chess_bot import ChessBot
+
+logger = logging.getLogger(__name__)
 
 
 class BotRegistry:
@@ -25,14 +30,15 @@ class BotRegistry:
     containing ChessBot implementations and makes them available for games.
     """
     
-    def __init__(self, bots_directory: str = "bots"):
+    def __init__(self, bots_directory: Optional[str] = None):
         """
         Initialize the bot registry.
 
-        :param bots_directory: Directory to scan for bot files
-        :type bots_directory: str
+        :param bots_directory: Directory to scan for bot files; the ``bots`` package directory
+            by default, so the registry works from any working directory
+        :type bots_directory: Optional[str]
         """
-        self.bots_directory = Path(bots_directory)
+        self.bots_directory = Path(bots_directory) if bots_directory else Path(__file__).resolve().parent
         self.loaded_bots: Dict[str, ChessBot] = {}
         self.available_bots: Dict[str, str] = {}  # bot_name -> file_path
         self.bot_classes: Dict[str, Type[ChessBot]] = {}
@@ -46,24 +52,22 @@ class BotRegistry:
         Automatically discover all bot files in the bots directory.
         """
         if not self.bots_directory.exists():
-            print(f"Warning: Bots directory '{self.bots_directory}' not found")
+            logger.warning("Bots directory '%s' not found", self.bots_directory)
             return
         
-        # Look for all Python files in bots directory
-        bot_files = list(self.bots_directory.glob("*_bot.py"))
-        
-        # Also check for any .py files that might contain bots
-        all_py_files = list(self.bots_directory.glob("*.py"))
-        for py_file in all_py_files:
-            if py_file.name not in ["__init__.py", "chess_bot.py", "bot_registry.py"]:
-                if py_file not in bot_files:
-                    bot_files.append(py_file)
-        
+        # Every public module of the directory may contain bots. Modules whose name starts with
+        # an underscore (e.g. ``_search_bots.py``) hold shared base classes and are skipped.
+        excluded = {"__init__.py", "chess_bot.py", "bot_registry.py"}
+        bot_files = sorted(
+            path for path in self.bots_directory.glob("*.py")
+            if path.name not in excluded and not path.name.startswith("_")
+        )
+
         for bot_file in bot_files:
             try:
                 self._scan_file_for_bots(bot_file)
             except Exception as e:
-                print(f"Warning: Error scanning {bot_file}: {e}")
+                logger.warning("Error scanning %s: %s", bot_file, e)
     
     def _scan_file_for_bots(self, file_path: Path) -> None:
         """
@@ -75,7 +79,7 @@ class BotRegistry:
         try:
             # Load the module dynamically
             spec = importlib.util.spec_from_file_location(
-                f"student_bot_{file_path.stem}", 
+                f"scanned_bot_{file_path.stem}", 
                 file_path
             )
             if spec is None or spec.loader is None:
@@ -107,10 +111,10 @@ class BotRegistry:
                     self.bot_classes[bot_name] = obj
                     self.available_bots[bot_name] = str(file_path)
 
-                    print(f"Found bot: {bot_name} in {file_path.name}")
+                    logger.debug("Found bot: %s in %s", bot_name, file_path.name)
         
         except Exception as e:
-            print(f"Error loading bots from {file_path}: {e}")
+            logger.warning("Could not load bots from %s: %s", file_path.name, e)
     
     def list_available_bots(self) -> List[str]:
         """
@@ -141,63 +145,66 @@ class BotRegistry:
         """
         return bot_name in self.bot_classes
     
-    def get_bot(self, bot_name: str) -> Optional[ChessBot]:
+    def get_bot(self, bot_name: str, **options: Any) -> Optional[ChessBot]:
         """
         Get a bot instance, loading it if necessary.
 
+        Without ``options`` the instance is cached and shared. With ``options`` (constructor
+        keyword arguments such as ``model="legacy_mlp"`` or ``max_depth=4``) a fresh, uncached
+        instance is built.
+
         :param bot_name: Name of the bot to get
         :type bot_name: str
+        :param options: Keyword arguments forwarded to the bot constructor
         :return: ChessBot instance, or None if bot not found/failed to load
         :rtype: Optional[ChessBot]
         """
+        if bot_name not in self.bot_classes:
+            return None
+
+        if options:
+            return self._load_bot(bot_name, cache=False, **options)
+
         # Return already loaded bot
         if bot_name in self.loaded_bots:
             return self.loaded_bots[bot_name]
-        
-        # Try to load the bot
-        if bot_name in self.bot_classes:
-            return self._load_bot(bot_name)
-        
-        return None
-    
-    def _load_bot(self, bot_name: str) -> Optional[ChessBot]:
+
+        return self._load_bot(bot_name)
+
+    def _load_bot(self, bot_name: str, cache: bool = True, **options: Any) -> Optional[ChessBot]:
         """
         Load (instantiate) a bot class.
 
         :param bot_name: Name of bot to load
         :type bot_name: str
+        :param cache: Remember the instance for later calls to :meth:`get_bot`
+        :type cache: bool
+        :param options: Keyword arguments forwarded to the bot constructor
         :return: ChessBot instance, or None if loading failed
         :rtype: Optional[ChessBot]
         """
         try:
             bot_class = self.bot_classes[bot_name]
-            bot_instance = bot_class()
+            bot_instance = bot_class(**options)
             
             # Validate that the bot is properly implemented
             if not isinstance(bot_instance, ChessBot):
-                print(f"Error: {bot_name} is not a proper ChessBot")
+                logger.error("%s is not a proper ChessBot", bot_name)
                 return None
-            
-            if not hasattr(bot_instance, 'name') or not bot_instance.name:
-                print(f"Error: {bot_name} doesn't have a valid name")
-                return None
-            
-            # Cache the loaded bot
-            self.loaded_bots[bot_name] = bot_instance
-            
-            # Cache bot info for faster access
-            try:
-                self.bot_info_cache[bot_name] = bot_instance.get_info()
-            except Exception as e:
-                print(f"Warning: Could not get info for bot {bot_name}: {e}")
-                print(e)
-                raise e
 
-            print(f"Loaded bot: {bot_instance.name} by {bot_instance.author}")
+            if not hasattr(bot_instance, 'name') or not bot_instance.name:
+                logger.error("%s doesn't have a valid name", bot_name)
+                return None
+
+            if cache:
+                self.loaded_bots[bot_name] = bot_instance
+                self.bot_info_cache[bot_name] = bot_instance.get_info()
+
+            logger.info("Loaded bot: %s by %s", bot_instance.name, bot_instance.author)
             return bot_instance
-            
+
         except Exception as e:
-            print(f"Error loading bot {bot_name}: {e}")
+            logger.warning("Could not load bot %s: %s", bot_name, e)
             return None
     
     def get_bot_info(self, bot_name: str) -> Optional[Dict[str, Any]]:
@@ -215,25 +222,18 @@ class BotRegistry:
         
         # Try to get info from loaded bot
         if bot_name in self.loaded_bots:
-            try:
-                info = self.loaded_bots[bot_name].get_info()
-                self.bot_info_cache[bot_name] = info
-                return info
-            except Exception as e:
-                print(e)
-                raise e
+            info = self.loaded_bots[bot_name].get_info()
+            self.bot_info_cache[bot_name] = info
+            return info
 
         # As last resort, try to instantiate bot to get info
         if bot_name in self.bot_classes:
-            try:
-                bot_class = self.bot_classes[bot_name]
-                temp_bot = bot_class()
-                info = temp_bot.get_info()
-                self.bot_info_cache[bot_name] = info
-                return info
-            except Exception as e:
-                print(e)
-                raise e
+            temp_bot = self._load_bot(bot_name, cache=False)
+            if temp_bot is None:
+                return None
+            info = temp_bot.get_info()
+            self.bot_info_cache[bot_name] = info
+            return info
 
         return None
     
@@ -251,11 +251,10 @@ class BotRegistry:
         self.bot_info_cache.clear()
 
         # Re-discover all bots
-        old_count = len(self.bot_classes)
         self._discover_bots()
         new_count = len(self.bot_classes)
-        
-        print(f"Reloaded bots: found {new_count} total bots")
+
+        logger.info("Reloaded bots: found %d total bots", new_count)
         return new_count
     
     def validate_all_bots(self) -> Dict[str, bool]:
@@ -285,7 +284,7 @@ class BotRegistry:
                 results[bot_name] = valid
                 
             except Exception as e:
-                print(f"Validation error for {bot_name}: {e}")
+                logger.warning("Validation error for %s: %s", bot_name, e)
                 results[bot_name] = False
         
         return results
@@ -312,7 +311,7 @@ class BotRegistry:
             "total_available": len(self.bot_classes),
             "currently_loaded": len(self.loaded_bots),
             "builtin_bots": 2,  # RandomBot, HumanPlayer
-            "student_bots": len(self.bot_classes) - 2,
+            "custom_bots": len(self.bot_classes) - 2,
             "bot_files_found": len(self.available_bots),
             "tournament_ready": len(self.get_tournament_ready_bots())
         }

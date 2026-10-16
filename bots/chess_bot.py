@@ -1,9 +1,11 @@
 """
-Chess Bot Base Classes
-AI Course - Python Fundamentals Lab
+Chess Bot Base Class
 
-This module defines the abstract interface that all chess bots must implement.
-Students will inherit from ChessBot to create their own chess engines.
+Defines the abstract interface that every chess bot implements; subclass :class:`ChessBot`
+(or one of the search bases in ``bots/_search_bots.py``) to add a new engine.
+
+Based on the AI course framework (Inteligencia Artificial e Ingeniería del Conocimiento,
+CEU San Pablo University).
 """
 
 from abc import ABC, abstractmethod
@@ -25,7 +27,7 @@ class ChessBot(ABC):
 
         :param name: Name of your bot (should be unique)
         :type name: str
-        :param author: Your CEU email
+        :param author: Name of the bot author
         :type author: str
         """
         self.name = name

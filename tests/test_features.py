@@ -7,7 +7,7 @@ functions in bots/features.py and understand the expected behavior and return va
 
 import chess
 
-from bots.features import (
+from evaluation.features import (
     extract_material_features,
     extract_mobility_features
 )

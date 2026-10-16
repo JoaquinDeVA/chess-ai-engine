@@ -15,7 +15,7 @@ class RandomBot(ChessBot):
         """
         Initialize the random bot.
         """
-        super().__init__("RandomBot", "AI Course")
+        super().__init__("RandomBot", "Chess AI Engine")
         self.random = random.Random(30)
 
 

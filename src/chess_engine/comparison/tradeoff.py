@@ -21,7 +21,7 @@ import pandas as pd
 from chess_engine.bots._search_bots import IterativeDeepeningBot
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.evaluation.heuristics import h2, h3
+from chess_engine.evaluation.heuristics import h2, h3, h3t
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, get_model_class
 from chess_engine.models.cards import card_path, update_card
@@ -37,7 +37,7 @@ SINGLE_THREAD_VARIABLES = (
     "TF_NUM_INTRAOP_THREADS",
     "TF_NUM_INTEROP_THREADS",
 )
-HEURISTICS = {"h2": h2, "h3": h3}
+HEURISTICS = {"h2": h2, "h3": h3, "h3t": h3t}
 
 
 def fixed_time_manager(seconds: float) -> TimeManager:
@@ -61,8 +61,8 @@ def make_player(
 ) -> IterativeDeepeningBot:
     """Build an iterative-deepening player without an opening book.
 
-    :param spec: ``"h2"`` / ``"h3"`` for a hand-crafted heuristic, a registered model name or
-        ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
+    :param spec: ``"h2"``, ``"h3"`` or ``"h3t"`` for a hand-crafted heuristic, a registered model
+        name or ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
         instance.
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.

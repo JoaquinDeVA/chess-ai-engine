@@ -4,11 +4,14 @@ Every heuristic has the signature ``(state, player) -> float`` and returns the e
 outcome for ``player`` in ``[0.01, 0.99]`` (terminal values are 0, 0.5 and 1, so a heuristic
 value never outranks a real win).
 
-``h1``-``h3`` use fixed weights; ``h4`` blends three weight sets (opening, middlegame,
+``h1``-``h3`` use fixed weights; ``h3t`` uses the weights of ``h3``'s features fitted to
+Stockfish (see ``scripts/data/fit_h3t.py``); ``h4`` blends three weight sets (opening, middlegame,
 endgame) according to the remaining material and reacts to hanging pieces.
 """
 
-from typing import Dict
+import json
+from pathlib import Path
+from typing import Dict, Optional
 
 import chess
 
@@ -179,6 +182,63 @@ def h3(state: ChessGameState, player: chess.Color) -> float:
     :rtype: float
     """
     return linear_weighted_heuristic(state, player, H3_WEIGHTS)
+
+
+#: Versioned JSON file with the weights of :func:`h3t`, written by ``scripts/data/fit_h3t.py``.
+H3T_WEIGHTS_PATH = Path(__file__).with_name("h3t_weights.json")
+
+_H3T_CACHE: Dict[str, Dict[str, float]] = {}
+
+
+def load_h3t_weights(path: Optional[Path] = None) -> Dict[str, float]:
+    """Load the fitted weights of :func:`h3t`, once per file.
+
+    :param path: Weights file (default: :data:`H3T_WEIGHTS_PATH`)
+    :type path: Optional[Path]
+    :return: Weight per feature name in :data:`FEATURE_NAMES`
+    :rtype: Dict[str, float]
+    :raises FileNotFoundError: If the file does not exist (it must be fitted first)
+    :raises ValueError: If the weights are not keyed by exactly the feature names
+    """
+    location = Path(path) if path is not None else H3T_WEIGHTS_PATH
+    key = str(location)
+    if key not in _H3T_CACHE:
+        if not location.exists():
+            raise FileNotFoundError(
+                f"{location} not found: fit it with scripts/data/fit_h3t.py first"
+            )
+        weights = json.loads(location.read_text())["weights"]
+        if set(weights) != set(FEATURE_NAMES):
+            raise ValueError(f"{location}: weights must be keyed by {list(FEATURE_NAMES)}")
+        _H3T_CACHE[key] = {name: float(weights[name]) for name in FEATURE_NAMES}
+    return _H3T_CACHE[key]
+
+
+def reset_h3t_cache() -> None:
+    """Forget the weights loaded by :func:`load_h3t_weights` (the next call reads the file)."""
+    _H3T_CACHE.clear()
+
+
+def h3t(state: ChessGameState, player: chess.Color) -> float:
+    """Tuned classical reference: the features of ``h3`` with weights fitted to Stockfish.
+
+    The White value is ``0.5 + sum(w * (feature - 0.5))``, clipped to ``[0.01, 0.99]``; Black
+    gets ``1 - white``, so the two values are exactly complementary. The weights may have any
+    sign and need not sum to 1.
+
+    :param state: Current chess game state
+    :type state: ChessGameState
+    :param player: Player to evaluate for
+    :type player: chess.Color
+    :return: Evaluation in ``[0.01, 0.99]``
+    :rtype: float
+    :raises FileNotFoundError: If the weights file has not been fitted yet
+    """
+    weights = load_h3t_weights()
+    features = get_position_features(state.get_board())
+    white = 0.5 + sum(weights[name] * (features[name] - 0.5) for name in FEATURE_NAMES)
+    white = max(HEURISTIC_MARGIN, min(1.0 - HEURISTIC_MARGIN, white))
+    return white if player == chess.WHITE else 1.0 - white
 
 
 def interpolate_weights(

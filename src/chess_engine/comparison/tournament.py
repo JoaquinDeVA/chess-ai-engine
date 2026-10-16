@@ -32,7 +32,7 @@ from chess_engine.search.time_management import TimeManager
 logger = logging.getLogger(__name__)
 
 #: Player whose rating is fixed at 0 Elo.
-ANCHOR = "h3"
+ANCHOR = "h3t"
 
 #: Scores are clipped to ``[CLIP, 1 - CLIP]`` before taking a logarithm.
 CLIP = 0.01

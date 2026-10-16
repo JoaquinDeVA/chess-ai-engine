@@ -22,6 +22,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "chess_engine.knowledge" = ["*.pl"]
+"chess_engine.evaluation" = ["h3t_weights.json"]
 "chess_engine.models" = ["artifacts/*", "cards/*.json"]
 "chess_engine.training" = ["configs/*.toml"]
 

@@ -5,7 +5,8 @@
 #   EFFORT=40 bash scripts/run_all.sh
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (40),
-# AGREEMENT_N (20000, best-move sample rows), HOURS (10, tournament wall-clock budget), PYTHON.
+# AGREEMENT_N (20000, best-move sample rows), HOURS (10, tournament wall-clock budget),
+# PLAYERS (the tournament players, anchored at h3t), PYTHON.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -14,6 +15,7 @@ SIDECAR="${SIDECAR:-data/lichess/sidecar}"
 EFFORT="${EFFORT:-40}"
 AGREEMENT_N="${AGREEMENT_N:-20000}"
 HOURS="${HOURS:-10}"
+PLAYERS="${PLAYERS:-pst_tapered,pst_terms,pst_kb,nn4,nn8,h3t}"
 PYTHON="${PYTHON:-python}"
 
 # Models trained from the raw shards, and every model evaluated (the older ones are measured only).
@@ -38,8 +40,17 @@ done
 echo "=== profile (depth against accuracy)"
 "$PYTHON" scripts/bench/profile_tradeoff.py --raw "$RAW" --sidecar "$SIDECAR"
 
+WEIGHTS="src/chess_engine/evaluation/h3t_weights.json"
+if [ ! -f "$WEIGHTS" ] || [ -n "$(find "$SIDECAR" -name '*.sidecar.parquet' -newer "$WEIGHTS" -print -quit)" ]; then
+  echo "=== fit h3t"
+  "$PYTHON" scripts/data/fit_h3t.py --raw "$RAW" --sidecar "$SIDECAR" --positions 300000 --jobs 4 \
+    --out "$WEIGHTS"
+else
+  echo "=== fit h3t skipped (weights newer than the sidecars)"
+fi
+
 echo "=== tournament (${HOURS} h)"
-"$PYTHON" scripts/bench/run_tournament.py --hours "$HOURS"
+"$PYTHON" scripts/bench/run_tournament.py --players "$PLAYERS" --anchor h3t --hours "$HOURS"
 
 echo "=== report"
 "$PYTHON" -m chess_engine.comparison.report

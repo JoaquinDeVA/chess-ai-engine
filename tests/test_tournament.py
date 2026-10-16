@@ -83,7 +83,7 @@ def test_crashed_game_is_recorded_not_fatal(tmp_path, monkeypatch):
     assert len(records) == 2
     assert all("KeyError" in r["error"] for r in records)
     assert summary["errors"] == 2
-    assert summarize(records)["players"]["h3"]["games"] == 0
+    assert summarize(records, anchor="h3")["players"]["h3"]["games"] == 0
 
 
 def test_unknown_player_fails_before_any_game(tmp_path):
@@ -321,7 +321,7 @@ def test_summarize_scores_and_elo():
         game("h3", "m", "black"),  # m wins
         game("m", "h2", None, error="KeyError: boom"),  # excluded from every score
     ]
-    summary = summarize(results)
+    summary = summarize(results, anchor="h3")
     h2 = summary["players"]["h2"]
     assert h2["games"] == 4
     assert (h2["wins"], h2["draws"], h2["losses"]) == (1, 1, 2)
@@ -346,7 +346,7 @@ def test_iterative_fit_matches_direct_score_for_two_players():
         game("h2", "h3", None),
         game("h3", "h2", "black"),
     ]
-    h2 = summarize(results)["players"]["h2"]
+    h2 = summarize(results, anchor="h3")["players"]["h2"]
     assert h2["elo"] == pytest.approx(h2["elo_vs_anchor"], abs=0.5)
 
 
@@ -410,8 +410,8 @@ def test_parse_args_rejects_fewer_than_two_distinct_players(script, capsys):
 def test_parse_args_requires_the_anchor(script, capsys):
     with pytest.raises(SystemExit):
         script.parse_args(["--players", "h2,m"])
-    assert "must include h3" in capsys.readouterr().err
-    assert "h3" in script.parse_args([]).specs
+    assert "must include h3t" in capsys.readouterr().err
+    assert "h3t" in script.parse_args([]).specs
 
 
 def test_calibrate_returns_none_when_no_game_is_played(script):
@@ -459,7 +459,7 @@ def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, 
         game("h3", "h2", "white"),
         game("m2", "h3", "black"),
     ]
-    summary = summarize(results)
+    summary = summarize(results, anchor="h3")
     assert summary["players"]["m"]["elo_interval"] > 0
 
     recorded = tournament.record_cards(summary, ["h2", "h3", "m", "m2"], "h3", 10.0, 0.1)

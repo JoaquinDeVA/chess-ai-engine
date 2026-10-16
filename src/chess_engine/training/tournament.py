@@ -36,7 +36,7 @@ ANCHOR = "h3"
 #: Scores are clipped to ``[CLIP, 1 - CLIP]`` before taking a logarithm.
 CLIP = 0.01
 
-#: Pools that may be rebuilt after a worker dies before the run gives up.
+#: Pools that may be rebuilt in a row, with no game finished in between, before the run gives up.
 MAX_POOL_REBUILDS = 5
 
 #: Broken pools a game may be in flight for before it is recorded as an error.
@@ -305,8 +305,10 @@ def run_round_robin(
     games in flight in that pool are requeued without a record, because CPython fails all of them.
     A game that was in flight for :data:`MAX_DEATHS_PER_GAME` broken pools is recorded as an error
     and not retried. While such a suspect is unfinished, games run one at a time, so that the blame
-    is unambiguous. After :data:`MAX_POOL_REBUILDS` rebuilds with games still pending, the run stops
-    with a ``RuntimeError``; rerun it to resume. Errored games are excluded from the scores.
+    is unambiguous. After :data:`MAX_POOL_REBUILDS` rebuilds in a row with games still pending, the
+    run stops with a ``RuntimeError``; rerun it to resume. Every finished game (also an errored one)
+    resets that count, so a long run only gives up after consecutive broken pools without progress.
+    Errored games are excluded from the scores.
 
     The workers are started with ``OMP_NUM_THREADS``, ``OPENBLAS_NUM_THREADS``, ``MKL_NUM_THREADS``,
     ``TF_NUM_INTRAOP_THREADS`` and ``TF_NUM_INTEROP_THREADS`` set to ``"1"``, so that timed games
@@ -347,8 +349,11 @@ def run_round_robin(
     played = len(pending)
     counts = {"errors": 0}
     deaths: Dict[Job, int] = {}
+    rebuilds = 0
 
     def emit(record: Dict[str, Any]) -> None:
+        nonlocal rebuilds
+        rebuilds = 0  # progress: only consecutive broken pools count towards the limit
         counts["errors"] += "error" in record
         handle.write(json.dumps(record) + "\n")
         handle.flush()
@@ -358,7 +363,6 @@ def run_round_robin(
         if pending:
             out.parent.mkdir(parents=True, exist_ok=True)
             _repair_tail(out)
-            rebuilds = 0
             with out.open("a") as handle:
                 while pending:
                     if _run_pool(pending, workers, play, emit, deaths) and pending:
@@ -384,20 +388,24 @@ def _elo_from_score(score: float) -> float:
 
 
 def _fit_elo(
-    counts: Dict[Tuple[str, str], int], points: Dict[str, float], games: Dict[str, int]
+    counts: Dict[Tuple[str, str], int],
+    points: Dict[str, float],
+    games: Dict[str, int],
+    anchor: str,
 ) -> Dict[str, float]:
     """Bradley-Terry ratings from all pairs, fitted by the minorise-maximise iteration.
 
     Scores per player are clipped like the pairwise ones, so no rating diverges. The ratings are
-    anchored at :data:`ANCHOR`.
+    anchored at ``anchor``.
 
     :param counts: Number of games per ordered pair ``(player, opponent)``.
     :param points: Points (wins + half draws) per player.
     :param games: Games per player.
+    :param anchor: Player whose rating is fixed at 0.
     :return: Elo per player with games; empty if the anchor has no games.
     """
     players = [p for p in games if games[p] > 0]
-    if ANCHOR not in players:
+    if anchor not in players:
         return {}
     weight = {p: min(max(points[p] / games[p], CLIP), 1 - CLIP) * games[p] for p in players}
     gamma = {p: 1.0 for p in players}
@@ -410,7 +418,7 @@ def _fit_elo(
                 if q != p and counts.get((p, q))
             )
             updated[p] = weight[p] / denominator
-        scale = updated[ANCHOR]
+        scale = updated[anchor]
         change = max(abs(updated[p] / scale - gamma[p]) for p in players)
         gamma = {p: updated[p] / scale for p in players}
         if change < 1e-10:
@@ -418,11 +426,11 @@ def _fit_elo(
     return {p: 400 * math.log10(gamma[p]) for p in players}
 
 
-def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[str, Any]:
     """Scores, W-D-L, Elo and 95% intervals of a set of game records.
 
     Crashed games (records with ``"error"``) are left out. For each player the score is
-    ``wins + draws / 2`` over games. ``elo_vs_h3`` uses the player's score against :data:`ANCHOR`
+    ``wins + draws / 2`` over games. ``elo_vs_anchor`` uses the player's score against ``anchor``
     alone; ``elo`` is the Bradley-Terry fit over all pairs. The 95% interval of the score is the
     normal approximation from the variance of the per-game points.
 
@@ -431,13 +439,14 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     slightly optimistic. Crashed games are not retried.
 
     :param results: Game records as written by :func:`run_round_robin`.
+    :param anchor: Player whose Elo is 0.
     :return: ``players`` (per player: games, wins, draws, losses, score in percent, ``ci95`` in
-        percent, ``elo_vs_h3``, ``elo``), ``head_to_head`` (``[wins, draws, losses]`` of the row
-        player against the column player) and ``errors`` (number of crashed games).
-    :raises ValueError: If :data:`ANCHOR` takes part in none of the records.
+        percent, ``elo_vs_anchor``, ``elo``), ``head_to_head`` (``[wins, draws, losses]`` of the
+        row player against the column player) and ``errors`` (number of crashed games).
+    :raises ValueError: If ``anchor`` takes part in none of the records.
     """
-    if not any(ANCHOR in (r["white"], r["black"]) for r in results):
-        raise ValueError(f"the anchor player '{ANCHOR}' must take part in the tournament")
+    if not any(anchor in (r["white"], r["black"]) for r in results):
+        raise ValueError(f"the anchor player '{anchor}' must take part in the tournament")
     players = sorted({p for r in results for p in (r["white"], r["black"])})
     per_game: Dict[str, List[float]] = {p: [] for p in players}
     head = {p: {q: [0, 0, 0] for q in players if q != p} for p in players}
@@ -463,7 +472,7 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
     games = {p: len(per_game[p]) for p in players}
     points = {p: sum(per_game[p]) for p in players}
-    fitted = _fit_elo(counts, points, games)
+    fitted = _fit_elo(counts, points, games, anchor)
 
     stats: Dict[str, Dict[str, Any]] = {}
     for p in players:
@@ -475,7 +484,7 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "losses": sum(record[2] for record in head[p].values()),
             "score": None,
             "ci95": None,
-            "elo_vs_h3": None,
+            "elo_vs_anchor": None,
             "elo": fitted.get(p),
         }
         if n:
@@ -483,13 +492,14 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             variance = statistics.fmean(x * x for x in per_game[p]) - mean * mean
             margin = 1.96 * math.sqrt(max(variance, 0.0) / n)
             entry["score"] = 100 * mean
-            entry["ci95"] = [100 * max(0.0, mean - margin), 100 * min(1.0, mean + margin)]
-            if p == ANCHOR:
-                entry["elo_vs_h3"] = 0.0
-            elif counts.get((p, ANCHOR)):
-                wins, draws, losses = head[p][ANCHOR]
+            low, high = max(0.0, mean - margin), min(1.0, mean + margin)
+            entry["ci95"] = [100 * low, 100 * high]
+            if p == anchor:
+                entry["elo_vs_anchor"] = 0.0
+            elif counts.get((p, anchor)):
+                wins, draws, losses = head[p][anchor]
                 score = (wins + 0.5 * draws) / (wins + draws + losses)
-                entry["elo_vs_h3"] = _elo_from_score(score)
+                entry["elo_vs_anchor"] = _elo_from_score(score)
         stats[p] = entry
 
     return {

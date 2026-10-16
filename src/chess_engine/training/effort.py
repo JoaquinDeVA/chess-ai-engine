@@ -146,7 +146,8 @@ def fit(
     :param positions: TRAIN rows used for each epoch.
     :param config: Fit configuration (see :func:`fit_config`).
     :param quiet_only: Train on quiet positions only.
-    :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`.
+    :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`. The TRAIN
+        rows are undersampled in mates by ``rep.mate_keep``.
     """
     model = model_class(rep=rep)
     batches = _Epochs(
@@ -158,6 +159,7 @@ def fit(
             positions,
             SAMPLE_SEED,
             quiet_only=quiet_only,
+            mate_keep=rep.mate_keep,
         )
     )
     summary = model.fit_stream(batches, validation, config)

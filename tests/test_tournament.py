@@ -182,8 +182,14 @@ def test_culprit_is_recorded_after_two_deaths_and_the_others_are_played(tmp_path
     assert summary["errors"] == 1 and summary["played"] == 4
 
 
+def _dies_on_every_game(job):
+    """A play function whose worker always dies, so that no game ever finishes."""
+    os._exit(1)
+
+
 def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
     monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
+    monkeypatch.setattr(tournament, "MAX_DEATHS_PER_GAME", 3)
     out = tmp_path / "games.jsonl"
     openings = paired_openings(2, seed=2)
     with pytest.raises(RuntimeError, match="giving up"):
@@ -194,10 +200,35 @@ def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
             increment=0.0,
             workers=2,
             out=out,
-            play=_dies_on_first_opening_as_h2,
+            play=_dies_on_every_game,
         )
-    keys = [(r["white"], r["black"], r["fen"]) for r in read_records(out)]
-    assert len(keys) == len(set(keys))
+    assert read_records(out) == []
+
+
+def test_rebuild_counter_resets_after_each_finished_game(tmp_path, monkeypatch):
+    """Two culprits, each killing two pools: the run only survives if progress resets the count."""
+    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
+    out = tmp_path / "games.jsonl"
+    openings = paired_openings(2, seed=2)
+    summary = run_round_robin(
+        ["h2", "h3"],
+        openings,
+        base=2.0,
+        increment=0.0,
+        workers=1,
+        out=out,
+        play=_dies_on_h2_white_in_both_openings,
+    )
+    records = read_records(out)
+    assert len(records) == 4
+    assert summary["errors"] == 2 and summary["played"] == 4
+
+
+def _dies_on_h2_white_in_both_openings(job):
+    """Kill the worker when h2 plays White from either opening of ``paired_openings(2, 2)``."""
+    if job[0] == "h2" and job[2] in paired_openings(2, seed=2):
+        os._exit(1)
+    return tournament._play_game(job)
 
 
 def test_truncated_last_line_is_ignored_and_repaired(tmp_path, caplog):
@@ -261,15 +292,15 @@ def test_summarize_scores_and_elo():
     assert h2["games"] == 4
     assert (h2["wins"], h2["draws"], h2["losses"]) == (1, 1, 2)
     assert h2["score"] == pytest.approx(37.5)
-    assert h2["elo_vs_h3"] == pytest.approx(-400 * math.log10(1 / 0.375 - 1))
+    assert h2["elo_vs_anchor"] == pytest.approx(-400 * math.log10(1 / 0.375 - 1))
 
     m = summary["players"]["m"]
     assert m["games"] == 4
     assert (m["wins"], m["draws"], m["losses"]) == (3, 0, 1)
     assert m["score"] == pytest.approx(75.0)
-    assert m["elo_vs_h3"] == pytest.approx(-400 * math.log10(1 / 0.75 - 1))
+    assert m["elo_vs_anchor"] == pytest.approx(-400 * math.log10(1 / 0.75 - 1))
 
-    assert summary["players"]["h3"]["elo_vs_h3"] == pytest.approx(0.0)
+    assert summary["players"]["h3"]["elo_vs_anchor"] == pytest.approx(0.0)
     lo, hi = h2["ci95"]
     assert lo < 37.5 < hi
 
@@ -282,7 +313,7 @@ def test_iterative_fit_matches_direct_score_for_two_players():
         game("h3", "h2", "black"),
     ]
     h2 = summarize(results)["players"]["h2"]
-    assert h2["elo"] == pytest.approx(h2["elo_vs_h3"], abs=0.5)
+    assert h2["elo"] == pytest.approx(h2["elo_vs_anchor"], abs=0.5)
 
 
 def test_summarize_requires_the_anchor_player():
@@ -351,3 +382,30 @@ def test_parse_args_requires_the_anchor(script, capsys):
 
 def test_calibrate_returns_none_when_no_game_is_played(script):
     assert script.calibrate(["h3"], 2.0, 0.0, 1) is None
+
+
+def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, monkeypatch, capsys):
+    from chess_engine.models import base as models_base
+    from chess_engine.models import registry
+    from chess_engine.models.linear_eval import PstTaperedModel
+
+    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+    PstTaperedModel().save(tmp_path / "pst_tapered@x.npz")
+    tournament.check_specs(["h2", "pst_tapered@x"])
+    with pytest.raises(ValueError, match="pst_tapered@missing"):
+        tournament.check_specs(["pst_tapered@missing"])
+
+    args = script.parse_args(["--players", "pst_tapered@x,m", "--anchor", "m"])
+    assert args.specs == ["pst_tapered@x", "m"] and args.anchor == "m"
+    with pytest.raises(SystemExit):
+        script.parse_args(["--players", "h2,m", "--anchor", "h3"])
+    assert "must include h3" in capsys.readouterr().err
+
+    results = [game("pst_tapered@x", "m", "white"), game("m", "pst_tapered@x", "white")]
+    summary = summarize(results, anchor="m")
+    assert summary["players"]["m"]["elo"] == pytest.approx(0.0)
+    assert summary["players"]["m"]["elo_vs_anchor"] == pytest.approx(0.0)
+    assert summary["players"]["pst_tapered@x"]["elo_vs_anchor"] == pytest.approx(0.0)
+    with pytest.raises(ValueError, match="'m'"):
+        summarize([game("h2", "h3", "white")], anchor="m")

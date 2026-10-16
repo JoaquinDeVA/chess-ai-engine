@@ -39,12 +39,18 @@ def fmt(value: Optional[float], digits: int = 1, signed: bool = False) -> str:
     return f"{value:+.{digits}f}" if signed else f"{value:.{digits}f}"
 
 
-def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, Any]) -> str:
+def render_markdown(
+    summary: Dict[str, Any],
+    specs: List[str],
+    meta: Dict[str, Any],
+    anchor: str = ANCHOR,
+) -> str:
     """Cross table, scores and Elo of a tournament.
 
     :param summary: Output of :func:`summarize`.
     :param specs: Players, in display order.
     :param meta: Free-form facts printed above the tables (time control, openings, date).
+    :param anchor: Player whose Elo is 0.
     :return: Markdown text.
     """
     players = summary["players"]
@@ -56,7 +62,7 @@ def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, A
         f"- crashed games (excluded): {summary['errors']}",
         "",
         "Scores are from the row player's point of view (wins + half draws). Elo is relative to "
-        f"`{ANCHOR}` = 0: *vs {ANCHOR}* uses only the games against it, *fit* is a "
+        f"`{anchor}` = 0: *vs {anchor}* uses only the games against it, *fit* is a "
         "Bradley-Terry fit over all pairs. The 95% interval is the normal approximation of the "
         "score. Elo uses scores clipped to [0.01, 0.99]; the intervals treat games as independent, "
         "so they are slightly optimistic (the two games of an opening are correlated). Crashed "
@@ -80,7 +86,7 @@ def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, A
         "",
         "## Scores and Elo",
         "",
-        "| Player | Games | W-D-L | Score % | 95% interval % | Elo vs h3 | Elo fit |",
+        f"| Player | Games | W-D-L | Score % | 95% interval % | Elo vs {anchor} | Elo fit |",
         "|---|---|---|---|---|---|---|",
     ]
     for spec in sorted(specs, key=lambda s: -(players[s]["score"] or 0.0)):
@@ -88,7 +94,7 @@ def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, A
         interval = "—" if p["ci95"] is None else f"{p['ci95'][0]:.1f} – {p['ci95'][1]:.1f}"
         lines.append(
             f"| {spec} | {p['games']} | {p['wins']}-{p['draws']}-{p['losses']} | "
-            f"{fmt(p['score'])} | {interval} | {fmt(p['elo_vs_h3'], 0, True)} | "
+            f"{fmt(p['score'])} | {interval} | {fmt(p['elo_vs_anchor'], 0, True)} | "
             f"{fmt(p['elo'], 0, True)} |"
         )
     return "\n".join(lines) + "\n"
@@ -131,6 +137,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=max(1, (os.cpu_count() or 2) - 1),
         help="parallel games; capped at cores - 1",
     )
+    parser.add_argument(
+        "--anchor", default=ANCHOR, help="player whose Elo is 0; must be one of --players"
+    )
     parser.add_argument("--hours", type=float, default=10.0, help="wall-clock budget")
     parser.add_argument("--out", type=Path, default=Path("data/tournament/games.jsonl"))
     parser.add_argument("--report", type=Path, default=Path("docs/training/TOURNAMENT.md"))
@@ -138,8 +147,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     args.specs = [s.strip() for s in args.players.split(",") if s.strip()]
     if len(set(args.specs)) < 2:
         parser.error("--players needs at least two distinct players")
-    if ANCHOR not in args.specs:
-        parser.error(f"--players must include {ANCHOR}: it is the Elo anchor")
+    if args.anchor not in args.specs:
+        parser.error(f"--players must include {args.anchor}: it is the Elo anchor")
     return args
 
 
@@ -170,7 +179,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     run = run_round_robin(specs, openings, args.base, args.increment, workers, args.out)
     print(f"played {run['played']}, skipped {run['skipped']}, crashed {run['errors']}")
 
-    summary = summarize(read_games(args.out))
+    summary = summarize(read_games(args.out), args.anchor)
     meta = {
         "time control": f"{args.base:g}+{args.increment:g} s",
         "workers": workers,
@@ -179,7 +188,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "seconds per game (calibration)": f"{seconds_per_game:.1f}",
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(render_markdown(summary, specs, meta))
+    args.report.write_text(render_markdown(summary, specs, meta, args.anchor))
     print(f"Wrote {args.report}")
     return 0
 

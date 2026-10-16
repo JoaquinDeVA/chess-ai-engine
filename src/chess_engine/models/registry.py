@@ -1,9 +1,9 @@
 """Name -> model class registry."""
 
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Type
+from typing import Callable, Dict, List, Optional, Tuple, Type
 
-from .base import EvaluationModel
+from .base import ARTIFACTS_DIR, EvaluationModel
 
 _REGISTRY: Dict[str, Type[EvaluationModel]] = {}
 
@@ -50,13 +50,46 @@ def get_model_class(name: str) -> Type[EvaluationModel]:
         ) from None
 
 
-def load_model(name: str, path: Optional[Path] = None) -> EvaluationModel:
-    """Load the saved model registered under ``name``.
+def split_spec(spec: str) -> Tuple[str, Optional[str]]:
+    """Split a model specification ``name`` or ``name@tag``.
 
-    :param name: Registered model name.
-    :param path: Saved file; defaults to ``models/artifacts/<name>.<ext>``.
+    A tag names a second artifact of the same model (e.g. trained on undersampled mates).
+
+    :param spec: Registered model name, optionally followed by ``@`` and a tag.
+    :return: ``(name, tag)``; the tag is None for an untagged name.
+    :raises ValueError: If the tag after ``@`` or the name before it is empty.
+    """
+    name, separator, tag = spec.partition("@")
+    if not separator:
+        return name, None
+    if not name or not tag:
+        raise ValueError(f"model spec must look like name@tag, got {spec!r}")
+    return name, tag
+
+
+def artifact_path(spec: str) -> Path:
+    """Where the artifact of a model specification is saved.
+
+    :param spec: Model name, or ``name@tag``.
+    :return: ``default_path()`` of the class for a name; ``models/artifacts/<spec><suffix>``
+        for a tagged spec.
+    :raises KeyError: If the name is unknown.
+    """
+    name, tag = split_spec(spec)
+    cls = get_model_class(name)
+    if tag is None:
+        return cls.default_path()
+    return ARTIFACTS_DIR / f"{spec}{cls.artifact_suffix}"
+
+
+def load_model(spec: str, path: Optional[Path] = None) -> EvaluationModel:
+    """Load the saved model named by ``spec``.
+
+    :param spec: Registered model name, or ``name@tag`` for a tagged artifact.
+    :param path: Saved file; defaults to :func:`artifact_path`.
     :return: The loaded model.
-    :raises KeyError: If ``name`` is unknown.
+    :raises KeyError: If the name is unknown.
     :raises FileNotFoundError: If the model file does not exist (train it first).
     """
-    return get_model_class(name).load(path)
+    name, _ = split_spec(spec)
+    return get_model_class(name).load(path or artifact_path(spec))

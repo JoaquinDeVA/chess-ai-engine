@@ -23,6 +23,7 @@ from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h2, h3
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, get_model_class
+from chess_engine.models.registry import split_spec
 from chess_engine.search.time_management import TimeManager
 
 logger = logging.getLogger(__name__)
@@ -58,8 +59,9 @@ def make_player(
 ) -> IterativeDeepeningBot:
     """Build an iterative-deepening player without an opening book.
 
-    :param spec: ``"h2"`` / ``"h3"`` for a hand-crafted heuristic, any other string for a
-        registered model name, or an :class:`EvaluationModel` instance.
+    :param spec: ``"h2"`` / ``"h3"`` for a hand-crafted heuristic, a registered model name or
+        ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
+        instance.
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.
     :return: The player.
@@ -68,8 +70,13 @@ def make_player(
         return IterativeHeuristicBot(
             eval_function=HEURISTICS[spec], max_depth=max_depth, time_manager=time_manager
         )
+    name = spec if isinstance(spec, str) else type(spec).name
     return IterativeModelBookBot(
-        model=spec, opening_book=OpeningBook({}), max_depth=max_depth, time_manager=time_manager
+        model=spec,
+        opening_book=OpeningBook({}),
+        max_depth=max_depth,
+        name=name,
+        time_manager=time_manager,
     )
 
 
@@ -136,15 +143,15 @@ def _profile_job(job: Tuple[str, float, pd.DataFrame]) -> Optional[Dict[str, obj
 def validate_specs(specs: Sequence[str]) -> None:
     """Fail fast on a player that is neither a heuristic nor a registered model.
 
-    :param specs: Player specifications.
+    :param specs: Player specifications (``name`` or ``name@tag``).
     :raises ValueError: If a spec is unknown.
     """
     for spec in specs:
         if spec in HEURISTICS:
             continue
         try:
-            get_model_class(spec)
-        except KeyError as error:
+            get_model_class(split_spec(spec)[0])
+        except (KeyError, ValueError) as error:
             raise ValueError(f"unknown player {spec!r}: {error.args[0]}") from error
 
 

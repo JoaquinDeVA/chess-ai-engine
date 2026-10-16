@@ -249,3 +249,27 @@ def test_evaluator_unchanged_for_existing_models(stub_model):
             expected = cp_to_expected_score(cp if player == chess.WHITE else -cp)
             value = evaluator(ChessGameState(board), player)
             assert value == pytest.approx(expected, abs=1e-12)
+
+
+def test_tagged_spec_round_trip(tmp_path, monkeypatch):
+    from chess_engine.models import base as models_base
+    from chess_engine.models import registry
+
+    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+    cls = get_model_class("pst_tapered")
+    cls(weights=np.zeros(768), bias=0.0).save()
+    cls(weights=np.full(768, 0.5), bias=1.0).save(tmp_path / "pst_tapered@x.npz")
+
+    assert registry.split_spec("pst_tapered@x") == ("pst_tapered", "x")
+    assert registry.split_spec("pst_tapered") == ("pst_tapered", None)
+    with pytest.raises(ValueError):
+        registry.split_spec("pst_tapered@")
+    tagged = load_model("pst_tapered@x")
+    assert tagged.bias == 1.0 and tagged.weights[0] == 0.5
+    plain = load_model("pst_tapered")
+    assert plain.bias == 0.0
+    with pytest.raises(FileNotFoundError):
+        load_model("pst_tapered@missing")
+    with pytest.raises(KeyError):
+        load_model("no_such_model@x")

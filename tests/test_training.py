@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from chess_engine import models
+from chess_engine.models import registry
 from chess_engine.training import cards, report
 from chess_engine.training import evaluate as evaluate_cli
 from chess_engine.training import train as train_cli
@@ -19,8 +20,10 @@ from chess_engine.training.dataset import (
     load_evaluations,
     split_dataset,
 )
+from chess_engine.training.lichess_raw import shard_path, write_shard
 from chess_engine.training.metrics import compute_metrics, outcome_class
 from chess_engine.training.representation import Representation
+from chess_engine.training.sidecar import build_sidecar
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
 from tests.test_effort import write_fixture_shards
@@ -409,3 +412,59 @@ class TestEffortCommandLine:
         )  # fmt: skip
         assert code == 2
         assert "bogus" in capsys.readouterr().out
+
+
+def write_mate_shards(raw, side, count=900, seed=4):
+    """Like :func:`write_fixture_shards`, but every fifth position is a mate in 2."""
+    raw.mkdir(parents=True, exist_ok=True)
+    boards = random_positions(count, seed=seed)
+    records = []
+    for index, board in enumerate(boards):
+        fen = " ".join(board.fen().split()[:4])
+        record = {"fen": fen, "cp": material_cp(board), "mate": None, "depth": 20, "knodes": 1,
+                  "best_move": None, "n_evals": 1, "n_pvs": 1}  # fmt: skip
+        if index % 5 == 0:
+            record.update(cp=None, mate=2)
+        records.append(record)
+    write_shard(shard_path(raw, 0), records, {"perspective": "white"})
+    build_sidecar(shard_path(raw, 0), side)
+
+
+class TestMateKeepAndTags:
+    def test_train_cli_mate_keep_and_tag_write_tagged_artifact_and_card(
+        self, isolated_cards, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        write_mate_shards(raw, side)
+
+        code = train_cli.main(
+            [
+                "--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05", "--tag", "mates5",
+                "--raw", str(raw), "--sidecar", str(side),
+            ]
+        )  # fmt: skip
+        assert code == 0
+        assert (tmp_path / "pst_tapered@mates5.npz").exists()
+        assert not (tmp_path / "pst_tapered.npz").exists()
+        card = cards.load_card("pst_tapered@mates5")
+        assert card["name"] == "pst_tapered@mates5"
+        assert card["training"]["representation"]["mate_keep"] == 0.05
+        assert cards.load_card("pst_tapered") == {"name": "pst_tapered"}
+
+    def test_judge_sample_ignores_mate_keep(self, stub_model, tmp_path, monkeypatch):
+        """The test sample of the evaluation is always read with every row (no ``mate_keep``)."""
+
+        class StopAfterCallError(Exception):
+            pass
+
+        calls = []
+
+        def recording_load_sample(*args, **kwargs):
+            calls.append(kwargs)
+            raise StopAfterCallError
+
+        monkeypatch.setattr(evaluate_cli, "load_sample", recording_load_sample)
+        with pytest.raises(StopAfterCallError):
+            evaluate_cli.sample_benchmark(stub_model, tmp_path, tmp_path)
+        assert calls and calls[0].get("mate_keep", 1.0) == 1.0

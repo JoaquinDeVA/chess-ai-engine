@@ -6,10 +6,12 @@ Raw evaluations (``cp`` / ``mate``) are always from **White's point of view**; a
 are kept.
 """
 
+import zlib
 from dataclasses import asdict, dataclass
 
 import chess
 import numpy as np
+import pandas as pd
 
 from chess_engine.models.base import CP_SCALE
 
@@ -22,6 +24,18 @@ _SCALES = ("winprob", "cp_linear")
 _PERSPECTIVES = ("white", "side_to_move")
 _FILTERS = ("all", "quiet")
 _SCORE_EPS = 1e-6
+#: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
+_MATE_SALT = "mate-keep"
+
+
+def validate_mate_keep(mate_keep: float) -> None:
+    """Check the share of mate positions kept.
+
+    :param mate_keep: Share in ``(0, 1]``; 1 keeps every mate.
+    :raises ValueError: If it is outside ``(0, 1]``.
+    """
+    if not 0.0 < mate_keep <= 1.0:
+        raise ValueError(f"mate_keep must be in (0, 1], got {mate_keep}")
 
 
 @dataclass(frozen=True)
@@ -32,12 +46,15 @@ class Representation:
     :param k: Slope of the logistic curve (only used by ``"winprob"``).
     :param perspective: ``"white"`` or ``"side_to_move"`` (score of the player to move).
     :param filter: ``"all"`` positions or only ``"quiet"`` ones (see :func:`is_quiet`).
+    :param mate_keep: Share of the mate positions kept in the training data, in ``(0, 1]``
+        (see :func:`keep_mate_rows`); 1 keeps them all.
     """
 
     scale: str = "winprob"
     k: float = LICHESS_K
     perspective: str = "side_to_move"
     filter: str = "all"
+    mate_keep: float = 1.0
 
     def __post_init__(self) -> None:
         if self.scale not in _SCALES:
@@ -46,18 +63,20 @@ class Representation:
             raise ValueError(f"unknown perspective: {self.perspective!r}")
         if self.filter not in _FILTERS:
             raise ValueError(f"unknown filter: {self.filter!r}")
+        validate_mate_keep(self.mate_keep)
 
     @property
     def name(self) -> str:
-        """Short identifier, e.g. ``"winprob-k0.00368-stm-all"``."""
+        """Short identifier, e.g. ``"winprob-k0.00368-stm-all"``; ``-mates5`` if mates are cut."""
         scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
         persp = "stm" if self.perspective == "side_to_move" else "white"
-        return f"{scale}-{persp}-{self.filter}"
+        mates = f"-mates{100 * self.mate_keep:g}" if self.mate_keep < 1.0 else ""
+        return f"{scale}-{persp}-{self.filter}{mates}"
 
     def to_dict(self) -> dict:
         """Fields as a plain dictionary.
 
-        :return: ``{"scale": ..., "k": ..., "perspective": ..., "filter": ...}``.
+        :return: ``{"scale": ..., "k": ..., "perspective": ..., "filter": ..., "mate_keep": ...}``.
         """
         return asdict(self)
 
@@ -134,3 +153,22 @@ def is_quiet(board: chess.Board, best_move: str | None) -> bool:
         return True
     move = chess.Move.from_uci(best_move)
     return not (board.is_capture(move) or move.promotion is not None)
+
+
+def keep_mate_rows(fens: pd.Series, mate_keep: float, seed: int = 42) -> np.ndarray:
+    """Which mate positions to keep when only a share ``mate_keep`` of them is wanted.
+
+    Each FEN gets a CRC32 hash (salted with ``seed``) mapped to ``[0, 1)``; it is kept when the
+    hash is below ``mate_keep``. The kept set of a smaller share is therefore a subset of a larger
+    one. The mask covers every given row: the caller keeps the non-mate rows itself.
+
+    :param fens: FENs of the mate positions (any iterable of strings).
+    :param mate_keep: Share to keep, in ``(0, 1]``.
+    :param seed: Salt of the hash.
+    :return: Boolean array, one entry per FEN.
+    :raises ValueError: If ``mate_keep`` is outside ``(0, 1]``.
+    """
+    validate_mate_keep(mate_keep)
+    salt = f"{_MATE_SALT}:{seed}:"
+    hashes = np.fromiter((zlib.crc32(f"{salt}{fen}".encode()) for fen in fens), dtype=np.float64)
+    return hashes / 2.0**32 < mate_keep

@@ -6,14 +6,16 @@ Linear models, from the raw shards: ``--model pst_tapered --effort <0-100>``.
 
 import argparse
 import json
+import re
 import time
 import tomllib
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.registry import available_models, get_model_class
+from chess_engine.models.registry import artifact_path, available_models, get_model_class
 
 from .cards import current_commit, today, update_card
 from .dataset import SPLIT_SEED, VALIDATION, encode_positions, load_evaluations, split_dataset
@@ -73,11 +75,24 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help='linear models: "default", or a JSON object with the fields of Representation '
         "(scale, k, perspective, filter)",
     )
+    parser.add_argument(
+        "--mate-keep",
+        type=float,
+        default=1.0,
+        help="share of the mate positions kept in the TRAIN and validation sets, in (0, 1]",
+    )
+    parser.add_argument(
+        "--tag",
+        help="train a variant: artifact <model>@<tag>, card <model>@<tag> (letters, digits, ._-)",
+    )
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
     parser.add_argument(
         "--sidecar", type=Path, default=DEFAULT_SIDECAR_DIR, help="sidecar directory"
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
+        parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
+    return args
 
 
 def parse_representation(text: Optional[str]) -> Representation:
@@ -92,6 +107,34 @@ def parse_representation(text: Optional[str]) -> Representation:
     if text is None or text == "default":
         return Representation()
     return Representation.from_dict(json.loads(text))
+
+
+def model_spec(args: argparse.Namespace) -> str:
+    """Name of the model being trained: ``<model>`` or ``<model>@<tag>``.
+
+    :param args: Parsed arguments (``model`` and ``tag``).
+    :return: The specification, also used for the artifact and the card.
+    """
+    return f"{args.model}@{args.tag}" if args.tag else args.model
+
+
+def effort_representation(args: argparse.Namespace) -> Representation:
+    """Representation of an effort run: ``--representation`` with ``--mate-keep`` applied.
+
+    :param args: Parsed arguments.
+    :return: The representation to train with.
+    :raises ValueError: If ``--mate-keep`` disagrees with the ``mate_keep`` of
+        ``--representation``, or is outside ``(0, 1]``.
+    """
+    rep = parse_representation(args.representation)
+    if args.mate_keep == 1.0:
+        return rep
+    if rep.mate_keep not in (1.0, args.mate_keep):
+        raise ValueError(
+            f"--mate-keep {args.mate_keep} disagrees with mate_keep {rep.mate_keep} "
+            "of --representation"
+        )
+    return replace(rep, mate_keep=args.mate_keep)
 
 
 def _format_duration(seconds: float) -> str:
@@ -117,7 +160,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     :return: Process exit code.
     """
     started = time.perf_counter()
-    rep = parse_representation(args.representation)
+    rep = effort_representation(args)
     quiet = rep.filter == "quiet"
     available = available_rows(args.sidecar, quiet_only=quiet)
     if available == 0:
@@ -136,6 +179,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         MAX_VALIDATION_ROWS,
         seed=SAMPLE_SEED,
         quiet_only=quiet,
+        mate_keep=rep.mate_keep,
     )
     timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
     estimate = estimated_seconds(plan, timing)
@@ -159,9 +203,9 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         quiet,
     )
 
-    path = model.save(args.output)
+    path = model.save(args.output or artifact_path(model_spec(args)))
     update_card(
-        args.model,
+        model_spec(args),
         status="current",
         architecture=model_class.architecture,
         features=model_class.features.name,
@@ -208,6 +252,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.data is None:
         print("--data is required for CSV models")
         return 2
+    if args.mate_keep != 1.0:
+        print("--mate-keep only applies to linear models trained with --effort")
+        return 2
 
     config = load_config(args.model, args.config)
     if args.epochs is not None:
@@ -233,9 +280,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         config=config,
     )
 
-    path = model.save(args.output)
+    path = model.save(args.output or artifact_path(model_spec(args)))
     update_card(
-        args.model,
+        model_spec(args),
         status="current",
         architecture=model_class.architecture,
         features=extractor.name,

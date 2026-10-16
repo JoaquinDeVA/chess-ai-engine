@@ -1,11 +1,13 @@
 import chess
 import numpy as np
+import pandas as pd
 import pytest
 
 from chess_engine.training.representation import (
     LICHESS_K,
     Representation,
     is_quiet,
+    keep_mate_rows,
     score_to_cp,
     target,
     white_score,
@@ -77,3 +79,29 @@ def test_representation_round_trips_through_dict():
     assert Representation.from_dict(rep.to_dict()) == rep
     assert Representation().name == "winprob-k0.00368-stm-all"
     assert LICHESS_K == 0.00368208
+
+
+def test_mate_keep_is_nested():
+    fens = pd.Series([f"fen-{i} w - - 0 1" for i in range(200_000)])
+    keep_10 = keep_mate_rows(fens, 0.10)
+    keep_5 = keep_mate_rows(fens, 0.05)
+    assert (keep_5 <= keep_10).all()
+    assert abs(keep_10.mean() - 0.10) < 0.01
+    assert abs(keep_5.mean() - 0.05) < 0.01
+    assert keep_mate_rows(fens, 1.0).all()
+
+
+@pytest.mark.parametrize("bad", [0.0, -0.1, 1.5])
+def test_mate_keep_outside_zero_one_is_rejected(bad):
+    with pytest.raises(ValueError):
+        Representation(mate_keep=bad)
+    with pytest.raises(ValueError):
+        keep_mate_rows(pd.Series(["x"]), bad)
+
+
+def test_mate_keep_is_part_of_the_name_only_when_undersampled():
+    assert Representation().name == "winprob-k0.00368-stm-all"
+    assert Representation(mate_keep=0.05).name == "winprob-k0.00368-stm-all-mates5"
+    rep = Representation(mate_keep=0.05)
+    assert Representation.from_dict(rep.to_dict()) == rep
+    assert Representation().to_dict()["mate_keep"] == 1.0

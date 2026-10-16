@@ -135,3 +135,54 @@ def test_iter_batches_n_zero_yields_nothing(dirs):
     raw, side = dirs
     assert list(iter_batches(raw, side, TRAIN, 16, 0, seed=1)) == []
     assert all(len(b) for b in iter_batches(raw, side, TRAIN, 16, None, seed=1))
+
+
+@pytest.fixture
+def mate_dirs(tmp_path, monkeypatch):
+    """Two shards where every fourth position is a mate in 3 (cp is then NaN)."""
+    monkeypatch.setattr("chess_engine.training.lichess_raw.ROW_GROUP_SIZE", 64)
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    raw.mkdir()
+    side.mkdir()
+    fens = random_fens(400)
+    for index, chunk in enumerate((fens[:250], fens[250:])):
+        records = []
+        for position, fen in enumerate(chunk):
+            rec = record(fen, "e7e5" if " b " in fen else "e2e4")
+            if position % 4 == 0:
+                rec.update(cp=None, mate=3)
+            records.append(rec)
+        write_shard(shard_path(raw, index), records, {"perspective": "white"})
+    for index in range(2):
+        build_sidecar(shard_path(raw, index), side)
+    return raw, side
+
+
+def test_load_sample_mate_keep_filters_only_mates(mate_dirs):
+    raw, side = mate_dirs
+    everything = load_sample(raw, side, TRAIN, 10_000)
+    kept = load_sample(raw, side, TRAIN, 10_000, mate_keep=0.2)
+    is_mate = everything["mate"].notna()
+    assert is_mate.any() and not is_mate.all()
+    assert kept["mate"].notna().sum() < is_mate.sum()
+    assert kept["mate"].notna().mean() < 0.3
+    assert (kept["mate"].isna().sum()) == (~is_mate).sum(), "non-mate rows are untouched"
+    assert set(kept["fen"][kept["mate"].notna()]) <= set(everything["fen"][is_mate])
+    assert len(load_sample(raw, side, TRAIN, 10_000, mate_keep=1.0)) == len(everything)
+
+
+def test_load_sample_mate_keep_counts_rows_after_the_filter(mate_dirs):
+    raw, side = mate_dirs
+    sample = load_sample(raw, side, TRAIN, 60, mate_keep=0.5)
+    assert len(sample) == 60
+    assert (assign_split(sample["fen"]) == TRAIN).all()
+
+
+def test_iter_batches_mate_keep(mate_dirs):
+    raw, side = mate_dirs
+    everything = pd.concat(iter_batches(raw, side, TRAIN, 16, None, seed=3))
+    kept = pd.concat(iter_batches(raw, side, TRAIN, 16, None, seed=3, mate_keep=0.2))
+    assert kept["mate"].notna().sum() < everything["mate"].notna().sum()
+    assert kept["mate"].isna().sum() == everything["mate"].isna().sum()
+    capped = list(iter_batches(raw, side, TRAIN, 16, 40, seed=3, mate_keep=0.2))
+    assert sum(len(b) for b in capped) == 40

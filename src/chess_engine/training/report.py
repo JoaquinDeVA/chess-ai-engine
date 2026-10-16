@@ -2,19 +2,56 @@
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
 this module regenerates: ``python -m chess_engine.training.report``.
+
+Each row reads the card sections ``accuracy`` and ``cost`` (written by ``training.evaluate``),
+``tradeoff`` (depth and search agreement per time per move, from the profiler) and ``tournament``
+(score and Elo, from the round-robin). A missing section shows a dash.
 """
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import chess_engine.models  # noqa: F401  (loads models first: avoids an import cycle)
+
 from .cards import PROJECT_ROOT, load_all_cards
+from .representation import Representation
 
 HISTORY_FILE = PROJECT_ROOT / "docs" / "training" / "MODELS_HISTORY.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 
+#: Models that are not retrained nor played: only their accuracy and cost are measured.
+ACCURACY_RECORDS = frozenset({"ridge_features", "mlp_features", "cnn_light", "cnn_resnet"})
+
+#: Times per move (seconds) of the depth columns, as keys of the ``tradeoff`` section.
+DEPTH_SECONDS = ("1", "3", "10")
+
+#: Time per move (seconds) of the search agreement column.
+AGREEMENT_SECONDS = "10"
+
 _STATUS_ORDER = {"current": 0}
 _DASH = "—"
+_HEADER = (
+    "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
+    "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
+    "Search agreement, 10 s | Score | Elo ± interval |"
+)
+_ALIGNMENT = "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+
+
+def _dig(card: Dict[str, Any], *keys: str) -> Any:
+    """Follow nested keys of a card; None as soon as one is missing.
+
+    :param card: Model card.
+    :param keys: Keys to follow.
+    :return: The value found, or None.
+    """
+    value: Any = card
+    for key in keys:
+        if not isinstance(value, dict) or key not in value:
+            return None
+        value = value[key]
+    return value
 
 
 def _percent(value: Optional[float]) -> str:
@@ -27,82 +64,72 @@ def _number(value: Optional[float], digits: int = 1) -> str:
     return _DASH if value is None else f"{value:,.{digits}f}"
 
 
-def _size(card: Dict[str, Any]) -> str:
-    """Format the on-disk size of a model."""
-    kb = card.get("size_kb")
-    if kb is None:
+def _representation(card: Dict[str, Any]) -> str:
+    """Short name of the target representation of a linear model."""
+    fields = _dig(card, "training", "representation")
+    return _DASH if not fields else Representation.from_dict(fields).name
+
+
+def _elo(tournament: Dict[str, Any]) -> str:
+    """Elo estimate with its 95% half-width, e.g. ``+43 ± 24``."""
+    elo, interval = tournament.get("elo"), tournament.get("elo_interval")
+    if elo is None:
         return _DASH
-    return f"{kb / 1024:.1f} MB" if kb >= 1024 else f"{kb:.0f} KB"
+    return f"{elo:+.0f}" if interval is None else f"{elo:+.0f} ± {interval:.0f}"
 
 
-def _strength(card: Dict[str, Any]) -> str:
-    """Format the match results as ``opponent W-D-L`` pairs."""
-    strength = card.get("strength")
-    if not strength:
-        return _DASH
-    pairs = "; ".join(f"{opponent} {score}" for opponent, score in strength["results"].items())
-    return f"{pairs} (depth {strength['depth']})"
+def _row(card: Dict[str, Any]) -> str:
+    """One line of the history table.
 
-
-def _training_data(card: Dict[str, Any]) -> str:
-    """Summarize the training set and epochs."""
-    training = card.get("training") or {}
-    if not training:
-        return _DASH
-    parts = []
-    if training.get("train_samples"):
-        parts.append(f"{training['train_samples']:,} positions")
-    if training.get("dataset"):
-        parts.append(str(training["dataset"]))
-    if training.get("epochs"):
-        parts.append(f"{training['epochs']} epochs")
-    return ", ".join(parts) or _DASH
-
-
-def render_benchmarked(cards: List[Dict[str, Any]]) -> str:
-    """Comparison table of the models.
-
-    :param cards: All model cards.
-    :return: Markdown table.
+    :param card: Model card.
+    :return: Markdown table row.
     """
-    rows = [card for card in cards if card.get("status") in _STATUS_ORDER]
-    rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"]))
-    lines = [
-        "| Model | Status | Architecture | Params | Size | Training data | Time / eval | "
-        "MAE (cp) | RMSE (cp) | Agreement | ±50 cp | ±100 cp | Playing strength |",
-        "|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|",
+    name = card["name"]
+    accuracy = _dig(card, "accuracy", "all") or {}
+    non_quiet = _dig(card, "accuracy", "non_quiet") or {}
+    tournament = card.get("tournament") or {}
+    tradeoff = card.get("tradeoff") or {}
+    best_move = (
+        f"{_percent(accuracy.get('best_move_agreement'))} / "
+        f"{_percent(non_quiet.get('best_move_agreement'))}"
+        if accuracy
+        else _DASH
+    )
+    effort = _dig(card, "training", "effort")
+    cells = [
+        f"`{name}`",
+        "accuracy record" if name in ACCURACY_RECORDS else "plays",
+        _number(card.get("parameters"), 0),
+        _representation(card),
+        _DASH if effort is None else str(effort),
+        _number(accuracy.get("spearman"), 3),
+        _number(accuracy.get("mae"), 3),
+        best_move,
+        _number(_dig(card, "cost", "us_per_eval")),
     ]
-    for card in rows:
-        bench = card.get("benchmark") or {}
-        time_per_eval = bench.get("ms_per_eval")
-        lines.append(
-            "| `{name}` | {status} | {arch} | {params} | {size} | {data} | {ms} | {mae} | {rmse} "
-            "| {acc} | {w50} | {w100} | {strength} |".format(
-                name=card["name"],
-                status=card["status"],
-                arch=card.get("architecture", _DASH),
-                params=_number(card.get("parameters"), 0),
-                size=_size(card),
-                data=_training_data(card),
-                ms=_DASH if time_per_eval is None else f"{time_per_eval:.2f} ms",
-                mae=_number(bench.get("mae_cp")),
-                rmse=_number(bench.get("rmse_cp")),
-                acc=_percent(bench.get("accuracy")),
-                w50=_percent(bench.get("within_50")),
-                w100=_percent(bench.get("within_100")),
-                strength=_strength(card),
-            )
-        )
-    return "\n".join(lines)
+    cells += [_number(_dig(tradeoff, seconds, "mean_depth")) for seconds in DEPTH_SECONDS]
+    cells.append(_percent(_dig(tradeoff, AGREEMENT_SECONDS, "search_agreement")))
+    score = tournament.get("score")
+    cells.append(_DASH if score is None else f"{score:.1f}%")
+    cells.append(_elo(tournament))
+    return "| " + " | ".join(cells) + " |"
 
 
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
+    Models with status ``current`` are listed; the models that play come first.
+
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.
     """
-    return render_benchmarked(load_all_cards() if cards is None else cards)
+    rows = [
+        card
+        for card in (load_all_cards() if cards is None else cards)
+        if card.get("status") in _STATUS_ORDER
+    ]
+    rows.sort(key=lambda card: (card["name"] in ACCURACY_RECORDS, card["name"]))
+    return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
 
 
 def update_history_file(path: Optional[Path] = None) -> bool:

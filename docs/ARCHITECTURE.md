@@ -14,7 +14,7 @@ flowchart TB
     BOTS --> MODELS["models/<br/>learned evaluators"]
     BOTS --> KNOW["knowledge/<br/>opening book · Prolog patterns"]
     SEARCH --> GAME["search/game_problems.py<br/>GameState · GameProblem"]
-    TRAIN["training/<br/>train · evaluate · report"] --> MODELS
+    TRAIN["training/<br/>train · evaluate · tradeoff · tournament · report"] --> MODELS
 ```
 
 | Package | Responsibility |
@@ -23,7 +23,7 @@ flowchart TB
 | `bots/` | The playable bots and the registry that finds them |
 | `evaluation/` | Hand-crafted features (material, mobility, king safety...) and the heuristics `h1`..`h4` |
 | `models/` | Learned position evaluators behind one interface (`EvaluationModel`) and a registry |
-| `training/` | Commands that train one model and benchmark it against Stockfish |
+| `training/` | The comparison pipeline: `representation` (target scale), `sidecar` (split, quiet flag and sampler over the raw shards), `effort` (training size per effort level), `train`, `judge` (accuracy and best-move agreement against Stockfish), `evaluate` (judge and cost of a model), `tradeoff` (depth against accuracy at a fixed time per move), `tournament` (round-robin, Elo), `lichess_raw` (conversion of the Lichess dump), `report` (model cards to table) |
 | `knowledge/` | Opening book (Python) and tactical-pattern knowledge base (Prolog) |
 | `engine/` | Game loop with clocks, tournaments, results and PGN export |
 
@@ -117,5 +117,5 @@ forwards constructor arguments, which is how `--model` and `--depth` reach the b
 | To add... | Implement | Guide |
 |---|---|---|
 | a bot | `evaluate()` in a subclass of `IterativeDeepeningBot` | [ADDING_A_BOT.md](ADDING_A_BOT.md) |
-| an evaluation model | an `EvaluationModel` and register it | [ADDING_A_MODEL.md](ADDING_A_MODEL.md) |
+| an evaluation model | a `LinearFeatures` and a `LinearEvalModel`, or any `EvaluationModel`; register it by name | [ADDING_A_MODEL.md](ADDING_A_MODEL.md) |
 | another game | `GameState` and `GameProblem`; the algorithms are game-agnostic | [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md) |

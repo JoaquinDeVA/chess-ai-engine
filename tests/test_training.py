@@ -176,6 +176,18 @@ def isolated_cards(tmp_path, monkeypatch):
     return tmp_path
 
 
+ACCURACY = {
+    "all": {"spearman": 0.912, "mae": 0.083, "best_move_agreement": 0.345, "n": 100},
+    "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
+    "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
+}
+TRADEOFF = {
+    "1": {"mean_depth": 1.0, "search_agreement": 0.2},
+    "3": {"mean_depth": 3.2, "search_agreement": 0.3},
+    "10": {"mean_depth": 6.0, "search_agreement": 0.4},
+}
+
+
 class TestCardsAndReport:
     def test_update_merges_dictionaries_and_replaces_scalars(self, isolated_cards):
         cards.update_card("m", architecture="a", training={"epochs": 3, "dataset": "x"})
@@ -187,34 +199,48 @@ class TestCardsAndReport:
     def test_missing_card_is_an_empty_skeleton(self, isolated_cards):
         assert cards.load_card("ghost") == {"name": "ghost"}
 
-    def test_table_renders_a_benchmarked_model(self, isolated_cards):
+    def test_report_renders_new_columns(self, isolated_cards):
+        representation = Representation().to_dict()
         cards.update_card(
-            "good",
+            "pst_tapered",
             status="current",
-            architecture="Ridge",
+            architecture="PST",
+            parameters=1234,
+            training={"effort": 40, "representation": representation},
+            accuracy=ACCURACY,
+            cost={"us_per_eval": 12.5},
+            tradeoff=TRADEOFF,
+            tournament={"games": 400, "score": 56.2, "elo": 43.0, "elo_interval": 24.1},
+        )
+        text = report.render_tables()
+        header = (
+            "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
+            "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
+            "Search agreement, 10 s | Score | Elo ± interval |"
+        )
+        row = (
+            f"| `pst_tapered` | plays | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
+            "34.5% / 28.0% | 12.5 | 1.0 | 3.2 | 6.0 | 40.0% | 56.2% | +43 ± 24 |"
+        )
+        assert header in text and row in text
+
+    def test_accuracy_record_models_marked(self, isolated_cards):
+        cards.update_card(
+            "ridge_features",
+            status="current",
             parameters=30,
-            size_kb=2.0,
-            training={"train_samples": 1000, "dataset": "d.csv", "epochs": 1},
-            benchmark={
-                "ms_per_eval": 1.5,
-                "mae_cp": 120.0,
-                "rmse_cp": 200.0,
-                "accuracy": 0.7,
-                "within_50": 0.3,
-                "within_100": 0.5,
-            },
-            strength={"depth": 2, "results": {"H2": "8-1-1"}},
+            accuracy=ACCURACY,
+            cost={"us_per_eval": 12.5},
         )
         text = report.render_tables()
         assert (
-            "| `good` | current | Ridge | 30 | 2 KB | 1,000 positions, d.csv, 1 epochs | 1.50 ms | 120.0 |"
-            in text
-        )
-        assert "70.0%" in text and "H2 8-1-1 (depth 2)" in text
+            "| `ridge_features` | accuracy record | 30 | — | — | 0.912 | 0.083 | 34.5% / 28.0% | 12.5 "
+            "| — | — | — | — | — | — |"
+        ) in text
 
-    def test_models_without_a_benchmark_show_dashes(self, isolated_cards):
+    def test_models_without_sections_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
-        assert "| — | — | — | — | — | — |" in report.render_tables()
+        assert f"| `fresh` | plays |{' — |' * 13}" in report.render_tables()
 
     def test_history_file_is_updated_between_markers_only(self, isolated_cards):
         path = report.HISTORY_FILE
@@ -345,6 +371,33 @@ class TestEffortCommandLine:
         assert training["effort"] == 40
         assert training["effort_config"]["trials"] == 1
         assert training["effort_config"]["max_epochs"] == 5
+
+    def test_evaluate_writes_accuracy_and_cost_from_the_test_sample(self, isolated_cards, tmp_path):
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        write_fixture_shards(raw, side, 900, seed=4)
+        target = tmp_path / "pst_tapered.npz"
+        shards = ["--raw", str(raw), "--sidecar", str(side)]
+        assert (
+            train_cli.main(
+                ["--model", "pst_tapered", "--effort", "0", *shards, "--output", str(target)]
+            )
+            == 0
+        )
+
+        assert (
+            evaluate_cli.main(
+                ["--model", "pst_tapered", "--path", str(target), *shards, "--agreement-n", "50"]
+            )
+            == 0
+        )
+        card = cards.load_card("pst_tapered")
+        accuracy = card["accuracy"]
+        rows = accuracy["sample"]["rows"]
+        assert rows > 0 and accuracy["sample"] == {"rows": rows, "seed": 42, "agreement_n": 50}
+        assert set(accuracy) >= {"all", "quiet", "non_quiet", "sample"}
+        assert accuracy["all"]["n"] == rows and 0 <= accuracy["all"]["mae"] <= 1
+        assert card["cost"]["us_per_eval"] > 0
+        assert "benchmark" not in card
 
     def test_unknown_representation_field_exits_cleanly(self, isolated_cards, tmp_path, capsys):
         code = train_cli.main(

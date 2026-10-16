@@ -1,24 +1,33 @@
 # Models
 
-One row per *approach*: retraining or tuning a model overwrites its row, and a new row is only added
-for a genuinely different approach. The table is generated from `models/cards/*.json` by
-`python -m chess_engine.training.report`; regenerate everything with `bash scripts/run_all.sh`
-(see [TRAINING_TASKS.md](TRAINING_TASKS.md)).
+One row per model. The table is generated from `models/cards/*.json` by
+`python -m chess_engine.training.report`; `bash scripts/run_all.sh` regenerates the cards and the
+table (see [TRAINING_TASKS.md](TRAINING_TASKS.md)). A dash means the model has no result yet for
+that column.
 
-Columns: architecture, size, training data, **time per evaluation** (features included, one position at
-a time, CPU), **error against Stockfish** in centipawns, **agreement** (model and Stockfish agree on who
-is better, ±50 cp counting as equal), share of predictions within 50 / 100 cp, and playing strength as
-`W-D-L` of an ML bot using the model against H2 and H3 at equal depth.
+Columns:
 
-> The evaluation protocol and the models themselves are being redesigned; see
-> [ADDING_A_MODEL.md](../ADDING_A_MODEL.md) and [ROADMAP.md](../ROADMAP.md). Treat numbers as relative.
+- **Kind**: `plays` models are trained at an effort level and take part in the round-robin;
+  `accuracy record` models are the older ones. Their current weights are measured, but they are
+  neither retrained nor played.
+- **Params** and **Representation** (target scale, point of view, position filter) and **Effort**
+  (0-100, see [ADDING_A_MODEL.md](../ADDING_A_MODEL.md)).
+- **Spearman**, **MAE**: rank correlation and mean absolute error of the expected score against
+  Stockfish, on the fixed test sample (200,000 positions, seed 42). MAE is in expected-score units,
+  from 0 to 1.
+- **Best move, all / non-quiet**: share of positions where one search step picks the Stockfish best
+  move (the first 20,000 sample positions, or fewer when `--agreement-n` is lower).
+- **µs per eval**: median time of one evaluation of one position, as the search calls it.
+- **Depth 1 s / 3 s / 10 s**: mean completed search depth with a fixed time per move, and **search
+  agreement** at 10 s: how often that search finds the Stockfish best move.
+- **Score**, **Elo ± interval**: round-robin score and Elo with its 95% interval; the full results
+  are in `TOURNAMENT.md`.
 
 <!-- BEGIN GENERATED TABLES -->
-| Model | Status | Architecture | Params | Size | Training data | Time / eval | MAE (cp) | RMSE (cp) | Agreement | ±50 cp | ±100 cp | Playing strength |
-|---|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|
-| `cnn_light` | current | CNN (5 conv layers 32-32-64-64-64, GAP) + dense branch -> Dense32-16-1 | 109,569 | 496 KB | course dataset (Stockfish evaluations, mirror-augmented) | — | — | — | — | — | — | — |
-| `cnn_resnet` | current | ResNet-style CNN (Conv32-64, two dilated residual blocks, Conv256, GAP) + dense branch on 9 extras -> Dense256-128-64-1 | 572,353 | 2.3 MB | course dataset (Stockfish evaluations, mirror-augmented) | — | — | — | — | — | — | — |
-| `linear_baseline` | current | LinearRegression on 6 material features (turn + piece-count differences) | 7 | 1 KB | 745,515 positions, evaluations.csv, 1 epochs | — | — | — | — | — | — | — |
-| `mlp_features` | current | MLP 29 -> 32 -> 16 -> 1 (ReLU), NumPy inference | 1,505 | 45 KB | 745,515 positions, evaluations.csv, 40 epochs | — | — | — | — | — | — | — |
-| `ridge_features` | current | StandardScaler -> Ridge(alpha=10) on 29 features | 30 | 2 KB | 745,515 positions, evaluations.csv, 1 epochs | — | — | — | — | — | — | — |
+| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | Score | Elo ± interval |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `cnn_light` | accuracy record | 109,569 | — | — | — | — | — | — | — | — | — | — | — | — |
+| `cnn_resnet` | accuracy record | 572,353 | — | — | — | — | — | — | — | — | — | — | — | — |
+| `mlp_features` | accuracy record | 1,505 | — | — | — | — | — | — | — | — | — | — | — | — |
+| `ridge_features` | accuracy record | 30 | — | — | — | — | — | — | — | — | — | — | — | — |
 <!-- END GENERATED TABLES -->

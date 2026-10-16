@@ -2,15 +2,17 @@
 
 Ideas, roughly in the order they would pay off.
 
-## Evaluation models (needs its own design pass)
-- Revisit the centipawn → expected-score conversion (today a linear map clipped at ±1267 cp; a
-  logistic win-probability curve is the usual alternative).
-- A much larger, deduplicated position set (the Lichess evaluation database is available through
-  `scripts/download_lichess_evals.py`) and a fixed benchmark split.
-- A speed budget: the search calls the evaluator thousands of times per move, so the cost per
-  position (features included) matters as much as the accuracy.
-- Incremental feature updates (NNUE-style) instead of re-encoding the board at every node.
-- Light, full and future model families under the same `EvaluationModel` contract.
+## Evaluation models (redesign in progress)
+Done: the linear models predict the expected score through a logistic target; positions come from
+the raw Lichess evaluation database (sharded, with a fixed split); effort-based training; the
+comparison measures accuracy, cost, depth at a fixed time per move and a round-robin at equal time.
+Open:
+- Run the comparison with the full data and decide which models stay (the rule is strength at
+  equal time).
+- Second round: the best model against variants trained with 5% or 10% of the forced-mate rows.
+- Incremental feature updates (NNUE-style) instead of re-encoding the board at every node, only if
+  the measured cost still dominates the search.
+- Other model families under the same `EvaluationModel` contract, judged by the same comparison.
 
 ## Search
 - Quiescence search to avoid evaluating positions in the middle of a capture sequence.

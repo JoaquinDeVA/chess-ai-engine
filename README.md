@@ -124,19 +124,27 @@ Details, flowcharts and the conventions used by the cut-off test are in
 
 ## Evaluation models
 
-Models estimate the evaluation of a position (centipawns, White's point of view) the way Stockfish
-would. Four are included (`ridge_features`, `mlp_features`, `cnn_light`, `cnn_resnet`), plus a minimal
-`material_linear` that demonstrates how to add one. Their comparison is generated in
-[MODELS_HISTORY.md](docs/training/MODELS_HISTORY.md). This part of the project is still being designed: the interface
-is stable, the internals are not ([docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md)).
+Models estimate the evaluation of a position (expected score for White, as Stockfish would see it)
+and the search uses it as its evaluation function. Three linear models are trained from the raw
+Lichess evaluations at an effort level 0-100: `material_linear` (material counts), `pst_tapered`
+(piece-square tables) and `pst_terms` (piece-square tables plus classical terms). Four older models
+(`ridge_features`, `mlp_features`, `cnn_light`, `cnn_resnet`) are only measured for accuracy.
+
+The comparison has three parts: [MODELS_HISTORY.md](docs/training/MODELS_HISTORY.md) (accuracy and
+cost against Stockfish), `TRADEOFF.md` (search depth against search accuracy at a fixed time per
+move) and `TOURNAMENT.md` (round-robin at equal time per move, the verdict).
 
 ```bash
-python scripts/download_lichess_evals.py --rows 1000000        # build data/evaluations.csv
-python -m chess_engine.training.train    --model mlp_features --data data/evaluations.csv
-python -m chess_engine.training.evaluate --model mlp_features --data data/evaluations.csv --strength
+python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst  # raw shards
+python scripts/prepare_dataset.py                                                    # sidecars
+python -m chess_engine.training.train    --model pst_tapered --effort 40
+python -m chess_engine.training.evaluate --model pst_tapered
+python scripts/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10
+python scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 --hours 10
 ```
 
-`bash scripts/run_all.sh` does this for every model; [TRAINING_TASKS.md](docs/training/TRAINING_TASKS.md) is the checklist.
+`EFFORT=40 bash scripts/run_all.sh` runs the whole flow; [TRAINING_TASKS.md](docs/training/TRAINING_TASKS.md)
+is the checklist and [ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md) explains how to add a model.
 
 ## Extending the engine
 

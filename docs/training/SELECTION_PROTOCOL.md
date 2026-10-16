@@ -69,21 +69,25 @@ changes a handful of features (the incremental-update idea).
 | `pst_terms` | PST + 11 classical terms (pawns, mobility, king shield...) | none | 1 | ~790 | does knowledge per node pay for fewer nodes? |
 | `pst_kb` | piece-square **relative to each king's bucket**, both sides (HalfKP-like) | none | 1 | ~10,000 | the *different* one: king-awareness without non-linearity |
 | `nn4` | the 768 `pst_tapered` features | 256 (accumulator) → 32 → 32 | 4 | ~206,000 | the "4-layer" network |
-| `nn8` | the king-bucket features of `pst_kb` | 384 (accumulator) → 128 → 64 → 64 → 32 → 32 → 16 | 8 | ~4,000,000 | the "8-layer" network, as large as this CPU can train in a night |
 
-`pst_kb` versus `pst_tapered` isolates the value of king-relative features; `nn8` versus `pst_kb`
-isolates the value of non-linearity on the same inputs; `nn4` versus `pst_tapered` isolates it on the
-cheap inputs. The accumulator layer (first layer) is the incremental part: summing the rows of the active
+`pst_kb` versus `pst_tapered` isolates the value of king-relative features; `nn4` versus `pst_tapered`
+isolates the value of non-linearity on the same cheap inputs.
+
+**Dropped: an 8-layer network (`nn8`, king-bucket inputs, ~4 million parameters).** It was designed on
+request, but it is too heavy for this CPU-only machine (about 20x the parameters of `nn4`, slower to train
+and ~2x slower per evaluation, which costs search depth). It stays as a night-2 option **only if** `nn4`
+beats `pst_tapered` clearly and still has headroom; the design is: `pst_kb` features → 384 → 128 → 64 → 64 →
+32 → 32 → 16 → 1. The accumulator layer (first layer) is the incremental part: summing the rows of the active
 features, which can be updated per move; the following layers are small dense layers recomputed per
 evaluation.
 
 Inference is NumPy only (Keras is used to train and its weights are exported), so playing does not need
-TensorFlow. Expected cost per evaluation: `nn4` ~100 µs, `nn8` ~200 µs, against ~56 µs (`pst_tapered`) and
+TensorFlow. Expected cost per evaluation: `nn4` ~100 µs, against ~56 µs (`pst_tapered`) and
 ~117 µs (`pst_terms`); the profile measures the truth.
 
 ## Night-1 budget
 
 Training is "good enough", not exhaustive: roughly 20 million positions per model, two to four passes,
-validated every pass (about 80% of the attainable accuracy for the linear models and less for `nn8`, which
+validated every pass (about 80% of the attainable accuracy for the linear models and less for `nn4`, which
 is exactly why the headroom column exists). Order of cost: the linear models take minutes, the networks
 tens of minutes; the profile takes about 40 minutes for everyone; the tournament takes the rest of the night.

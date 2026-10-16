@@ -299,16 +299,3 @@ class TestCommandLines:
         assert train_cli.load_config("ridge_features", config) == {"alpha": 3.5}
         assert train_cli.load_config("ridge_features", tmp_path / "missing.toml") == {}
         assert train_cli.load_config("ridge_features")["alpha"] == 10.0
-
-
-def test_strength_match_reports_results_from_the_models_point_of_view():
-    from chess_engine.training.strength import run_strength_match
-
-    section = run_strength_match(
-        "linear_baseline", games=2, depth=1, time_limit=60.0, increment=0.0
-    )
-    assert section["depth"] == 1 and section["games_per_opponent"] == 2
-    assert set(section["results"]) == {"H2", "H3"}
-    for score in section["results"].values():
-        wins, draws, losses = map(int, score.split("-"))
-        assert wins + draws + losses == 2

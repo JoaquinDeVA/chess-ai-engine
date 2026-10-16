@@ -36,7 +36,7 @@ and builds the estimator or network. `models/linear_baseline.py` is the smallest
 
 ```bash
 python -m chess_engine.training.train    --model <name> --data data/evaluations.csv
-python -m chess_engine.training.evaluate --model <name> --data data/evaluations.csv --strength
+python -m chess_engine.training.evaluate --model <name> --data data/evaluations.csv
 python scripts/plot_models.py
 python main.py --player1 IterativeModelBookBot --model <name> --player2 IterativeHeuristicBot --depth 2
 ```

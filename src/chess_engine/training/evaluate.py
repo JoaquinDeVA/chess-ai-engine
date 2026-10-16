@@ -1,8 +1,8 @@
 """Benchmark a model against Stockfish: ``python -m chess_engine.training.evaluate --model <name> --data <csv>``.
 
 The benchmark uses the fixed hash-based test split of :mod:`training.dataset` and reports
-the metrics of :mod:`training.metrics`, the time needed to evaluate one position, and
-(optionally) the results of a small match against reference bots.
+the metrics of :mod:`training.metrics` and the time needed to evaluate one position.
+Playing strength is measured by :mod:`training.tournament` instead.
 """
 
 import argparse
@@ -116,13 +116,6 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--max-test-rows", type=int)
     parser.add_argument("--latency-samples", type=int, default=1000)
     parser.add_argument("--jobs", type=int, default=-1)
-    parser.add_argument(
-        "--strength", action="store_true", help="also play a match against reference bots"
-    )
-    parser.add_argument("--games", type=int, default=10, help="games per opponent for --strength")
-    parser.add_argument(
-        "--depth", type=int, default=2, help="search depth of the ML bot for --strength"
-    )
     return parser.parse_args(argv)
 
 
@@ -149,11 +142,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     if "status" not in load_card(args.model):
         sections["status"] = "current"
     update_card(args.model, **sections)
-
-    if args.strength:
-        from .strength import run_strength_match
-
-        update_card(args.model, strength=run_strength_match(args.model, args.games, args.depth))
 
     update_history_file()
     for key in (

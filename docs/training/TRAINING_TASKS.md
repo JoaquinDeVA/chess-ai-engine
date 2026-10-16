@@ -10,10 +10,9 @@ Checklist to (re)train and benchmark the models and refresh `MODELS_HISTORY.md`.
 - [ ] `data/evaluations.csv` exists. Either of:
   - `ln -s /path/to/evaluations.csv data/evaluations.csv`
   - `python scripts/download_lichess_evals.py --rows 1000000` (public Lichess database, CC0)
-- [ ] `bash scripts/run_all.sh` (about 1–2 h on CPU; add `GAMES=0` to skip the matches)
+- [ ] `bash scripts/run_all.sh` (about 1–2 h on CPU)
   - trains `linear_baseline`, `ridge_features`, `mlp_features` (minutes)
   - benchmarks all five models: error and agreement with Stockfish, time per evaluation
-  - plays the strength matches (10 games against H2 and H3)
   - regenerates the table in `MODELS_HISTORY.md` and the plots in `docs/img/`
 - [ ] Look at `MODELS_HISTORY.md` and `docs/img/*.png`, then `git add src/chess_engine/models docs && git commit`.
 
@@ -26,5 +25,5 @@ Checklist to (re)train and benchmark the models and refresh `MODELS_HISTORY.md`.
 
 - [ ] Follow `docs/ADDING_A_MODEL.md` (a model is one small file plus a config).
 - [ ] `python -m chess_engine.training.train --model <name> --data data/evaluations.csv`
-- [ ] `python -m chess_engine.training.evaluate --model <name> --data data/evaluations.csv --strength`
+- [ ] `python -m chess_engine.training.evaluate --model <name> --data data/evaluations.csv`
 - [ ] `python scripts/plot_models.py` and commit.

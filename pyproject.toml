@@ -17,12 +17,17 @@ prolog = ["pyswip>=0.3"]
 data = ["zstandard>=0.22"]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.5"]
 
-[tool.setuptools]
-packages = ["adversarial_search", "bots", "config", "engine", "evaluation", "knowledge", "models", "training"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"chess_engine.knowledge" = ["*.pl"]
+"chess_engine.models" = ["artifacts/*", "cards/*.json"]
+"chess_engine.training" = ["configs/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src", "."]
 addopts = "-q"
 markers = [
     "prolog: requires SWI-Prolog (skipped when it is not installed)",
@@ -32,6 +37,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+src = ["src", "."]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "D"]

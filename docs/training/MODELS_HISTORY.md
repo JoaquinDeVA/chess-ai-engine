@@ -2,7 +2,7 @@
 
 One row per *approach*: retraining or tuning a model overwrites its row, and a new row is only added
 for a genuinely different approach. The table is generated from `models/cards/*.json` by
-`python -m training.report`; regenerate everything with `bash scripts/run_all.sh`
+`python -m chess_engine.training.report`; regenerate everything with `bash scripts/run_all.sh`
 (see [TRAINING_TASKS.md](TRAINING_TASKS.md)).
 
 Columns: architecture, size, training data, **time per evaluation** (features included, one position at
@@ -11,7 +11,7 @@ is better, ±50 cp counting as equal), share of predictions within 50 / 100 cp, 
 `W-D-L` of an ML bot using the model against H2 and H3 at equal depth.
 
 > The evaluation protocol and the models themselves are being redesigned; see
-> [docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md) and [ROADMAP.md](ROADMAP.md). Treat numbers as relative.
+> [ADDING_A_MODEL.md](../ADDING_A_MODEL.md) and [ROADMAP.md](../ROADMAP.md). Treat numbers as relative.
 
 <!-- BEGIN GENERATED TABLES -->
 | Model | Status | Architecture | Params | Size | Training data | Time / eval | MAE (cp) | RMSE (cp) | Agreement | ±50 cp | ±100 cp | Playing strength |

@@ -7,7 +7,7 @@ from typing import Dict, Optional, Union
 import chess
 
 #: Default location of the book shipped with the project.
-DEFAULT_BOOK_PATH = Path(__file__).resolve().parent.parent / "data" / "opening_book.json"
+DEFAULT_BOOK_PATH = Path(__file__).resolve().parents[3] / "data" / "opening_book.json"
 
 
 def position_key(board: chess.Board) -> str:

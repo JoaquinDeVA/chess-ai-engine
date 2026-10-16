@@ -1,7 +1,7 @@
 """Render the model cards into the table of ``MODELS_HISTORY.md``.
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
-this module regenerates: ``python -m training.report``.
+this module regenerates: ``python -m chess_engine.training.report``.
 """
 
 from pathlib import Path
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .cards import PROJECT_ROOT, load_all_cards
 
-HISTORY_FILE = PROJECT_ROOT / "MODELS_HISTORY.md"
+HISTORY_FILE = PROJECT_ROOT / "docs" / "training" / "MODELS_HISTORY.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 

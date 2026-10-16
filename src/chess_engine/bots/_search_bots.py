@@ -12,16 +12,16 @@ from typing import Any, Dict, List, Optional
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
-from adversarial_search.chess_problem import ChessProblem
-from adversarial_search.game_algorithms import (
+from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.game_algorithms import (
     SearchStatistics,
     heuristic_alphabeta_iterative_deepening_search,
 )
-from adversarial_search.game_problems import GameState
-from adversarial_search.search_utils import DEFAULT_MAX_TT_ENTRIES, order_by_mvv_lva
-from adversarial_search.time_management import TimeManager
-from bots.chess_bot import ChessBot
+from chess_engine.search.game_problems import GameState
+from chess_engine.search.search_utils import DEFAULT_MAX_TT_ENTRIES, order_by_mvv_lva
+from chess_engine.search.time_management import TimeManager
 
 logger = logging.getLogger(__name__)
 

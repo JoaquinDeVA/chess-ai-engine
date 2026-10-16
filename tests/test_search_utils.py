@@ -2,8 +2,8 @@
 
 import chess
 
-from adversarial_search.game_algorithms import AdversarialSearchResult
-from adversarial_search.search_utils import (
+from chess_engine.search.game_algorithms import AdversarialSearchResult
+from chess_engine.search.search_utils import (
     EXACT,
     LOWER_BOUND,
     UPPER_BOUND,

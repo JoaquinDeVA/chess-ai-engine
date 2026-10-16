@@ -3,7 +3,7 @@
 A model estimates the evaluation of a position in centipawns, from White's point of view, the
 way Stockfish would. Models are looked up by name through the registry::
 
-    from models import load_model
+    from chess_engine.models import load_model
     model = load_model("ridge_features")
     model.predict_cp(chess.Board())
 

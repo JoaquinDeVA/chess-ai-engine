@@ -87,9 +87,9 @@ class BotRegistry:
 
             module = importlib.util.module_from_spec(spec)
 
-            # Add the bots directory to Python path temporarily
+            # Add the source root (the folder holding ``chess_engine``) to Python path temporarily
             old_path = sys.path[:]
-            sys.path.insert(0, str(self.bots_directory.parent))
+            sys.path.insert(0, str(self.bots_directory.parent.parent))
 
             try:
                 spec.loader.exec_module(module)

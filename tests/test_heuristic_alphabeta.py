@@ -8,10 +8,10 @@ Students should write more comprehensive tests themselves.
 import chess
 import pytest
 
-from adversarial_search.chess_game_state import ChessGameState
-from adversarial_search.chess_problem import ChessProblem
-from adversarial_search.game_algorithms import heuristic_alphabeta_search
-from evaluation.features import get_position_features
+from chess_engine.evaluation.features import get_position_features
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.game_algorithms import heuristic_alphabeta_search
 
 
 def simple_average_heuristic(state, player):

@@ -8,9 +8,9 @@ import chess
 import chess.pgn
 import pytest
 
-from bots.chess_bot import ChessBot
-from engine.data_classes import GameResult, TournamentConfig, TournamentResult
-from engine.game_manager import GameManager, load_config
+from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.engine.data_classes import GameResult, TournamentConfig, TournamentResult
+from chess_engine.engine.game_manager import GameManager, load_config
 
 SCHOLARS_MATE_WHITE = ["e2e4", "f1c4", "d1h5", "h5f7"]
 SCHOLARS_MATE_BLACK = ["e7e5", "b8c6", "g8f6"]

@@ -1,4 +1,4 @@
-"""Benchmark a model against Stockfish: ``python -m training.evaluate --model <name> --data <csv>``.
+"""Benchmark a model against Stockfish: ``python -m chess_engine.training.evaluate --model <name> --data <csv>``.
 
 The benchmark uses the fixed hash-based test split of :mod:`training.dataset` and reports
 the metrics of :mod:`training.metrics`, the time needed to evaluate one position, and
@@ -14,9 +14,9 @@ from typing import Any, Dict, List, Optional
 import chess
 import numpy as np
 
-import models  # noqa: F401  (registers the built-in models)
-from models.base import CP_SCALE, EvaluationModel
-from models.registry import available_models, load_model
+import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.models.base import CP_SCALE, EvaluationModel
+from chess_engine.models.registry import available_models, load_model
 
 from .cards import current_commit, load_card, today, update_card
 from .dataset import SPLIT_SEED, encode_positions, load_evaluations, split_dataset

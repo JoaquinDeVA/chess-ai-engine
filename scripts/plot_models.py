@@ -12,9 +12,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from training.cards import PROJECT_ROOT, load_all_cards  # noqa: E402
+from chess_engine.training.cards import PROJECT_ROOT, load_all_cards  # noqa: E402
 
 OUTPUT_DIR = PROJECT_ROOT / "docs" / "img"
 
@@ -93,7 +93,10 @@ def main() -> int:
     """
     cards = benchmarked(load_all_cards())
     if not cards:
-        print("No benchmarked models yet: run python -m training.evaluate first", file=sys.stderr)
+        print(
+            "No benchmarked models yet: run python -m chess_engine.training.evaluate first",
+            file=sys.stderr,
+        )
         return 1
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     plot_error_vs_time(cards, OUTPUT_DIR / "models_error_vs_time.png")

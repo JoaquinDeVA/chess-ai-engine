@@ -1,6 +1,7 @@
 # Architecture
 
-The engine is split in layers; each one only depends on the ones below it.
+The engine is split in layers; each one only depends on the ones below it. All packages live in
+`src/chess_engine/`.
 
 ```mermaid
 flowchart TB
@@ -8,17 +9,17 @@ flowchart TB
     GM --> REG["bots/bot_registry.py<br/>discovers bots"]
     REG --> BOTS["bots/<br/>playable bots"]
     BOTS --> BASES["bots/_search_bots.py<br/>IterativeDeepeningBot"]
-    BASES --> SEARCH["adversarial_search/<br/>algorithms, transposition table,<br/>killer moves, time management"]
+    BASES --> SEARCH["search/<br/>algorithms, transposition table,<br/>killer moves, time management"]
     BOTS --> EVAL["evaluation/<br/>features and heuristics"]
     BOTS --> MODELS["models/<br/>learned evaluators"]
     BOTS --> KNOW["knowledge/<br/>opening book · Prolog patterns"]
-    SEARCH --> GAME["adversarial_search/game_problems.py<br/>GameState · GameProblem"]
+    SEARCH --> GAME["search/game_problems.py<br/>GameState · GameProblem"]
     TRAIN["training/<br/>train · evaluate · report"] --> MODELS
 ```
 
 | Package | Responsibility |
 |---|---|
-| `adversarial_search/` | Game abstractions (`GameState`, `GameProblem`), the chess implementation on top of python-chess, minimax / alpha-beta / advanced alpha-beta / iterative deepening, search helpers, time management |
+| `search/` | Game abstractions (`GameState`, `GameProblem`), the chess implementation on top of python-chess, minimax / alpha-beta / advanced alpha-beta / iterative deepening, search helpers, time management |
 | `bots/` | The playable bots and the registry that finds them |
 | `evaluation/` | Hand-crafted features (material, mobility, king safety...) and the heuristics `h1`..`h4` |
 | `models/` | Learned position evaluators behind one interface (`EvaluationModel`) and a registry |

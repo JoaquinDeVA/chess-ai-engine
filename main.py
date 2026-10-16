@@ -15,10 +15,10 @@ import sys
 import traceback
 from typing import Optional
 
-from bots.bot_registry import BotRegistry
-from bots.human_player import HumanPlayer
-from config.settings import load_config
-from engine.game_manager import GameManager
+from chess_engine.bots.bot_registry import BotRegistry
+from chess_engine.bots.human_player import HumanPlayer
+from chess_engine.config.settings import load_config
+from chess_engine.engine.game_manager import GameManager
 
 
 def setup_argument_parser() -> argparse.ArgumentParser:

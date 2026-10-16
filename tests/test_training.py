@@ -6,12 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import models
-from tests.conftest import material_cp, random_positions
-from training import cards, report
-from training import evaluate as evaluate_cli
-from training import train as train_cli
-from training.dataset import (
+from chess_engine import models
+from chess_engine.training import cards, report
+from chess_engine.training import evaluate as evaluate_cli
+from chess_engine.training import train as train_cli
+from chess_engine.training.dataset import (
     TEST,
     TRAIN,
     VALIDATION,
@@ -20,8 +19,9 @@ from training.dataset import (
     load_evaluations,
     split_dataset,
 )
-from training.metrics import compute_metrics, outcome_class
-from training.targets import cp_to_target, mate_to_target, row_targets
+from chess_engine.training.metrics import compute_metrics, outcome_class
+from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
+from tests.conftest import material_cp, random_positions
 
 
 class TestTargets:
@@ -302,7 +302,7 @@ class TestCommandLines:
 
 
 def test_strength_match_reports_results_from_the_models_point_of_view():
-    from training.strength import run_strength_match
+    from chess_engine.training.strength import run_strength_match
 
     section = run_strength_match(
         "linear_baseline", games=2, depth=1, time_limit=60.0, increment=0.0

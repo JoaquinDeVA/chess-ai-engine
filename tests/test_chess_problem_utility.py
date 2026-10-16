@@ -8,8 +8,8 @@ and provides examples of terminal chess positions for different game outcomes.
 import chess
 import pytest
 
-from adversarial_search.chess_game_state import ChessGameState
-from adversarial_search.chess_problem import ChessProblem
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.chess_problem import ChessProblem
 
 
 @pytest.fixture

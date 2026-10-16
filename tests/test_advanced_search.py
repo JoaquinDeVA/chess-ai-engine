@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from adversarial_search.game_algorithms import (
+from chess_engine.search.game_algorithms import (
     SearchStatistics,
     advanced_heuristic_alphabeta_search,
     heuristic_alphabeta_iterative_deepening_search,

@@ -5,13 +5,13 @@ import time
 import chess
 import pytest
 
-from bots._search_bots import IterativeDeepeningBot, fallback_move
-from bots.iterative_heuristic_bot import IterativeHeuristicBot
-from bots.iterative_model_book_bot import IterativeModelBookBot
-from evaluation.heuristics import h1, h2, h3, h4
-from knowledge.opening_book import OpeningBook
-from models.base import ARTIFACTS_DIR
-from models.evaluator import ModelEvaluator
+from chess_engine.bots._search_bots import IterativeDeepeningBot, fallback_move
+from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.evaluation.heuristics import h1, h2, h3, h4
+from chess_engine.knowledge.opening_book import OpeningBook
+from chess_engine.models.base import ARTIFACTS_DIR
+from chess_engine.models.evaluator import ModelEvaluator
 from tests.conftest import MATE_IN_ONE
 
 MATE_MOVE = chess.Move.from_uci("a1a8")
@@ -61,7 +61,7 @@ class TestEveryBot:
 
 class TestEvaluation:
     def test_all_heuristics_stay_inside_the_open_unit_interval(self, sample_boards):
-        from adversarial_search.chess_game_state import ChessGameState
+        from chess_engine.search.chess_game_state import ChessGameState
 
         for heuristic in (h1, h2, h3, h4):
             for board in sample_boards[:15]:
@@ -125,7 +125,7 @@ class TestIterativeDeepening:
 class TestMLBots:
     def test_evaluator_scale_uses_the_whole_interval(self, stub_model):
         """Regression B10: centipawns were divided by 20000, squeezing evaluations into 0.47-0.53."""
-        from adversarial_search.chess_game_state import ChessGameState
+        from chess_engine.search.chess_game_state import ChessGameState
 
         evaluate = ModelEvaluator(stub_model)
         up_a_queen = ChessGameState(

@@ -54,7 +54,7 @@ one class.
 flowchart TB
     CLI["main.py"] --> GM["engine/<br/>GameManager"]
     GM --> REG["bots/<br/>registry + bots"]
-    REG --> SEARCH["adversarial_search/<br/>algorithms, time management"]
+    REG --> SEARCH["search/<br/>algorithms, time management"]
     REG --> EVAL["evaluation/<br/>features, heuristics"]
     REG --> MODELS["models/<br/>learned evaluators"]
     REG --> KNOW["knowledge/<br/>opening book, Prolog"]
@@ -62,6 +62,15 @@ flowchart TB
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for class diagrams and the life of a move.
+
+```
+src/chess_engine/   the engine: search, bots, engine, evaluation, knowledge, models, training, config
+data/               opening book (versioned) and downloaded datasets (ignored by git)
+docs/               guides and diagrams; docs/training/ holds the training checklist and model history
+scripts/            dataset download and labelling, plots, run_all.sh
+tests/              pytest suite
+main.py             command-line interface
+```
 
 ## Installation
 
@@ -98,7 +107,7 @@ python main.py --mode tournament
 ```
 
 `--model` and `--depth` are only applied to the bots that accept them. Time controls are set in
-`config/settings.py`.
+`src/chess_engine/config/settings.py`.
 
 ## Search algorithms
 
@@ -118,20 +127,20 @@ Details, flowcharts and the conventions used by the cut-off test are in
 Models estimate the evaluation of a position (centipawns, White's point of view) the way Stockfish
 would. Four are included (`ridge_features`, `mlp_features`, `cnn_light`, `cnn_resnet`), plus a minimal
 `linear_baseline` that demonstrates how to add one. Their comparison is generated in
-[MODELS_HISTORY.md](MODELS_HISTORY.md). This part of the project is still being designed: the interface
+[MODELS_HISTORY.md](docs/training/MODELS_HISTORY.md). This part of the project is still being designed: the interface
 is stable, the internals are not ([docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md)).
 
 ```bash
 python scripts/download_lichess_evals.py --rows 1000000        # build data/evaluations.csv
-python -m training.train    --model mlp_features --data data/evaluations.csv
-python -m training.evaluate --model mlp_features --data data/evaluations.csv --strength
+python -m chess_engine.training.train    --model mlp_features --data data/evaluations.csv
+python -m chess_engine.training.evaluate --model mlp_features --data data/evaluations.csv --strength
 ```
 
-`bash scripts/run_all.sh` does this for every model; [TRAINING_TASKS.md](TRAINING_TASKS.md) is the checklist.
+`bash scripts/run_all.sh` does this for every model; [TRAINING_TASKS.md](docs/training/TRAINING_TASKS.md) is the checklist.
 
 ## Extending the engine
 
-* **A bot**: one file in `bots/` implementing `evaluate()` →
+* **A bot**: one file in `src/chess_engine/bots/` implementing `evaluate()` →
   [docs/ADDING_A_BOT.md](docs/ADDING_A_BOT.md).
 * **An evaluation model**: a registered `EvaluationModel` →
   [docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md).
@@ -161,7 +170,7 @@ timeline
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md): quiescence search, a redesign of the evaluation models (conversion of
+See [ROADMAP.md](docs/ROADMAP.md): quiescence search, a redesign of the evaluation models (conversion of
 evaluations, larger datasets, speed), endgame tablebases and a UCI front end.
 
 ## Authors

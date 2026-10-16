@@ -5,14 +5,14 @@ from typing import Any, Dict, Tuple
 
 import chess
 
-import models  # noqa: F401  (registers the built-in models)
-from bots.bot_registry import BotRegistry
-from bots.chess_bot import ChessBot
-from bots.iterative_heuristic_bot import IterativeHeuristicBot
-from bots.iterative_model_book_bot import IterativeModelBookBot
-from engine.game_manager import GameManager
-from evaluation.heuristics import h2, h3
-from knowledge.opening_book import OpeningBook
+import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.bots.bot_registry import BotRegistry
+from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.engine.game_manager import GameManager
+from chess_engine.evaluation.heuristics import h2, h3
+from chess_engine.knowledge.opening_book import OpeningBook
 
 OPENING_PLIES = 4
 

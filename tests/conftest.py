@@ -6,8 +6,8 @@ from typing import List
 import chess
 import pytest
 
-from models.base import EvaluationModel
-from models.features import VectorFeatures
+from chess_engine.models.base import EvaluationModel
+from chess_engine.models.features import VectorFeatures
 
 PIECE_CP = {
     chess.PAWN: 100,

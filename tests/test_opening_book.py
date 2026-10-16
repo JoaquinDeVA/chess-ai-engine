@@ -2,7 +2,7 @@ import json
 
 import chess
 
-from knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook, position_key
+from chess_engine.knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook, position_key
 
 
 def test_key_ignores_move_counters():

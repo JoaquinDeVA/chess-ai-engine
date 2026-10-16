@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("pyswip")
 try:
-    from knowledge.pattern_detector import PrologPatternDetector
+    from chess_engine.knowledge.pattern_detector import PrologPatternDetector
 
     PrologPatternDetector()
 except RuntimeError:

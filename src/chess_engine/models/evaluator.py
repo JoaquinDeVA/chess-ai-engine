@@ -2,7 +2,7 @@
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
+from chess_engine.search.chess_game_state import ChessGameState
 
 from .base import EvaluationModel, cp_to_expected_score
 

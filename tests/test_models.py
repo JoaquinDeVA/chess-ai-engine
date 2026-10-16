@@ -4,10 +4,16 @@ import chess
 import numpy as np
 import pytest
 
-from models import CP_SCALE, available_models, cp_to_expected_score, get_model_class, load_model
-from models.base import ARTIFACTS_DIR, EvaluationModel
-from models.features import BitboardFeatures, MaterialFeatures, VectorFeatures
-from models.registry import register_model
+from chess_engine.models import (
+    CP_SCALE,
+    available_models,
+    cp_to_expected_score,
+    get_model_class,
+    load_model,
+)
+from chess_engine.models.base import ARTIFACTS_DIR, EvaluationModel
+from chess_engine.models.features import BitboardFeatures, MaterialFeatures, VectorFeatures
+from chess_engine.models.registry import register_model
 from tests.conftest import material_cp
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import chess
 
-from bots.chess_bot import ChessBot
+from chess_engine.bots.chess_bot import ChessBot
 
 
 class HumanPlayer(ChessBot):

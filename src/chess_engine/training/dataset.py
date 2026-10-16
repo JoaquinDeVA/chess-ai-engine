@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from models.features import FeatureExtractor
+from chess_engine.models.features import FeatureExtractor
 
 from .targets import MAX_MATE_DISTANCE, row_targets
 

@@ -1,7 +1,7 @@
 """Tournament configuration presets (bullet and blitz) and their loader."""
 
 # Import from the shared data classes
-from engine.data_classes import TournamentConfig
+from chess_engine.engine.data_classes import TournamentConfig
 
 # Preset configurations
 BULLET_CONFIG = {

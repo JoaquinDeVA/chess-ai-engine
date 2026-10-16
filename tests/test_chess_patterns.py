@@ -10,7 +10,13 @@ try:
 except Exception:  # SwiPrologNotFoundError when the interpreter is missing
     pytest.skip("SWI-Prolog is not installed", allow_module_level=True)
 
-KNOWLEDGE_BASE = Path(__file__).resolve().parent.parent / "knowledge" / "chess_patterns.pl"
+KNOWLEDGE_BASE = (
+    Path(__file__).resolve().parent.parent
+    / "src"
+    / "chess_engine"
+    / "knowledge"
+    / "chess_patterns.pl"
+)
 
 
 @pytest.fixture(scope="module")

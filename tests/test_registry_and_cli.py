@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from bots.bot_registry import BotRegistry
+from chess_engine.bots.bot_registry import BotRegistry
 from tests.conftest import MATE_IN_ONE
 
 ROOT = Path(__file__).resolve().parent.parent

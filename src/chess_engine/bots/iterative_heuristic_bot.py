@@ -4,11 +4,11 @@ from typing import Callable, Optional
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
-from adversarial_search.chess_problem import ChessProblem
-from adversarial_search.time_management import TimeManager
-from bots._search_bots import AUTHOR, IterativeDeepeningBot
-from evaluation.heuristics import h3
+from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
+from chess_engine.evaluation.heuristics import h3
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.time_management import TimeManager
 
 
 class IterativeHeuristicBot(IterativeDeepeningBot):

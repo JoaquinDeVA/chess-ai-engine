@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retrain and re-benchmark every model, then refresh MODELS_HISTORY.md and the plots.
+# Retrain and re-benchmark every model, then refresh docs/training/MODELS_HISTORY.md and the plots.
 #
 #   bash scripts/run_all.sh                 # everything except the (GPU-sized) CNN retraining
 #   TRAIN_CNN=1 bash scripts/run_all.sh     # also retrain cnn_resnet
@@ -24,17 +24,17 @@ EVALUATE=(linear_baseline ridge_features mlp_features cnn_light cnn_resnet)
 
 for model in "${TRAIN[@]}"; do
   echo "=== train ${model}"
-  "$PYTHON" -m training.train --model "$model" --data "$DATA"
+  "$PYTHON" -m chess_engine.training.train --model "$model" --data "$DATA"
 done
 
 for model in "${EVALUATE[@]}"; do
   echo "=== evaluate ${model}"
   if [ "$GAMES" -gt 0 ]; then
-    "$PYTHON" -m training.evaluate --model "$model" --data "$DATA" --strength --games "$GAMES" --depth "$DEPTH"
+    "$PYTHON" -m chess_engine.training.evaluate --model "$model" --data "$DATA" --strength --games "$GAMES" --depth "$DEPTH"
   else
-    "$PYTHON" -m training.evaluate --model "$model" --data "$DATA"
+    "$PYTHON" -m chess_engine.training.evaluate --model "$model" --data "$DATA"
   fi
 done
 
 "$PYTHON" scripts/plot_models.py
-echo "Done. Review MODELS_HISTORY.md and docs/img/, then commit models/ and the docs."
+echo "Done. Review docs/training/MODELS_HISTORY.md and docs/img/, then commit src/chess_engine/models/ and docs/."

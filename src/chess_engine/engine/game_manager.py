@@ -17,10 +17,10 @@ from typing import Dict, List, Optional
 
 import chess
 
-from bots.bot_registry import BotRegistry
-from bots.chess_bot import ChessBot
-from bots.human_player import HumanPlayer
-from engine.data_classes import GameResult, TournamentConfig, TournamentResult
+from chess_engine.bots.bot_registry import BotRegistry
+from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.bots.human_player import HumanPlayer
+from chess_engine.engine.data_classes import GameResult, TournamentConfig, TournamentResult
 
 #: Terminations in which a player loses without the game ending on the board.
 FORFEIT_TERMINATIONS = ("time_forfeit", "illegal_move", "player_error")

@@ -8,9 +8,8 @@ from pathlib import Path
 import chess
 import pytest
 
-from tests.conftest import material_cp, random_positions
-from training import cards
-from training.lichess import (
+from chess_engine.training import cards
+from chess_engine.training.lichess import (
     SIDE_TO_MOVE,
     WHITE,
     convert,
@@ -19,7 +18,8 @@ from training.lichess import (
     to_row,
     write_csv,
 )
-from training.stockfish import find_stockfish, label_positions
+from chess_engine.training.stockfish import find_stockfish, label_positions
+from tests.conftest import material_cp, random_positions
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,7 +83,7 @@ class TestLichessConversion:
         assert to_row(record, WHITE)["mate_distance"] == 2
 
     def test_csv_roundtrips_through_the_training_loader(self, boards, tmp_path):
-        from training.dataset import load_evaluations
+        from chess_engine.training.dataset import load_evaluations
 
         lines = [database_line(b, WHITE) for b in boards[:300]]
         path = tmp_path / "evals.csv"

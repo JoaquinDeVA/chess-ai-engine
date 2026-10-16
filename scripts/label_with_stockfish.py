@@ -13,10 +13,10 @@ from pathlib import Path
 
 import chess
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from training.lichess import write_csv  # noqa: E402
-from training.stockfish import find_stockfish, label_positions  # noqa: E402
+from chess_engine.training.lichess import write_csv  # noqa: E402
+from chess_engine.training.stockfish import find_stockfish, label_positions  # noqa: E402
 
 
 def random_fens(count: int, seed: int = 0, max_plies: int = 80):

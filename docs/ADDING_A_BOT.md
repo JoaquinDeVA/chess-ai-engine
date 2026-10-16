@@ -1,14 +1,14 @@
 # Adding a bot
 
-A bot is one file in `bots/`. Subclass one of the bases in `bots/_search_bots.py` and implement
+A bot is one file in `src/chess_engine/bots/`. Subclass the base in `bots/_search_bots.py` and implement
 `evaluate(state, player)`, the expected score of `player` in `state`, strictly between 0 and 1.
 
 ```python
-# bots/material_bot.py
+# src/chess_engine/bots/material_bot.py
 import chess
 
-from bots._search_bots import IterativeDeepeningBot
-from evaluation.features import extract_material_features
+from chess_engine.bots._search_bots import IterativeDeepeningBot
+from chess_engine.evaluation.features import extract_material_features
 
 
 class MaterialBot(IterativeDeepeningBot):

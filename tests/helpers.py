@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Hashable, List, Optional
 
-from adversarial_search.game_problems import GameProblem, GameState
+from chess_engine.search.game_problems import GameProblem, GameState
 
 
 class TreeState(GameState):

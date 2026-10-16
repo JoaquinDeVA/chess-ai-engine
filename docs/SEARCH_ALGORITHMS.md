@@ -1,6 +1,6 @@
 # Search algorithms
 
-All algorithms live in `adversarial_search/game_algorithms.py` and work on any `GameProblem`.
+All algorithms live in `src/chess_engine/search/game_algorithms.py` and work on any `GameProblem`.
 
 | Function | What it adds |
 |---|---|

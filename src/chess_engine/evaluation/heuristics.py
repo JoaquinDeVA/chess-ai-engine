@@ -12,7 +12,7 @@ from typing import Dict
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
+from chess_engine.search.chess_game_state import ChessGameState
 
 from .features import get_position_features
 

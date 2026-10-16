@@ -7,6 +7,9 @@
   and the `FixedDepthBot` base. `PrologPatternDetector` moved to `knowledge/pattern_detector.py`.
 
 ### Changed
+- Code moved to an installable package in `src/chess_engine/` (`adversarial_search` is now
+  `chess_engine.search`); module commands are `python -m chess_engine.training.<command>`.
+  `ROADMAP.md` moved to `docs/`, `TRAINING_TASKS.md` and `MODELS_HISTORY.md` to `docs/training/`.
 - `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now
   `IterativeModelBookBot`. Strength matches play against H2 and H3 only.
 

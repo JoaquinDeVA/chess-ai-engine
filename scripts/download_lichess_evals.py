@@ -15,9 +15,9 @@ from pathlib import Path
 
 import zstandard
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from training.lichess import convert, write_csv  # noqa: E402
+from chess_engine.training.lichess import convert, write_csv  # noqa: E402
 
 DEFAULT_URL = "https://database.lichess.org/lichess_db_eval.jsonl.zst"
 

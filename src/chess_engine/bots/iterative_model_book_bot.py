@@ -4,14 +4,14 @@ from typing import Optional, Union
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
-from adversarial_search.time_management import TimeManager
-from bots._search_bots import AUTHOR, IterativeDeepeningBot
-from knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook
-from models import EvaluationModel, load_model
-from models.evaluator import ModelEvaluator
+from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
+from chess_engine.knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook
+from chess_engine.models import EvaluationModel, load_model
+from chess_engine.models.evaluator import ModelEvaluator
+from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.search.time_management import TimeManager
 
-#: Model used when none is given. Train it with ``python -m training.train --model mlp_features``.
+#: Model used when none is given. Train it with ``python -m chess_engine.training.train --model mlp_features``.
 DEFAULT_MODEL = "mlp_features"
 
 

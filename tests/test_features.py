@@ -7,7 +7,7 @@ functions in bots/features.py and understand the expected behavior and return va
 
 import chess
 
-from evaluation.features import extract_material_features, extract_mobility_features
+from chess_engine.evaluation.features import extract_material_features, extract_mobility_features
 
 
 def test_starting_position_material():

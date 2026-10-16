@@ -15,7 +15,7 @@ from typing import Optional
 
 import numpy as np
 
-from models.base import CP_SCALE
+from chess_engine.models.base import CP_SCALE
 
 #: Largest ``|mate_distance|`` that is kept as a training example.
 MAX_MATE_DISTANCE = 2

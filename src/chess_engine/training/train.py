@@ -1,12 +1,12 @@
-"""Train a registered model: ``python -m training.train --model <name> --data <csv>``."""
+"""Train a registered model: ``python -m chess_engine.training.train --model <name> --data <csv>``."""
 
 import argparse
 import tomllib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import models  # noqa: F401  (registers the built-in models)
-from models.registry import available_models, get_model_class
+import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.models.registry import available_models, get_model_class
 
 from .cards import current_commit, today, update_card
 from .dataset import SPLIT_SEED, encode_positions, load_evaluations, split_dataset
@@ -104,7 +104,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         },
     )
     print(
-        f"Saved {path}. Next: python -m training.evaluate --model {args.model} --data {args.data}"
+        f"Saved {path}. Next: python -m chess_engine.training.evaluate --model {args.model} --data {args.data}"
     )
     return 0
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 CARDS_DIR = Path(__file__).resolve().parent.parent / "models" / "cards"
-PROJECT_ROOT = CARDS_DIR.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def card_path(name: str) -> Path:

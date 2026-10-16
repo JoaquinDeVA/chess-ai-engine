@@ -295,15 +295,20 @@ def test_slotted_features_are_one_hot_and_mover_relative():
     assert features.size("side_to_move") == 768
     assert features.max_active == 32
     assert sorted(indices) == sorted(features.active(chess.Board().mirror(), "side_to_move")[0])
-    for board in random_positions(20, seed=21):
+    for board in random_positions(200, seed=21):
         indices, _ = features.active(board, "side_to_move")
         m_indices, _ = features.active(board.mirror(), "side_to_move")
         assert sorted(indices) == sorted(m_indices)
+        assert len(indices) <= features.max_entries("side_to_move")
+        white_indices, _ = features.active(board, "white")
+        assert len(white_indices) <= features.max_entries("white")
 
 
 def test_slotted_white_perspective_has_turn_entry():
     features = SlottedPstFeatures()
     assert features.size("white") == 769
+    assert features.max_entries("white") == 33
+    assert features.max_entries("side_to_move") == 32
     indices, values = features.active(chess.Board(), "white")
     assert len(indices) == 33
     assert sum(1 for index in indices if index < 384) == 16  # White pieces
@@ -324,12 +329,8 @@ def test_king_bucket_mirror_invariance():
 
 
 def test_king_bucket_file_mirror_symmetry():
-    # Castling rights and en passant are not features: clear them so that the file mirror of a
-    # position is a position of the same kind.
     features = KingBucketFeatures()
     for board in random_positions(50, seed=23):
-        board.castling_rights = chess.BB_EMPTY
-        board.ep_square = None
         mirrored = board.transform(chess.flip_horizontal)
         indices, _ = features.active(board, "side_to_move")
         m_indices, _ = features.active(mirrored, "side_to_move")

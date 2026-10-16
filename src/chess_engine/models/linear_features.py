@@ -355,8 +355,8 @@ class SlottedPstFeatures(LinearFeatures):
     :attr:`max_active` non-zero entries.
 
     Under ``"white"`` no mirroring is applied: White pieces use the first block, Black pieces the
-    second, and one turn entry at index 768 follows, ``1.0`` when White is to move and ``0.0``
-    otherwise.
+    second, and one turn entry at index 768 follows: ``1.0`` when White is to move, ``0.0`` when
+    Black is to move.
 
     :cvar name: ``"pst_slotted"``.
     :cvar max_active: Most entries under ``"side_to_move"`` (one per piece, 32 at most).
@@ -365,6 +365,15 @@ class SlottedPstFeatures(LinearFeatures):
     name = "pst_slotted"
     max_active = 32
     _TURN_INDEX = 2 * _OPPONENT_PIECE_BLOCK
+
+    def max_entries(self, perspective: str) -> int:
+        """Most non-zero entries a position can have under ``perspective``.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``32`` under ``"side_to_move"`` (one per piece), ``33`` under ``"white"`` (plus
+            the turn entry).
+        """
+        return self.max_active + (1 if perspective == "white" else 0)
 
     def size(self, perspective: str) -> int:
         """Two blocks of 384 piece-square weights, plus one turn weight under ``"white"``.
@@ -444,8 +453,8 @@ class KingBucketFeatures(LinearFeatures):
     player to move.
 
     :cvar name: ``"king_bucket"``.
-    :cvar max_active: Most entries: two per non-king piece (at most 30 pieces per side) plus two
-        king entries, which is 62; 64 leaves room.
+    :cvar max_active: Most entries: two per non-king piece (at most 30 non-king pieces in total)
+        plus two king entries, which is 62; 64 leaves room.
     """
 
     name = "king_bucket"

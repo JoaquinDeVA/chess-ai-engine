@@ -42,7 +42,7 @@ positions). Result on the trial: **`white`**, i.e. `cp`/`mate` are from White's 
 (old pipeline, unchanged) uses the same convention.
 
 Code: `src/chess_engine/training/lichess_raw.py` (parser, shard writer),
-`scripts/fetch_lichess_raw.py`.
+`scripts/data/fetch_lichess_raw.py`.
 
 ## Running
 
@@ -53,7 +53,7 @@ the file is downloaded first with `aria2c` (resumable) and then converted from t
 aria2c -x 4 -s 4 -k 64M --continue=true --auto-file-renaming=false --file-allocation=none \
     --max-tries=0 --retry-wait=30 -d data/lichess -o lichess_db_eval.jsonl.zst \
     https://database.lichess.org/lichess_db_eval.jsonl.zst
-python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst \
+python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst \
     --output-dir data/lichess/raw --log-file data/lichess/progress.log
 ```
 

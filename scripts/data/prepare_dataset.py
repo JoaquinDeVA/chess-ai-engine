@@ -3,17 +3,14 @@
 
 One shard per worker process; existing sidecars are skipped, so the run can be repeated.
 
-    python scripts/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 5
+    python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 5
 """
 
 import argparse
-import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from chess_engine.training.sidecar import build_sidecar, sidecar_path  # noqa: E402
+from chess_engine.training.sidecar import build_sidecar, sidecar_path
 
 
 def main() -> None:

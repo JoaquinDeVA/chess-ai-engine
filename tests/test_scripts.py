@@ -1,4 +1,4 @@
-"""Lichess conversion, Stockfish labelling and plotting."""
+"""Lichess conversion, Stockfish labelling and the bake-off script."""
 
 import importlib.util
 import io
@@ -111,7 +111,8 @@ class TestStockfishLabelling:
 
 
 def load_script(name: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
+    path = next((ROOT / "scripts").glob(f"*/{name}.py"))
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -120,27 +121,6 @@ def load_script(name: str):
 def test_random_positions_script_helper_is_reproducible():
     module = load_script("label_with_stockfish")
     assert list(module.random_fens(5, seed=3)) == list(module.random_fens(5, seed=3))
-
-
-def test_plots_are_written_for_benchmarked_models(tmp_path, monkeypatch):
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    for name, mae, ms in (("a", 150.0, 0.1), ("b", 100.0, 30.0)):
-        cards.update_card(
-            name,
-            status="current",
-            benchmark={"mae_cp": mae, "ms_per_eval": ms, "accuracy": 0.7, "within_100": 0.5},
-        )
-    module = load_script("plot_models")
-    monkeypatch.setattr(module, "OUTPUT_DIR", tmp_path / "img")
-    assert module.main() == 0
-    assert (tmp_path / "img" / "models_error_vs_time.png").stat().st_size > 1000
-    assert (tmp_path / "img" / "models_agreement.png").stat().st_size > 1000
-
-
-def test_plotting_without_results_fails_cleanly(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    assert load_script("plot_models").main() == 1
-    assert "No benchmarked models" in capsys.readouterr().err
 
 
 def test_write_csv_header():

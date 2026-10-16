@@ -9,7 +9,7 @@ skipped (their lines are still decompressed, not parsed), so an interrupted run 
 with the same options. Only legal standard-chess positions are kept (``chess.Board.is_valid``);
 parsing and the legality check run in ``--workers`` processes.
 
-    python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst
+    python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst
 """
 
 import argparse
@@ -18,7 +18,6 @@ import itertools
 import multiprocessing
 import os
 import resource
-import sys
 import time
 import urllib.request
 from collections import deque
@@ -27,10 +26,8 @@ from pathlib import Path
 import pyarrow as pa
 import zstandard
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from chess_engine.training.lichess import DETECTION_SAMPLE, detect_perspective  # noqa: E402
-from chess_engine.training.lichess_raw import (  # noqa: E402
+from chess_engine.training.lichess import DETECTION_SAMPLE, detect_perspective
+from chess_engine.training.lichess_raw import (
     ROW_GROUP_SIZE,
     ShardWriter,
     parse_chunk,

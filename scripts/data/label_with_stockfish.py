@@ -3,7 +3,7 @@
 
 Positions come from a text file (one FEN per line) or, with ``--random N``, from random play.
 
-    python scripts/label_with_stockfish.py --random 20000 --depth 12 --output data/own_evals.csv
+    python scripts/data/label_with_stockfish.py --random 20000 --depth 12 --output data/own_evals.csv
 """
 
 import argparse
@@ -13,10 +13,8 @@ from pathlib import Path
 
 import chess
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from chess_engine.training.lichess import write_csv  # noqa: E402
-from chess_engine.training.stockfish import find_stockfish, label_positions  # noqa: E402
+from chess_engine.training.lichess import write_csv
+from chess_engine.training.stockfish import find_stockfish, label_positions
 
 
 def random_fens(count: int, seed: int = 0, max_plies: int = 80):

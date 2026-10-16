@@ -4,20 +4,17 @@
 Only the beginning of the (multi-gigabyte) compressed file is read: the stream is closed as soon
 as ``--rows`` positions have been converted.
 
-    python scripts/download_lichess_evals.py --output data/evaluations.csv --rows 1000000
+    python scripts/data/download_lichess_evals.py --output data/evaluations.csv --rows 1000000
 """
 
 import argparse
 import io
-import sys
 import urllib.request
 from pathlib import Path
 
 import zstandard
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from chess_engine.training.lichess import convert, write_csv  # noqa: E402
+from chess_engine.training.lichess import convert, write_csv
 
 DEFAULT_URL = "https://database.lichess.org/lichess_db_eval.jsonl.zst"
 

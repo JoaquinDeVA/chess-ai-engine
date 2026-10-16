@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the tactical-pattern diagrams used by ``docs/TACTICAL_PATTERNS.md`` as SVG files.
 
-python scripts/render_pattern_boards.py
+python scripts/docs/render_pattern_boards.py
 """
 
 from pathlib import Path
@@ -9,7 +9,7 @@ from pathlib import Path
 import chess
 import chess.svg
 
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "docs" / "img"
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "docs" / "img"
 
 # name -> (FEN, [(from, to), ...] arrows to draw)
 DIAGRAMS = {

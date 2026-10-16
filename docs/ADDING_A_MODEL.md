@@ -27,7 +27,7 @@ Then run the flow. Each command works on one model; `scripts/run_all.sh` runs th
 
 ```bash
 # sidecars (split, quiet flag, side to move) for the raw Lichess shards in data/lichess/raw
-python scripts/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar
+python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar
 
 # train at an effort level 0-100 (positions, epochs and hyper-parameter trials grow with it)
 python -m chess_engine.training.train --model my_model --effort 40
@@ -36,10 +36,10 @@ python -m chess_engine.training.train --model my_model --effort 40
 python -m chess_engine.comparison.evaluate --model my_model
 
 # depth reached and search agreement at a fixed time per move, against the reference bots
-python scripts/profile_tradeoff.py --players my_model,h2,h3 --seconds 1,3,10
+python scripts/bench/profile_tradeoff.py --players my_model,h2,h3 --seconds 1,3,10
 
 # round-robin at equal time per move; must include h3 (the Elo anchor)
-python scripts/run_tournament.py --players my_model,h3,pst_tapered,h2
+python scripts/bench/run_tournament.py --players my_model,h3,pst_tapered,h2
 ```
 
 `train` prints the chosen configuration and an estimated duration before it starts. The target

@@ -96,7 +96,8 @@ def test_fetch_is_sharded_and_restartable(tmp_path):
     from tests.conftest import material_cp, random_positions
 
     spec = importlib.util.spec_from_file_location(
-        "fetch_lichess_raw", Path(__file__).resolve().parent.parent / "scripts/fetch_lichess_raw.py"
+        "fetch_lichess_raw",
+        Path(__file__).resolve().parent.parent / "scripts/data/fetch_lichess_raw.py",
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

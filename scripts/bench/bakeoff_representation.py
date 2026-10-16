@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Representation bake-off: which target, point of view and training subset suit pst_tapered.
 
-python scripts/bakeoff_representation.py --train-positions 5000000 --test-positions 200000 \
+python scripts/bench/bakeoff_representation.py --train-positions 5000000 --test-positions 200000 \
     --effort 30 --tiebreak-games 200 --out docs/training/bakeoff.json
 
 Every variant changes one axis of the default representation and is trained as a tagged model
@@ -23,7 +23,6 @@ import json
 import math
 import os
 import re
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,29 +31,28 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-from chess_engine.comparison.judge import judge  # noqa: E402
-from chess_engine.comparison.tournament import (  # noqa: E402
+from chess_engine.comparison.judge import judge
+from chess_engine.comparison.tournament import (
     paired_openings,
     read_games,
     record_cards,
     run_round_robin,
     summarize,
 )
-from chess_engine.models.cards import card_path, current_commit, today, update_card  # noqa: E402
-from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel  # noqa: E402
-from chess_engine.models.registry import artifact_path, get_model_class  # noqa: E402
-from chess_engine.training.dataset import TEST, TRAIN, VALIDATION  # noqa: E402
-from chess_engine.training.effort import SAMPLE_SEED, effort_config, fit_config  # noqa: E402
-from chess_engine.training.representation import Representation  # noqa: E402
-from chess_engine.training.sidecar import iter_batches, load_sample  # noqa: E402
-from chess_engine.training.train import (  # noqa: E402
+from chess_engine.models.cards import card_path, current_commit, today, update_card
+from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel
+from chess_engine.models.registry import artifact_path, get_model_class
+from chess_engine.training.dataset import TEST, TRAIN, VALIDATION
+from chess_engine.training.effort import SAMPLE_SEED, effort_config, fit_config
+from chess_engine.training.representation import Representation
+from chess_engine.training.sidecar import iter_batches, load_sample
+from chess_engine.training.train import (
     DEFAULT_RAW_DIR,
     DEFAULT_SIDECAR_DIR,
     MAX_VALIDATION_ROWS,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 MODEL = "pst_tapered"
 

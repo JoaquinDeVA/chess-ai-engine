@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round-robin at equal time per move: calibrate, play, and write the report.
 
-python scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 \
+python scripts/bench/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 \
     --base 10 --increment 0.1 --workers 5 --hours 10 --out data/tournament/games.jsonl
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
@@ -12,16 +12,12 @@ to ``docs/training/TOURNAMENT.md``. The ``tournament`` section of the model card
 
 import argparse
 import os
-import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-from chess_engine.comparison.tournament import (  # noqa: E402
+from chess_engine.comparison.tournament import (
     ANCHOR,
     paired_openings,
     read_games,
@@ -30,6 +26,8 @@ from chess_engine.comparison.tournament import (  # noqa: E402
     size_for_budget,
     summarize,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_PLAYERS = "material_linear,pst_tapered,pst_terms,h2,h3"
 

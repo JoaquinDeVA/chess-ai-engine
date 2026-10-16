@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Profile search depth against search accuracy at a fixed time per move.
 
-python scripts/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10 --positions 300
+python scripts/bench/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10 --positions 300
 
 Use ``--parallel 1`` (the default) for published numbers: parallel workers are limited to one
 thread each but still compete for the machine.
@@ -14,7 +14,6 @@ updated too.
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 
 import matplotlib
@@ -22,10 +21,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
 from chess_engine.comparison.tradeoff import record_cards, run_profiles  # noqa: E402
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_PLAYERS = "pst_tapered,pst_terms,material_linear,h2,h3,mlp_features"
 

@@ -32,7 +32,7 @@ above those involving minor pieces.
 | ![Fork](img/fork.svg) | ![Skewer](img/skewer.svg) |
 | **Fork**: the knight attacks the king and the rook. | **Skewer**: the rook checks the king, which must leave the rank, exposing the rook behind it. |
 
-The diagrams are generated with `python scripts/render_pattern_boards.py`.
+The diagrams are generated with `python scripts/docs/render_pattern_boards.py`.
 
 ## Requirements
 

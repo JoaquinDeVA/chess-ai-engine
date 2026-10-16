@@ -21,7 +21,7 @@ TRAINED=(material_linear pst_tapered pst_terms)
 EVALUATED=(material_linear pst_tapered pst_terms ridge_features mlp_features cnn_light cnn_resnet)
 
 echo "=== sidecars"
-"$PYTHON" scripts/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
+"$PYTHON" scripts/data/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
 
 for model in "${TRAINED[@]}"; do
   echo "=== train ${model} (effort ${EFFORT})"
@@ -36,10 +36,10 @@ for model in "${EVALUATED[@]}"; do
 done
 
 echo "=== profile (depth against accuracy)"
-"$PYTHON" scripts/profile_tradeoff.py --raw "$RAW" --sidecar "$SIDECAR"
+"$PYTHON" scripts/bench/profile_tradeoff.py --raw "$RAW" --sidecar "$SIDECAR"
 
 echo "=== tournament (${HOURS} h)"
-"$PYTHON" scripts/run_tournament.py --hours "$HOURS"
+"$PYTHON" scripts/bench/run_tournament.py --hours "$HOURS"
 
 echo "=== report"
 "$PYTHON" -m chess_engine.comparison.report

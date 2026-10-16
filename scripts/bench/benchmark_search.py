@@ -5,25 +5,22 @@ Prints, per position and bot, the time, nodes visited, nodes per second, deepest
 the chosen move. Time varies between runs, but the chosen move and the node count are
 deterministic, so two runs (for example before and after an optimisation) can be compared:
 
-    python scripts/benchmark_search.py --json docs/benchmarks/search_baseline.json
-    python scripts/benchmark_search.py --compare docs/benchmarks/search_baseline.json
+    python scripts/bench/benchmark_search.py --json docs/benchmarks/search_baseline.json
+    python scripts/bench/benchmark_search.py --compare docs/benchmarks/search_baseline.json
 """
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 import chess
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot  # noqa: E402
-from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot  # noqa: E402
-from chess_engine.evaluation.heuristics import h3  # noqa: E402
-from chess_engine.knowledge.opening_book import OpeningBook  # noqa: E402
+from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.evaluation.heuristics import h3
+from chess_engine.knowledge.opening_book import OpeningBook
 
 #: Large enough for the time manager to give every move its maximum budget (40 s).
 CLOCK = 10_000.0

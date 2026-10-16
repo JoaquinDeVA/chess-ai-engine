@@ -85,7 +85,7 @@ pip install -e ".[ml,prolog,data]"   # optional: learned models, Prolog patterns
 ```
 
 Optional system packages: SWI-Prolog for the tactical-pattern detector (`apt install swi-prolog`) and Stockfish for
-`scripts/label_with_stockfish.py` (`apt install stockfish`).
+`scripts/data/label_with_stockfish.py` (`apt install stockfish`).
 
 ## Usage
 
@@ -135,12 +135,12 @@ cost against Stockfish), `TRADEOFF.md` (search depth against search accuracy at 
 move) and `TOURNAMENT.md` (round-robin at equal time per move, the verdict).
 
 ```bash
-python scripts/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst  # raw shards
-python scripts/prepare_dataset.py                                                    # sidecars
+python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst  # raw shards
+python scripts/data/prepare_dataset.py                                                    # sidecars
 python -m chess_engine.training.train    --model pst_tapered --effort 40
 python -m chess_engine.comparison.evaluate --model pst_tapered
-python scripts/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10
-python scripts/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 --hours 10
+python scripts/bench/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10
+python scripts/bench/run_tournament.py --players material_linear,pst_tapered,pst_terms,h2,h3 --hours 10
 ```
 
 `EFFORT=40 bash scripts/run_all.sh` runs the whole flow; [TRAINING_TASKS.md](docs/training/TRAINING_TASKS.md)

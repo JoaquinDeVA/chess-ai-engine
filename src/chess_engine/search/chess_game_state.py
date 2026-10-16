@@ -7,6 +7,7 @@ This module implements the GameState interface for chess using the python-chess 
 from typing import Any, Optional
 
 import chess
+from chess import Outcome, Termination
 
 from .game_problems import GameState
 
@@ -17,6 +18,11 @@ class ChessGameState(GameState):
 
     Wraps a chess.Board object to provide the GameState interface
     required by adversarial search algorithms.
+
+    The terminal test is the one of ``board.outcome(claim_draw=True)``, but the threefold
+    repetition claim (slow in python-chess: it replays the game on every call) is computed from
+    the transposition keys of the positions since the last irreversible move, which every state
+    carries and extends in constant time per move.
     """
 
     def __init__(self, board: Optional[chess.Board] = None):
@@ -30,6 +36,32 @@ class ChessGameState(GameState):
             self.board = chess.Board()
         else:
             self.board = board.copy()
+        self._history, self._has_repeated = self._build_history(self.board)
+        self._outcome: Optional[Outcome] = None
+        self._outcome_known = False
+
+    @staticmethod
+    def _build_history(board: chess.Board) -> tuple[tuple, bool]:
+        """
+        Transposition keys of the positions since the last irreversible move.
+
+        Mirrors the counting of ``Board.can_claim_threefold_repetition``: the current position and
+        the ones before it, stopping at (and excluding the position before) an irreversible move.
+
+        :param board: Board with its move stack
+        :type board: chess.Board
+        :return: The keys (oldest first, current last) and whether any key occurs twice or more
+        :rtype: tuple[tuple, bool]
+        """
+        probe = board.copy()
+        keys = [probe._transposition_key()]
+        while probe.move_stack:
+            move = probe.pop()
+            if probe.is_irreversible(move):
+                break
+            keys.append(probe._transposition_key())
+        keys.reverse()
+        return tuple(keys), len(set(keys)) < len(keys)
 
     def get_legal_moves(self) -> list[Any]:
         """
@@ -55,8 +87,59 @@ class ChessGameState(GameState):
         if move not in self.board.legal_moves:
             raise ValueError(f"Move {move} is not legal in current position")
 
+        irreversible = self.board.is_irreversible(move)
         self.board.push(move)
+        key = self.board._transposition_key()
+        if irreversible:
+            self._history = (key,)
+            self._has_repeated = False
+        else:
+            self._has_repeated = self._has_repeated or key in self._history
+            self._history += (key,)
+        self._outcome_known = False
         return self
+
+    def _compute_outcome(self) -> Optional[Outcome]:
+        """
+        Outcome of ``board.outcome(claim_draw=True)`` without python-chess' slow threefold check.
+
+        :return: The outcome, or None if the game is not over
+        :rtype: Optional[chess.Outcome]
+        """
+        board = self.board
+        outcome = board.outcome(claim_draw=False)
+        if outcome is not None:
+            return outcome
+        if board.can_claim_fifty_moves():
+            return Outcome(Termination.FIFTY_MOVES, None)
+        if self._can_claim_threefold_repetition():
+            return Outcome(Termination.THREEFOLD_REPETITION, None)
+        return None
+
+    def _can_claim_threefold_repetition(self) -> bool:
+        """
+        Same result as ``board.can_claim_threefold_repetition()``.
+
+        The current position occurred three times, or some legal move reaches a position that
+        already occurred twice (impossible unless some position has repeated).
+
+        :return: True if a draw by threefold repetition can be claimed
+        :rtype: bool
+        """
+        history = self._history
+        if history.count(history[-1]) >= 3:
+            return True
+        if not self._has_repeated:
+            return False
+        board = self.board
+        for move in board.legal_moves:
+            board.push(move)
+            try:
+                if history.count(board._transposition_key()) >= 2:
+                    return True
+            finally:
+                board.pop()
+        return False
 
     def is_over(self) -> bool:
         """
@@ -67,7 +150,10 @@ class ChessGameState(GameState):
         :return: True if the game has ended, False if still in progress
         :rtype: bool
         """
-        return self.board.is_game_over(claim_draw=True)
+        if not self._outcome_known:
+            self._outcome = self._compute_outcome()
+            self._outcome_known = True
+        return self._outcome is not None
 
     def get_current_player(self) -> Any:
         """
@@ -90,7 +176,7 @@ class ChessGameState(GameState):
         if not self.is_over():
             return None
 
-        outcome = self.board.outcome(claim_draw=True)
+        outcome = self._outcome
         if outcome:
             if outcome.winner == chess.WHITE:
                 return "white"
@@ -108,7 +194,13 @@ class ChessGameState(GameState):
         :return: A deep copy of this game state
         :rtype: ChessGameState
         """
-        return ChessGameState(self.board)
+        clone = ChessGameState.__new__(ChessGameState)
+        clone.board = self.board.copy()
+        clone._history = self._history
+        clone._has_repeated = self._has_repeated
+        clone._outcome = self._outcome
+        clone._outcome_known = self._outcome_known
+        return clone
 
     def __str__(self) -> str:
         """

@@ -190,9 +190,11 @@ For every model, written to its card and to the generated table in `MODELS_HISTO
 Models in the comparison: the new 1 (material, reference), 2 and 3 play; the existing models only
 get the accuracy and cost metrics (see 4B).
 
-Match budget (user's decision): **one night, ~10 h**. Fast time control (order of 10 s + 0.1 s
-per move), several games in parallel; every model first plays H2/H3, and only the best ones play a
-round-robin between themselves.
+Match budget (user's decision): **one night, ~10 h**. The trade-off is decided by **a full
+round-robin with a high number of games** between all the models that play (1, 2, 3) and the
+references `IterativeHeuristicBot` with `h2` and `h3`: every pair plays the same set of paired
+openings with colours swapped, at equal time per move, several games in parallel. The time control
+and the number of games per pair are sized to fill the budget (order of 10 s + 0.1 s per move).
 
 Decision rule (user's decision): **strength at equal time decides.** The strongest model stays;
 another one survives only if it wins clearly on something that matters (e.g. much faster with

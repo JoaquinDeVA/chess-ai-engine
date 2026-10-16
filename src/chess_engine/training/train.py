@@ -70,7 +70,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--effort", type=int, help="linear models: effort level 0-100")
     parser.add_argument(
         "--representation",
-        help='linear models: JSON of the Representation fields, or "default"',
+        help='linear models: "default", or a JSON object with the fields of Representation '
+        "(scale, k, perspective, filter)",
     )
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
     parser.add_argument(
@@ -85,11 +86,25 @@ def parse_representation(text: Optional[str]) -> Representation:
     :param text: ``None`` or ``"default"`` for the default representation, otherwise a JSON object
         with the fields of :class:`Representation`.
     :return: The representation.
-    :raises ValueError: If the JSON is invalid or has unknown fields or values.
+    :raises ValueError: If the JSON is invalid or a value is not allowed.
+    :raises TypeError: If the JSON has a field that Representation does not have.
     """
     if text is None or text == "default":
         return Representation()
     return Representation.from_dict(json.loads(text))
+
+
+def _format_duration(seconds: float) -> str:
+    """Human-readable duration.
+
+    :param seconds: Duration in seconds.
+    :return: Seconds, minutes or hours, with one decimal.
+    """
+    if seconds < 120:
+        return f"{seconds:.0f} s"
+    if seconds < 7200:
+        return f"{seconds / 60:.1f} min"
+    return f"{seconds / 3600:.1f} h"
 
 
 def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
@@ -122,12 +137,14 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         seed=SAMPLE_SEED,
         quiet_only=quiet,
     )
-    per_position = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
-    estimate = estimated_seconds(plan, per_position)
+    timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
+    estimate = estimated_seconds(plan, timing)
     print(
-        f"Timed: {per_position * 1e6:.1f} us per position. "
-        f"Estimated duration: {estimate / 3600:.2f} h (upper bound)"
+        f"Timed: {timing.seconds_per_position * 1e6:.1f} us per position, "
+        f"validation {timing.encode_seconds:.2f} s to featurize and "
+        f"{timing.score_seconds:.2f} s per epoch"
     )
+    print(f"Estimated duration: {_format_duration(estimate)}")
 
     best = search(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
     print(f"Final fit with l2={best['l2']:.2e}, lr={best['lr']:.2e}")
@@ -185,7 +202,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if is_linear:
         try:
             return train_by_effort(args, model_class)
-        except ValueError as error:
+        except (ValueError, TypeError) as error:
             print(error)
             return 2
     if args.data is None:

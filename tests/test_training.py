@@ -23,6 +23,7 @@ from chess_engine.training.metrics import compute_metrics, outcome_class
 from chess_engine.training.representation import Representation
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
+from tests.test_effort import write_fixture_shards
 
 
 class TestTargets:
@@ -306,19 +307,8 @@ class TestEffortCommandLine:
     """``--effort`` trains a linear model straight from raw shards and their sidecars."""
 
     def test_train_cli_trains_pst_on_fixture_shards(self, isolated_cards, tmp_path):
-        from chess_engine.training.lichess_raw import shard_path, write_shard
-        from chess_engine.training.sidecar import build_sidecar
-
         raw, side = tmp_path / "raw", tmp_path / "side"
-        raw.mkdir()
-        boards = random_positions(900, seed=4)
-        records = [
-            {"fen": " ".join(b.fen().split()[:4]), "cp": material_cp(b), "mate": None,
-             "depth": 20, "knodes": 1, "best_move": None, "n_evals": 1, "n_pvs": 1}  # fmt: skip
-            for b in boards
-        ]  # fmt: skip
-        write_shard(shard_path(raw, 0), records, {"perspective": "white"})
-        build_sidecar(shard_path(raw, 0), side)
+        write_fixture_shards(raw, side, 900, seed=4)
         target = tmp_path / "pst_tapered.npz"
 
         assert (
@@ -336,3 +326,33 @@ class TestEffortCommandLine:
         assert training["representation"] == Representation().to_dict()
         assert training["train_samples"] > 0 and training["seconds"] > 0
         assert training["effort_config"]["trials"] == 0
+
+    def test_effort_40_runs_one_trial_and_records_it(self, isolated_cards, tmp_path):
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        write_fixture_shards(raw, side, 900, seed=4)
+        target = tmp_path / "pst_tapered.npz"
+
+        assert (
+            train_cli.main(
+                [
+                    "--model", "pst_tapered", "--effort", "40",
+                    "--raw", str(raw), "--sidecar", str(side), "--output", str(target),
+                ]
+            )
+            == 0
+        )  # fmt: skip
+        training = cards.load_card("pst_tapered")["training"]
+        assert training["effort"] == 40
+        assert training["effort_config"]["trials"] == 1
+        assert training["effort_config"]["max_epochs"] == 5
+
+    def test_unknown_representation_field_exits_cleanly(self, isolated_cards, tmp_path, capsys):
+        code = train_cli.main(
+            [
+                "--model", "pst_tapered", "--effort", "0",
+                "--raw", str(tmp_path), "--sidecar", str(tmp_path),
+                "--representation", '{"bogus": 1}',
+            ]
+        )  # fmt: skip
+        assert code == 2
+        assert "bogus" in capsys.readouterr().out

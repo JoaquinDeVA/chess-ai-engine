@@ -7,15 +7,22 @@ the TRAIN split of the raw shards through :meth:`LinearEvalModel.fit_stream`.
 
 import math
 import os
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, NamedTuple, Tuple
 
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel
+from chess_engine.models.linear_eval import (
+    DEFAULT_FIT_CONFIG,
+    LinearEvalModel,
+    _losses,
+    _scores,
+    encode_frame,
+)
 from chess_engine.training.representation import Representation
 
 from .dataset import TRAIN
@@ -27,8 +34,6 @@ BASE_POSITIONS = 100_000
 BATCH_SIZE = 4096
 #: Positions of the timed calibration run (one epoch).
 TIMED_POSITIONS = 50_000
-#: Validation rows used by the calibration run (small, so that its time is mostly training).
-TIMED_VALIDATION_ROWS = 5_000
 #: Share of ``positions`` used by each hyper-parameter trial.
 TRIAL_FRACTION = 0.1
 L2_RANGE = (1e-7, 1e-3)
@@ -78,6 +83,19 @@ def available_rows(sidecar_dir: Path, quiet_only: bool = False) -> int:
             mask &= table["quiet"].to_numpy(zero_copy_only=False)
         total += int(mask.sum())
     return total
+
+
+class Timing(NamedTuple):
+    """Measured costs of a model on this machine, used by :func:`estimated_seconds`.
+
+    :param seconds_per_position: Training time per position of one epoch.
+    :param encode_seconds: Featurizing the validation set (paid once per fit).
+    :param score_seconds: Scoring the validation set (paid once per epoch).
+    """
+
+    seconds_per_position: float
+    encode_seconds: float
+    score_seconds: float
 
 
 class _Epochs:
@@ -154,47 +172,65 @@ def calibrate(
     validation: pd.DataFrame,
     plan: Dict[str, int],
     quiet_only: bool = False,
-) -> float:
-    """Time one epoch over a short sample.
+) -> Timing:
+    """Time a one-epoch fit and split its cost into training and validation.
+
+    The fit uses ``min(TIMED_POSITIONS, positions)`` training rows and the whole validation set,
+    as the real runs do. Featurizing and scoring the validation set are timed separately, and the
+    rest of the fit time is attributed to training.
 
     :param model_class: A concrete :class:`LinearEvalModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
-    :param validation: Validation rows (only the first few thousand are used).
+    :param validation: Validation rows (as used by the real runs).
     :param plan: Output of :func:`effort_config`.
     :param quiet_only: Train on quiet positions only.
-    :return: Seconds per training position.
+    :return: The measured :class:`Timing`.
     """
     config = fit_config(plan, DEFAULT_FIT_CONFIG["l2"], DEFAULT_FIT_CONFIG["lr"])
     config["max_epochs"] = 1
     rows = min(TIMED_POSITIONS, plan["positions"])
-    _, summary = fit(
-        model_class,
-        rep,
-        raw_dir,
-        sidecar_dir,
-        validation.head(TIMED_VALIDATION_ROWS),
-        rows,
-        config,
-        quiet_only,
+    model, summary = fit(
+        model_class, rep, raw_dir, sidecar_dir, validation, rows, config, quiet_only
     )
-    return summary["seconds"] / max(1, summary["train_rows"])
+
+    started = time.perf_counter()
+    rows, cols, vals, targets = encode_frame(model_class.features, rep, validation)
+    encode_seconds = time.perf_counter() - started
+    theta = np.append(model.weights, model.bias)
+    started = time.perf_counter()
+    _losses(_scores(rows, cols, vals, len(targets), theta), targets).mean()
+    score_seconds = time.perf_counter() - started
+
+    train_seconds = max(0.0, summary["seconds"] - encode_seconds - score_seconds)
+    return Timing(
+        seconds_per_position=train_seconds / max(1, summary["train_rows"]),
+        encode_seconds=encode_seconds,
+        score_seconds=score_seconds,
+    )
 
 
-def estimated_seconds(plan: Dict[str, int], seconds_per_position: float) -> float:
-    """Upper-bound duration of the final fit and the trials.
+def estimated_seconds(plan: Dict[str, int], timing: Timing) -> float:
+    """Estimated duration of the trials and the final fit.
+
+    The trials refit on ``TRIAL_FRACTION`` of the positions, but each of them featurizes and scores
+    the full validation set. Early stopping can make the real run shorter.
 
     :param plan: Output of :func:`effort_config`.
-    :param seconds_per_position: Output of :func:`calibrate`.
-    :return: ``positions * max_epochs * seconds_per_position * (1 + trials * 0.1)``.
+    :param timing: Output of :func:`calibrate`.
+    :return: Training part ``(1 + trials * TRIAL_FRACTION) * positions * epochs * s_per_position``
+        plus validation part ``(1 + trials) * (encode + epochs * score)``.
     """
-    return (
-        plan["positions"]
+    fits = 1 + plan["trials"]
+    training = (
+        (1 + plan["trials"] * TRIAL_FRACTION)
+        * plan["positions"]
         * plan["max_epochs"]
-        * seconds_per_position
-        * (1 + plan["trials"] * TRIAL_FRACTION)
+        * timing.seconds_per_position
     )
+    validation = fits * (timing.encode_seconds + plan["max_epochs"] * timing.score_seconds)
+    return training + validation
 
 
 def search(

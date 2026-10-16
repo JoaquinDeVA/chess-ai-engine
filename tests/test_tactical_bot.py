@@ -72,7 +72,7 @@ def test_plays_legal_moves_and_finds_mate_in_one():
         assert bot.get_move(board, 10.0) in board.legal_moves
 
 
-def test_tactical_ordering_prunes_at_least_as_much_as_no_ordering():
+def test_in_a_tactical_position_both_bots_agree_and_ordering_visits_no_more_nodes():
     board = chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")
     tactical, plain = TacticalAlphaBetaBot(max_depth=3), NonTacticalAlphaBetaBot(max_depth=3)
     assert tactical.get_move(board, 10.0) == plain.get_move(board, 10.0)

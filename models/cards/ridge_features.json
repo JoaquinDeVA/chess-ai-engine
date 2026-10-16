@@ -8,7 +8,6 @@
   "training": {
     "dataset": "evaluations.csv",
     "date": "2026-10-16",
-    "commit": "d16becd+dirty",
     "config": {
       "alpha": 10.0
     },

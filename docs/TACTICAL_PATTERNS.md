@@ -1,9 +1,14 @@
 # Tactical patterns
 
 `TacticalAlphaBetaBot` asks a Prolog knowledge base, `knowledge/chess_patterns.pl`, which legal
-moves *create* a tactical pattern, and searches those first. Better ordering means earlier
-alpha-beta cut-offs: the bot returns the same move as `NonTacticalAlphaBetaBot` while visiting
-fewer nodes.
+moves *create* a tactical pattern, and searches those first. Better ordering can mean earlier
+alpha-beta cut-offs, and `NonTacticalAlphaBetaBot` is the control to measure that: same search and
+evaluation, no Prolog ordering.
+
+> **Cost.** Every node loads its position into Prolog, about 2 ms per node. At depth 3 the tactical
+> bot takes several seconds per move where the control takes about a second, and in quiet middlegame
+> positions it can even visit *more* nodes than the control. Compare `get_search_statistics()` of both
+> bots on your own positions before drawing conclusions.
 
 The Python side (`PrologPatternDetector`) loads the position once as facts (`piece/4`,
 `to_move/1`, `can_castle/2`, `en_passant/2`, `move/4`), queries each predicate once for all moves

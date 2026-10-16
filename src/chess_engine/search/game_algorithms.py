@@ -232,12 +232,17 @@ class SearchStatistics(NamedTuple):
     :param truncated: True if the search was stopped early by the cut-off test (for example
         because the clock ran out) so its result may be based on a shallower search than asked
     :type truncated: bool
+    :param completed_depth: Depth of the deepest iterative-deepening iteration that finished
+        without being truncated (0 if none did); ``max_depth_reached`` also counts plies seen
+        in a truncated iteration
+    :type completed_depth: int
     """
 
     nodes_visited: int
     pruning_count: int
     max_depth_reached: int
     truncated: bool = False
+    completed_depth: int = 0
 
 
 def heuristic_alphabeta_search(
@@ -636,6 +641,7 @@ def heuristic_alphabeta_iterative_deepening_search(
     total_nodes = 0
     total_prunings = 0
     deepest_ply = 0
+    completed_depth = 0
     last_truncated = False
     iteration_times: List[float] = []
 
@@ -664,6 +670,7 @@ def heuristic_alphabeta_iterative_deepening_search(
         total_nodes += stats.nodes_visited
         total_prunings += stats.pruning_count
         last_truncated = stats.truncated
+        deepest_ply = max(deepest_ply, stats.max_depth_reached)
 
         if stats.truncated:
             if best_move is None and move is not None:
@@ -671,11 +678,15 @@ def heuristic_alphabeta_iterative_deepening_search(
             break
 
         best_move = move
-        deepest_ply = max(deepest_ply, stats.max_depth_reached)
+        completed_depth = depth
         if time.time() - start_time >= time_limit:
             break
 
     final_stats = SearchStatistics(
-        total_nodes, total_prunings, deepest_ply, last_truncated and best_move is None
+        total_nodes,
+        total_prunings,
+        deepest_ply,
+        last_truncated and best_move is None,
+        completed_depth,
     )
     return best_move, final_stats

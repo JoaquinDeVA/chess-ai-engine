@@ -188,6 +188,48 @@ class TestIterativeDeepening:
         assert move == "good"
         assert not stats.truncated
 
+    def test_completed_depth_excludes_truncated_iteration(self):
+        """The cut-off fires inside the depth-3 iteration after it already reached ply 3."""
+        tree = {
+            "root": {"good": "g1", "bad": "y1"},
+            "g1": {"r": "g2"},
+            "g2": {"r": "g3"},
+            "g3": {"r": "g4"},
+            "y1": {"r": "y2"},
+        }
+
+        def cutoff_at_y1_in_depth_three(state, depth_remaining, elapsed):
+            return state.name == "y1" and depth_remaining == 2
+
+        _, stats = heuristic_alphabeta_iterative_deepening_search(
+            TreeGame(),
+            build_state(tree, {"y2": 0.0, "g4": 0.0}),
+            zero_eval,
+            cutoff_at_y1_in_depth_three,
+            max_depth=3,
+            time_limit=60.0,
+        )
+        assert stats.completed_depth == 2
+        assert stats.max_depth_reached == 3
+
+    def test_completed_depth_equals_max_depth_without_cutoff(self):
+        tree = {
+            "root": {"a": "x1"},
+            "x1": {"r": "x2"},
+            "x2": {"r": "x3"},
+            "x3": {"r": "x4"},
+        }
+        _, stats = heuristic_alphabeta_iterative_deepening_search(
+            TreeGame(),
+            build_state(tree, {"x4": 0.0}),
+            zero_eval,
+            never_cutoff,
+            max_depth=3,
+            time_limit=60.0,
+        )
+        assert stats.completed_depth == 3
+        assert stats.max_depth_reached == 3
+
     def test_stops_when_the_next_iteration_would_not_fit(self):
         tree = {"root": {"a": "x"}, "x": {"c": "p"}}
         utilities = {"p": 1.0}

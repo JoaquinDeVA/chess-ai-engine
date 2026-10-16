@@ -145,7 +145,7 @@
 **Interfaces:**
 - Consumes: Tasks 1-5; `run_round_robin` (Task 11) for the tie-break.
 - Produces: `scripts/bakeoff_representation.py --raw --sidecar --train-positions 5000000 --test-positions 200000 --effort 30 --out docs/training/bakeoff.json` which trains `pst_tapered` for the variants below (one axis changed at a time from the default), judges each, writes JSON and `docs/training/BAKEOFF.md` (table: variant, spearman/MAE/agreement for all / quiet / non_quiet, training seconds), then plays a tie-break round-robin at fixed depth 3 between the two best variants by `all` best-move agreement (`--tiebreak-games 200`), and STOPS (no automatic choice; the report ends with "Decision: pending").
-  Variants: `winprob k=0.00368 stm all` (default), `cp_linear stm all`, `winprob k=0.0025 stm all`, `winprob k=0.005 stm all`, `winprob k=0.00368 white all`, `winprob k=0.00368 stm quiet` (trained on quiet, judged on everything).
+  Variants: `winprob k=0.00368 stm all` (default), `cp_linear stm all`, `winprob k=0.0025 stm all`, `winprob k=0.005 stm all`, `winprob k=0.00368 white all`, `winprob k=0.00368 stm quiet` (trained on quiet, judged on everything), `winprob k=0.00368 stm all, depth >= 20` (drops the 11% shallowest, noisiest Stockfish evaluations), `winprob k=0.00368 stm all, mates dropped` (rows with `mate` set removed: 17.7% of rows, saturated targets of far-away mates). For the last two, `load_sample` must also return the raw `depth` column and the script filters on `depth` / `mate` after loading.
 - [ ] **Step 1:** Failing test `test_bakeoff_runs_on_fixture` (tiny shards, `--train-positions 2000 --test-positions 500 --tiebreak-games 2`, report written with 6 rows).
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS; ruff.
 - [ ] **Step 5:** Commit `feat: representation bake-off script`.
@@ -231,5 +231,5 @@
 - [ ] **R3:** Train `material_linear`, `pst_tapered`, `pst_terms` with the chosen representation at the effort the user picks (training prints the estimate first).
 - [ ] **R4:** `evaluate` all models (including the four existing ones as accuracy records; for the CNNs lower `agreement_n` if the run is too slow and note it in the card).
 - [ ] **R5:** `profile_tradeoff.py` for all models at 1, 3, 10 s.
-- [ ] **R6:** Overnight `run_tournament.py` (~10 h) with `material_linear, pst_tapered, pst_terms, h2, h3`.
+- [ ] **R6:** Overnight `run_tournament.py` (~10 h) with `pst_tapered, pst_terms, h2, h3` at 60 s + 1 s (the default `TimeManager` has a 1.5 s minimum per move, which would turn a 10 s clock into scrambles and make depth-at-equal-time meaningless). `material_linear` is trained and measured in accuracy / depth profiles but does not play the tournament.
 - [ ] **R7:** Apply the decision rule (strength at equal time decides; existing models are kept as records); remove dominated new models; regenerate `MODELS_HISTORY.md`; commit.

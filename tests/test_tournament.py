@@ -34,6 +34,7 @@ def test_paired_openings_are_distinct_and_playable():
     assert paired_openings(5, plies=6, seed=1) == openings
 
 
+@pytest.mark.slow
 def test_every_pair_plays_both_colours(tmp_path):
     out = tmp_path / "games.jsonl"
     opening = paired_openings(1, seed=2)[0]
@@ -102,6 +103,7 @@ def _dies_on_first_white_h2(job):
     return tournament._play_game(job)
 
 
+@pytest.mark.slow
 def test_dead_worker_is_recorded_and_pool_rebuilt(tmp_path):
     out = tmp_path / "games.jsonl"
     opening = paired_openings(1, seed=2)[0]
@@ -122,6 +124,7 @@ def test_dead_worker_is_recorded_and_pool_rebuilt(tmp_path):
     assert summary["errors"] == 1 and summary["played"] == 2
 
 
+@pytest.mark.slow
 def test_run_gives_up_after_too_many_pool_rebuilds(tmp_path, monkeypatch):
     monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 0)
     out = tmp_path / "games.jsonl"
@@ -150,6 +153,7 @@ def _dies_on_first_opening_as_h2(job):
     return tournament._play_game(job)
 
 
+@pytest.mark.slow
 def test_culprit_is_recorded_after_two_deaths_and_the_others_are_played(tmp_path):
     out = tmp_path / "games.jsonl"
     openings = paired_openings(2, seed=2)
@@ -188,6 +192,7 @@ def _dies_on_every_game(job):
     os._exit(1)
 
 
+@pytest.mark.slow
 def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
     monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
     monkeypatch.setattr(tournament, "MAX_DEATHS_PER_GAME", 3)
@@ -220,6 +225,7 @@ def _dies_once_as_h2_white(job):
     return tournament._play_game(job)
 
 
+@pytest.mark.slow
 def test_rebuild_counter_resets_after_each_game_played(tmp_path, monkeypatch):
     """Two broken pools, one per opening, with a game played in between: the limit of 1 holds."""
     markers = tmp_path / "markers"
@@ -241,6 +247,7 @@ def test_rebuild_counter_resets_after_each_game_played(tmp_path, monkeypatch):
     assert summary["errors"] == 0 and summary["played"] == 4
 
 
+@pytest.mark.slow
 def test_run_gives_up_when_every_game_dies(tmp_path, monkeypatch):
     """Error records do not reset the count, so a systemic failure ends the run."""
     monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 2)

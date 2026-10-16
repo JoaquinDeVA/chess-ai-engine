@@ -72,6 +72,7 @@ def test_mirrored_position_gets_complementary_white_score():
         )
 
 
+@pytest.mark.slow
 def test_fit_learns_material():
     model = get_model_class("pst_tapered")()
     boards = random_positions(3000, seed=5)

@@ -164,6 +164,7 @@ def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
     assert all((b["depth"] >= 20).all() for b in batches)
 
 
+@pytest.mark.slow
 def test_bakeoff_runs_on_fixture(tmp_path, monkeypatch, capsys):
     module = load_script("bakeoff_representation")
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round-robin at equal time per move: calibrate, play, and write the report.
 
-python scripts/bench/run_tournament.py --players pst_tapered,pst_terms,pst_kb,nn4,nn8,h3t \
+python scripts/bench/run_tournament.py --players pst_tapered,pst_terms,pst_kb,h3t \
     --base 10 --increment 0.1 --workers 5 --hours 10 --out data/tournament/games.jsonl
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
@@ -29,7 +29,7 @@ from chess_engine.comparison.tournament import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-DEFAULT_PLAYERS = "pst_tapered,pst_terms,pst_kb,nn4,nn8,h3t"
+DEFAULT_PLAYERS = "pst_tapered,pst_terms,pst_kb,h3t"
 
 
 def fmt(value: Optional[float], digits: int = 1, signed: bool = False) -> str:

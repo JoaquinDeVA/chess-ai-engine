@@ -15,7 +15,7 @@ SIDECAR="${SIDECAR:-data/lichess/sidecar}"
 EFFORT="${EFFORT:-40}"
 AGREEMENT_N="${AGREEMENT_N:-20000}"
 HOURS="${HOURS:-10}"
-PLAYERS="${PLAYERS:-pst_tapered,pst_terms,pst_kb,nn4,nn8,h3t}"
+PLAYERS="${PLAYERS:-pst_tapered,pst_terms,pst_kb,h3t}"
 PYTHON="${PYTHON:-python}"
 
 # Models trained from the raw shards, and every model evaluated (the older ones are measured only).

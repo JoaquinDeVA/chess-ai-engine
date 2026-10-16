@@ -1,12 +1,11 @@
-"""
-Chess Position Feature Extraction
+"""Chess position feature extraction for hand-crafted evaluation functions.
 
-This module provides functions to extract various features from chess positions
-for use in evaluation functions.
+Every ``extract_*`` function returns a dictionary with the raw values for both colours, their
+difference, and ``*_diff_normalized``: the difference rescaled to ``[0, 1]`` where ``0.5`` means
+"equal" and values above ``0.5`` favour White. :func:`get_position_features` merges them all.
 """
-import copy
+
 from typing import Dict
-
 
 import chess
 
@@ -107,6 +106,7 @@ def extract_material_features(board: chess.Board) -> Dict[str, float]:
     :type board: chess.Board
     :return: Dictionary containing material features
     :rtype: Dict[str, float]
+    :raises ValueError: If ``board`` is not a :class:`chess.Board`
     """
 
     if (board is None) or (not isinstance(board, chess.Board)):
@@ -144,21 +144,14 @@ def extract_mobility_features(board: chess.Board) -> Dict[str, float]:
     :rtype: Dict[str, float]
     """
 
-    #Guardamos nuestro turno inicial
-    turn = board.turn
+    # Work on a copy so that the caller's board is never mutated, even temporarily.
+    probe = board.copy(stack=False)
+    probe.turn = chess.WHITE
+    white_mobility = probe.legal_moves.count()
+    probe.turn = chess.BLACK
+    black_mobility = probe.legal_moves.count()
 
-    #Calculamos para blancas
-    board.turn = chess.WHITE
-    white_mobility = len(list(board.legal_moves))
-
-    #Calculamos para negras
-    board.turn = chess.BLACK
-    black_mobility = len(list(board.legal_moves))
-
-    #Restauramos el turno
-    board.turn = turn
-
-    mobility_diff =  white_mobility - black_mobility
+    mobility_diff = white_mobility - black_mobility
 
     return {
         "white_mobility": white_mobility,

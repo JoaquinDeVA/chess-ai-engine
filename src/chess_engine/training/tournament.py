@@ -8,15 +8,18 @@ resumes where it stopped.
 
 import itertools
 import json
+import logging
 import math
 import multiprocessing
 import os
 import random
 import statistics
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections import deque
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
+from concurrent.futures.process import BrokenProcessPool
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, Iterator, List, Sequence, Tuple
 
 import chess
 
@@ -25,11 +28,19 @@ from chess_engine.engine.game_manager import GameManager
 from chess_engine.search.time_management import TimeManager
 from chess_engine.training.tradeoff import make_player
 
+logger = logging.getLogger(__name__)
+
 #: Player whose rating is fixed at 0 Elo.
 ANCHOR = "h3"
 
 #: Scores are clipped to ``[CLIP, 1 - CLIP]`` before taking a logarithm.
 CLIP = 0.01
+
+#: Pools that may be rebuilt after a worker dies before the run gives up.
+MAX_POOL_REBUILDS = 5
+
+#: ``(white spec, black spec, opening FEN, base seconds, increment seconds)``.
+Job = Tuple[str, str, str, float, float]
 
 #: Thread-pool variables pinned to 1 in the workers, so that timed games do not compete for cores.
 THREAD_VARIABLES = (
@@ -69,12 +80,61 @@ def paired_openings(n_pairs: int, plies: int = 6, seed: int = 0) -> List[str]:
 def read_games(path: Path) -> List[Dict[str, Any]]:
     """Read the game records of a tournament file.
 
+    A last line that does not parse (a write cut short by a hard kill) is ignored with a warning.
+    A broken line anywhere else means the file is corrupt and raises.
+
     :param path: JSON-lines file written by :func:`run_round_robin`.
     :return: One dict per game; an empty list if the file does not exist.
+    :raises ValueError: If a line other than the last one is not valid JSON.
     """
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    lines = path.read_text().splitlines()
+    records: List[Dict[str, Any]] = []
+    for number, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            if number == len(lines) - 1:
+                logger.warning("ignoring a truncated last line in %s", path)
+                break
+            raise ValueError(f"{path}: line {number + 1} is not valid JSON") from exc
+    return records
+
+
+def _repair_tail(path: Path) -> None:
+    """Truncate a partial last line so that the next append starts on a fresh line.
+
+    :param path: JSON-lines file; left alone if it does not exist or ends with a newline.
+    """
+    if not path.exists():
+        return
+    data = path.read_bytes()
+    if not data or data.endswith(b"\n"):
+        return
+    keep = data.rfind(b"\n") + 1
+    logger.warning("dropping %d bytes of a truncated line from %s", len(data) - keep, path)
+    with path.open("r+b") as handle:
+        handle.truncate(keep)
+
+
+def _check_time_control(
+    records: Sequence[Dict[str, Any]], base: float, increment: float, path: Path
+) -> None:
+    """Refuse to mix games played at another time control into one file.
+
+    :raises ValueError: If a record has a different base or increment (or none).
+    """
+    for record in records:
+        if float(record.get("base", -1)) != float(base) or float(
+            record.get("increment", -1)
+        ) != float(increment):
+            raise ValueError(
+                f"{path} already holds games at another time control; "
+                f"requested {base:g}+{increment:g} s. Use a different --out file."
+            )
 
 
 def check_specs(specs: Sequence[str]) -> None:
@@ -108,14 +168,20 @@ def single_threaded_env() -> Iterator[None]:
                 os.environ[name] = value
 
 
-def _play_game(job: Tuple[str, str, str, float, float]) -> Dict[str, Any]:
+def _play_game(job: Job) -> Dict[str, Any]:
     """Play one game in a worker process; a crash is returned as an ``error`` record.
 
-    :param job: ``(white spec, black spec, opening FEN, base seconds, increment seconds)``.
+    :param job: See :data:`Job`.
     :return: The game record.
     """
     white, black, fen, base, increment = job
-    record: Dict[str, Any] = {"white": white, "black": black, "fen": fen}
+    record: Dict[str, Any] = {
+        "white": white,
+        "black": black,
+        "fen": fen,
+        "base": base,
+        "increment": increment,
+    }
     try:
         white_player = make_player(white, TimeManager())
         black_player = make_player(black, TimeManager())
@@ -134,6 +200,72 @@ def _play_game(job: Tuple[str, str, str, float, float]) -> Dict[str, Any]:
     return record
 
 
+def _error_record(job: Job, message: str) -> Dict[str, Any]:
+    """Record of a game that produced no result."""
+    white, black, fen, base, increment = job
+    return {
+        "white": white,
+        "black": black,
+        "fen": fen,
+        "base": base,
+        "increment": increment,
+        "error": message,
+    }
+
+
+def _outcome(future: Future, job: Job) -> Tuple[Dict[str, Any], bool]:
+    """Record of a finished future, and whether its worker process died.
+
+    :return: ``(record, died)``.
+    """
+    try:
+        return future.result(), False
+    except BrokenProcessPool as exc:
+        return _error_record(job, f"worker process died: {exc}"), True
+    except Exception as exc:
+        return _error_record(job, f"{type(exc).__name__}: {exc}"), False
+
+
+def _run_pool(
+    pending: Deque[Job],
+    workers: int,
+    play: Callable[[Job], Dict[str, Any]],
+    emit: Callable[[Dict[str, Any]], None],
+) -> bool:
+    """Play jobs from ``pending`` in one pool until it is empty or a worker dies.
+
+    At most ``workers`` games are in flight, so a dead worker only costs the games that were
+    running. Those are emitted as errors; the untouched jobs stay in ``pending``.
+
+    :return: True if the pool broke (the caller rebuilds it).
+    """
+    context = multiprocessing.get_context("spawn")
+    pool = ProcessPoolExecutor(max_workers=workers, mp_context=context)
+    in_flight: Dict[Future, Job] = {}
+    broken = False
+    try:
+        while in_flight or (pending and not broken):
+            while pending and not broken and len(in_flight) < workers:
+                job = pending.popleft()
+                try:
+                    in_flight[pool.submit(play, job)] = job
+                except BrokenProcessPool:
+                    pending.appendleft(job)
+                    broken = True
+            if not in_flight:
+                break
+            done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                record, died = _outcome(future, in_flight.pop(future))
+                broken = broken or died
+                emit(record)
+    except BaseException:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown(wait=not broken, cancel_futures=broken)
+    return broken
+
+
 def run_round_robin(
     specs: Sequence[str],
     openings: Sequence[str],
@@ -141,19 +273,30 @@ def run_round_robin(
     increment: float,
     workers: int,
     out: Path,
+    play: Callable[[Job], Dict[str, Any]] = _play_game,
 ) -> Dict[str, int]:
     """Play every pair on every opening twice, colours swapped, in parallel.
 
     Games already recorded in ``out`` (same white, black and opening) are skipped. Each new game
-    is appended to ``out`` as soon as it finishes. A game whose players crash is recorded with an
-    ``"error"`` field and excluded from the scores.
+    is appended to ``out`` as soon as it finishes; every record carries ``base`` and ``increment``.
+    A file recorded at another time control is refused, since its scores would be mixed.
+
+    A game whose players raise is recorded with an ``"error"`` field. If a worker process dies
+    (for instance by a segfault or the out-of-memory killer), the games running in that pool are
+    recorded as errors and the pool is rebuilt for the rest; after :data:`MAX_POOL_REBUILDS`
+    rebuilds the run stops with a ``RuntimeError`` and can be resumed. Errored games are not
+    retried, and they are excluded from the scores.
 
     The workers are started with ``OMP_NUM_THREADS``, ``OPENBLAS_NUM_THREADS``, ``MKL_NUM_THREADS``,
     ``TF_NUM_INTRAOP_THREADS`` and ``TF_NUM_INTEROP_THREADS`` set to ``"1"``, so that timed games
     do not compete for cores; the parent's environment is restored afterwards. Pass
     ``workers <= os.cpu_count() - 1`` (the script does) to leave a core for the parent.
 
-    All player specifications are built once in this process before any game starts.
+    All player specifications are built once in this process before any game starts. A truncated
+    last line of ``out`` (left by a hard kill) is dropped before appending.
+
+    On an exception or ``KeyboardInterrupt`` the pool is shut down without waiting for the queue
+    and the exception is re-raised; the records already written stay valid.
 
     :param specs: Player specifications (see :func:`make_player`).
     :param openings: Starting FENs.
@@ -161,9 +304,12 @@ def run_round_robin(
     :param increment: Seconds added per move.
     :param workers: Worker processes.
     :param out: JSON-lines file to append the games to.
-    :return: ``played`` (new games), ``skipped`` (already recorded), ``errors`` (new crashed
-        games) and ``games`` (records in ``out`` after the run).
-    :raises ValueError: If a player specification cannot be built.
+    :param play: Plays one job; :func:`_play_game` unless a test substitutes its own.
+    :return: ``played`` (new games), ``skipped`` (already recorded), ``errors`` (new games that
+        produced no result) and ``games`` (records in ``out`` after the run).
+    :raises ValueError: If a player specification cannot be built, or ``out`` holds another
+        time control.
+    :raises RuntimeError: If worker processes died more than :data:`MAX_POOL_REBUILDS` times.
     """
     specs = list(specs)
     jobs = [
@@ -172,27 +318,38 @@ def run_round_robin(
         for fen in openings
         for job in ((a, b, fen, base, increment), (b, a, fen, base, increment))
     ]
-    done = {(r["white"], r["black"], r["fen"]) for r in read_games(out)}
-    pending = [job for job in jobs if job[:3] not in done]
+    existing = read_games(out)
+    _check_time_control(existing, base, increment, out)
+    done = {(r["white"], r["black"], r["fen"]) for r in existing}
+    pending: Deque[Job] = deque(job for job in jobs if job[:3] not in done)
+    played = len(pending)
+    counts = {"errors": 0}
 
-    errors = 0
+    def emit(record: Dict[str, Any]) -> None:
+        counts["errors"] += "error" in record
+        handle.write(json.dumps(record) + "\n")
+        handle.flush()
+
     with single_threaded_env():
         check_specs(specs)
         if pending:
             out.parent.mkdir(parents=True, exist_ok=True)
-            context = multiprocessing.get_context("spawn")
-            with ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
-                futures = [pool.submit(_play_game, job) for job in pending]
-                with out.open("a") as handle:
-                    for future in as_completed(futures):
-                        record = future.result()
-                        errors += "error" in record
-                        handle.write(json.dumps(record) + "\n")
-                        handle.flush()
+            _repair_tail(out)
+            rebuilds = 0
+            with out.open("a") as handle:
+                while pending:
+                    if _run_pool(pending, workers, play, emit):
+                        rebuilds += 1
+                        logger.warning("worker process died; rebuilding the pool (%d)", rebuilds)
+                        if rebuilds > MAX_POOL_REBUILDS:
+                            raise RuntimeError(
+                                f"worker processes died {rebuilds} times; giving up with "
+                                f"{len(pending)} games unplayed. Rerun to resume."
+                            )
     return {
-        "played": len(pending),
-        "skipped": len(jobs) - len(pending),
-        "errors": errors,
+        "played": played,
+        "skipped": len(jobs) - played,
+        "errors": counts["errors"],
         "games": len(read_games(out)),
     }
 
@@ -245,6 +402,10 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     ``wins + draws / 2`` over games. ``elo_vs_h3`` uses the player's score against :data:`ANCHOR`
     alone; ``elo`` is the Bradley-Terry fit over all pairs. The 95% interval of the score is the
     normal approximation from the variance of the per-game points.
+
+    Caveats: scores entering the Elo formulas are clipped to ``[0.01, 0.99]``. The intervals treat
+    games as independent, but the two games of a paired opening are correlated, so they are
+    slightly optimistic. Crashed games are not retried.
 
     :param results: Game records as written by :func:`run_round_robin`.
     :return: ``players`` (per player: games, wins, draws, losses, score in percent, ``ci95`` in

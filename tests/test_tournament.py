@@ -2,6 +2,7 @@
 
 import json
 import math
+import os
 
 import chess
 import pytest
@@ -38,6 +39,7 @@ def test_every_pair_plays_both_colours(tmp_path):
     assert len(records) == 2
     assert {(r["white"], r["black"]) for r in records} == {("h2", "h3"), ("h3", "h2")}
     assert all(r["fen"] == opening and "error" not in r for r in records)
+    assert all(r["base"] == 2.0 and r["increment"] == 0.0 for r in records)
 
 
 def test_resume_skips_finished_games(tmp_path):
@@ -47,6 +49,8 @@ def test_resume_skips_finished_games(tmp_path):
         "white": "h2",
         "black": "h3",
         "fen": opening,
+        "base": 2.0,
+        "increment": 0.0,
         "winner": "white",
         "result": "1-0",
         "termination": "checkmate",
@@ -86,6 +90,91 @@ def test_unknown_player_fails_before_any_game(tmp_path):
             ["h2", "no_such_model"], [opening], base=2.0, increment=0.0, workers=2, out=out
         )
     assert not out.exists()
+
+
+def _dies_on_first_white_h2(job):
+    """Play like the real worker, except that the worker process dies when h2 is White."""
+    if job[0] == "h2":
+        os._exit(1)
+    return tournament._play_game(job)
+
+
+def test_dead_worker_is_recorded_and_pool_rebuilt(tmp_path):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    summary = run_round_robin(
+        ["h2", "h3"],
+        [opening],
+        base=2.0,
+        increment=0.0,
+        workers=1,
+        out=out,
+        play=_dies_on_first_white_h2,
+    )
+    records = read_records(out)
+    assert len(records) == 2
+    assert [("error" in r) for r in records] == [True, False]
+    assert "died" in records[0]["error"]
+    assert records[1]["winner"] in ("white", "black", None)
+    assert summary["errors"] == 1 and summary["played"] == 2
+
+
+def test_run_gives_up_after_too_many_pool_rebuilds(tmp_path, monkeypatch):
+    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 0)
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    with pytest.raises(RuntimeError, match="giving up"):
+        run_round_robin(
+            ["h2", "h3"],
+            [opening],
+            base=2.0,
+            increment=0.0,
+            workers=1,
+            out=out,
+            play=_dies_on_first_white_h2,
+        )
+    records = read_records(out)
+    assert len(records) == 1 and "died" in records[0]["error"]
+
+
+def test_truncated_last_line_is_ignored_and_repaired(tmp_path, caplog):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    finished = {
+        "white": "h2",
+        "black": "h3",
+        "fen": opening,
+        "base": 2.0,
+        "increment": 0.0,
+        "winner": "white",
+    }
+    out.write_text(json.dumps(finished) + "\n" + '{"white": "h3", "bla')
+    assert len(tournament.read_games(out)) == 1
+    assert "truncated" in caplog.text
+
+    summary = run_round_robin(["h2", "h3"], [opening], 2.0, 0.0, 2, out)
+
+    lines = out.read_text().splitlines()
+    assert len(lines) == 2
+    assert all(json.loads(line) for line in lines)
+    assert summary["played"] == 1 and summary["games"] == 2
+
+
+def test_corrupt_line_in_the_middle_raises(tmp_path):
+    out = tmp_path / "games.jsonl"
+    out.write_text('{"white": "h2"\n{"white": "h3", "black": "h2"}\n')
+    with pytest.raises(ValueError, match="line 1"):
+        tournament.read_games(out)
+
+
+def test_other_time_control_is_refused(tmp_path):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    stale = {"white": "h2", "black": "h3", "fen": opening, "base": 10.0, "increment": 0.1}
+    out.write_text(json.dumps(stale) + "\n")
+    with pytest.raises(ValueError, match="another time control"):
+        run_round_robin(["h2", "h3"], [opening], base=2.0, increment=0.0, workers=2, out=out)
+    assert read_records(out) == [stale]
 
 
 def game(white, black, winner, **extra):

@@ -58,7 +58,9 @@ def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, A
         "Scores are from the row player's point of view (wins + half draws). Elo is relative to "
         f"`{ANCHOR}` = 0: *vs {ANCHOR}* uses only the games against it, *fit* is a "
         "Bradley-Terry fit over all pairs. The 95% interval is the normal approximation of the "
-        "score.",
+        "score. Elo uses scores clipped to [0.01, 0.99]; the intervals treat games as independent, "
+        "so they are slightly optimistic (the two games of an opening are correlated). Crashed "
+        "games are not retried and are excluded from the scores.",
         "",
         "## Cross table (W-D-L of row against column)",
         "",
@@ -92,10 +94,10 @@ def render_markdown(summary: Dict[str, Any], specs: List[str], meta: Dict[str, A
     return "\n".join(lines) + "\n"
 
 
-def calibrate(specs: List[str], base: float, increment: float, workers: int) -> float:
+def calibrate(specs: List[str], base: float, increment: float, workers: int) -> Optional[float]:
     """Worker-seconds per game, measured by playing one opening between every pair.
 
-    :return: Wall time times workers over games played.
+    :return: Wall time times workers over games played, or None if no game was played.
     """
     with tempfile.TemporaryDirectory() as tmp:
         started = time.perf_counter()
@@ -108,6 +110,8 @@ def calibrate(specs: List[str], base: float, increment: float, workers: int) -> 
             Path(tmp) / "calibration.jsonl",
         )
         elapsed = time.perf_counter() - started
+    if summary["played"] == 0:
+        return None
     return elapsed * workers / summary["played"]
 
 
@@ -130,7 +134,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--hours", type=float, default=10.0, help="wall-clock budget")
     parser.add_argument("--out", type=Path, default=Path("data/tournament/games.jsonl"))
     parser.add_argument("--report", type=Path, default=Path("docs/training/TOURNAMENT.md"))
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    args.specs = [s.strip() for s in args.players.split(",") if s.strip()]
+    if len(set(args.specs)) < 2:
+        parser.error("--players needs at least two distinct players")
+    if ANCHOR not in args.specs:
+        parser.error(f"--players must include {ANCHOR}: it is the Elo anchor")
+    return args
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -140,13 +150,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     :return: Process exit code.
     """
     args = parse_args(argv)
-    specs = [s.strip() for s in args.players.split(",") if s.strip()]
+    specs = args.specs
     workers = min(args.workers, max(1, (os.cpu_count() or 2) - 1))
     if workers != args.workers:
         print(f"Using {workers} workers (cores - 1), not {args.workers}.")
 
     print("Calibrating ...")
     seconds_per_game = calibrate(specs, args.base, args.increment, workers)
+    if seconds_per_game is None:
+        print("Calibration played no games; check the players.")
+        return 1
     openings_per_pair = size_for_budget(args.hours, workers, len(specs), seconds_per_game)
     if openings_per_pair < 1:
         print(f"Budget too small: one opening needs about {seconds_per_game:.1f} s per game.")

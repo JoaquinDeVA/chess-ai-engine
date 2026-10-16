@@ -1,8 +1,10 @@
 """Tests for the parallel round-robin tournament."""
 
+import importlib.util
 import json
 import math
 import os
+from pathlib import Path
 
 import chess
 import pytest
@@ -133,8 +135,69 @@ def test_run_gives_up_after_too_many_pool_rebuilds(tmp_path, monkeypatch):
             out=out,
             play=_dies_on_first_white_h2,
         )
+    # Nothing is recorded for the requeued game, so a rerun replays both games.
+    assert read_records(out) == []
+    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 5)
+    summary = run_round_robin(["h2", "h3"], [opening], 2.0, 0.0, 1, out)
+    assert summary["played"] == 2 and summary["errors"] == 0
+
+
+def _dies_on_first_opening_as_h2(job):
+    """Kill the worker when h2 plays White from the first opening of ``paired_openings(2, 2)``."""
+    if job[0] == "h2" and job[2] == paired_openings(1, seed=2)[0]:
+        os._exit(1)
+    return tournament._play_game(job)
+
+
+def test_culprit_is_recorded_after_two_deaths_and_the_others_are_played(tmp_path):
+    out = tmp_path / "games.jsonl"
+    openings = paired_openings(2, seed=2)
+    summary = run_round_robin(
+        ["h2", "h3"],
+        openings,
+        base=2.0,
+        increment=0.0,
+        workers=2,
+        out=out,
+        play=_dies_on_first_opening_as_h2,
+    )
     records = read_records(out)
-    assert len(records) == 1 and "died" in records[0]["error"]
+    keys = [(r["white"], r["black"], r["fen"]) for r in records]
+    expected = {
+        ("h2", "h3", openings[0]),
+        ("h3", "h2", openings[0]),
+        ("h2", "h3", openings[1]),
+        ("h3", "h2", openings[1]),
+    }
+    assert len(records) == 4 and set(keys) == expected  # nothing lost, nothing duplicated
+    errors = [r for r in records if "error" in r]
+    assert len(errors) == 1
+    assert (errors[0]["white"], errors[0]["black"], errors[0]["fen"]) == (
+        "h2",
+        "h3",
+        openings[0],
+    )
+    assert "died 2 times" in errors[0]["error"]
+    assert all("winner" in r for r in records if "error" not in r)
+    assert summary["errors"] == 1 and summary["played"] == 4
+
+
+def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
+    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
+    out = tmp_path / "games.jsonl"
+    openings = paired_openings(2, seed=2)
+    with pytest.raises(RuntimeError, match="giving up"):
+        run_round_robin(
+            ["h2", "h3"],
+            openings,
+            base=2.0,
+            increment=0.0,
+            workers=2,
+            out=out,
+            play=_dies_on_first_opening_as_h2,
+        )
+    keys = [(r["white"], r["black"], r["fen"]) for r in read_records(out)]
+    assert len(keys) == len(set(keys))
 
 
 def test_truncated_last_line_is_ignored_and_repaired(tmp_path, caplog):
@@ -232,3 +295,59 @@ def test_size_for_budget():
     assert size_for_budget(hours=1, workers=2, n_players=3, seconds_per_game=10) == 120
     # 10 h, 5 workers, 10 s per game -> 18000 games; 5 players -> 10 pairs -> 20 per opening.
     assert size_for_budget(hours=10, workers=5, n_players=5, seconds_per_game=10) == 900
+
+
+def test_complete_record_without_newline_is_kept(tmp_path):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    finished = {"white": "h2", "black": "h3", "fen": opening, "base": 2.0, "increment": 0.0}
+    line = json.dumps(finished).encode()
+    out.write_bytes(line)
+    tournament._repair_tail(out)
+    assert out.read_bytes() == line + b"\n"
+    assert tournament.read_games(out) == [finished]
+
+
+def test_truncated_multibyte_character_is_a_truncated_line(tmp_path, caplog):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    finished = (
+        json.dumps(
+            {"white": "h2", "black": "h3", "fen": opening, "base": 2.0, "increment": 0.0}
+        ).encode()
+        + b"\n"
+    )
+    partial = '{"note": "\u00e9"'.encode()[:-2]  # cut inside the two-byte character
+    out.write_bytes(finished + partial)
+    assert len(tournament.read_games(out)) == 1
+    assert "truncated" in caplog.text
+    tournament._repair_tail(out)
+    assert out.read_bytes() == finished
+
+
+@pytest.fixture(scope="module")
+def script():
+    path = Path(__file__).resolve().parent.parent / "scripts" / "run_tournament.py"
+    spec = importlib.util.spec_from_file_location("run_tournament", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_parse_args_rejects_fewer_than_two_distinct_players(script, capsys):
+    with pytest.raises(SystemExit):
+        script.parse_args(["--players", "h3"])
+    assert "at least two distinct players" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        script.parse_args(["--players", "h3,h3"])
+
+
+def test_parse_args_requires_the_anchor(script, capsys):
+    with pytest.raises(SystemExit):
+        script.parse_args(["--players", "h2,m"])
+    assert "must include h3" in capsys.readouterr().err
+    assert "h3" in script.parse_args([]).specs
+
+
+def test_calibrate_returns_none_when_no_game_is_played(script):
+    assert script.calibrate(["h3"], 2.0, 0.0, 1) is None

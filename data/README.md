@@ -9,3 +9,4 @@
   python scripts/download_lichess_evals.py --rows 1000000        # public Lichess database (CC0)
   python scripts/label_with_stockfish.py --random 50000          # your own positions
   ```
+* `lichess/raw/` – raw sharded Parquet export of the Lichess evaluations (`scripts/fetch_lichess_raw.py`); schema, measurements and plan in `docs/training/DATA.md`. **Not versioned**.

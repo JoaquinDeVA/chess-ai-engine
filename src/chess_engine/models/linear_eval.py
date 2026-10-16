@@ -6,10 +6,16 @@ data: the score of the side to move (or of White), converted back to centipawns 
 answers :meth:`predict_cp`.
 """
 
+import functools
 import json
 import math
+import multiprocessing
+import os
 import time
-from collections.abc import Iterable
+from collections import deque
+from collections.abc import Iterable, Iterator
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
@@ -30,10 +36,16 @@ DEFAULT_FIT_CONFIG: Dict[str, Any] = {
     "batch_size": 4096,
     "max_epochs": 20,
     "patience": 3,
+    "workers": 1,
 }
 _ADAM_BETA1 = 0.9
 _ADAM_BETA2 = 0.999
 _ADAM_EPS = 1e-8
+#: Thread-count variables pinned to 1 in the featurization workers (the BLAS threads of
+#: numpy would otherwise oversubscribe the cores).
+_THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+
+EncodedFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
 def _sigmoid(z: float) -> float:
@@ -43,6 +55,21 @@ def _sigmoid(z: float) -> float:
     :return: ``1 / (1 + exp(-z))``.
     """
     return 0.5 * (1.0 + math.tanh(0.5 * z))
+
+
+def _features_of(cls: type) -> LinearFeatures:
+    """Feature set of a concrete linear model class.
+
+    :param cls: A class derived from :class:`LinearEvalModel`.
+    :return: Its ``features`` attribute.
+    :raises TypeError: If the class is the abstract base, which defines no features.
+    """
+    features = getattr(cls, "features", None)
+    if features is None:
+        raise TypeError(
+            f"{cls.__name__} defines no features; use a concrete model such as PstTaperedModel"
+        )
+    return features
 
 
 class LinearEvalModel(EvaluationModel):
@@ -65,7 +92,7 @@ class LinearEvalModel(EvaluationModel):
         rep: Optional[Representation] = None,
     ):
         self.rep = rep if rep is not None else Representation()
-        size = self.features.size(self.rep.perspective)
+        size = _features_of(type(self)).size(self.rep.perspective)
         self.weights = np.zeros(size) if weights is None else weights
         self.bias = float(bias)
 
@@ -151,28 +178,40 @@ class LinearEvalModel(EvaluationModel):
 
         :param path: File to load; defaults to :meth:`default_path`.
         :return: The model, with the representation it was trained with.
+        :raises TypeError: If called on the abstract base, which has no features.
         :raises FileNotFoundError: If the file does not exist.
-        :raises ValueError: If the file was saved with other features.
+        :raises ValueError: If the file was saved with other features or its weights do not
+            match the feature set.
         """
+        features = _features_of(cls)
         path = Path(path) if path else cls.default_path()
         if not path.exists():
             raise FileNotFoundError(f"model file not found: {path}")
         with np.load(path) as data:
             meta = json.loads(str(data["meta"]))
             weights, bias = data["weights"], float(data["bias"])
-        if meta["features"] != cls.features.name:
+        if meta["features"] != features.name:
             raise ValueError(f"{path} was saved with features {meta['features']!r}")
-        return cls(weights=weights, bias=bias, rep=Representation.from_dict(meta["rep"]))
+        rep = Representation.from_dict(meta["rep"])
+        expected = features.size(rep.perspective)
+        if weights.size != expected:
+            raise ValueError(
+                f"{path}: expected {expected} weights for features {features.name!r} under "
+                f"perspective {rep.perspective!r}, found {weights.size}"
+            )
+        return cls(weights=weights, bias=bias, rep=rep)
 
     def save(self, path: Optional[Path] = None) -> Path:
         """Save weights, bias, features name and representation in one ``.npz`` file.
 
         :param path: Destination; defaults to :meth:`default_path`.
         :return: The path that was written.
+        :raises TypeError: If the model has no features (the abstract base class).
         """
+        features = _features_of(type(self))
         path = Path(path) if path else self.default_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        meta = {"features": self.features.name, "rep": self.rep.to_dict()}
+        meta = {"features": features.name, "rep": self.rep.to_dict()}
         # A file object keeps numpy from appending ".npz" to the requested name.
         with open(path, "wb") as handle:
             np.savez(
@@ -192,72 +231,85 @@ class LinearEvalModel(EvaluationModel):
         """Train with Adam on the binary cross-entropy against soft targets.
 
         ``batches`` is read once per epoch, so it must be re-iterable (a list, or an object whose
-        ``__iter__`` restarts), not a one-shot generator. The weights of the epoch with the lowest
+        ``__iter__`` restarts), not a one-shot generator. Minibatches never span two frames: each
+        frame is cut into chunks of at most ``batch_size`` rows, so the effective batch size
+        depends on how the caller chunks the data. The weights of the epoch with the lowest
         validation loss are kept.
 
+        With ``workers > 1`` the frames are featurized in a process pool, in order, while the
+        main process runs the updates; the result is the same as with one worker.
+
         :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.
-        :param validation: Same columns, used for early stopping.
-        :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``; missing
-            keys take :data:`DEFAULT_FIT_CONFIG`.
+        :param validation: Same columns, used for early stopping; must not be empty.
+        :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
+            ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`.
         :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
             ``train_rows``, ``seconds`` and the ``config`` used.
-        :raises ValueError: If an epoch yields no rows.
+        :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
+            validation loss is not finite.
         """
         cfg = {**DEFAULT_FIT_CONFIG, **config}
         started = time.perf_counter()
+        if len(validation) == 0:
+            raise ValueError("validation set is empty; early stopping needs validation rows")
         size = self._weights.size
         theta = np.append(self._weights, self.bias)  # coefficients, then the intercept
         moment, velocity = np.zeros_like(theta), np.zeros_like(theta)
         step = 0
         validation_data = self._encode(validation)
+        batch_size = int(cfg["batch_size"])
+        workers = int(cfg["workers"])
         best_theta, best_loss, best_epoch = theta.copy(), math.inf, 0
         train_losses: List[float] = []
         val_losses: List[float] = []
         bad_epochs = 0
         train_rows = 0
 
-        for epoch in range(1, int(cfg["max_epochs"]) + 1):
-            loss_sum, rows_seen = 0.0, 0
-            for frame in batches:
-                for local in _minibatches(*self._encode(frame), int(cfg["batch_size"])):
-                    local_rows, local_cols, local_vals, local_y = local
-                    count = len(local_y)
-                    z = _scores(local_rows, local_cols, local_vals, count, theta)
-                    loss_sum += float(np.sum(_losses(z, local_y)))
-                    rows_seen += count
-                    grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
-                    grad_w = (
-                        np.bincount(
-                            local_cols,
-                            weights=local_vals * grad_z[local_rows],
-                            minlength=size,
+        with _featurization_pool(workers) as executor:
+            for epoch in range(1, int(cfg["max_epochs"]) + 1):
+                loss_sum, rows_seen = 0.0, 0
+                for encoded in self._encoded_frames(batches, workers, executor):
+                    for local in _minibatches(*encoded, batch_size):
+                        local_rows, local_cols, local_vals, local_y = local
+                        count = len(local_y)
+                        z = _scores(local_rows, local_cols, local_vals, count, theta)
+                        loss_sum += float(np.sum(_losses(z, local_y)))
+                        rows_seen += count
+                        grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
+                        grad_w = (
+                            np.bincount(
+                                local_cols,
+                                weights=local_vals * grad_z[local_rows],
+                                minlength=size,
+                            )
+                            / count
+                            + float(cfg["l2"]) * theta[:size]
                         )
-                        / count
-                        + float(cfg["l2"]) * theta[:size]
-                    )
-                    grad = np.append(grad_w, grad_z.mean())
-                    step += 1
-                    moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
-                    velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
-                    m_hat = moment / (1 - _ADAM_BETA1**step)
-                    v_hat = velocity / (1 - _ADAM_BETA2**step)
-                    theta -= float(cfg["lr"]) * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
-            if rows_seen == 0:
-                raise ValueError("batches yielded no rows; pass a re-iterable collection")
-            train_rows = rows_seen
-            train_losses.append(loss_sum / rows_seen)
+                        grad = np.append(grad_w, grad_z.mean())
+                        step += 1
+                        moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
+                        velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
+                        m_hat = moment / (1 - _ADAM_BETA1**step)
+                        v_hat = velocity / (1 - _ADAM_BETA2**step)
+                        theta -= float(cfg["lr"]) * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
+                if rows_seen == 0:
+                    raise ValueError("batches yielded no rows; pass a re-iterable collection")
+                train_rows = rows_seen
+                train_losses.append(loss_sum / rows_seen)
 
-            val_rows, val_cols, val_vals, val_y = validation_data
-            val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
-            val_loss = float(np.mean(_losses(val_z, val_y)))
-            val_losses.append(val_loss)
-            if val_loss < best_loss:
-                best_loss, best_epoch, best_theta = val_loss, epoch, theta.copy()
-                bad_epochs = 0
-            else:
-                bad_epochs += 1
-                if bad_epochs > int(cfg["patience"]):
-                    break
+                val_rows, val_cols, val_vals, val_y = validation_data
+                val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
+                val_loss = float(np.mean(_losses(val_z, val_y)))
+                if not math.isfinite(val_loss):
+                    raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
+                val_losses.append(val_loss)
+                if val_loss < best_loss:
+                    best_loss, best_epoch, best_theta = val_loss, epoch, theta.copy()
+                    bad_epochs = 0
+                else:
+                    bad_epochs += 1
+                    if bad_epochs > int(cfg["patience"]):
+                        break
 
         self.weights = best_theta[:size]
         self.bias = float(best_theta[size])
@@ -271,32 +323,107 @@ class LinearEvalModel(EvaluationModel):
             "config": cfg,
         }
 
-    def _encode(self, frame: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Sparse features of the rows of a frame, row-ordered, with their soft targets.
+    def _encode(self, frame: pd.DataFrame) -> EncodedFrame:
+        """Sparse features of the rows of a frame, with their soft targets.
 
         :param frame: Rows with ``fen, cp, mate, white_to_move``.
         :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
         """
-        rows: List[int] = []
-        cols: List[int] = []
-        vals: List[float] = []
-        for row, fen in enumerate(frame["fen"]):
-            indices, values = self.features.active(chess.Board(fen), self.rep.perspective)
-            rows.extend([row] * len(indices))
-            cols.extend(indices)
-            vals.extend(values)
-        y = target(
-            np.asarray(frame["cp"], dtype=np.float64),
-            np.asarray(frame["mate"], dtype=np.float64),
-            np.asarray(frame["white_to_move"], dtype=bool),
-            self.rep,
-        )
-        return (
-            np.asarray(rows, dtype=np.intp),
-            np.asarray(cols, dtype=np.intp),
-            np.asarray(vals, dtype=np.float64),
-            np.asarray(y, dtype=np.float64),
-        )
+        return encode_frame(self.features, self.rep, frame)
+
+    def _encoded_frames(
+        self,
+        batches: Iterable[pd.DataFrame],
+        workers: int,
+        executor: Optional[Executor],
+    ) -> Iterator[EncodedFrame]:
+        """Encoded frames in order, featurized by the pool when there is one.
+
+        At most ``2 * workers`` frames are in flight, so memory stays bounded.
+
+        :param batches: The frames of one epoch.
+        :param workers: Number of workers (``1`` means no pool).
+        :param executor: The pool, or None.
+        :return: Iterator of :data:`EncodedFrame`, in the order of ``batches``.
+        """
+        if executor is None:
+            for frame in batches:
+                yield self._encode(frame)
+            return
+        encode = functools.partial(encode_frame, self.features, self.rep)
+        window = 2 * workers
+        pending: deque = deque()
+        for frame in batches:
+            pending.append(executor.submit(encode, frame))
+            if len(pending) > window:
+                yield pending.popleft().result()
+        while pending:
+            yield pending.popleft().result()
+
+
+def encode_frame(
+    features: LinearFeatures, rep: Representation, frame: pd.DataFrame
+) -> EncodedFrame:
+    """Sparse features of the rows of a frame, with their soft targets.
+
+    Module-level so that featurization workers can run it.
+
+    :param features: Feature set.
+    :param rep: Representation; its perspective selects the features, its scale the targets.
+    :param frame: Rows with ``fen, cp, mate, white_to_move``.
+    :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
+    """
+    rows: List[int] = []
+    cols: List[int] = []
+    vals: List[float] = []
+    for row, fen in enumerate(frame["fen"]):
+        indices, values = features.active(chess.Board(fen), rep.perspective)
+        rows.extend([row] * len(indices))
+        cols.extend(indices)
+        vals.extend(values)
+    y = target(
+        np.asarray(frame["cp"], dtype=np.float64),
+        np.asarray(frame["mate"], dtype=np.float64),
+        np.asarray(frame["white_to_move"], dtype=bool),
+        rep,
+    )
+    return (
+        np.asarray(rows, dtype=np.intp),
+        np.asarray(cols, dtype=np.intp),
+        np.asarray(vals, dtype=np.float64),
+        np.asarray(y, dtype=np.float64),
+    )
+
+
+@contextmanager
+def _featurization_pool(workers: int) -> Iterator[Optional[ProcessPoolExecutor]]:
+    """Process pool for featurization, with single-threaded children.
+
+    The thread-count variables are set while the pool starts its (spawned) workers and restored
+    on exit, so the parent environment is left as it was.
+
+    :param workers: Number of processes; ``1`` yields None (no pool).
+    :return: The pool, or None.
+    :raises ValueError: If ``workers`` is below 1.
+    """
+    if workers < 1:
+        raise ValueError(f"workers must be at least 1, got {workers}")
+    if workers == 1:
+        yield None
+        return
+    saved = {name: os.environ.get(name) for name in _THREAD_ENV}
+    os.environ.update({name: "1" for name in _THREAD_ENV})
+    try:
+        with ProcessPoolExecutor(
+            max_workers=workers, mp_context=multiprocessing.get_context("spawn")
+        ) as executor:
+            yield executor
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def _minibatches(rows, cols, vals, y, batch_size: int):

@@ -1,5 +1,8 @@
 """Tests of the linear evaluation core and of the tapered piece-square-table model."""
 
+import json
+import os
+
 import chess
 import numpy as np
 import pandas as pd
@@ -98,3 +101,58 @@ def test_logit_matches_dense_computation():
 
 def test_count_parameters_matches_size_plus_bias():
     assert get_model_class("pst_tapered")().count_parameters() == 768 + 1
+
+
+def test_fit_rejects_empty_validation():
+    model = get_model_class("pst_tapered")()
+    with pytest.raises(ValueError, match="validation set is empty"):
+        model.fit_stream([frame(random_positions(10, seed=1))], frame([]), {})
+
+
+def test_fit_rejects_non_finite_validation_loss():
+    model = get_model_class("pst_tapered")()
+    boards = random_positions(40, seed=12)
+    config = {"lr": float("nan"), "max_epochs": 2}
+    with pytest.raises(ValueError, match="not finite"):
+        model.fit_stream([frame(boards)], frame(random_positions(10, seed=13)), config)
+
+
+def test_workers_give_the_same_weights_as_one_worker():
+    boards = random_positions(120, seed=14)
+    batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
+    validation = frame(random_positions(30, seed=15))
+    config = {"batch_size": 16, "max_epochs": 3, "patience": 3, "lr": 0.05}
+    env_before = {name: os.environ.get(name) for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS")}
+
+    serial = get_model_class("pst_tapered")()
+    parallel = get_model_class("pst_tapered")()
+    serial_summary = serial.fit_stream(batches, validation, {**config, "workers": 1})
+    parallel_summary = parallel.fit_stream(batches, validation, {**config, "workers": 2})
+
+    assert np.array_equal(serial.weights, parallel.weights)
+    assert serial.bias == parallel.bias
+    assert serial_summary["val_losses"] == parallel_summary["val_losses"]
+    assert serial_summary["train_losses"] == parallel_summary["train_losses"]
+    env_after = {name: os.environ.get(name) for name in env_before}
+    assert env_after == env_before
+
+
+def test_base_class_refuses_save_and_load(tmp_path):
+    with pytest.raises(TypeError, match="defines no features"):
+        LinearEvalModel()
+    with pytest.raises(TypeError, match="defines no features"):
+        LinearEvalModel.load(tmp_path / "missing.npz")
+
+
+def test_load_rejects_weights_of_the_wrong_size(tmp_path):
+    path = tmp_path / "wrong.npz"
+    meta = {"features": "pst_tapered", "rep": Representation().to_dict()}
+    with open(path, "wb") as handle:
+        np.savez(
+            handle,
+            weights=np.zeros(10),
+            bias=np.float64(0.0),
+            meta=np.array(json.dumps(meta)),
+        )
+    with pytest.raises(ValueError, match="expected 768 weights.*found 10"):
+        get_model_class("pst_tapered").load(path)

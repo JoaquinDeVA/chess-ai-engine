@@ -8,6 +8,7 @@ from pathlib import Path
 import chess
 import pytest
 
+from chess_engine.models import registry
 from chess_engine.models.registry import artifact_path
 from chess_engine.training import cards, effort
 from chess_engine.training.lichess import (
@@ -196,6 +197,7 @@ def test_bakeoff_runs_on_fixture(tmp_path, monkeypatch, capsys):
             "--raw", str(raw), "--sidecar", str(side),
             "--train-positions", "2000", "--test-positions", "500", "--effort", "10",
             "--tiebreak-games", "1", "--base", "10", "--increment", "0.1", "--workers", "2",
+            "--tag-prefix", "test-bake",
             "--out", str(out), "--report", str(report),
         ]
     )  # fmt: skip
@@ -207,5 +209,25 @@ def test_bakeoff_runs_on_fixture(tmp_path, monkeypatch, capsys):
     assert all(variant.label in text for variant in module.VARIANTS)
     assert text.rstrip().splitlines()[-1] == "Decision: pending"
     # Temporary models and cards are deleted unless --keep-models is given.
-    assert not artifact_path("pst_tapered@bake-0").exists()
-    assert list((tmp_path / "cards").glob("*@bake-*.json")) == []
+    assert not artifact_path("pst_tapered@test-bake-0").exists()
+    assert list((tmp_path / "cards").glob("*@test-bake-*.json")) == []
+
+
+def test_bakeoff_refuses_to_overwrite_existing_tagged_models(tmp_path, monkeypatch, capsys):
+    module = load_script("bakeoff_representation")
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path / "artifacts")
+    (tmp_path / "artifacts").mkdir()
+    cards.update_card("pst_tapered@test-bake-2", status="bake-off")
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    bakeoff_fixture(raw, side, count=300)
+
+    code = module.main(
+        ["--raw", str(raw), "--sidecar", str(side), "--tag-prefix", "test-bake",
+         "--out", str(tmp_path / "b.json"), "--report", str(tmp_path / "B.md")]
+    )  # fmt: skip
+    assert code == 2
+    assert "pst_tapered@test-bake-2" in capsys.readouterr().out
+    assert cards.card_path("pst_tapered@test-bake-2").exists(), "a card it did not create"
+    assert not (tmp_path / "artifacts" / "pst_tapered@test-bake-0.npz").exists()
+    assert not (tmp_path / "b.json").exists()

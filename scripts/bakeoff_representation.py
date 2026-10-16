@@ -5,10 +5,14 @@ python scripts/bakeoff_representation.py --train-positions 5000000 --test-positi
     --effort 30 --tiebreak-games 200 --out docs/training/bakeoff.json
 
 Every variant changes one axis of the default representation and is trained as a tagged model
-``pst_tapered@bake-<index>`` (artifact and card). The variants are judged on the same test sample
+``pst_tapered@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
+``--tag-prefix`` says otherwise). The variants are judged on the same test sample
 with :func:`~chess_engine.training.judge.judge`. The two best by ``all`` best-move agreement then
 play a round-robin at equal time per move. The script stops there: it writes the report, which
-ends with ``Decision: pending``, and deletes the tagged models unless ``--keep-models`` is given.
+ends with ``Decision: pending``, and deletes the tagged models it created unless ``--keep-models`` is given. The script refuses
+to start if one of its tagged models or cards already exists, so it never overwrites or deletes
+models it did not create. A hard kill can leave ``@<prefix>-*`` files behind; they are safe to
+delete by hand.
 
 The variants that filter on ``depth`` or ``mate`` drop rows after loading, on the training stream
 and on the validation sample. The test sample always keeps every row.
@@ -18,6 +22,7 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -113,6 +118,7 @@ def training_batches(
     positions: int,
     batch_size: int,
     quiet: bool,
+    mate_keep: float = 1.0,
 ) -> Iterator[pd.DataFrame]:
     """Shuffled TRAIN batches of a variant, filtered after loading, ``positions`` rows in total.
 
@@ -125,11 +131,19 @@ def training_batches(
     :param positions: Kept rows to yield in one pass.
     :param batch_size: Rows per batch before filtering.
     :param quiet: Yield only quiet positions.
+    :param mate_keep: Share of the mate positions yielded (as in ``fit``); 1 keeps them all.
     :return: Iterator of DataFrames with the columns of the sampler.
     """
     seen = 0
     stream = iter_batches(
-        raw_dir, sidecar_dir, TRAIN, batch_size, None, SAMPLE_SEED, quiet_only=quiet
+        raw_dir,
+        sidecar_dir,
+        TRAIN,
+        batch_size,
+        None,
+        SAMPLE_SEED,
+        quiet_only=quiet,
+        mate_keep=mate_keep,
     )
     for frame in stream:
         frame = frame[variant.keeps(frame)].iloc[: positions - seen]
@@ -236,10 +250,17 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=max(1, (os.cpu_count() or 2) - 1),
         help="parallel tie-break games; capped at cores - 1",
     )
-    parser.add_argument("--keep-models", action="store_true", help="keep the @bake-* models")
-    parser.add_argument("--out", type=Path, default=Path("docs/training/bakeoff.json"))
-    parser.add_argument("--report", type=Path, default=Path("docs/training/BAKEOFF.md"))
+    parser.add_argument(
+        "--tag-prefix",
+        default="bake",
+        help="tagged models are pst_tapered@<prefix>-<index> (letters, digits, '.', '_', '-')",
+    )
+    parser.add_argument("--keep-models", action="store_true", help="keep the tagged models")
+    parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "docs/training/bakeoff.json")
+    parser.add_argument("--report", type=Path, default=PROJECT_ROOT / "docs/training/BAKEOFF.md")
     args = parser.parse_args(argv)
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag_prefix):
+        parser.error("--tag-prefix must contain only letters, digits, '.', '_' or '-'")
     if min(args.train_positions, args.test_positions, args.tiebreak_games) < 1:
         parser.error("--train-positions, --test-positions and --tiebreak-games must be >= 1")
     try:
@@ -270,6 +291,7 @@ def train_variant(
             args.train_positions,
             config["batch_size"],
             quiet,
+            mate_keep=variant.rep.mate_keep,
         )
     )
     model = get_model_class(MODEL)(rep=variant.rep)
@@ -285,6 +307,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     if not sorted(args.raw.glob("part-*.parquet")):
         print(f"no raw shards in {args.raw}")
+        return 2
+    specs = [f"{MODEL}@{args.tag_prefix}-{index}" for index in range(len(VARIANTS))]
+    taken = [spec for spec in specs if artifact_path(spec).exists() or card_path(spec).exists()]
+    if taken:
+        print(
+            f"refusing to start: {', '.join(taken)} already exist (artifact or card). "
+            "Use another --tag-prefix, or delete them by hand."
+        )
         return 2
     model_class = get_model_class(MODEL)
     plan = effort_config(args.effort, args.train_positions)
@@ -304,7 +334,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     created: List[str] = []
     try:
         for index, variant in enumerate(VARIANTS):
-            spec = f"{MODEL}@bake-{index}"
+            spec = specs[index]
             created.append(spec)
             print(f"[{index}] {variant.label}")
             sample = validation[variant.rep.filter == "quiet"]

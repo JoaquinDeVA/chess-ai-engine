@@ -153,9 +153,7 @@ def alphabeta_search(game: "GameProblem", state: "GameState") -> Any:
     """
     player = state.get_current_player()
 
-    def max_value(
-        state: "GameState", alpha: float, beta: float
-    ) -> AdversarialSearchResult:
+    def max_value(state: "GameState", alpha: float, beta: float) -> AdversarialSearchResult:
         """
         Calculate the maximum value achievable from this state with alpha-beta pruning.
 
@@ -186,9 +184,7 @@ def alphabeta_search(game: "GameProblem", state: "GameState") -> Any:
 
         return AdversarialSearchResult(best_value, best_move)
 
-    def min_value(
-        state: "GameState", alpha: float, beta: float
-    ) -> AdversarialSearchResult:
+    def min_value(state: "GameState", alpha: float, beta: float) -> AdversarialSearchResult:
         """
         Calculate the minimum value achievable from this state with alpha-beta pruning.
 
@@ -242,6 +238,7 @@ class SearchStatistics(NamedTuple):
     pruning_count: int
     max_depth_reached: int
     truncated: bool = False
+
 
 def heuristic_alphabeta_search(
     game: GameProblem,
@@ -305,7 +302,6 @@ def heuristic_alphabeta_search(
         if cutoff_test(state, depth, time.time() - time_of_start):
             return AdversarialSearchResult(eval_fn(state, player), None)
 
-
         best_value = float("-inf")
         best_move = None
 
@@ -315,7 +311,7 @@ def heuristic_alphabeta_search(
             actions = order_moves_callback(state.get_board(), actions)
 
         for action in actions:
-            result = min_value(game.result(state, action), alpha, beta, depth+1)
+            result = min_value(game.result(state, action), alpha, beta, depth + 1)
             if result.value > best_value:
                 best_value = result.value
                 best_move = action
@@ -344,7 +340,6 @@ def heuristic_alphabeta_search(
         :return: The minimum value and corresponding best move
         :rtype: AdversarialSearchResult
         """
-
         nonlocal nodes_visited
         nonlocal pruning_count
         nonlocal max_depth_reached
@@ -364,10 +359,10 @@ def heuristic_alphabeta_search(
         actions = game.actions(state)
 
         if order_moves_callback:
-            actions = order_moves_callback(state.get_board() , actions)
+            actions = order_moves_callback(state.get_board(), actions)
 
         for action in actions:
-            result = max_value(game.result(state, action), alpha, beta,depth +1)
+            result = max_value(game.result(state, action), alpha, beta, depth + 1)
             if result.value < best_value:
                 best_value = result.value
                 best_move = action
@@ -379,9 +374,8 @@ def heuristic_alphabeta_search(
 
         return AdversarialSearchResult(best_value, best_move)
 
-
     time_of_start = time.time()
-    search_result = max_value(state, float("-inf"), float("inf"), depth = 0)
+    search_result = max_value(state, float("-inf"), float("inf"), depth=0)
     return search_result.move, SearchStatistics(nodes_visited, pruning_count, max_depth_reached)
 
 

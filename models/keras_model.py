@@ -13,9 +13,7 @@ def _import_keras():
     try:
         import keras
     except ImportError as error:  # pragma: no cover - depends on the environment
-        raise ImportError(
-            "Keras models need the 'ml' extra: pip install -e '.[ml]'"
-        ) from error
+        raise ImportError("Keras models need the 'ml' extra: pip install -e '.[ml]'") from error
     return keras
 
 
@@ -76,7 +74,7 @@ class KerasModel(EvaluationModel):
         self.network.save(path)
         return path
 
-    def _predict_raw(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
+    def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
         """Run the network on an encoded batch.
 
         Calling the network directly is much faster than ``Model.predict`` for the tiny batches

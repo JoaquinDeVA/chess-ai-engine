@@ -2,8 +2,6 @@
 
 from collections import defaultdict
 
-import pytest
-
 from adversarial_search.game_algorithms import (
     SearchStatistics,
     advanced_heuristic_alphabeta_search,
@@ -61,8 +59,12 @@ def test_killer_moves_are_recorded_and_bounded():
     utilities = {"p": 1.0, "q": 0.0, "r": 1.0, "t": 0.0}
     killers = defaultdict(list)
     advanced_heuristic_alphabeta_search(
-        TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-        killer_moves=killers, max_depth=3,
+        TreeGame(),
+        build_state(tree, utilities),
+        zero_eval,
+        never_cutoff,
+        killer_moves=killers,
+        max_depth=3,
     )
     assert sum(len(v) for v in killers.values()) > 0
     assert all(len(v) <= 3 for v in killers.values())
@@ -73,13 +75,21 @@ def test_transposition_table_is_filled_and_reused():
     utilities = {"x": 1.0, "y": 0.0}
     table = {}
     advanced_heuristic_alphabeta_search(
-        TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-        transposition_table=table, max_depth=2,
+        TreeGame(),
+        build_state(tree, utilities),
+        zero_eval,
+        never_cutoff,
+        transposition_table=table,
+        max_depth=2,
     )
     assert len(table) > 0
     _, stats = advanced_heuristic_alphabeta_search(
-        TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-        transposition_table=table, max_depth=2,
+        TreeGame(),
+        build_state(tree, utilities),
+        zero_eval,
+        never_cutoff,
+        transposition_table=table,
+        max_depth=2,
     )
     assert stats.nodes_visited <= 2, "second search must be answered from the table"
 
@@ -94,8 +104,12 @@ def test_order_callback_is_invoked():
         return list(reversed(moves))
 
     move, _ = advanced_heuristic_alphabeta_search(
-        TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-        order_moves_callback=reverse, max_depth=2,
+        TreeGame(),
+        build_state(tree, utilities),
+        zero_eval,
+        never_cutoff,
+        order_moves_callback=reverse,
+        max_depth=2,
     )
     assert calls and move == "b", "with equal values the first move tried is kept"
 
@@ -109,8 +123,12 @@ def test_time_truncated_searches_do_not_pollute_the_transposition_table():
         return depth_remaining < 3
 
     _, stats = advanced_heuristic_alphabeta_search(
-        TreeGame(), build_state(tree, utilities), zero_eval, expire_below_root,
-        transposition_table=table, max_depth=3,
+        TreeGame(),
+        build_state(tree, utilities),
+        zero_eval,
+        expire_below_root,
+        transposition_table=table,
+        max_depth=3,
     )
     assert stats.truncated
     assert table == {}
@@ -121,8 +139,12 @@ class TestIterativeDeepening:
         tree = {"root": {"a": "x", "b": "y"}, "x": {"c": "p"}, "y": {"c": "q"}}
         utilities = {"p": 1.0, "q": 0.0}
         move, stats = heuristic_alphabeta_iterative_deepening_search(
-            TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-            max_depth=4, time_limit=5.0,
+            TreeGame(),
+            build_state(tree, utilities),
+            zero_eval,
+            never_cutoff,
+            max_depth=4,
+            time_limit=5.0,
         )
         assert move == "a"
         assert isinstance(stats, SearchStatistics)
@@ -151,8 +173,12 @@ class TestIterativeDeepening:
             return depth_remaining == 0 or calls["n"] > 8
 
         move, stats = heuristic_alphabeta_iterative_deepening_search(
-            TreeGame(), build_state(tree, utilities), eval_fn, clock_runs_out_in_depth_three,
-            max_depth=3, time_limit=60.0,
+            TreeGame(),
+            build_state(tree, utilities),
+            eval_fn,
+            clock_runs_out_in_depth_three,
+            max_depth=3,
+            time_limit=60.0,
         )
         assert calls["n"] > 8, "the third iteration must have started"
         assert move == "good"
@@ -162,7 +188,11 @@ class TestIterativeDeepening:
         tree = {"root": {"a": "x"}, "x": {"c": "p"}}
         utilities = {"p": 1.0}
         move, _ = heuristic_alphabeta_iterative_deepening_search(
-            TreeGame(), build_state(tree, utilities), zero_eval, never_cutoff,
-            max_depth=50, time_limit=0.2,
+            TreeGame(),
+            build_state(tree, utilities),
+            zero_eval,
+            never_cutoff,
+            max_depth=50,
+            time_limit=0.2,
         )
         assert move == "a"

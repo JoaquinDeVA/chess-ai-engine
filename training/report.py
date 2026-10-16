@@ -1,4 +1,4 @@
-"""Render the model cards into the tables of ``MODELS_HISTORY.md``.
+"""Render the model cards into the table of ``MODELS_HISTORY.md``.
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
 this module regenerates: ``python -m training.report``.
@@ -13,7 +13,7 @@ HISTORY_FILE = PROJECT_ROOT / "MODELS_HISTORY.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 
-_STATUS_ORDER = {"current": 0, "legacy": 1}
+_STATUS_ORDER = {"current": 0}
 _DASH = "—"
 
 
@@ -60,7 +60,7 @@ def _training_data(card: Dict[str, Any]) -> str:
 
 
 def render_benchmarked(cards: List[Dict[str, Any]]) -> str:
-    """Table of models that have weights (current and legacy).
+    """Comparison table of the models.
 
     :param cards: All model cards.
     :return: Markdown table.
@@ -96,56 +96,22 @@ def render_benchmarked(cards: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def render_historical(cards: List[Dict[str, Any]]) -> str:
-    """Table of experiments whose weights were not kept.
-
-    :param cards: All model cards.
-    :return: Markdown table.
-    """
-    rows = sorted(
-        (card for card in cards if card.get("status") == "historical"),
-        key=lambda card: card.get("order", 0),
-    )
-    lines = [
-        "| Experiment | Source | Architecture | Epochs | Logged val. MAE (normalized) | Notes |",
-        "|---|---|---|---:|---:|---|",
-    ]
-    for card in rows:
-        training = card.get("training") or {}
-        lines.append(
-            "| {name} | {source} | {arch} | {epochs} | {mae} | {notes} |".format(
-                name=card.get("display_name", card["name"]),
-                source=card.get("source", _DASH),
-                arch=card.get("architecture", _DASH),
-                epochs=training.get("epochs", _DASH),
-                mae=_number(card.get("logged_val_mae"), 3),
-                notes=card.get("notes", ""),
-            )
-        )
-    return "\n".join(lines)
-
-
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
-    """Both generated tables, with their headings.
+    """The comparison table of all models.
 
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.
     """
-    cards = load_all_cards() if cards is None else cards
-    return (
-        "### Models with weights\n\n"
-        f"{render_benchmarked(cards)}\n\n"
-        "### Historical experiments (weights not kept)\n\n"
-        f"{render_historical(cards)}"
-    )
+    return render_benchmarked(load_all_cards() if cards is None else cards)
 
 
-def update_history_file(path: Path = HISTORY_FILE) -> bool:
+def update_history_file(path: Optional[Path] = None) -> bool:
     """Replace the generated block of ``MODELS_HISTORY.md``.
 
-    :param path: File to update.
+    :param path: File to update (default: ``MODELS_HISTORY.md`` of the project).
     :return: True if the file was rewritten, False if it does not exist or has no markers yet.
     """
+    path = HISTORY_FILE if path is None else path
     if not path.exists():
         return False
     text = path.read_text(encoding="utf-8")
@@ -153,7 +119,9 @@ def update_history_file(path: Path = HISTORY_FILE) -> bool:
         return False
     head, rest = text.split(BEGIN_MARKER, 1)
     _, tail = rest.split(END_MARKER, 1)
-    path.write_text(f"{head}{BEGIN_MARKER}\n{render_tables()}\n{END_MARKER}{tail}", encoding="utf-8")
+    path.write_text(
+        f"{head}{BEGIN_MARKER}\n{render_tables()}\n{END_MARKER}{tail}", encoding="utf-8"
+    )
     return True
 
 

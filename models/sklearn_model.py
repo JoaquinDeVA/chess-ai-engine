@@ -68,7 +68,7 @@ class SklearnModel(EvaluationModel):
         joblib.dump(self.estimator, path)
         return path
 
-    def _predict_raw(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
+    def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
         """Run the estimator.
 
         :param inputs: Encoded batch; only the first array is used.

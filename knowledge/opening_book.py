@@ -45,7 +45,7 @@ class OpeningBook:
         :return: The loaded book.
         :raises FileNotFoundError: If ``path`` does not exist.
         """
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             return cls(json.load(handle))
 
     def lookup(self, board: chess.Board) -> Optional[chess.Move]:

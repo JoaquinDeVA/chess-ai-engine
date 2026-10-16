@@ -1,4 +1,4 @@
-"""""
+""" ""
 Basic test suite for heuristic_alphabeta_search function
 
 This provides minimal smoke tests to verify student implementations work.
@@ -96,9 +96,7 @@ def test_italian_game_position():
         ),  # After 1.e4
         (
             2,
-            chess.Board(
-                "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"
-            ),
+            chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
         ),  # After 1.e4 e5
     ],
 )
@@ -113,6 +111,6 @@ def test_returns_legal_move_always(position_index, board):
     )
 
     assert move is not None, f"Algorithm returned None for position {position_index}"
-    assert (
-        move in board.legal_moves
-    ), f"Algorithm returned illegal move for position {position_index}"
+    assert move in board.legal_moves, (
+        f"Algorithm returned illegal move for position {position_index}"
+    )

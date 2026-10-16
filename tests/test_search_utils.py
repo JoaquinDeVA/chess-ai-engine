@@ -1,7 +1,6 @@
 """Tests for the helpers shared by the advanced search (transposition table, killers, ordering)."""
 
 import chess
-import pytest
 
 from adversarial_search.game_algorithms import AdversarialSearchResult
 from adversarial_search.search_utils import (
@@ -81,7 +80,9 @@ class TestMvvLva:
         pawn_takes_queen = chess.Move.from_uci("e4d5")
         queen_takes_queen = chess.Move.from_uci("d1d5")
         assert mvv_lva_score(board, pawn_takes_queen) > 0
-        assert mvv_lva_score(board, pawn_takes_queen) > mvv_lva_score(board, chess.Move.from_uci("d1d2"))
+        assert mvv_lva_score(board, pawn_takes_queen) > mvv_lva_score(
+            board, chess.Move.from_uci("d1d2")
+        )
         assert mvv_lva_score(board, pawn_takes_queen) > mvv_lva_score(board, queen_takes_queen)
 
     def test_en_passant_counts_as_a_pawn_capture(self):

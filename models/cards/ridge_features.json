@@ -1,0 +1,18 @@
+{
+  "name": "ridge_features",
+  "status": "current",
+  "architecture": "StandardScaler -> Ridge(alpha=10) on 29 features",
+  "features": "vector29",
+  "parameters": 30,
+  "size_kb": 1.8,
+  "training": {
+    "dataset": "evaluations.csv",
+    "date": "2026-10-16",
+    "commit": "d16becd+dirty",
+    "config": {
+      "alpha": 10.0
+    },
+    "epochs": 1,
+    "train_samples": 745515
+  }
+}

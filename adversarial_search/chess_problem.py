@@ -1,5 +1,5 @@
 """
-Chess Problem Implementation for Adversarial Search
+Chess problem implementation for adversarial search.
 
 This module implements the GameProblem interface for chess using ChessGameState.
 """
@@ -47,29 +47,14 @@ class ChessProblem(GameProblem):
         :rtype: float
         :raises ValueError: If state is not ChessGameState or not terminal
         """
-
-
-        if (GameState is None) or (not isinstance(state, GameState)) or (not state.is_over()):
+        if not isinstance(state, GameState) or not state.is_over():
             raise ValueError("state must be ChessGameState and terminal.")
 
-        if not player in [chess.WHITE, chess.BLACK]:
+        if player not in (chess.WHITE, chess.BLACK):
             raise ValueError("player must be chess.WHITE or chess.BLACK.")
 
-        #Devuelve un String del color ganador.
-        winner = state.get_winner()
-
-        #Transformamos a nuestro formato de jugador -> chess.(colour)
-        if winner == "white":
-            winner = chess.WHITE
-        elif winner == "black":
-            winner = chess.BLACK
-        else:
-            winner = None
-
-        #Miramos si es nuestro jugador, es otro (adversario) o ninguno (empate)
-        if winner == player:
-            return 1.0
-        elif winner is not None:
-            return 0.0
-
-        return 0.5
+        winner = state.get_winner()  # "white", "black" or None for a draw
+        if winner is None:
+            return 0.5
+        winner_color = chess.WHITE if winner == "white" else chess.BLACK
+        return 1.0 if winner_color == player else 0.0

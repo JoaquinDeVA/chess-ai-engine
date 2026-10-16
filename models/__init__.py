@@ -13,9 +13,10 @@ Importing this package registers the built-in models; heavy dependencies (scikit
 are only imported when a model is actually loaded or trained.
 """
 
+# Importing the modules below registers the built-in models.
+from . import (
+    architectures,  # noqa: F401,E402
+    linear_baseline,  # noqa: F401,E402
+)
 from .base import CP_SCALE, EvaluationModel, cp_to_expected_score  # noqa: F401
 from .registry import available_models, get_model_class, load_model, register_model  # noqa: F401
-
-# Importing the modules below registers the built-in models.
-from . import legacy  # noqa: F401,E402
-from . import linear_baseline  # noqa: F401,E402

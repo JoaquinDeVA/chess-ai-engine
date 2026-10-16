@@ -1,5 +1,5 @@
 """
-Data Classes for Chess Engine
+Data classes for the chess engine.
 
 This module contains all the data structures used throughout the chess engine
 (tournament configuration, game and tournament results, PGN export).
@@ -9,8 +9,8 @@ CEU San Pablo University).
 """
 
 import json
-from dataclasses import dataclass, asdict
-from typing import List, Optional, Dict, Any, Tuple
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import chess
 import chess.pgn
@@ -30,11 +30,12 @@ class TournamentConfig:
     :param scoring: Scoring system dictionary
     :type scoring: Dict[str, float]
     """
+
     total_game_time: float
     time_increment: float
     rounds: int
     scoring: Dict[str, float] = None
-    
+
     def __post_init__(self):
         if self.scoring is None:
             self.scoring = {"win": 1.0, "draw": 0.5, "loss": 0.0}
@@ -76,33 +77,34 @@ class GameResult:
     :param round_number: Tournament round number (optional)
     :type round_number: Optional[int]
     """
+
     # Game identification
     white_name: str
     black_name: str
     game_id: str
     timestamp: str
-    
+
     # Game outcome
     result: str  # "1-0", "0-1", "1/2-1/2", "*"
     winner: Optional[str]  # "white", "black", or None for draw
     termination: str  # "checkmate", "stalemate", "timeout", etc.
-    
+
     # Game details
     moves: List[str]  # List of moves in UCI format
     total_moves: int
     duration: float  # Total game time in seconds
-    
+
     # Position information
     starting_fen: str
     final_fen: str
-    
+
     # Time information
     white_time_left: float
     black_time_left: float
-    
+
     # Tournament information (optional)
     round_number: Optional[int] = None
-    
+
     def to_pgn(self, time_limit: float = None, time_increment: float = None) -> str:
         """
         Convert game result to PGN format.
@@ -116,10 +118,10 @@ class GameResult:
         """
         # Create PGN game
         game = chess.pgn.Game()
-        
+
         # Set headers
         game.headers["Event"] = "Student Chess Tournament"
-        game.headers["Date"] = self.timestamp.split('T')[0].replace('-', '.')
+        game.headers["Date"] = self.timestamp.split("T")[0].replace("-", ".")
         game.headers["White"] = self.white_name
         game.headers["Black"] = self.black_name
         game.headers["Result"] = self.result
@@ -128,10 +130,10 @@ class GameResult:
         if self.starting_fen != chess.STARTING_FEN:
             game.headers["SetUp"] = "1"
             game.headers["FEN"] = self.starting_fen
-        
+
         # Set proper time control format
         if time_limit is not None:
-            if time_limit == float('inf'):
+            if time_limit == float("inf"):
                 game.headers["TimeControl"] = "-"  # Unlimited time
             elif time_increment and time_increment > 0:
                 game.headers["TimeControl"] = f"{int(time_limit)}+{int(time_increment)}"
@@ -139,7 +141,7 @@ class GameResult:
                 game.headers["TimeControl"] = str(int(time_limit))
         else:
             game.headers["TimeControl"] = "-"
-        
+
         # Add moves
         # Set up the board with the starting position
         if self.starting_fen != chess.STARTING_FEN:
@@ -158,7 +160,7 @@ class GameResult:
                     board.push(move)
             except ValueError:
                 continue  # Skip invalid moves
-        
+
         return str(game)
 
 
@@ -180,13 +182,14 @@ class TournamentResult:
     :param duration: Total tournament duration in seconds
     :type duration: float
     """
+
     tournament_id: str
     timestamp: str
     config: TournamentConfig
     bot_names: List[str]
     games: List[GameResult]
     duration: float
-    
+
     def get_standings(self) -> List[Tuple[str, Dict[str, Any]]]:
         """
         Calculate tournament standings.
@@ -195,53 +198,51 @@ class TournamentResult:
         :rtype: List[Tuple[str, Dict[str, Any]]]
         """
         standings = {}
-        
+
         # Initialize standings for all bots
         for bot_name in self.bot_names:
             standings[bot_name] = {
-                'score': 0.0,
-                'wins': 0,
-                'draws': 0,
-                'losses': 0,
-                'games_played': 0
+                "score": 0.0,
+                "wins": 0,
+                "draws": 0,
+                "losses": 0,
+                "games_played": 0,
             }
-        
+
         # Get scoring rules
         scoring = self.config.scoring
-        
+
         # Process each game result
         for game in self.games:
             white_stats = standings[game.white_name]
             black_stats = standings[game.black_name]
-            
-            white_stats['games_played'] += 1
-            black_stats['games_played'] += 1
-            
+
+            white_stats["games_played"] += 1
+            black_stats["games_played"] += 1
+
             if game.winner == "white":
-                white_stats['wins'] += 1
-                white_stats['score'] += scoring['win']
-                black_stats['losses'] += 1
-                black_stats['score'] += scoring['loss']
+                white_stats["wins"] += 1
+                white_stats["score"] += scoring["win"]
+                black_stats["losses"] += 1
+                black_stats["score"] += scoring["loss"]
             elif game.winner == "black":
-                black_stats['wins'] += 1
-                black_stats['score'] += scoring['win']
-                white_stats['losses'] += 1
-                white_stats['score'] += scoring['loss']
+                black_stats["wins"] += 1
+                black_stats["score"] += scoring["win"]
+                white_stats["losses"] += 1
+                white_stats["score"] += scoring["loss"]
             else:  # Draw
-                white_stats['draws'] += 1
-                white_stats['score'] += scoring['draw']
-                black_stats['draws'] += 1
-                black_stats['score'] += scoring['draw']
-        
+                white_stats["draws"] += 1
+                white_stats["score"] += scoring["draw"]
+                black_stats["draws"] += 1
+                black_stats["score"] += scoring["draw"]
+
         # Sort by score (descending), then by wins
         sorted_standings = sorted(
-            standings.items(), 
-            key=lambda x: (x[1]['score'], x[1]['wins']), 
-            reverse=True
+            standings.items(), key=lambda x: (x[1]["score"], x[1]["wins"]), reverse=True
         )
-        
+
         return sorted_standings
-    
+
     def save_to_file(self, filename: str) -> None:
         """
         Save tournament results to JSON file.
@@ -250,9 +251,9 @@ class TournamentResult:
         :type filename: str
         """
         data = asdict(self)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(data, f, indent=2)
-    
+
     def export_games_to_pgn_directory(self, directory_path: str) -> None:
         """
         Export all tournament games to PGN files in a directory.
@@ -261,25 +262,25 @@ class TournamentResult:
         :type directory_path: str
         """
         import os
-        
+
         # Create directory if it doesn't exist
         os.makedirs(directory_path, exist_ok=True)
-        
+
         for game in self.games:
             # Create filename: white_player-black_player-round.pgn
             if game.round_number is not None:
                 filename = f"{game.white_name}-{game.black_name}-{game.round_number}.pgn"
             else:
                 filename = f"{game.white_name}-{game.black_name}.pgn"
-            
+
             file_path = os.path.join(directory_path, filename)
-            
+
             try:
                 pgn_content = game.to_pgn(
-                    time_limit=self.config.total_game_time, 
-                    time_increment=self.config.time_increment
+                    time_limit=self.config.total_game_time,
+                    time_increment=self.config.time_increment,
                 )
-                with open(file_path, 'w') as f:
+                with open(file_path, "w") as f:
                     f.write(pgn_content)
             except Exception as e:
                 print(f"Warning: Failed to export {filename}: {e}")

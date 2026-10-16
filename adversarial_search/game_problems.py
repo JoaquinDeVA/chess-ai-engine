@@ -1,10 +1,12 @@
+"""Abstract game interfaces (``GameState`` and ``GameProblem``) used by the search algorithms."""
+
 # This code is derived from the AIMA Python repository
 # Original source: https://github.com/aimacode/aima-python/
 # Licensed under MIT License
 # Copyright (c) 2016 aima-python contributors
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Hashable
+from typing import Any, Hashable, Optional
 
 
 class GameState(ABC):
@@ -87,6 +89,7 @@ class GameState(ABC):
     def key(self) -> Hashable:
         """
         Return a hashable representation of the game state.
+
         Subclasses must implement this to uniquely identify a state.
         """
         pass
@@ -100,9 +103,10 @@ class GameState(ABC):
         return hash(self.key())
 
 
-
 class GameProblem(ABC):
     """
+    A game problem: like a search problem with a terminal test and a utility per final state.
+
     A game-problem is similar to a problem, but it has a terminal test instead of
     a goal test, and a utility for each terminal state. To create a game,
     subclass this class and implement `utility`. You will also need to set
@@ -158,5 +162,3 @@ class GameProblem(ABC):
         :rtype: float
         """
         pass
-
-

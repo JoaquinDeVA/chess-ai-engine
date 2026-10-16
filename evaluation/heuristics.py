@@ -221,8 +221,7 @@ def interpolate_weights(
         first, second = midgame_weights, endgame_weights
 
     return {
-        key: towards_opening * first[key] + (1 - towards_opening) * second[key]
-        for key in first
+        key: towards_opening * first[key] + (1 - towards_opening) * second[key] for key in first
     }
 
 

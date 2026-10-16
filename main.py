@@ -6,6 +6,7 @@ Play a game between any two players (humans or bots), or run a round-robin tourn
 all the bots. The CLI skeleton comes from the AI course framework (CEU San Pablo University);
 ``--model`` and ``--depth`` are additions.
 """
+
 import argparse
 import inspect
 import logging
@@ -14,11 +15,11 @@ import sys
 import traceback
 from typing import Optional
 
-from bots.human_player import HumanPlayer
-
 from bots.bot_registry import BotRegistry
+from bots.human_player import HumanPlayer
 from config.settings import load_config
 from engine.game_manager import GameManager
+
 
 def setup_argument_parser() -> argparse.ArgumentParser:
     """
@@ -37,7 +38,7 @@ Examples:
   %(prog)s --player1 RandomBot --player2 StrongBot      # RandomBot(White) vs StrongBot(Black)
   %(prog)s --player1 RandomBot --random-color           # Human vs RandomBot (random colors)
   %(prog)s --player2 RandomBot                          # Human vs RandomBot (human=white)
-  %(prog)s --player1 MLBot --model legacy_mlp --player2 HeuristicAlphaBetaBot --depth 2
+  %(prog)s --player1 MLBot --model cnn_resnet --player2 HeuristicAlphaBetaBot --depth 2
   %(prog)s --mode tournament
   %(prog)s --list-bots
         """,
@@ -86,14 +87,9 @@ Examples:
         help="Search depth (maximum depth for the iterative-deepening bots)",
     )
 
-    parser.add_argument(
-        "--list-bots", action="store_true", help="List all available bots and exit"
-    )
+    parser.add_argument("--list-bots", action="store_true", help="List all available bots and exit")
 
-
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     parser.add_argument(
         "--board-style",
@@ -219,7 +215,9 @@ def run_single_game(
             print(f"Error: Bot '{player1_name}' not found")
             print("Use --list-bots to see available bots")
             return False
-        player1 = bot_registry.get_bot(player1_name, **bot_options(bot_registry, player1_name, args))
+        player1 = bot_registry.get_bot(
+            player1_name, **bot_options(bot_registry, player1_name, args)
+        )
         if player1 is None:
             print(f"Error: Bot '{player1_name}' could not be loaded (see the log above)")
             return False
@@ -232,7 +230,9 @@ def run_single_game(
             print(f"Error: Bot '{player2_name}' not found")
             print("Use --list-bots to see available bots")
             return False
-        player2 = bot_registry.get_bot(player2_name, **bot_options(bot_registry, player2_name, args))
+        player2 = bot_registry.get_bot(
+            player2_name, **bot_options(bot_registry, player2_name, args)
+        )
         if player2 is None:
             print(f"Error: Bot '{player2_name}' could not be loaded (see the log above)")
             return False
@@ -311,9 +311,7 @@ def run_single_game(
         # Export to PGN
         export_path = args.export if args.export else "last_game.pgn"
         try:
-            pgn_content = game_result.to_pgn(
-                time_limit=time_limit, time_increment=time_increment
-            )
+            pgn_content = game_result.to_pgn(time_limit=time_limit, time_increment=time_increment)
             with open(export_path, "w") as f:
                 f.write(pgn_content)
             print(f"Game exported to: {export_path}")
@@ -352,7 +350,7 @@ def run_tournament(
     try:
         config = load_config()
         if args.verbose:
-            print(f"Loaded tournament config from default location")
+            print("Loaded tournament config from default location")
             print(f"Tournament rounds: {config.rounds}")
     except Exception as e:
         print(f"Error loading configuration: {e}")
@@ -363,7 +361,9 @@ def run_tournament(
 
     if len(available_bots) < 2:
         print("Error: Tournament requires at least 2 bots")
-        print(f"Found {len(available_bots)} tournament-ready bots. Use --list-bots to see all available bots.")
+        print(
+            f"Found {len(available_bots)} tournament-ready bots. Use --list-bots to see all available bots."
+        )
         print("Make sure you have implemented multiple bot classes.")
         return False
 
@@ -390,9 +390,7 @@ def run_tournament(
         for rank, (bot_name, stats) in enumerate(standings, 1):
             wdl = f"{stats['wins']}-{stats['draws']}-{stats['losses']}"
             games_played = stats["wins"] + stats["draws"] + stats["losses"]
-            print(
-                f"{rank:<4} {bot_name:<15} {stats['score']:<6.1f} {wdl:<8} {games_played}"
-            )
+            print(f"{rank:<4} {bot_name:<15} {stats['score']:<6.1f} {wdl:<8} {games_played}")
 
         print(f"\nTotal games played: {len(tournament_result.games)}")
         print(f"Tournament duration: {tournament_result.duration:.1f} seconds")

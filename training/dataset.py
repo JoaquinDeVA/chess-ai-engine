@@ -120,4 +120,4 @@ def encode_positions(
 
     chunks = [fens[start : start + chunk_size] for start in range(0, len(fens), chunk_size)]
     parts = Parallel(n_jobs=n_jobs)(delayed(extractor.encode_fens)(chunk) for chunk in chunks)
-    return tuple(np.concatenate(column) for column in zip(*parts))
+    return tuple(np.concatenate(column) for column in zip(*parts, strict=True))

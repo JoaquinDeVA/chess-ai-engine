@@ -1,23 +1,14 @@
-"""Model architectures, plus the weights delivered with the university course.
-
-Trainable architectures (retrain them with ``python -m training.train``):
+"""Model architectures shipped with the project.
 
 * ``ridge_features``: scikit-learn ``StandardScaler -> Ridge`` on 29 hand-crafted features.
-* ``mlp_features``: a tiny dense network on the same features.
+* ``mlp_features``: a tiny dense network on the same features, evaluated with plain NumPy.
 * ``cnn_resnet``: residual convolutional network on an ``8x8x12`` piece tensor (+ 9 extras).
-
-Frozen course artifacts (``legacy_*``), kept for the record and for ``MODELS_HISTORY.md``:
-
-The notebooks of the course normalized centipawns with ``QUANTILE_CP = -1267``, so the
-training target of every centipawn row was ``-cp / 1267`` (inverted) while mate rows kept their
-natural sign. The delivered weights therefore predict the *negated* evaluation for ordinary
-positions. The ``legacy_*`` classes negate the output (``output_sign = -1``) so that they can be
-used and benchmarked fairly; mate rows (at most 2 moves from mate) are the only ones that are
-then reversed.
+* ``cnn_light``: smaller convolutional network with the same inputs (load-only).
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
+import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -52,10 +43,18 @@ class RidgeFeatures(SklearnModel):
 
 @register_model("mlp_features")
 class MlpFeatures(KerasModel):
-    """Dense 29-32-16-1 network with ReLU activations on :class:`VectorFeatures`."""
+    """Dense 29-32-16-1 network with ReLU activations on :class:`VectorFeatures`.
+
+    Training uses Keras, but inference is a handful of NumPy matrix products: about two orders
+    of magnitude faster per position than calling Keras, which matters inside a tree search.
+    """
 
     extractor = VectorFeatures()
-    architecture = "MLP 29 -> 32 -> 16 -> 1 (ReLU)"
+    architecture = "MLP 29 -> 32 -> 16 -> 1 (ReLU), NumPy inference"
+
+    def __init__(self, network: Any):
+        super().__init__(network)
+        self._dense = None
 
     @classmethod
     def build_network(cls, config: Dict[str, Any]):
@@ -70,13 +69,42 @@ class MlpFeatures(KerasModel):
         hidden = keras.layers.Dense(16, activation="relu")(hidden)
         return keras.Model(inputs=features, outputs=keras.layers.Dense(1)(hidden))
 
+    def fit(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Train with Keras and refresh the cached NumPy weights.
+
+        :return: Training summary (see :meth:`KerasModel.fit`).
+        """
+        summary = super().fit(*args, **kwargs)
+        self._dense = None
+        return summary
+
+    def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
+        """Forward pass in NumPy.
+
+        :param inputs: Encoded batch; one array of shape ``(n, 29)``.
+        :return: Predictions, shape ``(n,)``.
+        """
+        if self._dense is None:
+            self._dense = [
+                (layer.get_weights()[0], layer.get_weights()[1])
+                for layer in self.network.layers
+                if layer.__class__.__name__ == "Dense"
+            ]
+        activations = np.asarray(inputs[0], dtype=np.float32)
+        for index, (weights, bias) in enumerate(self._dense):
+            activations = activations @ weights + bias
+            if index < len(self._dense) - 1:
+                activations = np.maximum(activations, 0.0)
+        return activations.reshape(-1)
+
 
 @register_model("cnn_resnet")
 class CnnResnet(KerasModel):
     """Residual CNN over the piece planes, merged with a small dense branch for the extras.
 
-    Trained with Huber loss (delta 0.1), Adam 3e-4, batch 256 and early stopping. Reaching the
-    published quality needs a GPU: about two minutes per epoch on ~2M positions.
+    Trained with Huber loss (delta 0.1), Adam 3e-4, batch 256 and early stopping. The shipped
+    weights come from the university course; retraining needs a GPU (about two minutes per
+    epoch on ~2M positions).
     """
 
     extractor = BitboardFeatures()
@@ -134,40 +162,14 @@ class CnnResnet(KerasModel):
         return keras.Model(inputs=[board_input, meta_input], outputs=layers.Dense(1)(z))
 
 
+@register_model("cnn_light")
 class CnnLight(KerasModel):
     """Lighter CNN (109,569 parameters) with the same inputs as ``cnn_resnet``.
 
-    Only the saved weights survive from the course; the training code was not kept, so this
-    model can be loaded and evaluated but not retrained.
+    Only the saved weights survive from the course, so this model can be loaded and evaluated
+    but not retrained.
     """
 
     extractor = BitboardFeatures()
     architecture = "CNN (5 conv layers 32-32-64-64-64, GAP) + dense branch -> Dense32-16-1"
     trainable = False
-
-
-class _LegacySign:
-    """Mixin for the frozen course models: negate the output, forbid retraining."""
-
-    output_sign = -1.0
-    trainable = False
-
-
-@register_model("legacy_ridge")
-class LegacyRidge(_LegacySign, RidgeFeatures):
-    """Ridge weights delivered with the course (barely informative: outputs are near zero)."""
-
-
-@register_model("legacy_mlp")
-class LegacyMlp(_LegacySign, MlpFeatures):
-    """Dense 29-32-16-1 weights delivered with the course."""
-
-
-@register_model("legacy_cnn_resnet")
-class LegacyCnnResnet(_LegacySign, CnnResnet):
-    """Residual CNN weights delivered with the course (572,353 parameters)."""
-
-
-@register_model("legacy_cnn_light")
-class LegacyCnnLight(_LegacySign, CnnLight):
-    """Light CNN weights delivered with the course (109,569 parameters)."""

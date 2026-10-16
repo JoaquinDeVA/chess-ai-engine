@@ -108,7 +108,6 @@ def extract_material_features(board: chess.Board) -> Dict[str, float]:
     :rtype: Dict[str, float]
     :raises ValueError: If ``board`` is not a :class:`chess.Board`
     """
-
     if (board is None) or (not isinstance(board, chess.Board)):
         raise ValueError("board must be chess.Board")
 
@@ -143,7 +142,6 @@ def extract_mobility_features(board: chess.Board) -> Dict[str, float]:
     :return: Dictionary containing mobility features
     :rtype: Dict[str, float]
     """
-
     # Work on a copy so that the caller's board is never mutated, even temporarily.
     probe = board.copy(stack=False)
     probe.turn = chess.WHITE
@@ -210,14 +208,10 @@ def extract_center_control_features(board: chess.Board) -> Dict[str, float]:
     center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
 
     white_center = sum(
-        1
-        for sq in center_squares
-        if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE
+        1 for sq in center_squares if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE
     )
     black_center = sum(
-        1
-        for sq in center_squares
-        if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK
+        1 for sq in center_squares if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK
     )
 
     center_diff = white_center - black_center
@@ -244,12 +238,10 @@ def extract_king_safety_features(board: chess.Board) -> Dict[str, float]:
 
     # King safety: prefer corners/edges in middlegame
     white_king_safety = (
-        min(chess.square_file(white_king_sq), 7 - chess.square_file(white_king_sq))
-        / 3.5
+        min(chess.square_file(white_king_sq), 7 - chess.square_file(white_king_sq)) / 3.5
     )
     black_king_safety = (
-        min(chess.square_file(black_king_sq), 7 - chess.square_file(black_king_sq))
-        / 3.5
+        min(chess.square_file(black_king_sq), 7 - chess.square_file(black_king_sq)) / 3.5
     )
 
     # Castling rights bonus
@@ -341,4 +333,3 @@ def get_position_features(board: chess.Board) -> Dict[str, float]:
     features.update(extract_development_features(board))
 
     return features
-

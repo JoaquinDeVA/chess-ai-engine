@@ -1,5 +1,5 @@
 """
-Game Manager - Chess Game Orchestration
+Game manager: chess game and tournament orchestration.
 
 This module manages chess games, tournaments, and coordinates between
 bots, time controls, and game rules.
@@ -7,6 +7,7 @@ bots, time controls, and game rules.
 Based on the AI course framework (Inteligencia Artificial e Ingeniería del Conocimiento,
 CEU San Pablo University).
 """
+
 import itertools
 import json
 import random
@@ -30,7 +31,7 @@ class GameManager:
     manages game state, and processes results. It's the central
     orchestrator for all chess activities.
     """
-    
+
     def __init__(self, bot_registry: BotRegistry):
         """
         Initialize the game manager.
@@ -39,7 +40,7 @@ class GameManager:
         :type bot_registry: BotRegistry
         """
         self.bot_registry = bot_registry
-        self.active_games: Dict[str, 'ActiveGame'] = {}
+        self.active_games: Dict[str, ActiveGame] = {}
         self.completed_games: List[GameResult] = []
 
     def _format_board_emoji(self, board: chess.Board) -> str:
@@ -52,8 +53,18 @@ class GameManager:
         :rtype: str
         """
         piece_symbols = {
-            'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-            'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+            "r": "♜",
+            "n": "♞",
+            "b": "♝",
+            "q": "♛",
+            "k": "♚",
+            "p": "♟",
+            "R": "♖",
+            "N": "♘",
+            "B": "♗",
+            "Q": "♕",
+            "K": "♔",
+            "P": "♙",
         }
 
         board_str = ""
@@ -86,13 +97,17 @@ class GameManager:
         else:
             print(board)
 
-    def play_game(self, white_player: ChessBot, black_player: ChessBot,
-                  time_limit: float = 300.0,
-                  time_increment: float = 0.0,
-                  starting_position: Optional[str] = None,
-                  verbose: bool = False,
-                  board_style: str = "ascii",
-                  round_number: Optional[int] = None) -> GameResult:
+    def play_game(
+        self,
+        white_player: ChessBot,
+        black_player: ChessBot,
+        time_limit: float = 300.0,
+        time_increment: float = 0.0,
+        starting_position: Optional[str] = None,
+        verbose: bool = False,
+        board_style: str = "ascii",
+        round_number: Optional[int] = None,
+    ) -> GameResult:
         """
         Play a single game between any two players.
 
@@ -125,27 +140,29 @@ class GameManager:
         # Initialize time tracking
         white_time_left = time_limit
         black_time_left = time_limit
-        
+
         if verbose:
             print(f"Starting game: {white_player.name} (White) vs {black_player.name} (Black)")
             print(f"Time control: {time_limit}s + {time_increment}s increment")
             if starting_position:
                 print(f"Custom position: {starting_position}")
-        
+
         # Notify players of game start
         white_player.on_game_start(chess.WHITE, black_player.name)
         black_player.on_game_start(chess.BLACK, white_player.name)
-        
+
         # Play the game
         moves = []
-        start_time = time.time() 
+        start_time = time.time()
         winner = None
         termination = "unknown"
 
         try:
             while not board.is_game_over(claim_draw=True):
                 current_player = white_player if board.turn == chess.WHITE else black_player
-                current_time_left = white_time_left if board.turn == chess.WHITE else black_time_left
+                current_time_left = (
+                    white_time_left if board.turn == chess.WHITE else black_time_left
+                )
 
                 if verbose:
                     color_name = "White" if board.turn == chess.WHITE else "Black"
@@ -162,7 +179,7 @@ class GameManager:
                     winner = "black" if board.turn == chess.WHITE else "white"
                     termination = "time_forfeit"
                     break
-                
+
                 # Get move with time tracking
                 move_start = time.time()
                 try:
@@ -174,15 +191,15 @@ class GameManager:
                     winner = "black" if board.turn == chess.WHITE else "white"
                     termination = "player_error"
                     break
-                    
+
                 move_time = time.time() - move_start
-                
+
                 # Update time left
                 if board.turn == chess.WHITE:
                     white_time_left = max(0, white_time_left - move_time + time_increment)
                 else:
                     black_time_left = max(0, black_time_left - move_time + time_increment)
-                
+
                 # Check for time forfeit after move
                 if move_time > current_time_left:
                     if verbose:
@@ -190,7 +207,7 @@ class GameManager:
                     winner = "black" if board.turn == chess.WHITE else "white"
                     termination = "time_forfeit"
                     break
-                
+
                 # Validate move
                 if move is None or move not in board.legal_moves:
                     if verbose:
@@ -199,19 +216,19 @@ class GameManager:
                     winner = "black" if board.turn == chess.WHITE else "white"
                     termination = "illegal_move"
                     break
-                
+
                 # Make the move
                 moves.append(move.uci())
                 board.push(move)
-                
+
                 if verbose:
                     move_desc = f"{move.uci()}"
                     try:
                         move_desc = board.san(move)  # Get algebraic notation
-                    except:
-                        pass
+                    except ValueError:
+                        pass  # keep the UCI notation
                     print(f"Move: {move_desc} (took {move_time:.2f}s)")
-            
+
             # Game finished
             game_duration = time.time() - start_time
 
@@ -227,8 +244,10 @@ class GameManager:
                     termination = "ongoing"
 
             # Create game result
-            game_result = board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
-            
+            game_result = (
+                board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "*"
+            )
+
             result = GameResult(
                 white_name=white_player.name,
                 black_name=black_player.name,
@@ -244,16 +263,16 @@ class GameManager:
                 final_fen=board.fen(),
                 white_time_left=white_time_left,
                 black_time_left=black_time_left,
-                round_number=round_number
+                round_number=round_number,
             )
-            
+
             # Notify players of game end
             white_player.on_game_end(result.result, board)
             black_player.on_game_end(result.result, board)
-            
+
             self.completed_games.append(result)
             return result
-            
+
         except KeyboardInterrupt:
             if verbose:
                 print("\nGame cancelled by user")
@@ -262,13 +281,16 @@ class GameManager:
             if verbose:
                 print(f"Game error: {e}")
             raise
-    
-    def play_human_vs_bot(self, bot_name: str,
-                         human_color: Optional[chess.Color] = None,
-                         time_limit: float = 300.0,
-                         time_increment: float = 0.0,
-                         starting_position: Optional[str] = None,
-                         verbose: bool = False) -> GameResult:
+
+    def play_human_vs_bot(
+        self,
+        bot_name: str,
+        human_color: Optional[chess.Color] = None,
+        time_limit: float = 300.0,
+        time_increment: float = 0.0,
+        starting_position: Optional[str] = None,
+        verbose: bool = False,
+    ) -> GameResult:
         """
         Play a single game: Human vs Bot (convenience method).
 
@@ -291,32 +313,36 @@ class GameManager:
         bot = self.bot_registry.get_bot(bot_name)
         if bot is None:
             raise ValueError(f"Bot '{bot_name}' not found or failed to load")
-        
+
         # Create human player
         human = HumanPlayer("Human")
-        
+
         # Determine colors
         if human_color is None:
             human_color = random.choice([chess.WHITE, chess.BLACK])
-        
+
         # Assign players based on colors
         white_player = human if human_color == chess.WHITE else bot
         black_player = bot if human_color == chess.WHITE else human
-        
+
         return self.play_game(
             white_player=white_player,
             black_player=black_player,
             time_limit=time_limit,
             time_increment=time_increment,
             starting_position=starting_position,
-            verbose=verbose
+            verbose=verbose,
         )
-    
-    def play_bot_vs_bot(self, white_bot_name: str, black_bot_name: str,
-                       time_limit: float = 300.0,
-                       time_increment: float = 0.0,
-                       starting_position: Optional[str] = None,
-                       verbose: bool = False) -> GameResult:
+
+    def play_bot_vs_bot(
+        self,
+        white_bot_name: str,
+        black_bot_name: str,
+        time_limit: float = 300.0,
+        time_increment: float = 0.0,
+        starting_position: Optional[str] = None,
+        verbose: bool = False,
+    ) -> GameResult:
         """
         Play a single game: Bot vs Bot (convenience method).
 
@@ -338,27 +364,30 @@ class GameManager:
         # Get the bots
         white_bot = self.bot_registry.get_bot(white_bot_name)
         black_bot = self.bot_registry.get_bot(black_bot_name)
-        
+
         if white_bot is None:
             raise ValueError(f"White bot '{white_bot_name}' not found or failed to load")
         if black_bot is None:
             raise ValueError(f"Black bot '{black_bot_name}' not found or failed to load")
-        
+
         return self.play_game(
             white_player=white_bot,
             black_player=black_bot,
             time_limit=time_limit,
             time_increment=time_increment,
             starting_position=starting_position,
-            verbose=verbose
+            verbose=verbose,
         )
-    
-    def play_human_vs_human(self, white_name: str = "Human (White)",
-                           black_name: str = "Human (Black)",
-                           time_limit: float = 300.0,
-                           time_increment: float = 0.0,
-                           starting_position: Optional[str] = None,
-                           verbose: bool = False) -> GameResult:
+
+    def play_human_vs_human(
+        self,
+        white_name: str = "Human (White)",
+        black_name: str = "Human (Black)",
+        time_limit: float = 300.0,
+        time_increment: float = 0.0,
+        starting_position: Optional[str] = None,
+        verbose: bool = False,
+    ) -> GameResult:
         """
         Play a single game: Human vs Human (convenience method).
 
@@ -380,18 +409,19 @@ class GameManager:
         # Create human players
         white_human = HumanPlayer(white_name)
         black_human = HumanPlayer(black_name)
-        
+
         return self.play_game(
             white_player=white_human,
             black_player=black_human,
             time_limit=time_limit,
             time_increment=time_increment,
             starting_position=starting_position,
-            verbose=verbose
+            verbose=verbose,
         )
-    
-    def run_tournament(self, bot_names: List[str], config: TournamentConfig,
-                      verbose: bool = False) -> 'TournamentResult':
+
+    def run_tournament(
+        self, bot_names: List[str], config: TournamentConfig, verbose: bool = False
+    ) -> "TournamentResult":
         """
         Run a round-robin tournament between bots.
 
@@ -407,13 +437,12 @@ class GameManager:
         :return: TournamentResult with complete tournament information
         :rtype: TournamentResult
         """
-                
         if len(bot_names) < 2:
             raise ValueError("Tournament requires at least 2 bots")
-        
+
         tournament_start = time.time()
         tournament_id = f"tournament_{int(tournament_start)}"
-        
+
         # Load all bots
         bots = {}
         for bot_name in bot_names:
@@ -421,29 +450,29 @@ class GameManager:
             if bot is None:
                 raise ValueError(f"Bot '{bot_name}' not found or failed to load")
             bots[bot_name] = bot
-        
+
         if verbose:
             print(f"Loaded {len(bots)} bots for tournament")
             print(f"Tournament format: {config.rounds} round(s), round-robin")
             print(f"Time control: {config.total_game_time}s + {config.time_increment}s")
-        
+
         all_games = []
         game_number = 0
-        
+
         # Run the specified number of rounds
         for round_num in range(1, config.rounds + 1):
             if verbose:
                 print(f"\n=== Round {round_num} ===")
-            
+
             # Generate all pairings (each bot plays every other bot twice per round)
             for white_name, black_name in itertools.permutations(bot_names, 2):
                 game_number += 1
                 white_bot = bots[white_name]
                 black_bot = bots[black_name]
-                
+
                 if verbose:
                     print(f"Game {game_number}: {white_name} (White) vs {black_name} (Black)")
-                
+
                 # Play the game using the improved play_game method
                 # All error handling is done in play_game - it will return a proper GameResult
                 game_result = self.play_game(
@@ -452,12 +481,12 @@ class GameManager:
                     time_limit=config.total_game_time,
                     time_increment=config.time_increment,
                     starting_position=None,
-                    verbose=False,   # Keep individual games quiet unless very verbose
-                    round_number=round_num
+                    verbose=False,  # Keep individual games quiet unless very verbose
+                    round_number=round_num,
                 )
-                
+
                 all_games.append(game_result)
-                
+
                 if verbose:
                     result_str = f"Result: {game_result.result}"
                     if game_result.winner:
@@ -468,9 +497,9 @@ class GameManager:
                     if game_result.termination != "normal":
                         result_str += f" ({game_result.termination})"
                     print(f"  {result_str}")
-        
+
         tournament_duration = time.time() - tournament_start
-        
+
         # Create tournament result
         tournament_result = TournamentResult(
             tournament_id=tournament_id,
@@ -478,16 +507,16 @@ class GameManager:
             config=config,
             bot_names=bot_names,
             games=all_games,
-            duration=tournament_duration
+            duration=tournament_duration,
         )
-        
+
         if verbose:
             print(f"\nTournament completed in {tournament_duration:.1f} seconds")
             print(f"Total games played: {len(all_games)}")
-        
+
         return tournament_result
-    
-   
+
+
 def load_config(config_path: str) -> TournamentConfig:
     """
     Load simple tournament configuration.
@@ -498,7 +527,7 @@ def load_config(config_path: str) -> TournamentConfig:
     :rtype: TournamentConfig
     """
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             data = json.load(f)
         # FIXED: Pass all data as keyword arguments
         return TournamentConfig(**data)
@@ -517,7 +546,7 @@ class ActiveGame:
 
     Used internally by GameManager to track active games.
     """
-    
+
     def __init__(self, white_bot: ChessBot, black_bot: ChessBot, config: TournamentConfig):
         self.white_bot = white_bot
         self.black_bot = black_bot

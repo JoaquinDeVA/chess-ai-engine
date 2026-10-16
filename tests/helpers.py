@@ -14,8 +14,13 @@ class TreeState(GameState):
     :param to_move: Player to move at this node (0 or 1).
     """
 
-    def __init__(self, name: str, tree: Dict[str, Dict[str, str]], utilities: Dict[str, float],
-                 to_move: int = 0):
+    def __init__(
+        self,
+        name: str,
+        tree: Dict[str, Dict[str, str]],
+        utilities: Dict[str, float],
+        to_move: int = 0,
+    ):
         self.name = name
         self.tree = tree
         self.utilities = utilities

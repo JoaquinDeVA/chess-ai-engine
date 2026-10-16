@@ -45,7 +45,9 @@ def get_model_class(name: str) -> Type[EvaluationModel]:
     try:
         return _REGISTRY[name]
     except KeyError:
-        raise KeyError(f"unknown model {name!r}; available: {', '.join(available_models())}") from None
+        raise KeyError(
+            f"unknown model {name!r}; available: {', '.join(available_models())}"
+        ) from None
 
 
 def load_model(name: str, path: Optional[Path] = None) -> EvaluationModel:

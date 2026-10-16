@@ -1,4 +1,6 @@
-from typing import Dict, Any
+"""Console player: asks a human for moves in UCI notation."""
+
+from typing import Any, Dict
 
 import chess
 
@@ -55,8 +57,10 @@ class HumanPlayer(ChessBot):
         :rtype: Dict[str, Any]
         """
         info = super().get_info()
-        info.update({
-            "description": "Human player",
-            "version": "1.0",
-        })
+        info.update(
+            {
+                "description": "Human player",
+                "version": "1.0",
+            }
+        )
         return info

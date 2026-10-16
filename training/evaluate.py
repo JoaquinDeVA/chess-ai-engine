@@ -26,7 +26,9 @@ from .report import update_history_file
 PREDICTION_BATCH = 4096
 
 
-def predict_in_batches(model: EvaluationModel, inputs, batch_size: int = PREDICTION_BATCH) -> np.ndarray:
+def predict_in_batches(
+    model: EvaluationModel, inputs, batch_size: int = PREDICTION_BATCH
+) -> np.ndarray:
     """Run ``model.predict_target`` over a large encoded dataset in chunks.
 
     :param model: Model to run.
@@ -107,14 +109,20 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
-    parser.add_argument("--data", required=True, type=Path, help="CSV: fen,cp,is_mate,mate_distance")
+    parser.add_argument(
+        "--data", required=True, type=Path, help="CSV: fen,cp,is_mate,mate_distance"
+    )
     parser.add_argument("--path", type=Path, help="saved model file (default: models/artifacts)")
     parser.add_argument("--max-test-rows", type=int)
     parser.add_argument("--latency-samples", type=int, default=1000)
     parser.add_argument("--jobs", type=int, default=-1)
-    parser.add_argument("--strength", action="store_true", help="also play a match against reference bots")
+    parser.add_argument(
+        "--strength", action="store_true", help="also play a match against reference bots"
+    )
     parser.add_argument("--games", type=int, default=10, help="games per opponent for --strength")
-    parser.add_argument("--depth", type=int, default=2, help="search depth of the ML bot for --strength")
+    parser.add_argument(
+        "--depth", type=int, default=2, help="search depth of the ML bot for --strength"
+    )
     return parser.parse_args(argv)
 
 
@@ -146,7 +154,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         update_card(args.model, strength=run_strength_match(args.model, args.games, args.depth))
 
     update_history_file()
-    for key in ("n_test", "mae_cp", "rmse_cp", "accuracy", "within_50", "within_100", "ms_per_eval"):
+    for key in (
+        "n_test",
+        "mae_cp",
+        "rmse_cp",
+        "accuracy",
+        "within_50",
+        "within_100",
+        "ms_per_eval",
+    ):
         print(f"  {key:>12}: {result[key]}")
     return 0
 

@@ -1,5 +1,5 @@
 """
-Chess Game State Implementation for Adversarial Search
+Chess game state implementation for adversarial search.
 
 This module implements the GameState interface for chess using the python-chess library.
 """
@@ -138,4 +138,10 @@ class ChessGameState(GameState):
         return self.board.fen()
 
     def key(self) -> str:
+        """
+        Return the hashable identity of the state: its FEN string.
+
+        :return: FEN of the position (the move counters are part of it).
+        :rtype: str
+        """
         return self.get_fen()

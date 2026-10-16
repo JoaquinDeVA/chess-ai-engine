@@ -5,10 +5,11 @@ This test file helps students verify their understanding of the utility function
 and provides examples of terminal chess positions for different game outcomes.
 """
 
-import pytest
 import chess
-from adversarial_search.chess_problem import ChessProblem
+import pytest
+
 from adversarial_search.chess_game_state import ChessGameState
+from adversarial_search.chess_problem import ChessProblem
 
 
 @pytest.fixture
@@ -111,10 +112,14 @@ def test_threefold_repetition_draw(problem):
     # Create a position that will repeat 3 times
     # Simple knight moves that repeat the position
     moves = [
-        "g1f3", "g8f6",  # Knights out
-        "f3g1", "f6g8",  # Knights back (first repetition)
-        "g1f3", "g8f6",  # Knights out again
-        "f3g1", "f6g8"   # Knights back (second repetition)
+        "g1f3",
+        "g8f6",  # Knights out
+        "f3g1",
+        "f6g8",  # Knights back (first repetition)
+        "g1f3",
+        "g8f6",  # Knights out again
+        "f3g1",
+        "f6g8",  # Knights back (second repetition)
     ]
 
     for move in moves:
@@ -171,8 +176,8 @@ def test_value_error_none_state(problem):
     assert "ChessGameState" in str(exc_info.value)
 
 
+# The player argument must be validated as well
 
-#Probar que el argumento jugador sea tambien válido
 
 def test_invalid_player(problem):
     """Test that ValueError is raised for invalid player input."""
@@ -184,12 +189,12 @@ def test_invalid_player(problem):
 
     state = ChessGameState(board)
 
-    # Diferentes jugadores inválidos a probar
+    # Invalid players to try
     invalid_players = [None, "white", 2, -1, 3.14, object()]
 
     for invalid_player in invalid_players:
         with pytest.raises(ValueError) as exc_info:
             problem.utility(state, invalid_player)
 
-        # Mirar que el valueError es sobre el jugador
+        # The error must be about the player
         assert "player" in str(exc_info.value).lower()

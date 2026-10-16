@@ -74,7 +74,9 @@ def load_all_cards() -> List[Dict[str, Any]]:
     """
     if not CARDS_DIR.exists():
         return []
-    return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(CARDS_DIR.glob("*.json"))]
+    return [
+        json.loads(path.read_text(encoding="utf-8")) for path in sorted(CARDS_DIR.glob("*.json"))
+    ]
 
 
 def current_commit() -> str:
@@ -85,11 +87,17 @@ def current_commit() -> str:
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         dirty = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         return commit + ("+dirty" if dirty else "")
     except (OSError, subprocess.CalledProcessError):

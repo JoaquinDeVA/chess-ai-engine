@@ -1,5 +1,5 @@
 """
-Chess Bot Base Class
+Chess bot base class.
 
 Defines the abstract interface that every chess bot implements; subclass :class:`ChessBot`
 (or one of the search bases in ``bots/_search_bots.py``) to add a new engine.
@@ -9,7 +9,7 @@ CEU San Pablo University).
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
 
 import chess
 
@@ -20,7 +20,7 @@ class ChessBot(ABC):
 
     All chess bots must inherit from this class and implement the get_move method.
     """
-    
+
     def __init__(self, name: str, author: str = "Unknown"):
         """
         Initialize the chess bot.
@@ -47,7 +47,7 @@ class ChessBot(ABC):
         :raises: Should not raise exceptions - return any legal move if in trouble
         """
         pass
-    
+
     def get_info(self) -> Dict[str, Any]:
         """
         Get information about this bot.
@@ -61,7 +61,7 @@ class ChessBot(ABC):
             "description": "A chess bot",
             "version": "1.0",
         }
-    
+
     def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
         """
         Called when a new game starts.
@@ -93,7 +93,7 @@ class ChessBot(ABC):
         :type board: chess.Board
         """
         pass
-    
+
     def __str__(self) -> str:
         """
         String representation of the bot.
@@ -102,7 +102,7 @@ class ChessBot(ABC):
         :rtype: str
         """
         return f"{self.name} by {self.author}"
-    
+
     def __repr__(self) -> str:
         """
         Developer representation of the bot.

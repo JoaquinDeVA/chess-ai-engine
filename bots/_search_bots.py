@@ -100,8 +100,13 @@ class FixedDepthBot(_StatisticsMixin, ChessBot):
     :param problem: Chess problem to search; a fresh one is created by default.
     """
 
-    def __init__(self, name: str, author: str = AUTHOR, max_depth: int = 3,
-                 problem: Optional[ChessProblem] = None):
+    def __init__(
+        self,
+        name: str,
+        author: str = AUTHOR,
+        max_depth: int = 3,
+        problem: Optional[ChessProblem] = None,
+    ):
         super().__init__(name, author)
         self.max_depth = max_depth
         self.problem = problem if problem is not None else ChessProblem()
@@ -175,10 +180,15 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param problem: Chess problem to search; a fresh one is created by default.
     """
 
-    def __init__(self, name: str, author: str = AUTHOR, max_depth: int = 3,
-                 time_manager: Optional[TimeManager] = None,
-                 max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
-                 problem: Optional[ChessProblem] = None):
+    def __init__(
+        self,
+        name: str,
+        author: str = AUTHOR,
+        max_depth: int = 3,
+        time_manager: Optional[TimeManager] = None,
+        max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
+        problem: Optional[ChessProblem] = None,
+    ):
         super().__init__(name, author)
         self.max_depth = max_depth
         self.time_manager = time_manager or TimeManager()
@@ -247,8 +257,12 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             time_limit=self.turn_budget,
         )
         self.record_statistics(stats)
-        logger.debug("%s searched %d nodes to ply %d", self.name, stats.nodes_visited,
-                     stats.max_depth_reached)
+        logger.debug(
+            "%s searched %d nodes to ply %d",
+            self.name,
+            stats.nodes_visited,
+            stats.max_depth_reached,
+        )
         return move
 
     def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:

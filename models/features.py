@@ -53,7 +53,7 @@ class FeatureExtractor(ABC):
         encoded = [self.encode(board) for board in boards]
         if not encoded:
             return tuple(np.empty((0, *shape), dtype=np.float32) for shape in self.input_shapes)
-        return tuple(np.stack(column) for column in zip(*encoded))
+        return tuple(np.stack(column) for column in zip(*encoded, strict=True))
 
     def encode_fens(self, fens: Iterable[str]) -> Tuple[np.ndarray, ...]:
         """Encode positions given as FEN strings.

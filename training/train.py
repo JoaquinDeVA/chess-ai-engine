@@ -37,8 +37,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
-    parser.add_argument("--data", required=True, type=Path, help="CSV: fen,cp,is_mate,mate_distance")
-    parser.add_argument("--config", type=Path, help="TOML file (default: training/configs/<model>.toml)")
+    parser.add_argument(
+        "--data", required=True, type=Path, help="CSV: fen,cp,is_mate,mate_distance"
+    )
+    parser.add_argument(
+        "--config", type=Path, help="TOML file (default: training/configs/<model>.toml)"
+    )
     parser.add_argument("--output", type=Path, help="where to save (default: models/artifacts)")
     parser.add_argument("--max-rows", type=int, help="read only the first N rows of the CSV")
     parser.add_argument("--train-rows", type=int, help="subsample the training split to N rows")
@@ -99,7 +103,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             **summary,
         },
     )
-    print(f"Saved {path}. Next: python -m training.evaluate --model {args.model} --data {args.data}")
+    print(
+        f"Saved {path}. Next: python -m training.evaluate --model {args.model} --data {args.data}"
+    )
     return 0
 
 

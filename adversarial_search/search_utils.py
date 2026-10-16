@@ -49,7 +49,7 @@ class TTEntry:
     :param flag: One of :data:`EXACT`, :data:`LOWER_BOUND` or :data:`UPPER_BOUND`.
     """
 
-    result: "AdversarialSearchResult"
+    result: AdversarialSearchResult
     depth_remaining: int
     flag: str
 
@@ -60,7 +60,7 @@ def probe_transposition_table(
     depth_remaining: int,
     alpha: float,
     beta: float,
-) -> Tuple[Optional["AdversarialSearchResult"], float, float]:
+) -> Tuple[Optional[AdversarialSearchResult], float, float]:
     """Look a position up in the transposition table.
 
     :param table: Transposition table.
@@ -90,7 +90,7 @@ def probe_transposition_table(
 def store_transposition_entry(
     table: Dict[Hashable, TTEntry],
     key: Hashable,
-    result: "AdversarialSearchResult",
+    result: AdversarialSearchResult,
     depth_remaining: int,
     alpha_orig: float,
     beta_orig: float,
@@ -140,7 +140,9 @@ def record_killer_move(killers: Dict[int, List[Any]], depth: int, move: Any) -> 
         moves.pop(0)
 
 
-def reorder_by_killer_moves(moves: List[Any], depth: int, killers: Dict[int, List[Any]]) -> List[Any]:
+def reorder_by_killer_moves(
+    moves: List[Any], depth: int, killers: Dict[int, List[Any]]
+) -> List[Any]:
     """Move the killer moves of ``depth`` to the front, keeping the rest in order.
 
     :param moves: Candidate moves.

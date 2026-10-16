@@ -64,11 +64,15 @@ class PrologPatternDetector:
             from pyswip import Prolog
             from pyswip.core import SwiPrologNotFoundError
         except ImportError as error:
-            raise ImportError("TacticalAlphaBetaBot needs pyswip: pip install -e '.[prolog]'") from error
+            raise ImportError(
+                "TacticalAlphaBetaBot needs pyswip: pip install -e '.[prolog]'"
+            ) from error
         try:
             self.prolog = Prolog()
         except SwiPrologNotFoundError as error:
-            raise RuntimeError("TacticalAlphaBetaBot needs SWI-Prolog (apt install swi-prolog)") from error
+            raise RuntimeError(
+                "TacticalAlphaBetaBot needs SWI-Prolog (apt install swi-prolog)"
+            ) from error
         self.prolog.consult(str(prolog_file))
 
     def board_to_facts(self, board: chess.Board) -> List[str]:
@@ -101,8 +105,13 @@ class PrologPatternDetector:
 
     def clear_dynamic_facts(self) -> None:
         """Remove the facts of the previously loaded position."""
-        for predicate, arity in (("piece", 4), ("to_move", 1), ("can_castle", 2),
-                                 ("en_passant", 2), ("move", 4)):
+        for predicate, arity in (
+            ("piece", 4),
+            ("to_move", 1),
+            ("can_castle", 2),
+            ("en_passant", 2),
+            ("move", 4),
+        ):
             arguments = ",".join("_" * arity)
             list(self.prolog.query(f"retractall({predicate}({arguments}))"))
 
@@ -145,14 +154,24 @@ class PrologPatternDetector:
         }
 
         for predicate, key in _SCORED_PATTERNS:
-            self._collect(f"{predicate}(FromR, FromC, ToR, ToC, Score)", by_coordinates,
-                          lambda move, binding, key=key: result[move].__setitem__(key, binding["Score"]))
-        self._collect("move_creates_promotion(FromR, FromC, ToR, ToC)", by_coordinates,
-                      lambda move, binding: result[move].__setitem__("creates_promotion", True))
+            self._collect(
+                f"{predicate}(FromR, FromC, ToR, ToC, Score)",
+                by_coordinates,
+                lambda move, binding, key=key: result[move].__setitem__(key, binding["Score"]),
+            )
+        self._collect(
+            "move_creates_promotion(FromR, FromC, ToR, ToC)",
+            by_coordinates,
+            lambda move, binding: result[move].__setitem__("creates_promotion", True),
+        )
         return result
 
-    def _collect(self, query: str, by_coordinates: Dict[tuple, chess.Move],
-                 apply: Callable[[chess.Move, Dict[str, Any]], None]) -> None:
+    def _collect(
+        self,
+        query: str,
+        by_coordinates: Dict[tuple, chess.Move],
+        apply: Callable[[chess.Move, Dict[str, Any]], None],
+    ) -> None:
         """Run a Prolog query and call ``apply`` for every solution that matches a move.
 
         :param query: Prolog goal binding ``FromR, FromC, ToR, ToC``.
@@ -249,6 +268,8 @@ class TacticalAlphaBetaBot(FixedDepthBot):
         :return: Bot information.
         """
         info = super().get_info()
-        info.update(description="Alpha-beta with Prolog tactical-pattern move ordering",
-                    max_depth=self.max_depth)
+        info.update(
+            description="Alpha-beta with Prolog tactical-pattern move ordering",
+            max_depth=self.max_depth,
+        )
         return info

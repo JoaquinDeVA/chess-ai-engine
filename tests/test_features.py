@@ -7,10 +7,7 @@ functions in bots/features.py and understand the expected behavior and return va
 
 import chess
 
-from evaluation.features import (
-    extract_material_features,
-    extract_mobility_features
-)
+from evaluation.features import extract_material_features, extract_mobility_features
 
 
 def test_starting_position_material():
@@ -19,10 +16,10 @@ def test_starting_position_material():
     features = extract_material_features(board)
 
     # Both sides should have equal material (39 points each)
-    assert features['white_material'] == 39
-    assert features['black_material'] == 39
-    assert features['material_diff'] == 0
-    assert features['material_diff_normalized'] == 0.5
+    assert features["white_material"] == 39
+    assert features["black_material"] == 39
+    assert features["material_diff"] == 0
+    assert features["material_diff_normalized"] == 0.5
 
 
 def test_material_advantage_white():
@@ -33,11 +30,11 @@ def test_material_advantage_white():
 
     features = extract_material_features(board)
 
-    assert features['white_material'] == 39
-    assert features['black_material'] == 30  # 39 - 9 = 30
-    assert features['material_diff'] == 9
+    assert features["white_material"] == 39
+    assert features["black_material"] == 30  # 39 - 9 = 30
+    assert features["material_diff"] == 9
     # Normalized: (9 + 39) / 78 = 48/78 ≈ 0.615
-    assert abs(features['material_diff_normalized'] - 48/78) < 0.001
+    assert abs(features["material_diff_normalized"] - 48 / 78) < 0.001
 
 
 def test_starting_position_mobility():
@@ -46,10 +43,10 @@ def test_starting_position_mobility():
     features = extract_mobility_features(board)
 
     # Both sides should have equal mobility (20 moves each in starting position)
-    assert features['white_mobility'] == 20
-    assert features['black_mobility'] == 20
-    assert features['mobility_diff'] == 0
-    assert features['mobility_diff_normalized'] == 0.5
+    assert features["white_mobility"] == 20
+    assert features["black_mobility"] == 20
+    assert features["mobility_diff"] == 0
+    assert features["mobility_diff_normalized"] == 0.5
 
 
 def test_restricted_mobility():
@@ -64,9 +61,9 @@ def test_restricted_mobility():
     features = extract_mobility_features(board)
 
     # White should have more mobility due to active queen
-    assert features['white_mobility'] > features['black_mobility']
-    assert features['mobility_diff'] > 0
-    assert features['mobility_diff_normalized'] > 0.5
+    assert features["white_mobility"] > features["black_mobility"]
+    assert features["mobility_diff"] > 0
+    assert features["mobility_diff_normalized"] > 0.5
 
 
 def test_specific_mobility_values():
@@ -80,11 +77,11 @@ def test_specific_mobility_values():
     features = extract_mobility_features(board)
 
     # White should have 27 legal moves, black should have 29
-    assert features['white_mobility'] == 27
-    assert features['black_mobility'] == 29
-    assert features['mobility_diff'] == -2
+    assert features["white_mobility"] == 27
+    assert features["black_mobility"] == 29
+    assert features["mobility_diff"] == -2
     # Normalized: (-2 + 80) / 160 = 78/160 = 0.4875
-    assert abs(features['mobility_diff_normalized'] - 78/160) < 0.001
+    assert abs(features["mobility_diff_normalized"] - 78 / 160) < 0.001
 
 
 def test_endgame_mobility():
@@ -100,9 +97,8 @@ def test_endgame_mobility():
     features = extract_mobility_features(board)
 
     # White has 21 moves, black king has 3 moves
-    assert features['white_mobility'] == 21
-    assert features['black_mobility'] == 3
-    assert features['mobility_diff'] == 18
+    assert features["white_mobility"] == 21
+    assert features["black_mobility"] == 3
+    assert features["mobility_diff"] == 18
     # Normalized: (18 + 80) / 160 = 98/160 = 0.6125
-    assert abs(features['mobility_diff_normalized'] - 98/160) < 0.001
-
+    assert abs(features["mobility_diff_normalized"] - 98 / 160) < 0.001

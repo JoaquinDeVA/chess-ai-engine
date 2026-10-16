@@ -1,40 +1,43 @@
+"""Tests of the Prolog tactical-pattern knowledge base (skipped without SWI-Prolog)."""
+
+from pathlib import Path
+
 import pytest
-from pyswip import Prolog
+
+pyswip = pytest.importorskip("pyswip")
+try:
+    pyswip.Prolog()
+except Exception:  # SwiPrologNotFoundError when the interpreter is missing
+    pytest.skip("SWI-Prolog is not installed", allow_module_level=True)
+
+KNOWLEDGE_BASE = Path(__file__).resolve().parent.parent / "knowledge" / "chess_patterns.pl"
 
 
-# ----------------------------------------------------------------------
-# FIXTURE PRINCIPAL
-# ----------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def prolog():
-    """Inicializa el motor Prolog y carga el archivo chess_patterns.pl"""
-    pl = Prolog()
+    """Prolog engine with the pattern knowledge base loaded."""
+    pl = pyswip.Prolog()
+    pl.consult(str(KNOWLEDGE_BASE))
 
-    # Cargar el archivo principal de patrones
-    pl.consult("knowledge/chess_patterns.pl")
-
-    # Definir solo predicados completamente nuevos (no sobrescribir estáticos)
+    # Declare the dynamic predicate used by the tests without redefining static ones
     try:
         pl.assertz("move(dummy, dummy, dummy, dummy)")
     except ValueError:
-        pass  # Si ya está definido o protegido
+        pass  # already defined or protected
 
     yield pl
 
-    # Limpieza global (solo dinámicos)
     pl.retractall("piece(_,_,_,_)")
     pl.retractall("move(_,_,_,_)")
 
 
-# ----------------------------------------------------------------------
-# UTILIDAD
-# ----------------------------------------------------------------------
 def reset_pieces(pl):
+    """Remove every ``piece/4`` fact."""
     pl.retractall("piece(_,_,_,_)")
 
 
 # ----------------------------------------------------------------------
-# TESTS DE PATRONES
+# Pattern tests
 # ----------------------------------------------------------------------
 def test_absolute_pin(prolog):
     """Rook pinning knight to king"""
@@ -57,7 +60,6 @@ def test_relative_pin(prolog):
     prolog.assertz("piece(q, black, 8, 4)")
     prolog.assertz("move(4,3,4,4)")
 
-
     result = list(prolog.query("move_creates_relative_pin(4,3,4,4,Score)."))
     assert result and result[0]["Score"] > 0
     reset_pieces(prolog)
@@ -73,7 +75,6 @@ def test_fork(prolog):
     result = list(prolog.query("move_creates_fork(4,4,5,5,Score)."))
     assert result and result[0]["Score"] > 0
     reset_pieces(prolog)
-
 
 
 def test_skewer(prolog):

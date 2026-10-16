@@ -4,8 +4,9 @@ Basic test suite for HeuristicAlphaBetaBot class
 This provides minimal smoke tests to verify the bot implementation works.
 """
 
-import pytest
 import chess
+import pytest
+
 from bots.heuristic_alphabeta_bot import HeuristicAlphaBetaBot
 
 
@@ -65,11 +66,20 @@ def test_avoids_immediate_checkmate(bot):
     assert not test_board.is_checkmate()
 
 
-@pytest.mark.parametrize("position_index,board", [
-    (0, chess.Board()),  # Starting position
-    (1, chess.Board("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")),  # After 1.e4
-    (2, chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2")),  # After 1.e4 e5
-])
+@pytest.mark.parametrize(
+    "position_index,board",
+    [
+        (0, chess.Board()),  # Starting position
+        (
+            1,
+            chess.Board("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"),
+        ),  # After 1.e4
+        (
+            2,
+            chess.Board("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2"),
+        ),  # After 1.e4 e5
+    ],
+)
 def test_returns_legal_move_always(bot, position_index, board):
     """Test that bot always returns a legal move."""
     move = bot.get_move(board, time_limit=10.0)

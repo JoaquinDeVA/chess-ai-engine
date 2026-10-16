@@ -46,8 +46,6 @@ class EvaluationModel(ABC):
     :cvar artifact_suffix: File extension of the saved model.
     :cvar architecture: One-line description of the architecture, for the model card.
     :cvar trainable: Whether :meth:`fit` is implemented (legacy artifacts are load-only).
-    :cvar output_sign: ``-1`` for the legacy course models, whose training targets had the wrong
-        sign for centipawn rows; their raw output is negated so it is in White's point of view.
     """
 
     name: ClassVar[str]
@@ -55,7 +53,6 @@ class EvaluationModel(ABC):
     artifact_suffix: ClassVar[str]
     architecture: ClassVar[str] = ""
     trainable: ClassVar[bool] = True
-    output_sign: ClassVar[float] = 1.0
 
     @classmethod
     def default_path(cls) -> Path:
@@ -84,20 +81,12 @@ class EvaluationModel(ABC):
         """
 
     @abstractmethod
-    def _predict_raw(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
-        """Run the underlying estimator or network on a batch of encoded positions.
-
-        :param inputs: Arrays produced by ``extractor.encode_batch``.
-        :return: Raw outputs, shape ``(n,)``.
-        """
-
     def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
         """Predict normalized targets (White's point of view) for encoded positions.
 
         :param inputs: Arrays produced by ``extractor.encode_batch``.
         :return: Array of shape ``(n,)`` with values nominally in ``[-1, 1]``.
         """
-        return self.output_sign * self._predict_raw(inputs)
 
     @abstractmethod
     def fit(

@@ -1,5 +1,7 @@
+"""Baseline bot that plays random legal moves."""
+
 import random
-from typing import Dict, Any
+from typing import Any, Dict
 
 import chess
 
@@ -7,17 +9,12 @@ from bots.chess_bot import ChessBot
 
 
 class RandomBot(ChessBot):
-    """
-    Simple random move bot that chooses moves randomly from all legal options.
-    """
+    """Simple random move bot that chooses moves randomly from all legal options."""
 
     def __init__(self):
-        """
-        Initialize the random bot.
-        """
+        """Initialize the random bot."""
         super().__init__("RandomBot", "Chess AI Engine")
         self.random = random.Random(30)
-
 
     def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:
         """
@@ -50,8 +47,10 @@ class RandomBot(ChessBot):
         :rtype: Dict[str, Any]
         """
         info = super().get_info()
-        info.update({
-            "description": "Chooses random legal moves",
-            "version": "1.0",
-        })
+        info.update(
+            {
+                "description": "Chooses random legal moves",
+                "version": "1.0",
+            }
+        )
         return info

@@ -20,6 +20,7 @@ from chess_engine.training.dataset import (
     split_dataset,
 )
 from chess_engine.training.metrics import compute_metrics, outcome_class
+from chess_engine.training.representation import Representation
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
 
@@ -237,16 +238,16 @@ class TestCardsAndReport:
 class TestCommandLines:
     """End-to-end: CSV -> train -> save -> evaluate -> card, in a temporary directory."""
 
-    def test_train_then_evaluate_linear_baseline(self, isolated_cards, tmp_path, monkeypatch):
+    def test_train_then_evaluate_ridge_features(self, isolated_cards, tmp_path, monkeypatch):
         boards = random_positions(1200, seed=9)
         csv = write_csv(tmp_path / "evals.csv", boards)
-        target = tmp_path / "linear_baseline.pkl"
+        target = tmp_path / "ridge_features.pkl"
 
         assert (
             train_cli.main(
                 [
                     "--model",
-                    "linear_baseline",
+                    "ridge_features",
                     "--data",
                     str(csv),
                     "--output",
@@ -258,10 +259,10 @@ class TestCommandLines:
             == 0
         )
         assert target.exists()
-        card = cards.load_card("linear_baseline")
+        card = cards.load_card("ridge_features")
         assert (
             card["status"] == "current"
-            and card["parameters"] == 7
+            and card["parameters"] == 30
             and card["training"]["train_samples"] > 500
         )
 
@@ -269,7 +270,7 @@ class TestCommandLines:
             evaluate_cli.main(
                 [
                     "--model",
-                    "linear_baseline",
+                    "ridge_features",
                     "--data",
                     str(csv),
                     "--path",
@@ -282,7 +283,7 @@ class TestCommandLines:
             )
             == 0
         )
-        bench = cards.load_card("linear_baseline")["benchmark"]
+        bench = cards.load_card("ridge_features")["benchmark"]
         assert bench["n_test"] > 50 and bench["ms_per_eval"] > 0
         assert bench["accuracy"] > 0.6, (
             "material regression must beat chance on material-labelled data"
@@ -299,3 +300,39 @@ class TestCommandLines:
         assert train_cli.load_config("ridge_features", config) == {"alpha": 3.5}
         assert train_cli.load_config("ridge_features", tmp_path / "missing.toml") == {}
         assert train_cli.load_config("ridge_features")["alpha"] == 10.0
+
+
+class TestEffortCommandLine:
+    """``--effort`` trains a linear model straight from raw shards and their sidecars."""
+
+    def test_train_cli_trains_pst_on_fixture_shards(self, isolated_cards, tmp_path):
+        from chess_engine.training.lichess_raw import shard_path, write_shard
+        from chess_engine.training.sidecar import build_sidecar
+
+        raw, side = tmp_path / "raw", tmp_path / "side"
+        raw.mkdir()
+        boards = random_positions(900, seed=4)
+        records = [
+            {"fen": " ".join(b.fen().split()[:4]), "cp": material_cp(b), "mate": None,
+             "depth": 20, "knodes": 1, "best_move": None, "n_evals": 1, "n_pvs": 1}  # fmt: skip
+            for b in boards
+        ]  # fmt: skip
+        write_shard(shard_path(raw, 0), records, {"perspective": "white"})
+        build_sidecar(shard_path(raw, 0), side)
+        target = tmp_path / "pst_tapered.npz"
+
+        assert (
+            train_cli.main(
+                [
+                    "--model", "pst_tapered", "--effort", "0",
+                    "--raw", str(raw), "--sidecar", str(side), "--output", str(target),
+                ]
+            )
+            == 0
+        )  # fmt: skip
+        assert target.exists()
+        training = cards.load_card("pst_tapered")["training"]
+        assert training["effort"] == 0
+        assert training["representation"] == Representation().to_dict()
+        assert training["train_samples"] > 0 and training["seconds"] > 0
+        assert training["effort_config"]["trials"] == 0

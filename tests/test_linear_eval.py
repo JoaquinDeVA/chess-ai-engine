@@ -9,7 +9,16 @@ import pandas as pd
 import pytest
 
 from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.linear_features import MaterialCountFeatures, PstFeatures, phase
+from chess_engine.models.linear_features import (
+    _PAWN_CACHE,
+    BLOCK_SIZE,
+    TERM_NAMES,
+    MaterialCountFeatures,
+    PstFeatures,
+    PstTermsFeatures,
+    _pawn_terms,
+    phase,
+)
 from chess_engine.models.registry import available_models, get_model_class
 from chess_engine.training.representation import Representation
 from tests.conftest import material_cp, random_positions
@@ -188,3 +197,88 @@ def test_material_model_mirror_complement():
 
 def test_linear_baseline_is_gone():
     assert "linear_baseline" not in available_models()
+
+
+def term_values(board: chess.Board) -> dict[str, float]:
+    """White-POV value of every classical term (middlegame plus endgame weight of its entries)."""
+    indices, values = PstTermsFeatures().active(board, "white")
+    totals = dict.fromkeys(TERM_NAMES, 0.0)
+    for index, value in zip(indices, values, strict=True):
+        if 2 * BLOCK_SIZE <= index < 2 * BLOCK_SIZE + 2 * len(TERM_NAMES):
+            totals[TERM_NAMES[(index - 2 * BLOCK_SIZE) // 2]] += value
+    return totals
+
+
+def test_passed_pawn_term():
+    # Lone white pawn on a2 with no black pawn on files a and b: it is passed.
+    assert term_values(chess.Board("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"))["passed"] == pytest.approx(
+        0.25
+    )
+    # A black pawn on b5 is ahead on an adjacent file: nobody is passed.
+    blocked = term_values(chess.Board("4k3/8/8/1p6/8/8/P7/4K3 w - - 0 1"))
+    assert blocked["passed"] == pytest.approx(0.0)
+
+
+def test_doubled_and_isolated():
+    # a2 and a3 are doubled; neither has a friendly pawn on file b, so both are isolated.
+    totals = term_values(chess.Board("4k3/8/8/8/8/P7/P7/4K3 w - - 0 1"))
+    assert totals["doubled"] == pytest.approx(0.25)
+    assert totals["isolated"] == pytest.approx(0.5)
+
+
+def test_bishop_pair():
+    assert term_values(chess.Board("4k3/8/8/8/8/8/8/2B1KB2 w - - 0 1"))["bishop_pair"] == 1.0
+    assert term_values(chess.Board("4k3/8/8/8/8/8/8/2B1K3 w - - 0 1"))["bishop_pair"] == 0.0
+    # Black's pair counts against White.
+    assert term_values(chess.Board("2b1kb2/8/8/8/8/8/8/4K3 w - - 0 1"))["bishop_pair"] == -1.0
+
+
+def test_rook_open_and_half_open_file():
+    # Rook a1 sits on an empty file; rook e1 faces only the black pawn on e7.
+    totals = term_values(chess.Board("4k3/4p3/8/8/8/8/8/R3R1K1 w - - 0 1"))
+    assert totals["rook_open"] == 1.0
+    assert totals["rook_half_open"] == 1.0
+
+
+def test_king_shield():
+    # Three own pawns on f2, g2, h2 in front of the king on g1: 3 / 3.
+    shield = term_values(chess.Board("4k3/8/8/8/8/8/5PPP/6K1 w - - 0 1"))["king_shield"]
+    assert shield == pytest.approx(1.0)
+    # A pawn on g4 is more than two ranks ahead of the king: it does not count.
+    far = term_values(chess.Board("4k3/8/8/8/6P1/8/8/6K1 w - - 0 1"))["king_shield"]
+    assert far == pytest.approx(0.0)
+
+
+def test_mobility_counts_attacks_not_legal_moves():
+    # The knight on e2 is pinned by the rook on e8, so it has no legal move, but it attacks
+    # six squares, none of them occupied by White: 6 / 10.
+    board = chess.Board("4r2k/8/8/8/8/8/4N3/4K3 w - - 0 1")
+    assert not any(move.from_square == chess.E2 for move in board.legal_moves)
+    assert term_values(board)["mobility_knight"] == pytest.approx(0.6)
+
+
+def test_pst_terms_mirror_complement():
+    model = get_model_class("pst_terms")()
+    rng = np.random.default_rng(3)
+    model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
+    model.bias = 0.1
+    for board in random_positions(20, seed=17):
+        assert model.expected_score(board) == pytest.approx(
+            1.0 - model.expected_score(board.mirror())
+        )
+
+
+def test_pst_terms_parameter_count():
+    # 768 PST weights, two per term (middlegame and endgame), plus the bias.
+    assert get_model_class("pst_terms")().count_parameters() == 768 + 2 * 11 + 1
+
+
+def test_pawn_cache_hit_returns_same_features():
+    _PAWN_CACHE.clear()
+    first = chess.Board("4k3/8/8/8/8/8/P7/4K3 w - - 0 1")
+    # Same pawns, king elsewhere: the pawn terms come from the cache.
+    second = chess.Board("4k3/8/8/8/8/8/P7/3K4 w - - 0 1")
+    _pawn_terms(first)
+    cached = _pawn_terms(first)
+    assert _pawn_terms(second) is cached
+    assert len(_PAWN_CACHE) == 1

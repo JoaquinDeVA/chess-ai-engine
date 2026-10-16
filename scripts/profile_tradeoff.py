@@ -3,11 +3,15 @@
 
 python scripts/profile_tradeoff.py --players pst_tapered,h2,h3 --seconds 1,3,10 --positions 300
 
+Use ``--parallel 1`` (the default) for published numbers: parallel workers are limited to one
+thread each but still compete for the machine.
+
 Writes the JSON results, ``docs/training/TRADEOFF.md`` and ``docs/img/depth_vs_accuracy.png``.
 """
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -39,6 +43,8 @@ def render_markdown(results, path: Path) -> None:
     ]
     for r in results:
         overall = r["overall"]
+        if "mean_depth" not in overall:
+            continue
         agreement = " / ".join(
             f"{r[key].get('search_agreement', float('nan')):.3f}"
             for key in ("overall", "quiet", "non_quiet")
@@ -60,6 +66,8 @@ def plot(results, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for r in results:
         overall = r["overall"]
+        if "mean_depth" not in overall:
+            continue
         ax.scatter(overall["mean_depth"], overall["search_agreement"], s=50)
         ax.annotate(
             f"{r['player']} {r['seconds']:g}s",
@@ -84,7 +92,12 @@ def main() -> None:
     parser.add_argument("--players", default=DEFAULT_PLAYERS, help="comma-separated specs")
     parser.add_argument("--seconds", default="1,3,10", help="comma-separated seconds per move")
     parser.add_argument("--positions", type=int, default=300)
-    parser.add_argument("--parallel", type=int, default=1, help="worker processes")
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help="worker processes, each limited to one thread; published numbers should use 1",
+    )
     parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
     parser.add_argument("--sidecar", type=Path, default=Path("data/lichess/sidecar"))
     parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "docs/training/tradeoff.json")
@@ -93,22 +106,26 @@ def main() -> None:
         "--plot", type=Path, default=PROJECT_ROOT / "docs/img/depth_vs_accuracy.png"
     )
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
 
     from chess_engine.training.dataset import TEST
     from chess_engine.training.sidecar import load_sample
 
     positions = load_sample(args.raw, args.sidecar, TEST, args.positions)
-    results = run_profiles(
+    outcome = run_profiles(
         args.players.split(","),
         [float(s) for s in args.seconds.split(",")],
         positions,
         args.parallel,
     )
+    results = outcome["results"]
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(results, indent=2))
+    args.out.write_text(json.dumps(outcome, indent=2))
     render_markdown(results, args.markdown)
     plot(results, args.plot)
     print(f"Wrote {args.out}, {args.markdown} and {args.plot}")
+    if outcome["skipped"]:
+        print("SKIPPED (no saved model): " + ", ".join(outcome["skipped"]))
 
 
 if __name__ == "__main__":

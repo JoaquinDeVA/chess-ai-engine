@@ -6,6 +6,9 @@ The central trade-off of the project is that a slower, more accurate evaluation 
 depth in the same time per move. :func:`profile` measures both sides for one player.
 """
 
+import logging
+import multiprocessing
+import os
 import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -19,9 +22,18 @@ from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h2, h3
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.models import EvaluationModel
+from chess_engine.models import EvaluationModel, get_model_class
 from chess_engine.search.time_management import TimeManager
 
+logger = logging.getLogger(__name__)
+
+SINGLE_THREAD_VARIABLES = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "TF_NUM_INTRAOP_THREADS",
+    "TF_NUM_INTEROP_THREADS",
+)
 HEURISTICS = {"h2": h2, "h3": h3}
 
 
@@ -121,21 +133,56 @@ def _profile_job(job: Tuple[str, float, pd.DataFrame]) -> Optional[Dict[str, obj
     return {"player": spec, "seconds": seconds, **result}
 
 
+def validate_specs(specs: Sequence[str]) -> None:
+    """Fail fast on a player that is neither a heuristic nor a registered model.
+
+    :param specs: Player specifications.
+    :raises ValueError: If a spec is unknown.
+    """
+    for spec in specs:
+        if spec in HEURISTICS:
+            continue
+        try:
+            get_model_class(spec)
+        except KeyError as error:
+            raise ValueError(f"unknown player {spec!r}: {error.args[0]}") from error
+
+
 def run_profiles(
     specs: Sequence[str], seconds: Sequence[float], positions: pd.DataFrame, parallel: int = 1
-) -> List[Dict[str, object]]:
+) -> Dict[str, List]:
     """Profile every player at every time, optionally one player/time per process.
+
+    With ``parallel > 1`` every worker is limited to one thread (BLAS, TensorFlow) so that the
+    workers do not compete for cores; published numbers should still use ``parallel=1``.
 
     :param specs: Player specifications.
     :param seconds: Seconds per move to try.
     :param positions: Positions to search, see :func:`profile`.
     :param parallel: Number of worker processes (1 runs in this process).
-    :return: One result per profiled pair; players without a saved model are left out.
+    :return: ``results`` (one per profiled pair) and ``skipped`` (players without a saved model).
+    :raises ValueError: If a spec is unknown (nothing is profiled then).
     """
+    validate_specs(specs)
     jobs = [(spec, secs, positions) for spec in specs for secs in seconds]
     if parallel > 1:
-        with ProcessPoolExecutor(max_workers=parallel) as pool:
-            results = list(pool.map(_profile_job, jobs))
+        saved = {name: os.environ.get(name) for name in SINGLE_THREAD_VARIABLES}
+        os.environ.update(dict.fromkeys(SINGLE_THREAD_VARIABLES, "1"))
+        try:
+            context = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(max_workers=parallel, mp_context=context) as pool:
+                outcomes = list(pool.map(_profile_job, jobs))
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
     else:
-        results = [_profile_job(job) for job in jobs]
-    return [r for r in results if r is not None]
+        outcomes = [_profile_job(job) for job in jobs]
+    skipped = []
+    for (spec, _, _), outcome in zip(jobs, outcomes, strict=True):
+        if outcome is None and spec not in skipped:
+            logger.warning("skipping %s: no saved model artifact", spec)
+            skipped.append(spec)
+    return {"results": [o for o in outcomes if o is not None], "skipped": skipped}

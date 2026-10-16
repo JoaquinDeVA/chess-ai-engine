@@ -8,11 +8,11 @@ import chess
 import models  # noqa: F401  (registers the built-in models)
 from bots.bot_registry import BotRegistry
 from bots.chess_bot import ChessBot
-from bots.heuristic_alphabeta_bot import HeuristicAlphaBetaBot
-from bots.ml_bot import MLBot
-from bots.random_bot import RandomBot
+from bots.iterative_heuristic_bot import IterativeHeuristicBot
+from bots.iterative_model_book_bot import IterativeModelBookBot
 from engine.game_manager import GameManager
 from evaluation.heuristics import h2, h3
+from knowledge.opening_book import OpeningBook
 
 OPENING_PLIES = 4
 
@@ -37,9 +37,8 @@ def reference_opponents(depth: int) -> Dict[str, ChessBot]:
     :return: Mapping from display name to bot.
     """
     return {
-        "RandomBot": RandomBot(),
-        "H2": HeuristicAlphaBetaBot(h2, depth, name="H2"),
-        "H3": HeuristicAlphaBetaBot(h3, depth, name="H3"),
+        "H2": IterativeHeuristicBot(h2, depth),
+        "H3": IterativeHeuristicBot(h3, depth),
     }
 
 
@@ -62,7 +61,7 @@ def run_strength_match(
     :return: Card section: depth, time control and ``W-D-L`` from the model's point of view.
     """
     manager = GameManager(BotRegistry())
-    bot = MLBot(model=model_name, max_depth=depth)
+    bot = IterativeModelBookBot(model=model_name, opening_book=OpeningBook({}), max_depth=depth)
     results: Dict[str, str] = {}
 
     for opponent_name, opponent in reference_opponents(depth).items():

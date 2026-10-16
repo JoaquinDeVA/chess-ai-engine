@@ -8,7 +8,7 @@ for a genuinely different approach. The table is generated from `models/cards/*.
 Columns: architecture, size, training data, **time per evaluation** (features included, one position at
 a time, CPU), **error against Stockfish** in centipawns, **agreement** (model and Stockfish agree on who
 is better, ±50 cp counting as equal), share of predictions within 50 / 100 cp, and playing strength as
-`W-D-L` of an ML bot using the model against RandomBot, H2 and H3 at equal depth.
+`W-D-L` of an ML bot using the model against H2 and H3 at equal depth.
 
 > The evaluation protocol and the models themselves are being redesigned; see
 > [docs/ADDING_A_MODEL.md](docs/ADDING_A_MODEL.md) and [ROADMAP.md](ROADMAP.md). Treat numbers as relative.

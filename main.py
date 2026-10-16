@@ -33,12 +33,11 @@ def setup_argument_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --player1 human --player2 RandomBot          # Human(White) vs RandomBot(Black)
-  %(prog)s --player1 RandomBot --player2 HumanPlayer    # RandomBot(White) vs Human(Black)
-  %(prog)s --player1 RandomBot --player2 StrongBot      # RandomBot(White) vs StrongBot(Black)
-  %(prog)s --player1 RandomBot --random-color           # Human vs RandomBot (random colors)
-  %(prog)s --player2 RandomBot                          # Human vs RandomBot (human=white)
-  %(prog)s --player1 MLBot --model cnn_resnet --player2 HeuristicAlphaBetaBot --depth 2
+  %(prog)s --player1 human --player2 IterativeHeuristicBot          # Human(White) vs bot(Black)
+  %(prog)s --player1 IterativeHeuristicBot --player2 HumanPlayer    # bot(White) vs Human(Black)
+  %(prog)s --player1 IterativeHeuristicBot --random-color           # Human vs bot (random colors)
+  %(prog)s --player2 IterativeHeuristicBot                          # Human vs bot (human=white)
+  %(prog)s --player1 IterativeModelBookBot --model cnn_resnet --player2 IterativeHeuristicBot --depth 2
   %(prog)s --mode tournament
   %(prog)s --list-bots
         """,

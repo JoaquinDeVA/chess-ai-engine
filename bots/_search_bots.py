@@ -2,7 +2,6 @@
 
 The leading underscore keeps this file out of the bot registry (it contains no playable bot).
 
-* :class:`FixedDepthBot` - alpha-beta to a fixed depth; subclasses only provide an evaluation.
 * :class:`IterativeDeepeningBot` - clock-aware iterative deepening with a transposition table,
   killer moves and capture ordering; subclasses only provide an evaluation.
 """
@@ -18,7 +17,6 @@ from adversarial_search.chess_problem import ChessProblem
 from adversarial_search.game_algorithms import (
     SearchStatistics,
     heuristic_alphabeta_iterative_deepening_search,
-    heuristic_alphabeta_search,
 )
 from adversarial_search.game_problems import GameState
 from adversarial_search.search_utils import DEFAULT_MAX_TT_ENTRIES, order_by_mvv_lva
@@ -87,79 +85,6 @@ class _StatisticsMixin:
                 "max_depth_reached": self.last_search_stats.max_depth_reached,
             }
         return stats
-
-
-class FixedDepthBot(_StatisticsMixin, ChessBot):
-    """Alpha-beta search to a fixed depth with a heuristic evaluation.
-
-    Subclasses implement :meth:`evaluate` and may override :meth:`order_moves`.
-
-    :param name: Bot name shown in games and tournaments.
-    :param author: Author shown in bot listings.
-    :param max_depth: Plies to search.
-    :param problem: Chess problem to search; a fresh one is created by default.
-    """
-
-    def __init__(
-        self,
-        name: str,
-        author: str = AUTHOR,
-        max_depth: int = 3,
-        problem: Optional[ChessProblem] = None,
-    ):
-        super().__init__(name, author)
-        self.max_depth = max_depth
-        self.problem = problem if problem is not None else ChessProblem()
-        self.reset_statistics()
-
-    @abstractmethod
-    def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
-        """Heuristic value of a non-terminal position.
-
-        :param state: Position to evaluate.
-        :param player: Player the value is for.
-        :return: Expected score for ``player`` in ``[0, 1]``.
-        """
-
-    def order_moves(self, board: chess.Board, moves: List[chess.Move]) -> List[chess.Move]:
-        """Order the moves to search (better orderings prune more). Default: unchanged.
-
-        :param board: Position the moves are played from.
-        :param moves: Legal moves.
-        :return: The moves in the order they should be searched.
-        """
-        return moves
-
-    def cutoff_test(self, state: GameState, depth: int, time_used: float) -> bool:
-        """Stop the search once ``max_depth`` plies have been searched.
-
-        :param state: Node being visited.
-        :param depth: Plies from the root.
-        :param time_used: Seconds elapsed (unused: this bot ignores the clock).
-        :return: True when the node must be evaluated instead of expanded.
-        """
-        return depth >= self.max_depth
-
-    def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
-        """Reset the statistics.
-
-        :param color: Colour this bot plays.
-        :param opponent_name: Name of the opponent.
-        """
-        self.reset_statistics()
-
-    def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:
-        """Search ``max_depth`` plies and return the best move.
-
-        :param board: Current position.
-        :param time_limit: Seconds left on the clock (ignored by this bot).
-        :return: A legal move.
-        """
-        move, stats = heuristic_alphabeta_search(
-            self.problem, ChessGameState(board), self.evaluate, self.cutoff_test, self.order_moves
-        )
-        self.record_statistics(stats)
-        return move if move is not None and move in board.legal_moves else fallback_move(board)
 
 
 class IterativeDeepeningBot(_StatisticsMixin, ChessBot):

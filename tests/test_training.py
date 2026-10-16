@@ -201,14 +201,14 @@ class TestCardsAndReport:
                 "within_50": 0.3,
                 "within_100": 0.5,
             },
-            strength={"depth": 2, "results": {"RandomBot": "8-1-1"}},
+            strength={"depth": 2, "results": {"H2": "8-1-1"}},
         )
         text = report.render_tables()
         assert (
             "| `good` | current | Ridge | 30 | 2 KB | 1,000 positions, d.csv, 1 epochs | 1.50 ms | 120.0 |"
             in text
         )
-        assert "70.0%" in text and "RandomBot 8-1-1 (depth 2)" in text
+        assert "70.0%" in text and "H2 8-1-1 (depth 2)" in text
 
     def test_models_without_a_benchmark_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
@@ -308,7 +308,7 @@ def test_strength_match_reports_results_from_the_models_point_of_view():
         "linear_baseline", games=2, depth=1, time_limit=60.0, increment=0.0
     )
     assert section["depth"] == 1 and section["games_per_opponent"] == 2
-    assert set(section["results"]) == {"RandomBot", "H2", "H3"}
+    assert set(section["results"]) == {"H2", "H3"}
     for score in section["results"].values():
         wins, draws, losses = map(int, score.split("-"))
         assert wins + draws + losses == 2

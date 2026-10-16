@@ -18,9 +18,9 @@ Ideas, roughly in the order they would pay off.
 - Move ordering from the transposition table (best move of the previous iteration first).
 - Parallel search.
 
-## Tactical bot
-- Make the Prolog ordering affordable: apply it only near the root, cache it per position, or batch
-  the queries; then re-measure nodes and time against `NonTacticalAlphaBetaBot`.
+## Tactical patterns
+- Find an affordable use for `PrologPatternDetector`: move ordering only near the root, cached per
+  position, or batched queries; measure nodes and time against the same search without it.
 
 ## Endgames
 - Endgame tablebases. Syzygy only gives win/draw/loss and distance to zeroing (DTZ); a bot that

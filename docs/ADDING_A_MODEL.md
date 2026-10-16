@@ -15,7 +15,7 @@ flowchart LR
     A --> E["training.evaluate<br/>--model name"]
     E --> C
     C --> H["MODELS_HISTORY.md<br/>(generated table)"]
-    A --> B["MLBot / AdvancedMLBot<br/>--model name"]
+    A --> B["IterativeModelBookBot<br/>--model name"]
 ```
 
 ## The contract
@@ -38,7 +38,7 @@ and builds the estimator or network. `models/linear_baseline.py` is the smallest
 python -m training.train    --model <name> --data data/evaluations.csv
 python -m training.evaluate --model <name> --data data/evaluations.csv --strength
 python scripts/plot_models.py
-python main.py --player1 MLBot --model <name> --player2 HeuristicAlphaBetaBot --depth 2
+python main.py --player1 IterativeModelBookBot --model <name> --player2 IterativeHeuristicBot --depth 2
 ```
 
 Both commands work on **one** model at a time; `scripts/run_all.sh` loops over all of them.

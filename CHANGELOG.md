@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+- `RandomBot`, `HeuristicAlphaBetaBot`, `MLBot`, `TacticalAlphaBetaBot`, `NonTacticalAlphaBetaBot`
+  and the `FixedDepthBot` base. `PrologPatternDetector` moved to `knowledge/pattern_detector.py`.
+
+### Changed
+- `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now
+  `IterativeModelBookBot`. Strength matches play against H2 and H3 only.
+
 ## 1.0.0
 
 First public version, derived from four chained university practicals (adversarial search,

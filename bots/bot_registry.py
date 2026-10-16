@@ -314,8 +314,8 @@ class BotRegistry:
         return {
             "total_available": len(self.bot_classes),
             "currently_loaded": len(self.loaded_bots),
-            "builtin_bots": 2,  # RandomBot, HumanPlayer
-            "custom_bots": len(self.bot_classes) - 2,
+            "builtin_bots": 1,  # HumanPlayer
+            "custom_bots": len(self.bot_classes) - 1,
             "bot_files_found": len(self.available_bots),
             "tournament_ready": len(self.get_tournament_ready_bots()),
         }

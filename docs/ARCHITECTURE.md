@@ -7,7 +7,7 @@ flowchart TB
     CLI["main.py<br/>command line"] --> GM["engine/<br/>GameManager, results, PGN"]
     GM --> REG["bots/bot_registry.py<br/>discovers bots"]
     REG --> BOTS["bots/<br/>playable bots"]
-    BOTS --> BASES["bots/_search_bots.py<br/>FixedDepthBot · IterativeDeepeningBot"]
+    BOTS --> BASES["bots/_search_bots.py<br/>IterativeDeepeningBot"]
     BASES --> SEARCH["adversarial_search/<br/>algorithms, transposition table,<br/>killer moves, time management"]
     BOTS --> EVAL["evaluation/<br/>features and heuristics"]
     BOTS --> MODELS["models/<br/>learned evaluators"]
@@ -53,28 +53,16 @@ classDiagram
         on_game_start()
         on_game_end()
     }
-    class FixedDepthBot {
-        <<abstract>>
-        max_depth
-        evaluate(state, player)*
-        order_moves()
-    }
     class IterativeDeepeningBot {
         <<abstract>>
         time_manager
         transposition_table
         evaluate(state, player)*
     }
-    ChessBot <|-- FixedDepthBot
     ChessBot <|-- IterativeDeepeningBot
-    ChessBot <|-- RandomBot
     ChessBot <|-- HumanPlayer
-    FixedDepthBot <|-- HeuristicAlphaBetaBot
-    FixedDepthBot <|-- MLBot
-    FixedDepthBot <|-- TacticalAlphaBetaBot
-    HeuristicAlphaBetaBot <|-- NonTacticalAlphaBetaBot
-    IterativeDeepeningBot <|-- AdvancedHeuristicAlphaBetaBot
-    IterativeDeepeningBot <|-- AdvancedMLBot
+    IterativeDeepeningBot <|-- IterativeHeuristicBot
+    IterativeDeepeningBot <|-- IterativeModelBookBot
 
     class EvaluationModel {
         <<abstract>>
@@ -87,8 +75,7 @@ classDiagram
     }
     EvaluationModel <|-- SklearnModel
     EvaluationModel <|-- KerasModel
-    MLBot o-- EvaluationModel
-    AdvancedMLBot o-- EvaluationModel
+    IterativeModelBookBot o-- EvaluationModel
 ```
 
 `ChessGameState` wraps a `chess.Board` and its `key()` is the FEN, which is what the transposition
@@ -128,6 +115,6 @@ forwards constructor arguments, which is how `--model` and `--depth` reach the b
 
 | To add... | Implement | Guide |
 |---|---|---|
-| a bot | `evaluate()` in a subclass of `FixedDepthBot` or `IterativeDeepeningBot` | [ADDING_A_BOT.md](ADDING_A_BOT.md) |
+| a bot | `evaluate()` in a subclass of `IterativeDeepeningBot` | [ADDING_A_BOT.md](ADDING_A_BOT.md) |
 | an evaluation model | an `EvaluationModel` and register it | [ADDING_A_MODEL.md](ADDING_A_MODEL.md) |
 | another game | `GameState` and `GameProblem`; the algorithms are game-agnostic | [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md) |

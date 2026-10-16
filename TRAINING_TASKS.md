@@ -13,7 +13,7 @@ Checklist to (re)train and benchmark the models and refresh `MODELS_HISTORY.md`.
 - [ ] `bash scripts/run_all.sh` (about 1–2 h on CPU; add `GAMES=0` to skip the matches)
   - trains `linear_baseline`, `ridge_features`, `mlp_features` (minutes)
   - benchmarks all five models: error and agreement with Stockfish, time per evaluation
-  - plays the strength matches (10 games against RandomBot, H2 and H3)
+  - plays the strength matches (10 games against H2 and H3)
   - regenerates the table in `MODELS_HISTORY.md` and the plots in `docs/img/`
 - [ ] Look at `MODELS_HISTORY.md` and `docs/img/*.png`, then `git add models MODELS_HISTORY.md docs && git commit`.
 

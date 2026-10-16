@@ -1,6 +1,6 @@
 # data/
 
-* `opening_book.json` – opening book used by `AdvancedMLBot` (`{fen: uci_move}`), versioned.
+* `opening_book.json` – opening book used by `IterativeModelBookBot` (`{fen: uci_move}`), versioned.
 * `evaluations.csv` – Stockfish evaluations used to train and benchmark the evaluation models
   (columns `fen, cp, is_mate, mate_distance`, White's point of view). **Not versioned**; create it
   with one of:

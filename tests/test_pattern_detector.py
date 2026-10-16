@@ -1,18 +1,15 @@
-"""Tactical bot and its Prolog knowledge base (skipped when SWI-Prolog is not installed)."""
+"""Prolog tactical-pattern detector (skipped when SWI-Prolog is not installed)."""
 
 import chess
 import pytest
 
 pytest.importorskip("pyswip")
 try:
-    from bots.tactical_alphabeta_bot import PrologPatternDetector, TacticalAlphaBetaBot
+    from knowledge.pattern_detector import PrologPatternDetector
 
     PrologPatternDetector()
 except RuntimeError:
     pytest.skip("SWI-Prolog is not installed", allow_module_level=True)
-
-from bots.non_tactical_alphabeta_bot import NonTacticalAlphaBetaBot
-from tests.conftest import MATE_IN_ONE, random_positions
 
 
 @pytest.fixture(scope="module")
@@ -54,26 +51,3 @@ def test_promotions_are_flagged(detector):
     board = chess.Board("8/P6k/8/8/8/8/8/K7 w - - 0 1")
     patterns = detector.detect_move_patterns(board, list(board.legal_moves))
     assert any(p["creates_promotion"] for move, p in patterns.items() if move.promotion)
-
-
-def test_ordering_puts_the_best_tactic_first_and_keeps_every_move():
-    bot = TacticalAlphaBetaBot(max_depth=2)
-    board = chess.Board("4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1")
-    moves = list(board.legal_moves)
-    ordered = bot.order_moves(board, moves)
-    assert ordered[0] == chess.Move.from_uci("e4d5")
-    assert sorted(map(str, ordered)) == sorted(map(str, moves))
-
-
-def test_plays_legal_moves_and_finds_mate_in_one():
-    bot = TacticalAlphaBetaBot(max_depth=2)
-    assert bot.get_move(chess.Board(MATE_IN_ONE), 10.0) == chess.Move.from_uci("a1a8")
-    for board in random_positions(5, seed=4):
-        assert bot.get_move(board, 10.0) in board.legal_moves
-
-
-def test_in_a_tactical_position_both_bots_agree_and_ordering_visits_no_more_nodes():
-    board = chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")
-    tactical, plain = TacticalAlphaBetaBot(max_depth=3), NonTacticalAlphaBetaBot(max_depth=3)
-    assert tactical.get_move(board, 10.0) == plain.get_move(board, 10.0)
-    assert tactical.last_search_stats.nodes_visited <= plain.last_search_stats.nodes_visited

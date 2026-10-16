@@ -1,4 +1,4 @@
-"""Advanced machine-learning bot: opening book, then iterative deepening with a learned model."""
+"""Opening book, then iterative-deepening alpha-beta evaluated by a learned model."""
 
 from typing import Optional, Union
 
@@ -7,13 +7,15 @@ import chess
 from adversarial_search.chess_game_state import ChessGameState
 from adversarial_search.time_management import TimeManager
 from bots._search_bots import AUTHOR, IterativeDeepeningBot
-from bots.ml_bot import DEFAULT_MODEL
 from knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook
 from models import EvaluationModel, load_model
 from models.evaluator import ModelEvaluator
 
+#: Model used when none is given. Train it with ``python -m training.train --model mlp_features``.
+DEFAULT_MODEL = "mlp_features"
 
-class AdvancedMLBot(IterativeDeepeningBot):
+
+class IterativeModelBookBot(IterativeDeepeningBot):
     """Plays book moves while the game follows the opening book, then searches.
 
     Once the game leaves the book it never consults it again. The search is the clock-aware
@@ -33,7 +35,7 @@ class AdvancedMLBot(IterativeDeepeningBot):
         model: Union[str, EvaluationModel] = DEFAULT_MODEL,
         opening_book: Optional[OpeningBook] = None,
         max_depth: int = 3,
-        name: str = "AdvancedMLBot",
+        name: str = "IterativeModelBookBot",
         time_manager: Optional[TimeManager] = None,
     ):
         super().__init__(name, AUTHOR, max_depth, time_manager)

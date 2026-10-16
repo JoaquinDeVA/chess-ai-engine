@@ -80,7 +80,7 @@ interrupted iteration is discarded unless it is the first one (some move is alwa
 `TimeManager` turns the clock into a budget: 15% of the remaining time, between 1.5 s and 40 s and never
 more than half the clock; the hard limit is `1.5 × budget − 0.3 s`.
 
-## How `AdvancedMLBot` picks a move
+## How `IterativeModelBookBot` picks a move
 
 ```mermaid
 flowchart TD

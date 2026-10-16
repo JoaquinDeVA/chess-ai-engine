@@ -7,12 +7,12 @@ A bot is one file in `bots/`. Subclass one of the bases in `bots/_search_bots.py
 # bots/material_bot.py
 import chess
 
-from bots._search_bots import FixedDepthBot
+from bots._search_bots import IterativeDeepeningBot
 from evaluation.features import extract_material_features
 
 
-class MaterialBot(FixedDepthBot):
-    """Fixed-depth alpha-beta that only counts material."""
+class MaterialBot(IterativeDeepeningBot):
+    """Iterative-deepening alpha-beta that only counts material."""
 
     def __init__(self, max_depth: int = 2):
         super().__init__("MaterialBot", max_depth=max_depth)
@@ -27,14 +27,13 @@ That is all: the registry finds it, so it appears in `--list-bots` and in tourna
 
 ```bash
 python main.py --list-bots
-python main.py --player1 MaterialBot --player2 RandomBot --depth 3
+python main.py --player1 MaterialBot --player2 IterativeHeuristicBot --depth 3
 ```
 
 ## Choosing a base
 
 | Base | Use it when | You get |
 |---|---|---|
-| `FixedDepthBot` | the evaluation is cheap, or you want a reproducible depth | alpha-beta to `max_depth`, statistics |
 | `IterativeDeepeningBot` | you want the strongest play for the time available | iterative deepening, transposition table, killer moves, MVV-LVA ordering, time budget |
 | `ChessBot` | you do not want a tree search at all | just `get_move(board, time_limit)` |
 

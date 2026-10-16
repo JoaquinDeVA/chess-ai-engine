@@ -19,43 +19,32 @@ def registry() -> BotRegistry:
 
 def test_registry_finds_every_playable_bot(registry):
     names = set(registry.list_available_bots())
-    assert {
-        "RandomBot",
-        "HumanPlayer",
-        "HeuristicAlphaBetaBot",
-        "AdvancedHeuristicAlphaBetaBot",
-        "MLBot",
-        "AdvancedMLBot",
-        "TacticalAlphaBetaBot",
-        "NonTacticalAlphaBetaBot",
-    } <= names
+    assert names == {"HumanPlayer", "IterativeHeuristicBot", "IterativeModelBookBot"}
 
 
 def test_shared_base_classes_are_not_registered_as_bots(registry):
-    assert not {"FixedDepthBot", "IterativeDeepeningBot", "ChessBot"} & set(
-        registry.list_available_bots()
-    )
+    assert not {"IterativeDeepeningBot", "ChessBot"} & set(registry.list_available_bots())
 
 
 def test_registry_works_from_any_working_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    assert "RandomBot" in BotRegistry().list_available_bots()
+    assert "IterativeHeuristicBot" in BotRegistry().list_available_bots()
 
 
 def test_get_bot_caches_plain_instances_and_builds_fresh_ones_for_options(registry):
-    assert registry.get_bot("HeuristicAlphaBetaBot") is registry.get_bot("HeuristicAlphaBetaBot")
-    deep = registry.get_bot("HeuristicAlphaBetaBot", max_depth=4)
-    assert deep.max_depth == 4 and deep is not registry.get_bot("HeuristicAlphaBetaBot")
+    assert registry.get_bot("IterativeHeuristicBot") is registry.get_bot("IterativeHeuristicBot")
+    deep = registry.get_bot("IterativeHeuristicBot", max_depth=4)
+    assert deep.max_depth == 4 and deep is not registry.get_bot("IterativeHeuristicBot")
 
 
 def test_unknown_bot_and_bad_options_return_none(registry):
     assert registry.get_bot("Nope") is None
-    assert registry.get_bot("MLBot", model="no_such_model") is None
+    assert registry.get_bot("IterativeModelBookBot", model="no_such_model") is None
 
 
 def test_tournament_ready_bots_exclude_humans(registry):
     ready = registry.get_tournament_ready_bots()
-    assert "HumanPlayer" not in ready and "RandomBot" in ready
+    assert "HumanPlayer" not in ready and "IterativeHeuristicBot" in ready
 
 
 def run_cli(*args, timeout=180):
@@ -71,16 +60,16 @@ def run_cli(*args, timeout=180):
 def test_cli_lists_bots():
     result = run_cli("--list-bots")
     assert result.returncode == 0
-    assert "RandomBot" in result.stdout and "bots available" in result.stdout
+    assert "IterativeHeuristicBot" in result.stdout and "bots available" in result.stdout
 
 
 def test_cli_plays_a_game_to_the_end_and_exports_the_pgn(tmp_path):
     pgn = tmp_path / "game.pgn"
     result = run_cli(
         "--player1",
-        "HeuristicAlphaBetaBot",
+        "IterativeHeuristicBot",
         "--player2",
-        "RandomBot",
+        "IterativeHeuristicBot",
         "--depth",
         "2",
         "--position",
@@ -97,7 +86,12 @@ def test_cli_rejects_unknown_bots_and_bad_positions():
     assert run_cli("--player1", "Nope").returncode == 1
     assert (
         run_cli(
-            "--player1", "RandomBot", "--player2", "RandomBot", "--position", "garbage"
+            "--player1",
+            "IterativeHeuristicBot",
+            "--player2",
+            "IterativeHeuristicBot",
+            "--position",
+            "garbage",
         ).returncode
         == 1
     )
@@ -109,6 +103,9 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
     from main import bot_options
 
     args = argparse.Namespace(model="linear_baseline", depth=3)
-    assert bot_options(registry, "MLBot", args) == {"model": "linear_baseline", "max_depth": 3}
-    assert bot_options(registry, "HeuristicAlphaBetaBot", args) == {"max_depth": 3}
-    assert bot_options(registry, "RandomBot", args) == {}
+    assert bot_options(registry, "IterativeModelBookBot", args) == {
+        "model": "linear_baseline",
+        "max_depth": 3,
+    }
+    assert bot_options(registry, "IterativeHeuristicBot", args) == {"max_depth": 3}
+    assert bot_options(registry, "HumanPlayer", args) == {}

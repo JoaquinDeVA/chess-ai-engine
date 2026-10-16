@@ -44,13 +44,8 @@ one class.
 
 | Bot | Search | Evaluation | Needs |
 |---|---|---|---|
-| `RandomBot` | none | none | – |
-| `HeuristicAlphaBetaBot` | alpha-beta, fixed depth | weighted features (`h1`–`h4`) | – |
-| `AdvancedHeuristicAlphaBetaBot` | iterative deepening, transposition table, killers | weighted features | – |
-| `MLBot` | alpha-beta, fixed depth | learned model | `.[ml]` |
-| `AdvancedMLBot` | opening book, then iterative deepening | learned model | `.[ml]` |
-| `TacticalAlphaBetaBot` | alpha-beta ordered by Prolog tactics | weighted features | SWI-Prolog, `.[prolog]` |
-| `NonTacticalAlphaBetaBot` | same without the Prolog ordering (control) | weighted features | – |
+| `IterativeHeuristicBot` | iterative deepening, transposition table, killers | weighted features (`h1`–`h4`) | – |
+| `IterativeModelBookBot` | opening book, then iterative deepening | learned model | `.[ml]` |
 | `HumanPlayer` | – | you, at the console | – |
 
 ## Architecture
@@ -77,10 +72,10 @@ git clone https://github.com/JoaquinDeVA/chess-ai-engine.git
 cd chess-ai-engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"              # core engine and tests
-pip install -e ".[ml,prolog,data]"   # optional: learned models, tactical bot, dataset tools
+pip install -e ".[ml,prolog,data]"   # optional: learned models, Prolog patterns, dataset tools
 ```
 
-Optional system packages: SWI-Prolog for the tactical bot (`apt install swi-prolog`) and Stockfish for
+Optional system packages: SWI-Prolog for the tactical-pattern detector (`apt install swi-prolog`) and Stockfish for
 `scripts/label_with_stockfish.py` (`apt install stockfish`).
 
 ## Usage
@@ -89,13 +84,13 @@ Optional system packages: SWI-Prolog for the tactical bot (`apt install swi-prol
 python main.py --list-bots
 
 # you (White) against a bot, moves typed in UCI notation such as e2e4
-python main.py --player1 human --player2 AdvancedHeuristicAlphaBetaBot
+python main.py --player1 human --player2 IterativeHeuristicBot
 
-# bot against bot, choosing the model of the ML bots and the search depth
-python main.py --player1 AdvancedMLBot --model cnn_resnet --player2 HeuristicAlphaBetaBot --depth 3
+# bot against bot, choosing the model of the ML bot and the search depth
+python main.py --player1 IterativeModelBookBot --model cnn_resnet --player2 IterativeHeuristicBot --depth 3
 
 # from a given position (full FEN) and exporting the game
-python main.py --player1 HeuristicAlphaBetaBot --player2 RandomBot \
+python main.py --player1 IterativeHeuristicBot --player2 IterativeHeuristicBot \
   --position "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1" --export game.pgn
 
 # round-robin tournament between all bots (results and PGN files are written)

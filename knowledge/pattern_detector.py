@@ -1,8 +1,8 @@
-"""Tactical alpha-beta bot: move ordering driven by tactical patterns found in Prolog.
+"""Tactical-pattern detection with the Prolog knowledge base ``knowledge/chess_patterns.pl``.
 
-A Prolog knowledge base (``knowledge/chess_patterns.pl``) recognizes pins, forks, skewers,
-captures and promotions. The bot asks it which legal moves *create* such a pattern and searches
-those first, which makes alpha-beta prune much more.
+The knowledge base recognizes pins, forks, skewers, captures and promotions;
+:class:`PrologPatternDetector` loads a position as facts and asks which legal moves *create*
+each pattern.
 
 This module needs SWI-Prolog and the ``pyswip`` package (``pip install -e '.[prolog]'``); both
 are optional for the rest of the engine.
@@ -14,13 +14,9 @@ from typing import Any, Callable, Dict, List, Union
 
 import chess
 
-from adversarial_search.chess_game_state import ChessGameState
-from bots._search_bots import AUTHOR, FixedDepthBot
-from evaluation.heuristics import h3
-
 logger = logging.getLogger(__name__)
 
-KNOWLEDGE_BASE = Path(__file__).resolve().parent.parent / "knowledge" / "chess_patterns.pl"
+KNOWLEDGE_BASE = Path(__file__).resolve().parent / "chess_patterns.pl"
 
 # (Prolog predicate, key in the result dictionary); all of them bind FromR, FromC, ToR, ToC, Score.
 _SCORED_PATTERNS = (
@@ -30,15 +26,6 @@ _SCORED_PATTERNS = (
     ("move_creates_skewer", "skewer_score"),
     ("move_creates_capture", "mvv_lva_score"),
 )
-
-# Move-ordering weights: (baseline added when the pattern exists, multiplier of the Prolog score).
-ABSOLUTE_PIN_WEIGHT = (50, 3)
-RELATIVE_PIN_WEIGHT = (30, 3)
-FORK_WEIGHT = (100, 3)
-SKEWER_WEIGHT = (80, 3)
-CAPTURE_WEIGHT = (0, 3)
-PROMOTION_BONUS = 800
-CHECK_BONUS = 50
 
 
 def _square_coordinates(move: chess.Move) -> tuple:
@@ -65,13 +52,13 @@ class PrologPatternDetector:
             from pyswip.core import SwiPrologNotFoundError
         except ImportError as error:
             raise ImportError(
-                "TacticalAlphaBetaBot needs pyswip: pip install -e '.[prolog]'"
+                "PrologPatternDetector needs pyswip: pip install -e '.[prolog]'"
             ) from error
         try:
             self.prolog = Prolog()
         except SwiPrologNotFoundError as error:
             raise RuntimeError(
-                "TacticalAlphaBetaBot needs SWI-Prolog (apt install swi-prolog)"
+                "PrologPatternDetector needs SWI-Prolog (apt install swi-prolog)"
             ) from error
         self.prolog.consult(str(prolog_file))
 
@@ -189,87 +176,3 @@ class PrologPatternDetector:
             )
             if move is not None:
                 apply(move, binding)
-
-
-class TacticalAlphaBetaBot(FixedDepthBot):
-    """Fixed-depth alpha-beta that searches tactically promising moves first.
-
-    :param eval_function: Heuristic ``(state, player) -> float``; default ``h3``.
-    :param max_depth: Plies to search.
-    :param name: Bot name.
-    :raises ImportError: If ``pyswip`` is not installed.
-    :raises RuntimeError: If SWI-Prolog is not installed.
-    """
-
-    def __init__(
-        self,
-        eval_function: Callable[[ChessGameState, chess.Color], float] = h3,
-        max_depth: int = 3,
-        name: str = "TacticalAlphaBetaBot",
-    ):
-        super().__init__(name, AUTHOR, max_depth)
-        self.eval_function = eval_function
-        self.pattern_detector = PrologPatternDetector()
-
-    def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
-        """Evaluate with the configured heuristic.
-
-        :param state: Position to evaluate.
-        :param player: Player the value is for.
-        :return: Expected score for ``player`` in ``[0.01, 0.99]``.
-        """
-        return self.eval_function(state, player)
-
-    def order_moves(self, board: chess.Board, moves: List[chess.Move]) -> List[chess.Move]:
-        """Order moves by tactical value, best first.
-
-        Score = pin / fork / skewer bonuses (baseline + 3 x the Prolog score, so king-involved
-        tactics rank highest) + MVV-LVA capture score + 800 for promotions + 50 for checks.
-
-        :param board: Current position.
-        :param moves: Legal moves.
-        :return: The moves sorted by decreasing score.
-        """
-        patterns = self.pattern_detector.detect_move_patterns(board, moves)
-
-        def score(move: chess.Move) -> float:
-            found = patterns.get(move, {})
-            total = 0.0
-            for key, (baseline, factor) in (
-                ("absolute_pin_score", ABSOLUTE_PIN_WEIGHT),
-                ("relative_pin_score", RELATIVE_PIN_WEIGHT),
-                ("fork_score", FORK_WEIGHT),
-                ("skewer_score", SKEWER_WEIGHT),
-                ("mvv_lva_score", CAPTURE_WEIGHT),
-            ):
-                value = found.get(key, 0)
-                if value > 0:
-                    total += baseline + value * factor
-            if found.get("creates_promotion"):
-                total += PROMOTION_BONUS
-            if board.gives_check(move):
-                total += CHECK_BONUS
-            return total
-
-        return sorted(moves, key=score, reverse=True)
-
-    def on_game_end(self, result: str, board: chess.Board) -> None:
-        """Log the search statistics of the game.
-
-        :param result: Game result (``1-0``, ``0-1`` or ``1/2-1/2``).
-        :param board: Final position.
-        """
-        stats = self.get_search_statistics()
-        logger.info("%s search statistics: %s", self.name, stats)
-
-    def get_info(self):
-        """Describe the bot.
-
-        :return: Bot information.
-        """
-        info = super().get_info()
-        info.update(
-            description="Alpha-beta with Prolog tactical-pattern move ordering",
-            max_depth=self.max_depth,
-        )
-        return info

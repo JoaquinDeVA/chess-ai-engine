@@ -25,7 +25,7 @@ hyper-parameters chosen by search rather than by hand.
 2. Add a fast, non-neural evaluation family and train it on millions of positions.
 3. Make training a single command per model with an **effort level 0-100** that chooses data size,
    epochs and hyper-parameter search, and prints a time estimate first (an overnight run is fine).
-4. A comparison (phase 5) that ranks models by what matters for play: accuracy, cost per
+4. A comparison (phase 5) centred on the depth-accuracy trade-off, that ranks models by what matters for play: accuracy, cost per
    evaluation, depth reached in fixed time, and results in games at equal time.
 5. Keep only versions (datasets, models) that have a measured reason to exist.
 
@@ -164,6 +164,19 @@ Each model class maps the effort to its own configuration:
 Effort 100 for everything is allowed to take a night (~10 h).
 
 ## Phase 5: comparison
+
+**Central question (user): the depth-accuracy trade-off.** A lighter evaluation is less accurate per
+position but reaches more plies in the same time; the comparison must show, for the same time per
+move, how much depth each model buys and how much accuracy it gives up, and which side of that
+trade wins games. Models 1 and 2 only make sense through this lens: their accuracy alone is
+expected to be lower; their case is the extra depth. The headline output is therefore a
+depth-vs-accuracy view (table and plot: for each model, depth reached at a few fixed times per move
+against its accuracy), with the match results at equal time as the verdict. The existing models
+appear in it with their measured depth too, as the high-accuracy / low-depth end of the curve.
+
+A second accuracy measure follows from this focus: **accuracy of the search result**, not only of
+the static evaluation, e.g. best-move agreement with Stockfish of the full search at a fixed time
+per move, which directly shows whether extra depth compensates for a weaker evaluation.
 
 For every model, written to its card and to the generated table in `MODELS_HISTORY.md`:
 

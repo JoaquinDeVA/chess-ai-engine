@@ -17,6 +17,7 @@ are only imported when a model is actually loaded or trained.
 from . import (
     architectures,  # noqa: F401,E402
     linear_eval,  # noqa: F401,E402
+    neural_eval,  # noqa: F401,E402
 )
 from .base import CP_SCALE, EvaluationModel, cp_to_expected_score  # noqa: F401
 from .registry import available_models, get_model_class, load_model, register_model  # noqa: F401

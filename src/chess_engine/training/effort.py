@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Dict, NamedTuple, Tuple
 
+import chess
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -23,6 +24,7 @@ from chess_engine.models.linear_eval import (
     _scores,
     encode_frame,
 )
+from chess_engine.models.neural_eval import NeuralEvalModel
 from chess_engine.training.representation import (
     Representation,
     keep_mate_rows,
@@ -231,9 +233,14 @@ def calibrate(
     started = time.perf_counter()
     rows, cols, vals, targets = encode_frame(model_class.features, rep, validation)
     encode_seconds = time.perf_counter() - started
-    theta = np.append(model.weights, model.bias)
-    started = time.perf_counter()
-    _losses(_scores(rows, cols, vals, len(targets), theta), targets).mean()
+    if isinstance(model, NeuralEvalModel):
+        boards = [chess.Board(fen) for fen in validation["fen"]]
+        started = time.perf_counter()
+        model.predict_cp_batch(boards)
+    else:
+        theta = np.append(model.weights, model.bias)
+        started = time.perf_counter()
+        _losses(_scores(rows, cols, vals, len(targets), theta), targets).mean()
     score_seconds = time.perf_counter() - started
 
     train_seconds = max(0.0, summary["seconds"] - encode_seconds - score_seconds)

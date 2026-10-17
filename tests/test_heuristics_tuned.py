@@ -157,4 +157,4 @@ def test_run_tournament_defaults_use_h3t_anchor():
     assert tournament.ANCHOR == "h3t"
     args = script.parse_args([])
     assert args.anchor == "h3t"
-    assert args.specs == ["pst_tapered", "pst_terms", "pst_kb", "nn4", "nn8", "h3t"]
+    assert args.specs == ["pst_tapered", "pst_terms", "pst_kb", "nn4", "h3t"]

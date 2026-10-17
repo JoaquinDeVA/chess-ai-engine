@@ -1,7 +1,7 @@
 # Selection protocol and model families
 
 How the candidate evaluation models are trained, compared and chosen over the two-night plan, and why.
-Design background: [the training and evaluation design](../superpowers/specs/2026-10-16-training-and-evaluation-design.md).
+Design background: the training and evaluation design (local planning record, not versioned).
 
 ## The risk in "train, pick the best, tune the best"
 

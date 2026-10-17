@@ -66,3 +66,10 @@ desktop.ini
 
 # Vault de agentes: conocimiento local, no se versiona
 vault/
+
+# Instrucciones de agente y diseño interno: local, no se versiona
+CLAUDE.md
+docs/superpowers/
+
+# Pesos de Keras: los de cnn_resnet vienen del curso, pendientes de revisar su licencia
+*.keras

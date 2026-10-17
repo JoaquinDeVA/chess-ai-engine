@@ -25,6 +25,7 @@ from chess_engine.comparison.tournament import (
     run_round_robin,
     size_for_budget,
     summarize,
+    termination_section,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +83,7 @@ def render_markdown(
                 wins, draws, losses = head[row][col]
                 cells.append(f"{wins}-{draws}-{losses}")
         lines.append(f"| {row} | " + " | ".join(cells) + " |")
+    lines += termination_section(summary)
     lines += [
         "",
         "## Scores and Elo",

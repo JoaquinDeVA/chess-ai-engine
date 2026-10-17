@@ -16,6 +16,7 @@ from chess_engine.comparison.tournament import (
     run_round_robin,
     size_for_budget,
     summarize,
+    termination_section,
 )
 
 
@@ -133,6 +134,24 @@ def test_summarize_scores_and_elo():
     assert summary["players"]["h1"]["elo_vs_anchor"] == pytest.approx(0.0)
     lo, hi = mlp["ci95"]
     assert lo < 37.5 < hi
+
+
+def test_summarize_counts_terminations_and_forfeits():
+    results = [
+        game("m", "h1", "white", termination="checkmate"),
+        game("h1", "m", "white", termination="checkmate"),
+        game("m", "h1", "black", termination="time_forfeit"),
+        game("h1", "m", "white", termination="player_error"),
+        game("m", "h1", None, error="KeyError: boom"),  # crashed: not counted
+    ]
+    summary = summarize(results, anchor="h1")
+    assert summary["terminations"] == {"checkmate": 2, "time_forfeit": 1, "player_error": 1}
+    assert summary["forfeit_games"] == 2
+    text = "\n".join(termination_section(summary))
+    assert "## How the games ended" in text
+    assert "| checkmate | 2 | 50.0% |" in text
+    assert "Games decided by a forfeit (time, player error or illegal move): 2 of 4." in text
+    assert "No games." in "\n".join(termination_section({"terminations": {}, "forfeit_games": 0}))
 
 
 def test_iterative_fit_matches_direct_score_for_two_players():

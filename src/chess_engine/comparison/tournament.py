@@ -27,7 +27,7 @@ import chess
 
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.comparison.tradeoff import HEURISTICS, make_player
-from chess_engine.engine.game_manager import GameManager
+from chess_engine.engine.game_manager import FORFEIT_TERMINATIONS, GameManager
 from chess_engine.models.cards import card_path, update_card
 from chess_engine.search.time_management import TimeManager
 
@@ -501,8 +501,9 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
     :param anchor: Player whose Elo is 0.
     :return: ``players`` (per player: games, wins, draws, losses, score in percent, ``ci95`` in
         percent, ``elo_vs_anchor``, ``elo``, ``elo_interval``), ``head_to_head`` (``[wins, draws,
-        losses]`` of the row player against the column player) and ``errors`` (number of crashed
-        games).
+        losses]`` of the row player against the column player), ``errors`` (number of crashed
+        games), ``terminations`` (games per way of ending, crashed games excluded) and
+        ``forfeit_games`` (games ended by a forfeit; they still count as normal results).
     :raises ValueError: If ``anchor`` takes part in none of the records.
     """
     if not any(anchor in (r["white"], r["black"]) for r in results):
@@ -512,11 +513,14 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
     head = {p: {q: [0, 0, 0] for q in players if q != p} for p in players}
     counts: Dict[Tuple[str, str], int] = {}
     errors = 0
+    terminations: Dict[str, int] = {}
 
     for record in results:
         if "error" in record:
             errors += 1
             continue
+        if "termination" in record:
+            terminations[record["termination"]] = terminations.get(record["termination"], 0) + 1
         white, black = record["white"], record["black"]
         white_points = {"white": 1.0, "black": 0.0, None: 0.5}[record["winner"]]
         per_game[white].append(white_points)
@@ -568,7 +572,33 @@ def summarize(results: Sequence[Dict[str, Any]], anchor: str = ANCHOR) -> Dict[s
         "players": stats,
         "head_to_head": head,
         "errors": errors,
+        "terminations": terminations,
+        "forfeit_games": sum(n for t, n in terminations.items() if t in FORFEIT_TERMINATIONS),
     }
+
+
+def termination_section(summary: Dict[str, Any]) -> List[str]:
+    """Markdown lines of the "How the games ended" section of the report.
+
+    :param summary: Output of :func:`summarize`.
+    :return: Lines of the section, to be placed right after the cross table.
+    """
+    terminations = summary["terminations"]
+    total = sum(terminations.values())
+    lines = ["## How the games ended", ""]
+    if total:
+        lines += ["| Termination | Games | Share |", "|---|---|---|"]
+        for kind, n in sorted(terminations.items(), key=lambda item: (-item[1], item[0])):
+            lines.append(f"| {kind} | {n} | {100 * n / total:.1f}% |")
+    else:
+        lines.append("No games.")
+    lines += [
+        "",
+        "Games decided by a forfeit (time, player error or illegal move): "
+        f"{summary['forfeit_games']} of {total}. These are counted as results in the scores above.",
+        "",
+    ]
+    return lines
 
 
 def record_cards(

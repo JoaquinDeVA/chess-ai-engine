@@ -1,0 +1,14 @@
+{
+  "weights": {
+    "material_diff_normalized": 2.651317151959833,
+    "positional_diff_normalized": 5.384868573823809,
+    "mobility_diff_normalized": 0.578738495061196,
+    "center_diff_normalized": -0.02492910044770813,
+    "king_safety_diff_normalized": -0.19244559123673932,
+    "development_diff_normalized": 0.024846062027067184
+  },
+  "n": 261632,
+  "r2": 0.23259213085304353,
+  "r2_h3": 0.07406045616726498,
+  "date": "2026-10-17"
+}

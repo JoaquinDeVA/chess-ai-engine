@@ -171,6 +171,7 @@ def fit(
     positions: int,
     config: Dict[str, Any],
     quiet_only: bool = False,
+    seed: int = SAMPLE_SEED,
 ) -> Tuple[LinearEvalModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
@@ -182,6 +183,7 @@ def fit(
     :param positions: TRAIN rows used for each epoch.
     :param config: Fit configuration (see :func:`fit_config`).
     :param quiet_only: Train on quiet positions only.
+    :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
     :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
@@ -193,7 +195,7 @@ def fit(
             TRAIN,
             config["batch_size"],
             positions,
-            SAMPLE_SEED,
+            seed,
             quiet_only=quiet_only,
             mate_keep=rep.mate_keep,
         )

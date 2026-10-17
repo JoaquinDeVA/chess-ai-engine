@@ -70,6 +70,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--jobs", type=int, default=-1, help="processes used to encode positions")
     parser.add_argument("--effort", type=int, help="linear models: effort level 0-100")
+    parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
     parser.add_argument(
         "--representation",
         help='linear models: "default", or a JSON object with the fields of Representation '
@@ -209,6 +210,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         plan["positions"],
         fit_config(plan, best["l2"], best["lr"]),
         quiet,
+        seed=args.seed,
     )
 
     path = model.save(args.output or artifact_path(model_spec(args)))

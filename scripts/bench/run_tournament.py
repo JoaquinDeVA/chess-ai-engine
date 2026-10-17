@@ -141,6 +141,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--anchor", default=ANCHOR, help="player whose Elo is 0; must be one of --players"
     )
     parser.add_argument("--hours", type=float, default=10.0, help="wall-clock budget")
+    parser.add_argument(
+        "--openings",
+        type=int,
+        help="openings per pair (two games each, colours swapped); default: sized by --hours",
+    )
     parser.add_argument("--out", type=Path, default=Path("data/tournament/games.jsonl"))
     parser.add_argument("--report", type=Path, default=Path("docs/training/TOURNAMENT.md"))
     args = parser.parse_args(argv)
@@ -169,7 +174,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if seconds_per_game is None:
         print("Calibration played no games; check the players.")
         return 1
-    openings_per_pair = size_for_budget(args.hours, workers, len(specs), seconds_per_game)
+    if args.openings is not None:
+        openings_per_pair = args.openings
+    else:
+        openings_per_pair = size_for_budget(args.hours, workers, len(specs), seconds_per_game)
     if openings_per_pair < 1:
         print(f"Budget too small: one opening needs about {seconds_per_game:.1f} s per game.")
         return 1

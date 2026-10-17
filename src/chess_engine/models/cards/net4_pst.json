@@ -1,0 +1,62 @@
+{
+  "name": "net4_pst",
+  "status": "current",
+  "architecture": "Sparse network: 768 slotted piece-square inputs, 256-32-32-1 (4 layers)",
+  "features": "pst_slotted",
+  "parameters": 206177,
+  "size_kb": 1613.5,
+  "training": {
+    "dataset": "data/lichess/raw",
+    "date": "2026-10-17",
+    "commit": "2006288+dirty",
+    "epochs": 4,
+    "best_epoch": 2,
+    "train_losses": [
+      0.6311488174965103,
+      0.6077656990608098,
+      0.6013339545215145,
+      0.5972346227714742
+    ],
+    "val_losses": [
+      0.6138447085037452,
+      0.6116612750203057,
+      0.6117351599371593,
+      0.6134435374719449
+    ],
+    "train_rows": 794175,
+    "seconds": 231.27,
+    "config": {
+      "l2": 1e-06,
+      "lr": 0.01,
+      "batch_size": 4096,
+      "max_epochs": 4,
+      "patience": 2,
+      "workers": 4
+    },
+    "train_samples": 794175,
+    "effort": 30,
+    "effort_config": {
+      "positions": 794175,
+      "max_epochs": 4,
+      "patience": 2,
+      "trials": 0,
+      "batch_size": 4096
+    },
+    "representation": {
+      "scale": "winprob",
+      "k": 0.00368208,
+      "perspective": "side_to_move",
+      "filter": "all",
+      "mate_keep": 1.0
+    }
+  },
+  "tournament": {
+    "games": 10,
+    "score": 45.0,
+    "elo": 30.073973408997052,
+    "elo_interval": 237.48884849962064,
+    "anchor": "h1",
+    "base": 60.0,
+    "increment": 1.0
+  }
+}

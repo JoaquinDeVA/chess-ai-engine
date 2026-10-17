@@ -216,6 +216,11 @@ def test_parse_args_requires_the_anchor(script, capsys):
     assert "h1" in script.parse_args([]).specs
 
 
+def test_parse_args_takes_an_explicit_number_of_openings(script):
+    assert script.parse_args(["--openings", "1"]).openings == 1
+    assert script.parse_args([]).openings is None
+
+
 def test_calibrate_returns_none_when_no_game_is_played(script):
     assert script.calibrate(["h1"], 2.0, 0.0, 1) is None
 

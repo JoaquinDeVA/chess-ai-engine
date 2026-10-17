@@ -43,3 +43,20 @@ src/chess_engine/models/artifacts/*.tmp
 # Representation bake-off models (scripts/bakeoff_representation.py; tags @<prefix>-<i>)
 src/chess_engine/models/artifacts/*@*bake-*
 src/chess_engine/models/cards/*@*bake-*
+
+# Plan e instrucciones personales de Claude Code
+PLAN.md
+CLAUDE.local.md
+
+# Secretos
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Registros y temporales
+*.log
+
+# Sistema operativo
+Thumbs.db
+desktop.ini

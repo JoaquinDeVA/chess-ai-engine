@@ -62,15 +62,13 @@ Once a model has a saved file, a bot can use it:
 
 `mlp_features` and `cnn_resnet` predate the linear flow. They take
 an `EvaluationModel` subclass that chooses an extractor from `models/features.py` and builds a
-Keras network (`models/keras_model.py`). They
-train from a CSV of Stockfish evaluations and are benchmarked with the centipawn metrics:
+Keras network (`models/keras_model.py`). Their training data was a CSV of Stockfish evaluations,
+which has been retired with the old pipeline. Their current weights are only measured (accuracy
+and cost) from the raw shards; they are not retrained:
 
 ```bash
-python -m chess_engine.training.train    --model <name> --data data/evaluations.csv
-python -m chess_engine.comparison.evaluate --model <name> --data data/evaluations.csv
+python -m chess_engine.comparison.evaluate --model <name>
 ```
-
-Their current weights are only measured now (accuracy and cost); they are not retrained.
 
 ## The contract
 

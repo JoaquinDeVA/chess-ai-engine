@@ -38,8 +38,8 @@ Parquet, zstd, row groups of 100,000 rows. File metadata (JSON values): `perspec
 **Sign convention.** `perspective` is detected from the data
 (`chess_engine.training.lichess.detect_perspective`, material correlation on Black-to-move
 positions). Result on the trial: **`white`**, i.e. `cp`/`mate` are from White's point of view
-(positive = good for White, `mate > 0` = White mates) whoever is to move. `data/evaluations.csv`
-(old pipeline, unchanged) uses the same convention.
+(positive = good for White, `mate > 0` = White mates) whoever is to move. The CSV of the retired
+old pipeline used the same convention.
 
 Code: `src/chess_engine/training/lichess_raw.py` (parser, shard writer),
 `scripts/data/fetch_lichess_raw.py`.

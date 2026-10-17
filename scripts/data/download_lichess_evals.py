@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Build ``data/evaluations.csv`` from the public Lichess evaluation database (CC0).
 
+Obsolete: this produced the CSV of the retired old pipeline. The current data comes from
+``fetch_lichess_raw.py`` and ``prepare_dataset.py``.
+
 Only the beginning of the (multi-gigabyte) compressed file is read: the stream is closed as soon
 as ``--rows`` positions have been converted.
 

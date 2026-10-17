@@ -1,15 +1,18 @@
 # data/
 
 * `opening_book.json` – opening book used by `IterativeModelBookBot` (`{fen: uci_move}`), versioned.
-* `evaluations.csv` – Stockfish evaluations used to train and benchmark the old evaluation models
-  (columns `fen, cp, is_mate, mate_distance`, White's point of view). **Not versioned**; create it
-  with one of:
+* `lichess/raw/` – raw sharded Parquet export of the Lichess evaluations (126 shards, 124.9 M
+  positions). **Not versioned**. Created with:
 
   ```bash
-  python scripts/data/download_lichess_evals.py --rows 1000000   # public Lichess database (CC0)
-  python scripts/data/label_with_stockfish.py --random 50000     # your own positions
+  python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst
   ```
-* `lichess/raw/` – raw sharded Parquet export of the Lichess evaluations
-  (`scripts/data/fetch_lichess_raw.py`); `lichess/sidecar/` – aligned split / quiet flags
-  (`scripts/data/prepare_dataset.py`). Schema, measurements and plan in `docs/training/DATA.md`.
-  **Not versioned**.
+* `lichess/sidecar/` – one aligned sidecar per shard (split, quiet flag, side to move). **Not
+  versioned**. Created with:
+
+  ```bash
+  python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
+  ```
+
+Schema, measurements and plan in `docs/training/DATA.md`. The CSV of the old pipeline
+(`evaluations.csv`) has been retired.

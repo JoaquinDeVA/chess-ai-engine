@@ -12,9 +12,9 @@ Typical flow::
     python -m chess_engine.training.train --model linear_pst --effort 40
     python -m chess_engine.comparison.evaluate --model linear_pst
 
-CSV flow for the older models::
+The older CSV-family models (``mlp_features``, ``cnn_resnet``) are accuracy records: measure
+them from the raw shards with ``evaluate``. Their training CSV was retired, so they are not
+retrained::
 
-    python scripts/data/download_lichess_evals.py --output data/evaluations.csv --rows 1000000
-    python -m chess_engine.training.train --model mlp_features --data data/evaluations.csv
-    python -m chess_engine.comparison.evaluate --model mlp_features --data data/evaluations.csv
+    python -m chess_engine.comparison.evaluate --model mlp_features
 """

@@ -8,6 +8,7 @@
 - Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.
 - Candidate names proposed: `material_linear` -> `linear_material`, `pst_tapered` -> `linear_pst`,
   `pst_terms` -> `linear_pst_terms`, `pst_kb` -> `linear_king_bucket`, `nn4` -> `net4_pst` (code rename pending).
+- The agent vault (`vault/`) is no longer versioned: it stays local and is git-ignored.
 
 ## Unreleased
 

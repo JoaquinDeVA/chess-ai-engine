@@ -4,7 +4,7 @@ Motor de ajedrez con búsqueda adversarial, evaluaciones clásicas y aprendidas,
 
 ## Antes de tocar nada
 1. `git pull` (remoto `origin`, rama `main`).
-2. Lee `vault/README.md` y la ficha del módulo que vayas a tocar. Solo si no basta, lee el código.
+2. Si existe `vault/` en tu copia local (no está versionado), lee `vault/README.md` y la ficha del módulo que vayas a tocar. Solo si no basta, lee el código.
 3. Si el vault y el código discrepan, manda el código; avísame para actualizar la ficha.
 
 ## Cómo trabajar

@@ -43,4 +43,5 @@
 | Página | Para qué | Cuándo leerla |
 |---|---|---|
 | [ROADMAP.md](ROADMAP.md) | Ideas pendientes por orden de utilidad | Antes de proponer una mejora |
-| [../vault/README.md](../vault/README.md) | Decisiones, glosario y trampas del proyecto | Antes de cambiar algo no obvio |
+
+Las decisiones y el glosario de trabajo viven en `vault/`, que es local y no se versiona.

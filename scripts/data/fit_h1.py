@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fit the weights of the tuned heuristic ``h3t`` to Stockfish evaluations.
+"""Fit the weights of the heuristic ``h1`` to Stockfish evaluations.
 
-The six features of ``h3`` are computed for a sample of TRAIN positions without mates. The
+The six features of ``h1`` are computed for a sample of TRAIN positions without mates. The
 weights are the least-squares fit (no intercept) of ``white_score - 0.5`` on ``feature - 0.5``.
-The fit is judged on the 20% of the sample selected by the FEN hash, against the plain ``h3``
-weights, and written to the versioned weights file of :func:`h3t`.
+The fit is judged on the 20% of the sample selected by the FEN hash, against the plain
+``h3`` weights of the older heuristic, and written to the versioned weights file of :func:`h1`.
 
-    python scripts/data/fit_h3t.py --raw data/lichess/raw --sidecar data/lichess/sidecar \
+    python scripts/data/fit_h1.py --raw data/lichess/raw --sidecar data/lichess/sidecar \
         --positions 300000 --jobs 4
 """
 
@@ -25,7 +25,6 @@ import numpy as np
 from chess_engine.evaluation.features import get_position_features
 from chess_engine.evaluation.heuristics import (
     FEATURE_NAMES,
-    H3_WEIGHTS,
     HEURISTIC_MARGIN,
 )
 from chess_engine.training.dataset import TRAIN
@@ -33,12 +32,16 @@ from chess_engine.training.representation import Representation, white_score
 from chess_engine.training.sidecar import load_sample
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUT = PROJECT_ROOT / "src" / "chess_engine" / "evaluation" / "h3t_weights.json"
+DEFAULT_OUT = PROJECT_ROOT / "src" / "chess_engine" / "evaluation" / "h1_weights.json"
+
+#: Held-out R2 of the plain h3 weights (the old fixed-weight heuristic), from the fit of
+#: 2026-10-17; h3 no longer exists as a function, so the baseline is stored here.
+H3_BASELINE_R2 = 0.0740605
 
 #: Seed of the sample of TRAIN positions.
 SAMPLE_SEED = 42
 #: Salt of the hash that selects the held-out positions (share :data:`HOLDOUT_SHARE`).
-HOLDOUT_SALT = "h3t-holdout"
+HOLDOUT_SALT = "h1-holdout"
 HOLDOUT_SHARE = 0.2
 #: Positions per work item of the feature computation.
 CHUNK_SIZE = 2000
@@ -101,7 +104,7 @@ def fit_weights(features: np.ndarray, targets: np.ndarray) -> np.ndarray:
 
 
 def predict_white(features: np.ndarray, weights: np.ndarray) -> np.ndarray:
-    """White expected score of :func:`h3t`: the linear formula clipped to the heuristic margin.
+    """White expected score of :func:`h1`: the linear formula clipped to the heuristic margin.
 
     :param features: Feature matrix.
     :param weights: One weight per feature column.
@@ -169,12 +172,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     features = compute_features(fens, args.jobs)
     weights = fit_weights(features[fit], targets[fit])
-    h3_vector = np.array([H3_WEIGHTS[name] for name in FEATURE_NAMES])
     r2 = r2_score(targets[held], predict_white(features[held], weights))
-    r2_h3 = r2_score(targets[held], predict_white(features[held], h3_vector))
+    r2_h3 = H3_BASELINE_R2
 
     print(f"positions {len(fens)} (fit {int(fit.sum())}, held out {int(held.sum())})")
-    print(f"held-out R2: h3t {r2:.4f}, plain h3 {r2_h3:.4f}, gain {r2 - r2_h3:+.4f}")
+    print(f"held-out R2: h1 {r2:.4f}, plain h3 {r2_h3:.4f}, gain {r2 - r2_h3:+.4f}")
     payload = {
         "weights": {name: float(w) for name, w in zip(FEATURE_NAMES, weights, strict=True)},
         "n": len(fens),

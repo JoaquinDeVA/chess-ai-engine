@@ -73,10 +73,10 @@ class PstFeatures(LinearFeatures):
     Under ``"white"`` no mirroring is applied: White pieces add ``+1``, Black pieces ``-1``, and
     one extra entry ``+1`` (White to move) or ``-1`` (Black to move) is added at index 768.
 
-    :cvar name: ``"pst_tapered"``.
+    :cvar name: ``"linear_pst"``.
     """
 
-    name = "pst_tapered"
+    name = "linear_pst"
     _TURN_INDEX = 2 * BLOCK_SIZE
 
     def size(self, perspective: str) -> int:
@@ -299,10 +299,10 @@ class PstTermsFeatures(LinearFeatures):
     ``value * (1 - phase)`` to its endgame weight. Under ``"white"`` one turn entry (``+1``
     White to move, ``-1`` Black) follows the terms.
 
-    :cvar name: ``"pst_terms"``.
+    :cvar name: ``"linear_pst_terms"``.
     """
 
-    name = "pst_terms"
+    name = "linear_pst_terms"
     _TERM_BASE = 2 * BLOCK_SIZE
     _TURN_INDEX = _TERM_BASE + 2 * len(TERM_NAMES)
     _pst = PstFeatures()

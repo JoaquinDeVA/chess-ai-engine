@@ -32,7 +32,7 @@ from chess_engine.search.time_management import TimeManager
 logger = logging.getLogger(__name__)
 
 #: Player whose rating is fixed at 0 Elo.
-ANCHOR = "h3t"
+ANCHOR = "h1"
 
 #: Scores are clipped to ``[CLIP, 1 - CLIP]`` before taking a logarithm.
 CLIP = 0.01
@@ -521,7 +521,7 @@ def record_cards(
 ) -> List[str]:
     """Write the ``tournament`` section of the model cards of the players.
 
-    Heuristic players (``h2``, ``h3``) have no card and are skipped; so is a model whose card does
+    Heuristic players (``h1``) have no card and are skipped; so is a model whose card does
     not exist yet (cards are written by training, not created here) or that played no game.
 
     :param summary: Output of :func:`summarize`.

@@ -45,7 +45,7 @@ def frame(boards: list[chess.Board]) -> pd.DataFrame:
 
 def random_model(seed: int = 0, rep: Representation | None = None) -> LinearEvalModel:
     """Pst model with random weights, so that scores are not trivially 0.5."""
-    model = get_model_class("pst_tapered")(rep=rep)
+    model = get_model_class("linear_pst")(rep=rep)
     rng = np.random.default_rng(seed)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
@@ -76,7 +76,7 @@ def test_mirrored_position_gets_complementary_white_score():
 
 @pytest.mark.slow
 def test_fit_learns_material():
-    model = get_model_class("pst_tapered")()
+    model = get_model_class("linear_pst")()
     boards = random_positions(3000, seed=5)
     batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
     config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
@@ -92,7 +92,7 @@ def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
     model = random_model(seed=4, rep=rep)
     path = model.save(tmp_path / "model.npz")
 
-    loaded = get_model_class("pst_tapered").load(path)
+    loaded = get_model_class("linear_pst").load(path)
 
     assert loaded.rep == rep
     assert loaded.count_parameters() == model.count_parameters() == 769 + 1
@@ -112,17 +112,17 @@ def test_logit_matches_dense_computation():
 
 
 def test_count_parameters_matches_size_plus_bias():
-    assert get_model_class("pst_tapered")().count_parameters() == 768 + 1
+    assert get_model_class("linear_pst")().count_parameters() == 768 + 1
 
 
 def test_fit_rejects_empty_validation():
-    model = get_model_class("pst_tapered")()
+    model = get_model_class("linear_pst")()
     with pytest.raises(ValueError, match="validation set is empty"):
         model.fit_stream([frame(random_positions(10, seed=1))], frame([]), {})
 
 
 def test_fit_rejects_non_finite_validation_loss():
-    model = get_model_class("pst_tapered")()
+    model = get_model_class("linear_pst")()
     boards = random_positions(40, seed=12)
     config = {"lr": float("nan"), "max_epochs": 2}
     with pytest.raises(ValueError, match="not finite"):
@@ -136,8 +136,8 @@ def test_workers_give_the_same_weights_as_one_worker():
     config = {"batch_size": 16, "max_epochs": 3, "patience": 3, "lr": 0.05}
     env_before = {name: os.environ.get(name) for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS")}
 
-    serial = get_model_class("pst_tapered")()
-    parallel = get_model_class("pst_tapered")()
+    serial = get_model_class("linear_pst")()
+    parallel = get_model_class("linear_pst")()
     serial_summary = serial.fit_stream(batches, validation, {**config, "workers": 1})
     parallel_summary = parallel.fit_stream(batches, validation, {**config, "workers": 2})
 
@@ -158,7 +158,7 @@ def test_base_class_refuses_save_and_load(tmp_path):
 
 def test_load_rejects_weights_of_the_wrong_size(tmp_path):
     path = tmp_path / "wrong.npz"
-    meta = {"features": "pst_tapered", "rep": Representation().to_dict()}
+    meta = {"features": "linear_pst", "rep": Representation().to_dict()}
     with open(path, "wb") as handle:
         np.savez(
             handle,
@@ -167,7 +167,7 @@ def test_load_rejects_weights_of_the_wrong_size(tmp_path):
             meta=np.array(json.dumps(meta)),
         )
     with pytest.raises(ValueError, match="expected 768 weights.*found 10"):
-        get_model_class("pst_tapered").load(path)
+        get_model_class("linear_pst").load(path)
 
 
 MATERIAL_BOARD = "4k3/8/8/8/8/8/PPB5/R3K3 w - - 0 1"  # white: 2 pawns, 1 bishop, 1 rook
@@ -190,7 +190,7 @@ def test_material_features_count_differences():
 
 
 def test_material_model_mirror_complement():
-    model = get_model_class("material_linear")(weights=np.array([0.3, 0.1, 0.2, 0.5, 0.9]))
+    model = get_model_class("linear_material")(weights=np.array([0.3, 0.1, 0.2, 0.5, 0.9]))
     model.bias = 0.05
     for board in random_positions(20, seed=11):
         assert model.expected_score(board) == pytest.approx(
@@ -261,7 +261,7 @@ def test_mobility_counts_attacks_not_legal_moves():
 
 
 def test_pst_terms_mirror_complement():
-    model = get_model_class("pst_terms")()
+    model = get_model_class("linear_pst_terms")()
     rng = np.random.default_rng(3)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
@@ -273,7 +273,7 @@ def test_pst_terms_mirror_complement():
 
 def test_pst_terms_parameter_count():
     # 768 PST weights, two per term (middlegame and endgame), plus the bias.
-    assert get_model_class("pst_terms")().count_parameters() == 768 + 2 * 11 + 1
+    assert get_model_class("linear_pst_terms")().count_parameters() == 768 + 2 * 11 + 1
 
 
 def test_pawn_cache_hit_returns_same_features():
@@ -361,7 +361,7 @@ def test_king_bucket_rejects_white_perspective():
 
 
 def test_pst_kb_mirror_complement():
-    model = get_model_class("pst_kb")()
+    model = get_model_class("linear_king_bucket")()
     rng = np.random.default_rng(5)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
@@ -373,7 +373,7 @@ def test_pst_kb_mirror_complement():
 
 @pytest.mark.slow
 def test_pst_kb_fit_learns_material():
-    model = get_model_class("pst_kb")()
+    model = get_model_class("linear_king_bucket")()
     boards = random_positions(3000, seed=25)
     batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
     config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
@@ -385,13 +385,13 @@ def test_pst_kb_fit_learns_material():
 
 
 def test_pst_kb_save_load_round_trip(tmp_path):
-    model = get_model_class("pst_kb")()
+    model = get_model_class("linear_king_bucket")()
     rng = np.random.default_rng(8)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = -0.2
     path = model.save(tmp_path / "kb.npz")
 
-    loaded = get_model_class("pst_kb").load(path)
+    loaded = get_model_class("linear_king_bucket").load(path)
 
     assert loaded.count_parameters() == model.count_parameters() == 10368 + 1
     for board in random_positions(10, seed=27):
@@ -399,7 +399,7 @@ def test_pst_kb_save_load_round_trip(tmp_path):
 
 
 def test_pst_kb_is_registered():
-    assert "pst_kb" in available_models()
-    model = get_model_class("pst_kb")
+    assert "linear_king_bucket" in available_models()
+    model = get_model_class("linear_king_bucket")
     assert isinstance(model.features, KingBucketFeatures)
     assert model.architecture == "King-bucketed piece-square features (10,368 weights), logistic"

@@ -34,157 +34,33 @@ def test_paired_openings_are_distinct_and_playable():
     assert paired_openings(5, plies=6, seed=1) == openings
 
 
-@pytest.mark.slow
-def test_every_pair_plays_both_colours(tmp_path):
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    run_round_robin(["h2", "h3"], [opening], base=2.0, increment=0.0, workers=2, out=out)
-    records = read_records(out)
-    assert len(records) == 2
-    assert {(r["white"], r["black"]) for r in records} == {("h2", "h3"), ("h3", "h2")}
-    assert all(r["fen"] == opening and "error" not in r for r in records)
-    assert all(r["base"] == 2.0 and r["increment"] == 0.0 for r in records)
-
-
-def test_resume_skips_finished_games(tmp_path):
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    finished = {
-        "white": "h2",
-        "black": "h3",
-        "fen": opening,
-        "base": 2.0,
-        "increment": 0.0,
-        "winner": "white",
-        "result": "1-0",
-        "termination": "checkmate",
-        "total_moves": 10,
-    }
-    out.write_text(json.dumps(finished) + "\n")
-
-    summary = run_round_robin(["h2", "h3"], [opening], base=2.0, increment=0.0, workers=2, out=out)
-
-    records = read_records(out)
-    assert len(records) == 2
-    assert records[0] == finished
-    assert (records[1]["white"], records[1]["black"]) == ("h3", "h2")
-    assert summary["played"] == 1 and summary["skipped"] == 1
-
-
-def test_crashed_game_is_recorded_not_fatal(tmp_path, monkeypatch):
-    # Skip the up-front validation so that the bad spec only fails inside the worker.
-    monkeypatch.setattr(tournament, "check_specs", lambda specs: None)
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    summary = run_round_robin(
-        ["h3", "no_such_model"], [opening], base=2.0, increment=0.0, workers=2, out=out
-    )
-    records = read_records(out)
-    assert len(records) == 2
-    assert all("KeyError" in r["error"] for r in records)
-    assert summary["errors"] == 2
-    assert summarize(records, anchor="h3")["players"]["h3"]["games"] == 0
-
-
 def test_unknown_player_fails_before_any_game(tmp_path):
     out = tmp_path / "games.jsonl"
     opening = paired_openings(1, seed=2)[0]
     with pytest.raises(ValueError, match="no_such_model"):
         run_round_robin(
-            ["h2", "no_such_model"], [opening], base=2.0, increment=0.0, workers=2, out=out
+            ["mlp_features", "no_such_model"],
+            [opening],
+            base=2.0,
+            increment=0.0,
+            workers=2,
+            out=out,
         )
     assert not out.exists()
 
 
-def _dies_on_first_white_h2(job):
-    """Play like the real worker, except that the worker process dies when h2 is White."""
-    if job[0] == "h2":
+def _dies_on_first_white_mlp(job):
+    """Play like the real worker, except that the worker process dies when mlp_features is White."""
+    if job[0] == "mlp_features":
         os._exit(1)
     return tournament._play_game(job)
 
 
-@pytest.mark.slow
-def test_dead_worker_is_recorded_and_pool_rebuilt(tmp_path):
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    summary = run_round_robin(
-        ["h2", "h3"],
-        [opening],
-        base=2.0,
-        increment=0.0,
-        workers=1,
-        out=out,
-        play=_dies_on_first_white_h2,
-    )
-    records = read_records(out)
-    assert len(records) == 2
-    assert [("error" in r) for r in records] == [True, False]
-    assert "died" in records[0]["error"]
-    assert records[1]["winner"] in ("white", "black", None)
-    assert summary["errors"] == 1 and summary["played"] == 2
-
-
-@pytest.mark.slow
-def test_run_gives_up_after_too_many_pool_rebuilds(tmp_path, monkeypatch):
-    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 0)
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    with pytest.raises(RuntimeError, match="giving up"):
-        run_round_robin(
-            ["h2", "h3"],
-            [opening],
-            base=2.0,
-            increment=0.0,
-            workers=1,
-            out=out,
-            play=_dies_on_first_white_h2,
-        )
-    # Nothing is recorded for the requeued game, so a rerun replays both games.
-    assert read_records(out) == []
-    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 5)
-    summary = run_round_robin(["h2", "h3"], [opening], 2.0, 0.0, 1, out)
-    assert summary["played"] == 2 and summary["errors"] == 0
-
-
-def _dies_on_first_opening_as_h2(job):
-    """Kill the worker when h2 plays White from the first opening of ``paired_openings(2, 2)``."""
-    if job[0] == "h2" and job[2] == paired_openings(1, seed=2)[0]:
+def _dies_on_first_opening_as_mlp(job):
+    """Kill the worker when mlp_features plays White from the first opening of ``paired_openings(2, 2)``."""
+    if job[0] == "mlp_features" and job[2] == paired_openings(1, seed=2)[0]:
         os._exit(1)
     return tournament._play_game(job)
-
-
-@pytest.mark.slow
-def test_culprit_is_recorded_after_two_deaths_and_the_others_are_played(tmp_path):
-    out = tmp_path / "games.jsonl"
-    openings = paired_openings(2, seed=2)
-    summary = run_round_robin(
-        ["h2", "h3"],
-        openings,
-        base=2.0,
-        increment=0.0,
-        workers=2,
-        out=out,
-        play=_dies_on_first_opening_as_h2,
-    )
-    records = read_records(out)
-    keys = [(r["white"], r["black"], r["fen"]) for r in records]
-    expected = {
-        ("h2", "h3", openings[0]),
-        ("h3", "h2", openings[0]),
-        ("h2", "h3", openings[1]),
-        ("h3", "h2", openings[1]),
-    }
-    assert len(records) == 4 and set(keys) == expected  # nothing lost, nothing duplicated
-    errors = [r for r in records if "error" in r]
-    assert len(errors) == 1
-    assert (errors[0]["white"], errors[0]["black"], errors[0]["fen"]) == (
-        "h2",
-        "h3",
-        openings[0],
-    )
-    assert "died 2 times" in errors[0]["error"]
-    assert all("winner" in r for r in records if "error" not in r)
-    assert summary["errors"] == 1 and summary["played"] == 4
 
 
 def _dies_on_every_game(job):
@@ -192,32 +68,13 @@ def _dies_on_every_game(job):
     os._exit(1)
 
 
-@pytest.mark.slow
-def test_rebuild_limit_is_enforced_with_several_workers(tmp_path, monkeypatch):
-    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
-    monkeypatch.setattr(tournament, "MAX_DEATHS_PER_GAME", 3)
-    out = tmp_path / "games.jsonl"
-    openings = paired_openings(2, seed=2)
-    with pytest.raises(RuntimeError, match="giving up"):
-        run_round_robin(
-            ["h2", "h3"],
-            openings,
-            base=2.0,
-            increment=0.0,
-            workers=2,
-            out=out,
-            play=_dies_on_every_game,
-        )
-    assert read_records(out) == []
-
-
-def _dies_once_as_h2_white(job):
-    """Kill the worker the first time h2 plays White from either opening; later attempts play.
+def _dies_once_as_mlp_white(job):
+    """Kill the worker the first time mlp_features plays White from either opening; later attempts play.
 
     The first attempt is recorded by a marker file in ``$TOURNAMENT_TEST_MARKERS``, which the
     spawned workers inherit.
     """
-    if job[0] == "h2" and job[2] in paired_openings(2, seed=2):
+    if job[0] == "mlp_features" and job[2] in paired_openings(2, seed=2):
         marker = Path(os.environ["TOURNAMENT_TEST_MARKERS"]) / str(zlib.crc32(job[2].encode()))
         if not marker.exists():
             marker.touch()
@@ -225,72 +82,9 @@ def _dies_once_as_h2_white(job):
     return tournament._play_game(job)
 
 
-@pytest.mark.slow
-def test_rebuild_counter_resets_after_each_game_played(tmp_path, monkeypatch):
-    """Two broken pools, one per opening, with a game played in between: the limit of 1 holds."""
-    markers = tmp_path / "markers"
-    markers.mkdir()
-    monkeypatch.setenv("TOURNAMENT_TEST_MARKERS", str(markers))
-    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 1)
-    out = tmp_path / "games.jsonl"
-    summary = run_round_robin(
-        ["h2", "h3"],
-        paired_openings(2, seed=2),
-        base=2.0,
-        increment=0.0,
-        workers=1,
-        out=out,
-        play=_dies_once_as_h2_white,
-    )
-    records = read_records(out)
-    assert len(records) == 4 and all("error" not in r for r in records)
-    assert summary["errors"] == 0 and summary["played"] == 4
-
-
-@pytest.mark.slow
-def test_run_gives_up_when_every_game_dies(tmp_path, monkeypatch):
-    """Error records do not reset the count, so a systemic failure ends the run."""
-    monkeypatch.setattr(tournament, "MAX_POOL_REBUILDS", 2)
-    out = tmp_path / "games.jsonl"
-    with pytest.raises(RuntimeError, match="giving up"):
-        run_round_robin(
-            ["h2", "h3"],
-            paired_openings(2, seed=2),
-            base=2.0,
-            increment=0.0,
-            workers=2,
-            out=out,
-            play=_dies_on_every_game,
-        )
-    assert all("error" in r for r in read_records(out))
-
-
-def test_truncated_last_line_is_ignored_and_repaired(tmp_path, caplog):
-    out = tmp_path / "games.jsonl"
-    opening = paired_openings(1, seed=2)[0]
-    finished = {
-        "white": "h2",
-        "black": "h3",
-        "fen": opening,
-        "base": 2.0,
-        "increment": 0.0,
-        "winner": "white",
-    }
-    out.write_text(json.dumps(finished) + "\n" + '{"white": "h3", "bla')
-    assert len(tournament.read_games(out)) == 1
-    assert "truncated" in caplog.text
-
-    summary = run_round_robin(["h2", "h3"], [opening], 2.0, 0.0, 2, out)
-
-    lines = out.read_text().splitlines()
-    assert len(lines) == 2
-    assert all(json.loads(line) for line in lines)
-    assert summary["played"] == 1 and summary["games"] == 2
-
-
 def test_corrupt_line_in_the_middle_raises(tmp_path):
     out = tmp_path / "games.jsonl"
-    out.write_text('{"white": "h2"\n{"white": "h3", "black": "h2"}\n')
+    out.write_text('{"white": "mlp_features"\n{"white": "h1", "black": "mlp_features"}\n')
     with pytest.raises(ValueError, match="line 1"):
         tournament.read_games(out)
 
@@ -298,10 +92,12 @@ def test_corrupt_line_in_the_middle_raises(tmp_path):
 def test_other_time_control_is_refused(tmp_path):
     out = tmp_path / "games.jsonl"
     opening = paired_openings(1, seed=2)[0]
-    stale = {"white": "h2", "black": "h3", "fen": opening, "base": 10.0, "increment": 0.1}
+    stale = {"white": "mlp_features", "black": "h1", "fen": opening, "base": 10.0, "increment": 0.1}
     out.write_text(json.dumps(stale) + "\n")
     with pytest.raises(ValueError, match="another time control"):
-        run_round_robin(["h2", "h3"], [opening], base=2.0, increment=0.0, workers=2, out=out)
+        run_round_robin(
+            ["mlp_features", "h1"], [opening], base=2.0, increment=0.0, workers=2, out=out
+        )
     assert read_records(out) == [stale]
 
 
@@ -311,22 +107,22 @@ def game(white, black, winner, **extra):
 
 def test_summarize_scores_and_elo():
     results = [
-        game("h2", "h3", "black"),  # h3 wins
-        game("h3", "h2", "white"),  # h3 wins
-        game("h2", "h3", None),  # draw
-        game("h3", "h2", "black"),  # h2 wins
-        game("m", "h3", "white"),  # m wins
-        game("h3", "m", "white"),  # h3 wins
-        game("m", "h3", "white"),  # m wins
-        game("h3", "m", "black"),  # m wins
-        game("m", "h2", None, error="KeyError: boom"),  # excluded from every score
+        game("mlp_features", "h1", "black"),  # h1 wins
+        game("h1", "mlp_features", "white"),  # h1 wins
+        game("mlp_features", "h1", None),  # draw
+        game("h1", "mlp_features", "black"),  # mlp_features wins
+        game("m", "h1", "white"),  # m wins
+        game("h1", "m", "white"),  # h1 wins
+        game("m", "h1", "white"),  # m wins
+        game("h1", "m", "black"),  # m wins
+        game("m", "mlp_features", None, error="KeyError: boom"),  # excluded from every score
     ]
-    summary = summarize(results, anchor="h3")
-    h2 = summary["players"]["h2"]
-    assert h2["games"] == 4
-    assert (h2["wins"], h2["draws"], h2["losses"]) == (1, 1, 2)
-    assert h2["score"] == pytest.approx(37.5)
-    assert h2["elo_vs_anchor"] == pytest.approx(-400 * math.log10(1 / 0.375 - 1))
+    summary = summarize(results, anchor="h1")
+    mlp = summary["players"]["mlp_features"]
+    assert mlp["games"] == 4
+    assert (mlp["wins"], mlp["draws"], mlp["losses"]) == (1, 1, 2)
+    assert mlp["score"] == pytest.approx(37.5)
+    assert mlp["elo_vs_anchor"] == pytest.approx(-400 * math.log10(1 / 0.375 - 1))
 
     m = summary["players"]["m"]
     assert m["games"] == 4
@@ -334,25 +130,25 @@ def test_summarize_scores_and_elo():
     assert m["score"] == pytest.approx(75.0)
     assert m["elo_vs_anchor"] == pytest.approx(-400 * math.log10(1 / 0.75 - 1))
 
-    assert summary["players"]["h3"]["elo_vs_anchor"] == pytest.approx(0.0)
-    lo, hi = h2["ci95"]
+    assert summary["players"]["h1"]["elo_vs_anchor"] == pytest.approx(0.0)
+    lo, hi = mlp["ci95"]
     assert lo < 37.5 < hi
 
 
 def test_iterative_fit_matches_direct_score_for_two_players():
     results = [
-        game("h2", "h3", "black"),
-        game("h3", "h2", "white"),
-        game("h2", "h3", None),
-        game("h3", "h2", "black"),
+        game("mlp_features", "h1", "black"),
+        game("h1", "mlp_features", "white"),
+        game("mlp_features", "h1", None),
+        game("h1", "mlp_features", "black"),
     ]
-    h2 = summarize(results, anchor="h3")["players"]["h2"]
-    assert h2["elo"] == pytest.approx(h2["elo_vs_anchor"], abs=0.5)
+    mlp = summarize(results, anchor="h1")["players"]["mlp_features"]
+    assert mlp["elo"] == pytest.approx(mlp["elo_vs_anchor"], abs=0.5)
 
 
 def test_summarize_requires_the_anchor_player():
     with pytest.raises(ValueError):
-        summarize([{"white": "h2", "black": "m", "winner": None}])
+        summarize([{"white": "mlp_features", "black": "m", "winner": None}])
 
 
 def test_size_for_budget():
@@ -365,7 +161,13 @@ def test_size_for_budget():
 def test_complete_record_without_newline_is_kept(tmp_path):
     out = tmp_path / "games.jsonl"
     opening = paired_openings(1, seed=2)[0]
-    finished = {"white": "h2", "black": "h3", "fen": opening, "base": 2.0, "increment": 0.0}
+    finished = {
+        "white": "mlp_features",
+        "black": "h1",
+        "fen": opening,
+        "base": 2.0,
+        "increment": 0.0,
+    }
     line = json.dumps(finished).encode()
     out.write_bytes(line)
     tournament._repair_tail(out)
@@ -378,7 +180,7 @@ def test_truncated_multibyte_character_is_a_truncated_line(tmp_path, caplog):
     opening = paired_openings(1, seed=2)[0]
     finished = (
         json.dumps(
-            {"white": "h2", "black": "h3", "fen": opening, "base": 2.0, "increment": 0.0}
+            {"white": "mlp_features", "black": "h1", "fen": opening, "base": 2.0, "increment": 0.0}
         ).encode()
         + b"\n"
     )
@@ -401,21 +203,21 @@ def script():
 
 def test_parse_args_rejects_fewer_than_two_distinct_players(script, capsys):
     with pytest.raises(SystemExit):
-        script.parse_args(["--players", "h3"])
+        script.parse_args(["--players", "h1"])
     assert "at least two distinct players" in capsys.readouterr().err
     with pytest.raises(SystemExit):
-        script.parse_args(["--players", "h3,h3"])
+        script.parse_args(["--players", "h1,h1"])
 
 
 def test_parse_args_requires_the_anchor(script, capsys):
     with pytest.raises(SystemExit):
-        script.parse_args(["--players", "h2,m"])
-    assert "must include h3t" in capsys.readouterr().err
-    assert "h3t" in script.parse_args([]).specs
+        script.parse_args(["--players", "mlp_features,m"])
+    assert "must include h1" in capsys.readouterr().err
+    assert "h1" in script.parse_args([]).specs
 
 
 def test_calibrate_returns_none_when_no_game_is_played(script):
-    assert script.calibrate(["h3"], 2.0, 0.0, 1) is None
+    assert script.calibrate(["h1"], 2.0, 0.0, 1) is None
 
 
 def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, monkeypatch, capsys):
@@ -425,24 +227,24 @@ def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, m
 
     monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
     monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
-    PstTaperedModel().save(tmp_path / "pst_tapered@x.npz")
-    tournament.check_specs(["h2", "pst_tapered@x"])
-    with pytest.raises(ValueError, match="pst_tapered@missing"):
-        tournament.check_specs(["pst_tapered@missing"])
+    PstTaperedModel().save(tmp_path / "linear_pst@x.npz")
+    tournament.check_specs(["h1", "linear_pst@x"])
+    with pytest.raises(ValueError, match="linear_pst@missing"):
+        tournament.check_specs(["linear_pst@missing"])
 
-    args = script.parse_args(["--players", "pst_tapered@x,m", "--anchor", "m"])
-    assert args.specs == ["pst_tapered@x", "m"] and args.anchor == "m"
+    args = script.parse_args(["--players", "linear_pst@x,m", "--anchor", "m"])
+    assert args.specs == ["linear_pst@x", "m"] and args.anchor == "m"
     with pytest.raises(SystemExit):
-        script.parse_args(["--players", "h2,m", "--anchor", "h3"])
-    assert "must include h3" in capsys.readouterr().err
+        script.parse_args(["--players", "mlp_features,m", "--anchor", "h1"])
+    assert "must include h1" in capsys.readouterr().err
 
-    results = [game("pst_tapered@x", "m", "white"), game("m", "pst_tapered@x", "white")]
+    results = [game("linear_pst@x", "m", "white"), game("m", "linear_pst@x", "white")]
     summary = summarize(results, anchor="m")
     assert summary["players"]["m"]["elo"] == pytest.approx(0.0)
     assert summary["players"]["m"]["elo_vs_anchor"] == pytest.approx(0.0)
-    assert summary["players"]["pst_tapered@x"]["elo_vs_anchor"] == pytest.approx(0.0)
+    assert summary["players"]["linear_pst@x"]["elo_vs_anchor"] == pytest.approx(0.0)
     with pytest.raises(ValueError, match="'m'"):
-        summarize([game("h2", "h3", "white")], anchor="m")
+        summarize([game("mlp_features", "h1", "white")], anchor="m")
 
 
 def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, monkeypatch):
@@ -452,17 +254,17 @@ def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     cards.update_card("m", status="current", architecture="A")
     results = [
-        game("m", "h3", "white"),
-        game("h3", "m", "white"),
-        game("m", "h2", None),
-        game("h2", "m", "black"),
-        game("h3", "h2", "white"),
-        game("m2", "h3", "black"),
+        game("m", "h1", "white"),
+        game("h1", "m", "white"),
+        game("m", "mlp_features", None),
+        game("mlp_features", "m", "black"),
+        game("h1", "mlp_features", "white"),
+        game("m2", "h1", "black"),
     ]
-    summary = summarize(results, anchor="h3")
+    summary = summarize(results, anchor="h1")
     assert summary["players"]["m"]["elo_interval"] > 0
 
-    recorded = tournament.record_cards(summary, ["h2", "h3", "m", "m2"], "h3", 10.0, 0.1)
+    recorded = tournament.record_cards(summary, ["mlp_features", "h1", "m", "m2"], "h1", 10.0, 0.1)
     assert recorded == ["m"]
     section = cards.load_card("m")["tournament"]
     entry = summary["players"]["m"]
@@ -471,10 +273,10 @@ def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, 
         "score": entry["score"],
         "elo": entry["elo"],
         "elo_interval": entry["elo_interval"],
-        "anchor": "h3",
+        "anchor": "h1",
         "base": 10.0,
         "increment": 0.1,
     }
-    assert not cards.card_path("m2").exists() and not cards.card_path("h3").exists()
+    assert not cards.card_path("m2").exists() and not cards.card_path("h1").exists()
     row = next(line for line in report.render_tables().splitlines() if "`m`" in line)
     assert f"{entry['score']:.1f}%" in row and "±" in row

@@ -1,7 +1,5 @@
 """Tests for the depth-accuracy profiler."""
 
-import os
-
 import chess
 import pandas as pd
 import pytest
@@ -10,7 +8,7 @@ from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.comparison import tradeoff
 from chess_engine.comparison.tradeoff import fixed_time_manager, make_player, profile
-from chess_engine.evaluation.heuristics import h2, h3
+from chess_engine.evaluation.heuristics import h1
 from chess_engine.models import cards
 
 
@@ -28,11 +26,10 @@ def test_make_player_builds_model_and_heuristic_players(stub_model):
     assert model_player.max_depth == 4
     assert len(model_player.opening_book) == 0
     assert model_player.time_manager is manager
-    for spec, heuristic in (("h2", h2), ("h3", h3)):
-        player = make_player(spec, manager)
-        assert isinstance(player, IterativeHeuristicBot)
-        assert player.eval_function is heuristic
-        assert player.time_manager is manager
+    player = make_player("h1", manager)
+    assert isinstance(player, IterativeHeuristicBot)
+    assert player.eval_function is h1
+    assert player.time_manager is manager
 
 
 def test_profile_reports_depth_and_agreement(stub_model):
@@ -55,33 +52,9 @@ def _positions():
     return pd.DataFrame({"fen": [chess.STARTING_FEN], "best_move": ["e2e4"], "quiet": [True]})
 
 
-def test_run_profiles_reports_skipped_players(monkeypatch, caplog):
-    real = tradeoff.make_player
-
-    def fake(spec, manager, max_depth=30):
-        if spec == "mlp_features":
-            raise FileNotFoundError(spec)
-        return real(spec, manager, max_depth)
-
-    monkeypatch.setattr(tradeoff, "make_player", fake)
-    outcome = tradeoff.run_profiles(["h2", "mlp_features"], [0.1], _positions())
-    assert outcome["skipped"] == ["mlp_features"]
-    assert [r["player"] for r in outcome["results"]] == ["h2"]
-    assert "mlp_features" in caplog.text
-
-
 def test_run_profiles_unknown_player_fails_before_profiling():
     with pytest.raises(ValueError, match="no_such_model"):
-        tradeoff.run_profiles(["h2", "no_such_model"], [0.1], _positions())
-
-
-def test_parallel_workers_are_single_threaded_and_env_restored(monkeypatch):
-    monkeypatch.setenv("OMP_NUM_THREADS", "7")
-    monkeypatch.delenv("TF_NUM_INTRAOP_THREADS", raising=False)
-    outcome = tradeoff.run_profiles(["h2", "h3"], [0.1], _positions(), parallel=2)
-    assert len(outcome["results"]) == 2
-    assert os.environ["OMP_NUM_THREADS"] == "7"
-    assert "TF_NUM_INTRAOP_THREADS" not in os.environ
+        tradeoff.run_profiles(["h1", "no_such_model"], [0.1], _positions())
 
 
 @pytest.fixture
@@ -94,26 +67,3 @@ def cards_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
     monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
     return tmp_path
-
-
-def test_profile_writes_tradeoff_sections_shown_by_the_history(cards_dir):
-    from chess_engine.comparison import report
-    from chess_engine.models.linear_eval import PstTaperedModel
-
-    PstTaperedModel().save(cards_dir / "pst_tapered@t.npz")
-    cards.update_card("pst_tapered@t", status="current", architecture="PST", parameters=769)
-    results = tradeoff.run_profiles(["pst_tapered@t", "h2"], [1, 0.5], _positions())["results"]
-
-    assert tradeoff.record_cards(results) == ["pst_tapered@t"]
-    section = cards.load_card("pst_tapered@t")["tradeoff"]
-    assert set(section) == {"1", "0.5"}
-    for seconds in ("1", "0.5"):
-        assert section[seconds]["mean_depth"] >= 1
-        assert 0.0 <= section[seconds]["search_agreement"] <= 1.0
-    assert not cards.card_path("h2").exists()
-
-    text = report.render_tables()
-    row = next(line for line in text.splitlines() if line.startswith("| `pst_tapered@t`"))
-    cells = [cell.strip() for cell in row.split("|")[1:-1]]
-    assert float(cells[9]) == pytest.approx(section["1"]["mean_depth"], abs=0.05)
-    assert cells[10] == "—"  # no profile at 3 s

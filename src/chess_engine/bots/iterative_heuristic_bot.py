@@ -5,7 +5,7 @@ from typing import Callable, Optional
 import chess
 
 from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
-from chess_engine.evaluation.heuristics import h3
+from chess_engine.evaluation.heuristics import h1
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.chess_problem import ChessProblem
 from chess_engine.search.time_management import TimeManager
@@ -14,7 +14,7 @@ from chess_engine.search.time_management import TimeManager
 class IterativeHeuristicBot(IterativeDeepeningBot):
     """Clock-aware alpha-beta using a hand-crafted heuristic.
 
-    :param eval_function: Heuristic ``(state, player) -> float`` (``h1``..``h4``); default ``h3``.
+    :param eval_function: Heuristic ``(state, player) -> float`` (e.g. ``h1``); default ``h1``.
     :param max_depth: Deepest iteration to run.
     :param problem: Chess problem to search; a fresh one is created by default.
     :param time_manager: Time budgeting policy.
@@ -22,7 +22,7 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
 
     def __init__(
         self,
-        eval_function: Callable[[ChessGameState, chess.Color], float] = h3,
+        eval_function: Callable[[ChessGameState, chess.Color], float] = h1,
         max_depth: int = 3,
         problem: Optional[ChessProblem] = None,
         time_manager: Optional[TimeManager] = None,

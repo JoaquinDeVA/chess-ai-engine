@@ -393,7 +393,7 @@ class NeuralEvalModel(LinearEvalModel):
         }
 
 
-@register_model("nn4")
+@register_model("net4_pst")
 class Nn4Model(NeuralEvalModel):
     """768 slotted piece-square inputs, a 256 accumulator, 32, 32 and one output (4 layers)."""
 

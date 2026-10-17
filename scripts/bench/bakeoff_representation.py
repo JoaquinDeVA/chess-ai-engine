@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Representation bake-off: which target, point of view and training subset suit pst_tapered.
+"""Representation bake-off: which target, point of view and training subset suit linear_pst.
 
 python scripts/bench/bakeoff_representation.py --train-positions 5000000 --test-positions 200000 \
     --effort 30 --tiebreak-games 200 --out docs/training/bakeoff.json
 
 Every variant changes one axis of the default representation and is trained as a tagged model
-``pst_tapered@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
+``linear_pst@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
 ``--tag-prefix`` says otherwise). The variants are judged on the same test sample
 with :func:`~chess_engine.comparison.judge.judge`. The two best by ``all`` best-move agreement then
 play a round-robin at equal time per move. The script stops there: it writes the report, which
@@ -54,7 +54,7 @@ from chess_engine.training.train import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-MODEL = "pst_tapered"
+MODEL = "linear_pst"
 
 
 @dataclass(frozen=True)
@@ -176,7 +176,7 @@ def render_markdown(
     :return: Markdown text, ending with ``Decision: pending``.
     """
     lines = [
-        "# Representation bake-off (pst_tapered)",
+        "# Representation bake-off (linear_pst)",
         "",
         *(f"- {key}: {value}" for key, value in meta.items()),
         "",
@@ -251,7 +251,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--tag-prefix",
         default="bake",
-        help="tagged models are pst_tapered@<prefix>-<index> (letters, digits, '.', '_', '-')",
+        help="tagged models are linear_pst@<prefix>-<index> (letters, digits, '.', '_', '-')",
     )
     parser.add_argument("--keep-models", action="store_true", help="keep the tagged models")
     parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "docs/training/bakeoff.json")

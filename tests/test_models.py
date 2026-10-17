@@ -140,34 +140,32 @@ class TestScale:
 class TestRegistry:
     def test_builtin_models_are_registered(self):
         assert {
-            "ridge_features",
             "mlp_features",
             "cnn_resnet",
-            "material_linear",
+            "linear_material",
         } <= set(available_models())
 
     def test_unknown_model_lists_the_valid_names(self):
-        with pytest.raises(KeyError, match="available:.*material_linear"):
+        with pytest.raises(KeyError, match="available:.*linear_material"):
             get_model_class("nope")
 
     def test_registering_a_name_twice_is_an_error(self):
         with pytest.raises(ValueError, match="already registered"):
 
-            @register_model("material_linear")
+            @register_model("linear_material")
             class Impostor(EvaluationModel):  # pragma: no cover - never instantiated
                 pass
 
     def test_missing_artifact_raises_file_not_found(self, tmp_path):
         with pytest.raises(FileNotFoundError):
-            load_model("material_linear", tmp_path / "missing.npz")
+            load_model("linear_material", tmp_path / "missing.npz")
 
-    def test_frozen_models_cannot_be_retrained(self):
-        assert not get_model_class("cnn_light").trainable
-        assert get_model_class("ridge_features").trainable
+    def test_models_are_trainable_by_default(self):
+        assert get_model_class("mlp_features").trainable
 
 
 class TestShippedModels:
-    @pytest.mark.parametrize("name", ["mlp_features", "ridge_features", "cnn_light", "cnn_resnet"])
+    @pytest.mark.parametrize("name", ["mlp_features", "cnn_resnet"])
     def test_sign_is_white_point_of_view(self, name):
         pytest.importorskip("keras")
         model = load_model(name)
@@ -178,7 +176,6 @@ class TestShippedModels:
     def test_parameter_counts_match_the_architectures(self):
         pytest.importorskip("keras")
         assert load_model("mlp_features").count_parameters() == 1505
-        assert load_model("cnn_light").count_parameters() == 109_569
         assert load_model("cnn_resnet").count_parameters() == 572_353
 
     def test_numpy_inference_of_the_mlp_matches_keras(self, sample_boards):
@@ -194,7 +191,7 @@ class TestShippedModels:
 
     def test_batch_prediction_matches_single_predictions(self, sample_boards):
         pytest.importorskip("keras")
-        model = load_model("cnn_light")
+        model = load_model("cnn_resnet")
         batch = model.predict_cp_batch(sample_boards[:8])
         single = [model.predict_cp(board) for board in sample_boards[:8]]
         np.testing.assert_allclose(batch, single, atol=1e-2)
@@ -211,21 +208,21 @@ class TestMaterialLinear:
                 "white_to_move": [b.turn == chess.WHITE for b in boards],
             }
         )
-        model = get_model_class("material_linear")()
+        model = get_model_class("linear_material")()
         summary = model.fit_stream(
             [train], train.head(100), {"l2": 0.0, "lr": 0.05, "max_epochs": 40, "patience": 40}
         )
         assert summary["train_rows"] == 400
 
         path = model.save(tmp_path / "material.npz")
-        loaded = get_model_class("material_linear").load(path)
+        loaded = get_model_class("linear_material").load(path)
         predictions = loaded.predict_cp_batch(sample_boards)
         truth = np.clip([material_cp(b) for b in sample_boards], -CP_SCALE, CP_SCALE)
         assert np.corrcoef(predictions, truth)[0, 1] > 0.9
         assert loaded.count_parameters() == 6  # 5 coefficients + intercept
 
     def test_predictions_are_clipped_to_the_cp_scale(self):
-        model = get_model_class("material_linear")(weights=np.full(5, 10.0))
+        model = get_model_class("linear_material")(weights=np.full(5, 10.0))
         extreme = chess.Board("4k3/8/8/8/8/8/PPPPPPPP/QQQQKQQQ w - - 0 1")
         assert abs(model.predict_cp(extreme)) <= CP_SCALE
 
@@ -257,19 +254,19 @@ def test_tagged_spec_round_trip(tmp_path, monkeypatch):
 
     monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
     monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
-    cls = get_model_class("pst_tapered")
-    cls(weights=np.zeros(768), bias=0.0).save()
-    cls(weights=np.full(768, 0.5), bias=1.0).save(tmp_path / "pst_tapered@x.npz")
+    cls = get_model_class("linear_pst")
+    cls(weights=np.zeros(768), bias=0.0).save(tmp_path / "linear_pst.npz")
+    cls(weights=np.full(768, 0.5), bias=1.0).save(tmp_path / "linear_pst@x.npz")
 
-    assert registry.split_spec("pst_tapered@x") == ("pst_tapered", "x")
-    assert registry.split_spec("pst_tapered") == ("pst_tapered", None)
+    assert registry.split_spec("linear_pst@x") == ("linear_pst", "x")
+    assert registry.split_spec("linear_pst") == ("linear_pst", None)
     with pytest.raises(ValueError):
-        registry.split_spec("pst_tapered@")
-    tagged = load_model("pst_tapered@x")
+        registry.split_spec("linear_pst@")
+    tagged = load_model("linear_pst@x")
     assert tagged.bias == 1.0 and tagged.weights[0] == 0.5
-    plain = load_model("pst_tapered")
+    plain = load_model("linear_pst")
     assert plain.bias == 0.0
     with pytest.raises(FileNotFoundError):
-        load_model("pst_tapered@missing")
+        load_model("linear_pst@missing")
     with pytest.raises(KeyError):
         load_model("no_such_model@x")

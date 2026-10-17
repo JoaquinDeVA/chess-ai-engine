@@ -8,9 +8,6 @@ from pathlib import Path
 import chess
 import pytest
 
-from chess_engine.models import cards, registry
-from chess_engine.models.registry import artifact_path
-from chess_engine.training import effort
 from chess_engine.training.lichess import (
     SIDE_TO_MOVE,
     WHITE,
@@ -162,53 +159,3 @@ def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
     rows = sum(len(b) for b in batches)
     assert rows == 100
     assert all((b["depth"] >= 20).all() for b in batches)
-
-
-@pytest.mark.slow
-def test_bakeoff_runs_on_fixture(tmp_path, monkeypatch, capsys):
-    module = load_script("bakeoff_representation")
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(effort, "WORKERS", 2)
-    raw, side = tmp_path / "raw", tmp_path / "side"
-    bakeoff_fixture(raw, side)
-    report, out = tmp_path / "BAKEOFF.md", tmp_path / "bakeoff.json"
-
-    code = module.main(
-        [
-            "--raw", str(raw), "--sidecar", str(side),
-            "--train-positions", "2000", "--test-positions", "500", "--effort", "10",
-            "--tiebreak-games", "1", "--base", "10", "--increment", "0.1", "--workers", "2",
-            "--tag-prefix", "test-bake",
-            "--out", str(out), "--report", str(report),
-        ]
-    )  # fmt: skip
-    assert code == 0
-    data = json.loads(out.read_text())
-    assert len(data["variants"]) == 8
-    assert len(data["tiebreak"]["players"]) == 2
-    text = report.read_text()
-    assert all(variant.label in text for variant in module.VARIANTS)
-    assert text.rstrip().splitlines()[-1] == "Decision: pending"
-    # Temporary models and cards are deleted unless --keep-models is given.
-    assert not artifact_path("pst_tapered@test-bake-0").exists()
-    assert list((tmp_path / "cards").glob("*@test-bake-*.json")) == []
-
-
-def test_bakeoff_refuses_to_overwrite_existing_tagged_models(tmp_path, monkeypatch, capsys):
-    module = load_script("bakeoff_representation")
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path / "artifacts")
-    (tmp_path / "artifacts").mkdir()
-    cards.update_card("pst_tapered@test-bake-2", status="bake-off")
-    raw, side = tmp_path / "raw", tmp_path / "side"
-    bakeoff_fixture(raw, side, count=300)
-
-    code = module.main(
-        ["--raw", str(raw), "--sidecar", str(side), "--tag-prefix", "test-bake",
-         "--out", str(tmp_path / "b.json"), "--report", str(tmp_path / "B.md")]
-    )  # fmt: skip
-    assert code == 2
-    assert "pst_tapered@test-bake-2" in capsys.readouterr().out
-    assert cards.card_path("pst_tapered@test-bake-2").exists(), "a card it did not create"
-    assert not (tmp_path / "artifacts" / "pst_tapered@test-bake-0.npz").exists()
-    assert not (tmp_path / "b.json").exists()

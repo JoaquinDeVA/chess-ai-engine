@@ -1,7 +1,7 @@
 """Train a registered model.
 
 Models of the CSV family: ``python -m chess_engine.training.train --model <name> --data <csv>``.
-Linear models, from the raw shards: ``--model pst_tapered --effort <0-100>``.
+Linear models, from the raw shards: ``--model linear_pst --effort <0-100>``.
 """
 
 import argparse

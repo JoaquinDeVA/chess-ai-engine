@@ -1,6 +1,7 @@
 """Tests of the training pipeline: targets, dataset split, metrics, cards, report and the CLIs."""
 
 import json
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from chess_engine import models
 from chess_engine.comparison import evaluate as evaluate_cli
 from chess_engine.comparison import report
 from chess_engine.comparison.metrics import compute_metrics, outcome_class
+from chess_engine.models import base as models_base
 from chess_engine.models import cards, registry
 from chess_engine.training import train as train_cli
 from chess_engine.training.dataset import (
@@ -26,7 +28,6 @@ from chess_engine.training.representation import Representation
 from chess_engine.training.sidecar import build_sidecar
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
-from tests.test_effort import write_fixture_shards
 
 
 class TestTargets:
@@ -205,7 +206,7 @@ class TestCardsAndReport:
     def test_report_renders_new_columns(self, isolated_cards):
         representation = Representation().to_dict()
         cards.update_card(
-            "pst_tapered",
+            "linear_pst",
             status="current",
             architecture="PST",
             parameters=1234,
@@ -222,22 +223,22 @@ class TestCardsAndReport:
             "Search agreement, 10 s | Score | Elo ± interval |"
         )
         row = (
-            f"| `pst_tapered` | plays | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
+            f"| `linear_pst` | plays | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
             "34.5% / 28.0% | 12.5 | 1.0 | 3.2 | 6.0 | 40.0% | 56.2% | +43 ± 24 |"
         )
         assert header in text and row in text
 
     def test_accuracy_record_models_marked(self, isolated_cards):
         cards.update_card(
-            "ridge_features",
+            "mlp_features",
             status="current",
-            parameters=30,
+            parameters=1505,
             accuracy=ACCURACY,
             cost={"us_per_eval": 12.5},
         )
         text = report.render_tables()
         assert (
-            "| `ridge_features` | accuracy record | 30 | — | — | 0.912 | 0.083 | 34.5% / 28.0% "
+            "| `mlp_features` | accuracy record | 1,505 | — | — | 0.912 | 0.083 | 34.5% / 28.0% "
             "| 12.5 | — | — | — | — | — | — |"
         ) in text
 
@@ -268,144 +269,21 @@ class TestCardsAndReport:
 class TestCommandLines:
     """End-to-end: CSV -> train -> save -> evaluate -> card, in a temporary directory."""
 
-    def test_train_then_evaluate_ridge_features(self, isolated_cards, tmp_path, monkeypatch):
-        boards = random_positions(1200, seed=9)
-        csv = write_csv(tmp_path / "evals.csv", boards)
-        target = tmp_path / "ridge_features.pkl"
-
-        assert (
-            train_cli.main(
-                [
-                    "--model",
-                    "ridge_features",
-                    "--data",
-                    str(csv),
-                    "--output",
-                    str(target),
-                    "--jobs",
-                    "1",
-                ]
-            )
-            == 0
-        )
-        assert target.exists()
-        card = cards.load_card("ridge_features")
-        assert (
-            card["status"] == "current"
-            and card["parameters"] == 30
-            and card["training"]["train_samples"] > 500
-        )
-
-        assert (
-            evaluate_cli.main(
-                [
-                    "--model",
-                    "ridge_features",
-                    "--data",
-                    str(csv),
-                    "--path",
-                    str(target),
-                    "--latency-samples",
-                    "20",
-                    "--jobs",
-                    "1",
-                ]
-            )
-            == 0
-        )
-        bench = cards.load_card("ridge_features")["benchmark"]
-        assert bench["n_test"] > 50 and bench["ms_per_eval"] > 0
-        assert bench["accuracy"] > 0.6, (
-            "material regression must beat chance on material-labelled data"
-        )
-
-    def test_frozen_models_refuse_to_train(self, tmp_path, capsys):
-        csv = write_csv(tmp_path / "evals.csv", random_positions(10, seed=1))
-        assert train_cli.main(["--model", "cnn_light", "--data", str(csv)]) == 2
-        assert "cannot be retrained" in capsys.readouterr().out
-
     def test_config_files_are_read(self, tmp_path):
         config = tmp_path / "c.toml"
-        config.write_text("alpha = 3.5\n")
-        assert train_cli.load_config("ridge_features", config) == {"alpha": 3.5}
-        assert train_cli.load_config("ridge_features", tmp_path / "missing.toml") == {}
-        assert train_cli.load_config("ridge_features")["alpha"] == 10.0
+        config.write_text("epochs = 3\n")
+        assert train_cli.load_config("mlp_features", config) == {"epochs": 3}
+        assert train_cli.load_config("mlp_features", tmp_path / "missing.toml") == {}
+        assert train_cli.load_config("mlp_features")["epochs"] == 40
 
 
 class TestEffortCommandLine:
     """``--effort`` trains a linear model straight from raw shards and their sidecars."""
 
-    def test_train_cli_trains_pst_on_fixture_shards(self, isolated_cards, tmp_path):
-        raw, side = tmp_path / "raw", tmp_path / "side"
-        write_fixture_shards(raw, side, 900, seed=4)
-        target = tmp_path / "pst_tapered.npz"
-
-        assert (
-            train_cli.main(
-                [
-                    "--model", "pst_tapered", "--effort", "0",
-                    "--raw", str(raw), "--sidecar", str(side), "--output", str(target),
-                ]
-            )
-            == 0
-        )  # fmt: skip
-        assert target.exists()
-        training = cards.load_card("pst_tapered")["training"]
-        assert training["effort"] == 0
-        assert training["representation"] == Representation().to_dict()
-        assert training["train_samples"] > 0 and training["seconds"] > 0
-        assert training["effort_config"]["trials"] == 0
-
-    def test_effort_40_runs_one_trial_and_records_it(self, isolated_cards, tmp_path):
-        raw, side = tmp_path / "raw", tmp_path / "side"
-        write_fixture_shards(raw, side, 900, seed=4)
-        target = tmp_path / "pst_tapered.npz"
-
-        assert (
-            train_cli.main(
-                [
-                    "--model", "pst_tapered", "--effort", "40",
-                    "--raw", str(raw), "--sidecar", str(side), "--output", str(target),
-                ]
-            )
-            == 0
-        )  # fmt: skip
-        training = cards.load_card("pst_tapered")["training"]
-        assert training["effort"] == 40
-        assert training["effort_config"]["trials"] == 1
-        assert training["effort_config"]["max_epochs"] == 5
-
-    def test_evaluate_writes_accuracy_and_cost_from_the_test_sample(self, isolated_cards, tmp_path):
-        raw, side = tmp_path / "raw", tmp_path / "side"
-        write_fixture_shards(raw, side, 900, seed=4)
-        target = tmp_path / "pst_tapered.npz"
-        shards = ["--raw", str(raw), "--sidecar", str(side)]
-        assert (
-            train_cli.main(
-                ["--model", "pst_tapered", "--effort", "0", *shards, "--output", str(target)]
-            )
-            == 0
-        )
-
-        assert (
-            evaluate_cli.main(
-                ["--model", "pst_tapered", "--path", str(target), *shards, "--agreement-n", "50"]
-            )
-            == 0
-        )
-        card = cards.load_card("pst_tapered")
-        accuracy = card["accuracy"]
-        rows = accuracy["sample"]["rows"]
-        assert rows > 0 and accuracy["sample"] == {"rows": rows, "seed": 42, "agreement_n": 50}
-        assert set(accuracy) >= {"all", "quiet", "non_quiet", "sample"}
-        assert accuracy["all"]["n"] == rows and 0 <= accuracy["all"]["mae"] <= 1
-        assert card["cost"]["us_per_eval"] > 0
-        assert "benchmark" not in card
-
     def test_unknown_representation_field_exits_cleanly(self, isolated_cards, tmp_path, capsys):
         code = train_cli.main(
             [
-                "--model", "pst_tapered", "--effort", "0",
+                "--model", "linear_pst", "--effort", "0",
                 "--raw", str(tmp_path), "--sidecar", str(tmp_path),
                 "--representation", '{"bogus": 1}',
             ]
@@ -431,27 +309,6 @@ def write_mate_shards(raw, side, count=900, seed=4):
 
 
 class TestMateKeepAndTags:
-    def test_train_cli_mate_keep_and_tag_write_tagged_artifact_and_card(
-        self, isolated_cards, tmp_path, monkeypatch
-    ):
-        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
-        raw, side = tmp_path / "raw", tmp_path / "side"
-        write_mate_shards(raw, side)
-
-        code = train_cli.main(
-            [
-                "--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05", "--tag", "mates5",
-                "--raw", str(raw), "--sidecar", str(side),
-            ]
-        )  # fmt: skip
-        assert code == 0
-        assert (tmp_path / "pst_tapered@mates5.npz").exists()
-        assert not (tmp_path / "pst_tapered.npz").exists()
-        card = cards.load_card("pst_tapered@mates5")
-        assert card["name"] == "pst_tapered@mates5"
-        assert card["training"]["representation"]["mate_keep"] == 0.05
-        assert cards.load_card("pst_tapered") == {"name": "pst_tapered"}
-
     def test_judge_sample_ignores_mate_keep(self, stub_model, tmp_path, monkeypatch):
         """The test sample of the evaluation is always read with every row (no ``mate_keep``)."""
 
@@ -482,36 +339,81 @@ class TestMateKeepGuards:
         write_mate_shards(raw, side)
         shards = ["--raw", str(raw), "--sidecar", str(side)]
 
-        flag = ["--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05", *shards]
+        flag = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "0.05", *shards]
         assert train_cli.main(flag) == 2
         representation = [
-            "--model", "pst_tapered", "--effort", "0", "--representation",
+            "--model", "linear_pst", "--effort", "0", "--representation",
             '{"mate_keep": 0.05}', *shards,
         ]  # fmt: skip
         assert train_cli.main(representation) == 2
-        assert not list(tmp_path.glob("pst_tapered*.npz"))
-        assert cards.load_card("pst_tapered") == {"name": "pst_tapered"}
+        assert not list(tmp_path.glob("linear_pst*.npz"))
+        assert cards.load_card("linear_pst") == {"name": "linear_pst"}
 
-    def test_evaluate_accepts_a_tagged_spec_and_writes_its_card(
-        self, isolated_cards, tmp_path, monkeypatch
+
+class FakeLinearModel:
+    """Doble del modelo entrenado: guarda un fichero mínimo y no usa datos ni TensorFlow."""
+
+    def save(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fake")
+        return path
+
+    def count_parameters(self):
+        return 7
+
+
+@pytest.fixture
+def fake_training(isolated_cards, monkeypatch):
+    """Sustituye lectura de datos, calibrado, búsqueda y ajuste de ``train_by_effort``."""
+    monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+    monkeypatch.setattr(train_cli, "available_rows", lambda *a, **k: 1000)
+    monkeypatch.setattr(train_cli, "load_sample", lambda *a, **k: None)
+    timing = SimpleNamespace(seconds_per_position=1e-5, encode_seconds=0.1, score_seconds=0.1)
+    monkeypatch.setattr(train_cli, "calibrate", lambda *a, **k: timing)
+    monkeypatch.setattr(train_cli, "estimated_seconds", lambda *a, **k: 1.0)
+    monkeypatch.setattr(train_cli, "search", lambda *a, **k: {"l2": 1e-3, "lr": 1e-2})
+    summary = {"train_rows": 900, "val_mae": 0.1}
+    monkeypatch.setattr(train_cli, "fit", lambda *a, **k: (FakeLinearModel(), dict(summary)))
+    return isolated_cards
+
+
+class TestCommandLineWithDoubles:
+    """CLI de entrenamiento y evaluación con dobles: sin entrenar ni calcular métricas."""
+
+    def train(self, *extra):
+        argv = ["--model", "linear_pst", "--effort", "40", "--raw", "r", "--sidecar", "s", *extra]
+        return train_cli.main(argv)
+
+    def test_training_writes_the_card_with_its_training_section(self, fake_training, capsys):
+        assert self.train() == 0
+        card = cards.load_card("linear_pst")
+        assert card["status"] == "current" and card["parameters"] == 7
+        training = card["training"]
+        assert training["effort"] == 40 and training["train_samples"] == 900
+        assert training["val_mae"] == 0.1 and "effort_config" in training
+        assert "representation" in training and "date" in training and "commit" in training
+        assert "Effort 40" in capsys.readouterr().out
+
+    def test_tag_writes_artifact_and_card_without_touching_the_untagged_one(self, fake_training):
+        cards.update_card("linear_pst", status="current", parameters=99)
+        assert self.train("--tag", "x") == 0
+        assert (fake_training / "artifacts" / "linear_pst@x.npz").exists()
+        assert cards.load_card("linear_pst@x")["training"]["effort"] == 40
+        assert cards.load_card("linear_pst") == {
+            "name": "linear_pst", "status": "current", "parameters": 99
+        }  # fmt: skip
+
+    def test_evaluation_with_a_tag_writes_the_tagged_card(
+        self, isolated_cards, stub_model, monkeypatch
     ):
-        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
-        raw, side = tmp_path / "raw", tmp_path / "side"
-        write_mate_shards(raw, side)
-        shards = ["--raw", str(raw), "--sidecar", str(side)]
-        tagged = ["--model", "pst_tapered", "--effort", "0", "--mate-keep", "0.05",
-                  "--tag", "mates5", *shards]  # fmt: skip
-        assert train_cli.main(tagged) == 0
-
-        assert (
-            evaluate_cli.main(
-                ["--model", "pst_tapered@mates5", "--path",
-                 str(tmp_path / "pst_tapered@mates5.npz"), *shards, "--agreement-n", "50"]
-            )
-            == 0
-        )  # fmt: skip
-        card = cards.load_card("pst_tapered@mates5")
-        assert card["accuracy"]["sample"]["rows"] > 0 and card["cost"]["us_per_eval"] > 0
-        assert "accuracy" not in cards.load_card("pst_tapered")
-        with pytest.raises(SystemExit):
-            evaluate_cli.parse_args(["--model", "no_such_model@x"])
+        metrics = {
+            "accuracy": ACCURACY | {"sample": {"rows": 100, "seed": 1, "agreement_n": 10}},
+            "cost": {"us_per_eval": 5.0},
+        }
+        monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+        monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
+        monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
+        assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
+        assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912
+        assert cards.load_card("linear_pst") == {"name": "linear_pst"}

@@ -9,8 +9,8 @@ Typical flow::
 
     python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst
     python scripts/data/prepare_dataset.py
-    python -m chess_engine.training.train --model pst_tapered --effort 40
-    python -m chess_engine.comparison.evaluate --model pst_tapered
+    python -m chess_engine.training.train --model linear_pst --effort 40
+    python -m chess_engine.comparison.evaluate --model linear_pst
 
 CSV flow for the older models::
 

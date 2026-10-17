@@ -1,44 +1,16 @@
 """Model architectures shipped with the project.
 
-* ``ridge_features``: scikit-learn ``StandardScaler -> Ridge`` on 29 hand-crafted features.
 * ``mlp_features``: a tiny dense network on the same features, evaluated with plain NumPy.
 * ``cnn_resnet``: residual convolutional network on an ``8x8x12`` piece tensor (+ 9 extras).
-* ``cnn_light``: smaller convolutional network with the same inputs (load-only).
 """
 
 from typing import Any, Dict, Tuple
 
 import numpy as np
-from sklearn.linear_model import Ridge
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
 from .features import BitboardFeatures, VectorFeatures
 from .keras_model import KerasModel, _import_keras
 from .registry import register_model
-from .sklearn_model import SklearnModel
-
-
-@register_model("ridge_features")
-class RidgeFeatures(SklearnModel):
-    """Ridge regression (alpha 10) on standardized :class:`VectorFeatures`."""
-
-    extractor = VectorFeatures()
-    architecture = "StandardScaler -> Ridge(alpha=10) on 29 features"
-
-    @classmethod
-    def build_estimator(cls, config: Dict[str, Any]) -> Pipeline:
-        """Create the scaler + ridge pipeline.
-
-        :param config: Optional ``alpha`` (default 10.0).
-        :return: An untrained pipeline.
-        """
-        return Pipeline(
-            [
-                ("scaler", StandardScaler()),
-                ("lr", Ridge(alpha=config.get("alpha", 10.0), random_state=42)),
-            ]
-        )
 
 
 @register_model("mlp_features")
@@ -160,16 +132,3 @@ class CnnResnet(KerasModel):
         z = layers.Dense(128, activation="relu")(z)
         z = layers.Dense(64, activation="relu")(z)
         return keras.Model(inputs=[board_input, meta_input], outputs=layers.Dense(1)(z))
-
-
-@register_model("cnn_light")
-class CnnLight(KerasModel):
-    """Lighter CNN (109,569 parameters) with the same inputs as ``cnn_resnet``.
-
-    Only the saved weights survive from the course, so this model can be loaded and evaluated
-    but not retrained.
-    """
-
-    extractor = BitboardFeatures()
-    architecture = "CNN (5 conv layers 32-32-64-64-64, GAP) + dense branch -> Dense32-16-1"
-    trainable = False

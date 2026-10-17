@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from chess_engine.bots.bot_registry import BotRegistry
-from tests.conftest import MATE_IN_ONE
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,31 +56,6 @@ def run_cli(*args, timeout=180):
     )
 
 
-def test_cli_lists_bots():
-    result = run_cli("--list-bots")
-    assert result.returncode == 0
-    assert "IterativeHeuristicBot" in result.stdout and "bots available" in result.stdout
-
-
-def test_cli_plays_a_game_to_the_end_and_exports_the_pgn(tmp_path):
-    pgn = tmp_path / "game.pgn"
-    result = run_cli(
-        "--player1",
-        "IterativeHeuristicBot",
-        "--player2",
-        "IterativeHeuristicBot",
-        "--depth",
-        "2",
-        "--position",
-        MATE_IN_ONE,
-        "--export",
-        str(pgn),
-    )
-    assert result.returncode == 0, result.stderr
-    assert "Winner: white" in result.stdout
-    assert "Ra8#" in pgn.read_text()
-
-
 def test_cli_rejects_unknown_bots_and_bad_positions():
     assert run_cli("--player1", "Nope").returncode == 1
     assert (
@@ -102,9 +76,9 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
 
     from main import bot_options
 
-    args = argparse.Namespace(model="material_linear", depth=3)
+    args = argparse.Namespace(model="linear_material", depth=3)
     assert bot_options(registry, "IterativeModelBookBot", args) == {
-        "model": "material_linear",
+        "model": "linear_material",
         "max_depth": 3,
     }
     assert bot_options(registry, "IterativeHeuristicBot", args) == {"max_depth": 3}

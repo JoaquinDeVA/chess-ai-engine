@@ -1,4 +1,4 @@
-"""Tests of the tuned classical reference ``h3t`` and of the script that fits its weights."""
+"""Tests of the classical reference ``h1`` and of the script that fits its weights."""
 
 import importlib.util
 import json
@@ -19,11 +19,9 @@ from chess_engine.comparison.tradeoff import (
 from chess_engine.evaluation import heuristics
 from chess_engine.evaluation.heuristics import (
     FEATURE_NAMES,
-    H3_WEIGHTS,
-    h3,
-    h3t,
-    load_h3t_weights,
-    reset_h3t_cache,
+    h1,
+    load_h1_weights,
+    reset_h1_cache,
 )
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.training.lichess_raw import shard_path, write_shard
@@ -51,40 +49,30 @@ def load_script(relative: str, name: str):
 
 @pytest.fixture(scope="module")
 def fit_script():
-    return load_script("scripts/data/fit_h3t.py", "fit_h3t")
+    return load_script("scripts/data/fit_h1.py", "fit_h1")
 
 
 @pytest.fixture(autouse=True)
 def weights_file(tmp_path, monkeypatch):
-    """Point ``h3t`` at a weights file in a temporary directory, with a fresh cache."""
-    path = tmp_path / "h3t_weights.json"
+    """Point ``h1`` at a weights file in a temporary directory, with a fresh cache."""
+    path = tmp_path / "h1_weights.json"
     path.write_text(json.dumps({"weights": TUNED_WEIGHTS}))
-    monkeypatch.setattr(heuristics, "H3T_WEIGHTS_PATH", path)
-    reset_h3t_cache()
+    monkeypatch.setattr(heuristics, "H1_WEIGHTS_PATH", path)
+    reset_h1_cache()
     yield path
-    reset_h3t_cache()
+    reset_h1_cache()
 
 
 def states(count, seed):
     return [ChessGameState(board) for board in random_positions(count, seed=seed, max_plies=40)]
 
 
-def test_h3t_is_complementary_for_white_and_black():
+def test_h1_is_complementary_for_white_and_black():
     for state in states(50, seed=3):
-        white = h3t(state, chess.WHITE)
-        black = h3t(state, chess.BLACK)
+        white = h1(state, chess.WHITE)
+        black = h1(state, chess.BLACK)
         assert 0.01 <= white <= 0.99
         assert white + black == pytest.approx(1.0)
-
-
-def test_h3t_with_h3_like_weights_matches_h3_ordering(weights_file):
-    weights_file.write_text(json.dumps({"weights": H3_WEIGHTS}))
-    reset_h3t_cache()
-    sample = states(50, seed=4)
-    tuned = [h3t(state, chess.WHITE) for state in sample]
-    plain = [h3(state, chess.WHITE) for state in sample]
-    assert tuned == pytest.approx(plain)
-    assert sorted(range(50), key=tuned.__getitem__) == sorted(range(50), key=plain.__getitem__)
 
 
 def test_fit_recovers_known_weights(fit_script):
@@ -118,7 +106,7 @@ def test_fit_script_runs_on_fixture_shards(fit_script, tmp_path, capsys):
         ]
         write_shard(shard_path(raw, index), records, {"perspective": "white"})
         build_sidecar(shard_path(raw, index), sidecar)
-    out = tmp_path / "h3t_weights.json"
+    out = tmp_path / "h1_weights.json"
 
     argv = ["--raw", str(raw), "--sidecar", str(sidecar), "--positions", "300"]
     code = fit_script.main([*argv, "--jobs", "1", "--out", str(out)])
@@ -132,29 +120,37 @@ def test_fit_script_runs_on_fixture_shards(fit_script, tmp_path, capsys):
 
 
 def test_missing_weights_file_raises_with_hint(tmp_path):
-    with pytest.raises(FileNotFoundError, match="scripts/data/fit_h3t.py"):
-        load_h3t_weights(tmp_path / "absent.json")
+    with pytest.raises(FileNotFoundError, match="scripts/data/fit_h1.py"):
+        load_h1_weights(tmp_path / "absent.json")
 
 
 def test_weights_are_cached_until_reset(weights_file):
-    assert load_h3t_weights() == TUNED_WEIGHTS
-    weights_file.write_text(json.dumps({"weights": H3_WEIGHTS}))
-    assert load_h3t_weights() == TUNED_WEIGHTS  # served from the cache
-    reset_h3t_cache()
-    assert load_h3t_weights() == H3_WEIGHTS
+    assert load_h1_weights() == TUNED_WEIGHTS
+    other = {**TUNED_WEIGHTS, "material_diff_normalized": 0.9}
+    weights_file.write_text(json.dumps({"weights": other}))
+    assert load_h1_weights() == TUNED_WEIGHTS  # served from the cache
+    reset_h1_cache()
+    assert load_h1_weights() == other
 
 
-def test_tradeoff_accepts_h3t_spec():
-    assert HEURISTICS["h3t"] is h3t
-    validate_specs(["h3t", "h2"])
-    player = make_player("h3t", fixed_time_manager(0.2))
+def test_shipped_weights_file_loads_with_the_feature_names():
+    reset_h1_cache()
+    weights = load_h1_weights(Path(heuristics.__file__).with_name("h1_weights.json"))
+    assert set(weights) == set(FEATURE_NAMES)
+    assert all(np.isfinite(value) for value in weights.values())
+
+
+def test_tradeoff_accepts_h1_spec():
+    assert HEURISTICS["h1"] is h1
+    validate_specs(["h1"])
+    player = make_player("h1", fixed_time_manager(0.2))
     assert isinstance(player, IterativeHeuristicBot)
-    assert player.eval_function is h3t
+    assert player.eval_function is h1
 
 
-def test_run_tournament_defaults_use_h3t_anchor():
-    script = load_script("scripts/bench/run_tournament.py", "run_tournament_h3t")
-    assert tournament.ANCHOR == "h3t"
+def test_run_tournament_defaults_use_h1_anchor():
+    script = load_script("scripts/bench/run_tournament.py", "run_tournament_h1")
+    assert tournament.ANCHOR == "h1"
     args = script.parse_args([])
-    assert args.anchor == "h3t"
-    assert args.specs == ["pst_tapered", "pst_terms", "pst_kb", "nn4", "h3t"]
+    assert args.anchor == "h1"
+    assert args.specs == ["linear_pst", "linear_pst_terms", "linear_king_bucket", "net4_pst", "h1"]

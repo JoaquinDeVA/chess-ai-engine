@@ -7,7 +7,7 @@
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
 # EFFORT_NN (30, networks), AGREEMENT_N (20000, best-move sample rows), HOURS (4, tournament
 # wall-clock budget), BASE (60) and INCREMENT (1) (tournament clock), PROFILE_SECONDS (1,3),
-# PROFILE_POSITIONS (100), PLAYERS (tournament players, anchored at h3t), PYTHON.
+# PROFILE_POSITIONS (100), PLAYERS (tournament players, anchored at h1), PYTHON.
 # Models not yet registered are skipped with a line in the log (the runbook says so too).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,7 +22,7 @@ BASE="${BASE:-60}"
 INCREMENT="${INCREMENT:-1}"
 PROFILE_SECONDS="${PROFILE_SECONDS:-1,3}"
 PROFILE_POSITIONS="${PROFILE_POSITIONS:-100}"
-PLAYERS="${PLAYERS:-pst_tapered,pst_terms,pst_kb,nn4,h3t}"
+PLAYERS="${PLAYERS:-linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1}"
 PYTHON="${PYTHON:-python}"
 
 # Registered models only (a model whose code is not merged yet is skipped, with a log line).
@@ -32,8 +32,8 @@ registered() {
 
 # Models trained from the raw shards (order matters: cheapest first), and every model evaluated
 # (the older ones are measured only, never retrained).
-TRAINED=(material_linear pst_tapered pst_terms pst_kb nn4)
-EVALUATED=(material_linear pst_tapered pst_terms pst_kb nn4 ridge_features mlp_features cnn_light cnn_resnet)
+TRAINED=(linear_material linear_pst linear_pst_terms linear_king_bucket net4_pst)
+EVALUATED=(linear_material linear_pst linear_pst_terms linear_king_bucket net4_pst mlp_features cnn_resnet)
 
 echo "=== sidecars"
 "$PYTHON" scripts/data/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
@@ -55,22 +55,22 @@ for model in "${EVALUATED[@]}"; do
 done
 
 echo "=== profile (depth against accuracy)"
-PROFILE_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h3t ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
+PROFILE_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h1 ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
 "$PYTHON" scripts/bench/profile_tradeoff.py --players "$PROFILE_PLAYERS" --seconds "$PROFILE_SECONDS" \
   --positions "$PROFILE_POSITIONS" --parallel 1 --raw "$RAW" --sidecar "$SIDECAR"
 
-WEIGHTS="src/chess_engine/evaluation/h3t_weights.json"
+WEIGHTS="src/chess_engine/evaluation/h1_weights.json"
 if [ ! -f "$WEIGHTS" ] || [ -n "$(find "$SIDECAR" -name '*.sidecar.parquet' -newer "$WEIGHTS" -print -quit)" ]; then
-  echo "=== fit h3t"
-  "$PYTHON" scripts/data/fit_h3t.py --raw "$RAW" --sidecar "$SIDECAR" --positions 300000 --jobs 4 \
+  echo "=== fit h1"
+  "$PYTHON" scripts/data/fit_h1.py --raw "$RAW" --sidecar "$SIDECAR" --positions 300000 --jobs 4 \
     --out "$WEIGHTS"
 else
-  echo "=== fit h3t skipped (weights newer than the sidecars)"
+  echo "=== fit h1 skipped (weights newer than the sidecars)"
 fi
 
 echo "=== tournament (${HOURS} h)"
-TOURNAMENT_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h3t ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
-"$PYTHON" scripts/bench/run_tournament.py --players "$TOURNAMENT_PLAYERS" --anchor h3t \
+TOURNAMENT_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h1 ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
+"$PYTHON" scripts/bench/run_tournament.py --players "$TOURNAMENT_PLAYERS" --anchor h1 \
   --base "$BASE" --increment "$INCREMENT" --hours "$HOURS"
 
 echo "=== report"

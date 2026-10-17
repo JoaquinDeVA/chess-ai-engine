@@ -20,7 +20,7 @@ BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 
 #: Models that are not retrained nor played: only their accuracy and cost are measured.
-ACCURACY_RECORDS = frozenset({"ridge_features", "mlp_features", "cnn_light", "cnn_resnet"})
+ACCURACY_RECORDS = frozenset({"mlp_features", "cnn_resnet"})
 
 #: Times per move (seconds) of the depth columns, as keys of the ``tradeoff`` section.
 DEPTH_SECONDS = ("1", "3", "10")

@@ -465,7 +465,7 @@ def _losses(z: np.ndarray, y: np.ndarray) -> np.ndarray:
     return np.logaddexp(0.0, z) - y * z
 
 
-@register_model("pst_tapered")
+@register_model("linear_pst")
 class PstTaperedModel(LinearEvalModel):
     """Tapered piece-square tables (768 weights) with a logistic output."""
 
@@ -473,7 +473,7 @@ class PstTaperedModel(LinearEvalModel):
     architecture = "Tapered piece-square tables (768 weights), logistic"
 
 
-@register_model("pst_terms")
+@register_model("linear_pst_terms")
 class PstTermsModel(LinearEvalModel):
     """Tapered piece-square tables plus eleven classical terms (790 weights), logistic."""
 
@@ -481,7 +481,7 @@ class PstTermsModel(LinearEvalModel):
     architecture = "Tapered piece-square tables plus 11 classical terms (790 weights), logistic"
 
 
-@register_model("material_linear")
+@register_model("linear_material")
 class MaterialLinearModel(LinearEvalModel):
     """Logistic regression on five piece-count differences (and the turn under ``"white"``)."""
 
@@ -489,7 +489,7 @@ class MaterialLinearModel(LinearEvalModel):
     architecture = "Logistic regression on 5 material counts (own minus opponent)"
 
 
-@register_model("pst_kb")
+@register_model("linear_king_bucket")
 class KingBucketModel(LinearEvalModel):
     """King-bucketed piece-square features (10,368 weights), logistic."""
 

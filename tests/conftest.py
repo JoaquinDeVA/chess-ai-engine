@@ -86,3 +86,31 @@ def sample_boards() -> List[chess.Board]:
 
 
 MATE_IN_ONE = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"  # 1.Ra8#
+
+
+#: Shipped model artifacts that no test may overwrite (the course weights and the MLP).
+PROTECTED_ARTIFACTS = ("cnn_resnet.keras", "mlp_features.keras")
+_PROTECTED_HASHES: dict = {}
+
+
+def _artifact_hashes() -> dict:
+    import hashlib
+
+    from chess_engine.models.base import ARTIFACTS_DIR
+
+    hashes = {}
+    for name in PROTECTED_ARTIFACTS:
+        path = ARTIFACTS_DIR / name
+        hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    return hashes
+
+
+def pytest_sessionstart(session):
+    _PROTECTED_HASHES.update(_artifact_hashes())
+
+
+def pytest_sessionfinish(session, exitstatus):
+    changed = [n for n, h in _artifact_hashes().items() if h != _PROTECTED_HASHES.get(n)]
+    if changed:
+        print(f"\nERROR: a test overwrote shipped artifacts: {changed}")
+        session.exitstatus = 1

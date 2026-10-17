@@ -8,7 +8,7 @@ import pytest
 from chess_engine.bots._search_bots import IterativeDeepeningBot, fallback_move
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.evaluation.heuristics import h1, h2, h3, h4
+from chess_engine.evaluation.heuristics import h1
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models.base import ARTIFACTS_DIR
 from chess_engine.models.evaluator import ModelEvaluator
@@ -61,13 +61,12 @@ class TestEveryBot:
 
 
 class TestEvaluation:
-    def test_all_heuristics_stay_inside_the_open_unit_interval(self, sample_boards):
+    def test_h1_stays_inside_the_open_unit_interval(self, sample_boards):
         from chess_engine.search.chess_game_state import ChessGameState
 
-        for heuristic in (h1, h2, h3, h4):
-            for board in sample_boards[:15]:
-                for player in (chess.WHITE, chess.BLACK):
-                    assert 0.0 < heuristic(ChessGameState(board), player) < 1.0
+        for board in sample_boards[:15]:
+            for player in (chess.WHITE, chess.BLACK):
+                assert 0.0 < h1(ChessGameState(board), player) < 1.0
 
     def test_a_search_that_returns_no_move_falls_back_to_a_legal_one(self, stub_model):
         class Hopeless(IterativeDeepeningBot):
@@ -167,11 +166,11 @@ class TestMLBots:
         assert bot.get_move(chess.Board(), 10.0) == chess.Move.from_uci("e2e4")
 
     def test_models_can_be_selected_by_name(self, tmp_path, monkeypatch):
-        model_class = get_model_class("material_linear")
-        saved = model_class().save(tmp_path / "material_linear.npz")
+        model_class = get_model_class("linear_material")
+        saved = model_class().save(tmp_path / "linear_material.npz")
         monkeypatch.setattr(model_class, "default_path", classmethod(lambda cls: saved))
-        bot = IterativeModelBookBot(model="material_linear", max_depth=1)
-        assert bot.get_info()["model"] == "material_linear"
+        bot = IterativeModelBookBot(model="linear_material", max_depth=1)
+        assert bot.get_info()["model"] == "linear_material"
 
     @pytest.mark.skipif(
         not (ARTIFACTS_DIR / "mlp_features.keras").exists(), reason="mlp_features not trained"

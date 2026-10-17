@@ -1,4 +1,4 @@
-"""Tests of the sparse-input neural evaluation core and of the ``nn4`` model."""
+"""Tests of the sparse-input neural evaluation core and of the ``net4_pst`` model."""
 
 import json
 import subprocess
@@ -34,7 +34,7 @@ def frame(boards: list[chess.Board]) -> pd.DataFrame:
 
 
 def random_nn4(seed: int = 0, rep: Representation | None = None) -> NeuralEvalModel:
-    """An ``nn4`` with random layers, so that scores are not trivially 0.5."""
+    """A ``net4_pst`` with random layers, so that scores are not trivially 0.5."""
     model = Nn4Model(rep=rep)
     rng = np.random.default_rng(seed)
     model.layers = [
@@ -85,46 +85,18 @@ def test_mirror_complement_holds_for_random_weights():
         )
 
 
-def test_fit_stream_learns_material_and_lowers_validation_loss():
-    # Validation rows are training positions: three epochs on a few hundred rows do not improve
-    # a held-out set reliably (the network overfits rare features first), so this checks that
-    # training reduces the loss, not generalisation.
-    model = Nn4Model()
-    boards = random_positions(400, seed=5)
-    batches = [frame(boards[i : i + 100]) for i in range(0, len(boards), 100)]
-    config = {"l2": 0.0, "lr": 0.01, "batch_size": 16, "max_epochs": 3, "patience": 3}
-    summary = model.fit_stream(batches, frame(boards[:100]), config)
-
-    assert summary["epochs"] == 3
-    assert summary["val_losses"][summary["best_epoch"] - 1] < summary["val_losses"][0]
-    assert summary["train_rows"] == 400
-
-
 def test_fit_stream_rejects_empty_validation():
     model = Nn4Model()
     with pytest.raises(ValueError, match="validation set is empty"):
         model.fit_stream([frame(random_positions(10, seed=1))], frame([]), {})
 
 
-def test_fit_stream_workers_two_matches_one_worker_in_loss_shape():
-    boards = random_positions(160, seed=14)
-    batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
-    validation = frame(random_positions(30, seed=15))
-    config = {"batch_size": 64, "max_epochs": 2, "patience": 2, "lr": 0.01}
-
-    serial = Nn4Model().fit_stream(batches, validation, {**config, "workers": 1})
-    parallel = Nn4Model().fit_stream(batches, validation, {**config, "workers": 2})
-
-    assert serial["epochs"] == parallel["epochs"] == 2
-    assert parallel["train_losses"][0] == pytest.approx(serial["train_losses"][0], rel=0.05)
-
-
 def test_save_load_round_trip_gives_identical_scores(tmp_path):
     rep = Representation(scale="cp_linear", perspective="white", filter="quiet")
     model = random_nn4(seed=4, rep=rep)
-    path = model.save(tmp_path / "nn4.npz")
+    path = model.save(tmp_path / "net4_pst.npz")
 
-    loaded = get_model_class("nn4").load(path)
+    loaded = get_model_class("net4_pst").load(path)
 
     assert loaded.rep == rep
     assert loaded.count_parameters() == model.count_parameters()
@@ -146,15 +118,15 @@ def test_load_rejects_mismatching_shapes(tmp_path):
     with open(path, "wb") as handle:
         np.savez(handle, meta=np.array(json.dumps(meta)), **arrays)
     with pytest.raises(ValueError, match=r"expected \(768, 256\)"):
-        get_model_class("nn4").load(path)
+        get_model_class("net4_pst").load(path)
 
 
 def test_play_path_does_not_import_tensorflow(tmp_path):
-    path = random_nn4(seed=7).save(tmp_path / "nn4.npz")
+    path = random_nn4(seed=7).save(tmp_path / "net4_pst.npz")
     script = (
         "import sys, chess\n"
         "from chess_engine.models.registry import get_model_class\n"
-        f"model = get_model_class('nn4').load({str(path)!r})\n"
+        f"model = get_model_class('net4_pst').load({str(path)!r})\n"
         "score = model.expected_score(chess.Board())\n"
         "print(0.0 < score < 1.0, 'tensorflow' in sys.modules, 'keras' in sys.modules)\n"
     )

@@ -4,12 +4,12 @@ A model estimates the evaluation of a position in centipawns, from White's point
 way Stockfish would. Models are looked up by name through the registry::
 
     from chess_engine.models import load_model
-    model = load_model("ridge_features")
+    model = load_model("mlp_features")
     model.predict_cp(chess.Board())
 
 See ``docs/ADDING_A_MODEL.md`` to plug in a new one.
 
-Importing this package registers the built-in models; heavy dependencies (scikit-learn, Keras)
+Importing this package registers the built-in models; heavy dependencies (Keras)
 are only imported when a model is actually loaded or trained.
 """
 

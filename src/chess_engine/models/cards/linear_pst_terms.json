@@ -8,36 +8,32 @@
   "training": {
     "dataset": "data/lichess/raw",
     "date": "2026-10-17",
-    "commit": "2006288+dirty",
-    "epochs": 4,
-    "best_epoch": 4,
+    "commit": "5656f3d+dirty",
+    "epochs": 2,
+    "best_epoch": 2,
     "train_losses": [
-      0.6280587843813122,
-      0.6145484789989717,
-      0.612906267461211,
-      0.6122742254305091
+      0.6056899402654892,
+      0.6039836244817224
     ],
     "val_losses": [
-      0.6131279575913854,
-      0.6096829707359592,
-      0.6087145156580598,
-      0.608243678336639
+      0.6063145945639533,
+      0.6062973929957919
     ],
-    "train_rows": 794175,
-    "seconds": 258.103,
+    "train_rows": 15000000,
+    "seconds": 2675.313,
     "config": {
       "l2": 1e-06,
       "lr": 0.01,
       "batch_size": 4096,
-      "max_epochs": 4,
+      "max_epochs": 2,
       "patience": 2,
       "workers": 4
     },
-    "train_samples": 794175,
-    "effort": 30,
+    "train_samples": 15000000,
+    "effort": 15,
     "effort_config": {
-      "positions": 794175,
-      "max_epochs": 4,
+      "positions": 15000000,
+      "max_epochs": 2,
       "patience": 2,
       "trials": 0,
       "batch_size": 4096
@@ -52,11 +48,45 @@
   },
   "tournament": {
     "games": 10,
-    "score": 55.00000000000001,
-    "elo": 89.4014911367129,
-    "elo_interval": 201.1890368921979,
+    "score": 35.0,
+    "elo": -261.2192709872775,
+    "elo_interval": 269.059750906305,
     "anchor": "h1",
     "base": 60.0,
     "increment": 1.0
+  },
+  "accuracy": {
+    "all": {
+      "spearman": 0.6547237592317809,
+      "mae": 0.12942657417570286,
+      "n": 200000,
+      "best_move_agreement": 0.19335,
+      "agreement_n": 20000
+    },
+    "quiet": {
+      "spearman": 0.686547835812255,
+      "mae": 0.11494341941406616,
+      "n": 138657,
+      "best_move_agreement": 0.048969258589511754,
+      "agreement_n": 13825
+    },
+    "non_quiet": {
+      "spearman": 0.591910303698886,
+      "mae": 0.16216365566477675,
+      "n": 61343,
+      "best_move_agreement": 0.5165991902834008,
+      "agreement_n": 6175
+    },
+    "sample": {
+      "rows": 200000,
+      "seed": 42,
+      "agreement_n": 20000
+    }
+  },
+  "cost": {
+    "us_per_eval": 116.6,
+    "samples": 1000,
+    "date": "2026-10-17",
+    "commit": "5656f3d+dirty"
   }
 }

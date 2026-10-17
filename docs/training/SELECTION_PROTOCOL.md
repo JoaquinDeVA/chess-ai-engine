@@ -87,7 +87,7 @@ TensorFlow. Expected cost per evaluation: `net4_pst` ~100 µs, against ~56 µs (
 
 ## Night-1 budget
 
-Training is "good enough", not exhaustive: a share of the training rows per model (effort 30 is 30 %), two to four passes,
+Training is "good enough", not exhaustive: 30 million positions per model at effort 30, two to four passes,
 validated every pass (about 80% of the attainable accuracy for the linear models and less for `net4_pst`, which
 is exactly why the headroom column exists). Order of cost: the linear models take minutes, the networks
 tens of minutes; the profile takes about 40 minutes for everyone; the tournament takes the rest of the night.

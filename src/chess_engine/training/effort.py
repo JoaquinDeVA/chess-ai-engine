@@ -35,7 +35,9 @@ from .dataset import TRAIN
 from .sidecar import iter_batches
 
 MAX_EFFORT = 100
-#: Floor of the positions, so that the lowest efforts still train on a meaningful sample.
+#: Positions per effort point: effort 30 trains on 30 M positions, effort 70 on 70 M.
+POSITIONS_PER_EFFORT = 1_000_000
+#: Floor of the positions, so that effort 0 still trains on a meaningful sample.
 MIN_POSITIONS = 1_000_000
 BATCH_SIZE = 4096
 #: Positions of the timed calibration run (one epoch).
@@ -52,8 +54,8 @@ WORKERS = max(1, (os.cpu_count() or 1) - 2)
 def effort_config(effort: int, available: int) -> Dict[str, int]:
     """Training configuration for an effort level.
 
-    Positions are ``effort`` percent of ``available`` (effort 100 uses all the rows), with a floor
-    of ``MIN_POSITIONS`` and never more than ``available``. Epochs grow with effort and patience is
+    Positions are ``effort * POSITIONS_PER_EFFORT`` (effort 30 is 30 M), with a floor of
+    ``MIN_POSITIONS`` and never more than ``available``. Epochs grow with effort and patience is
     fixed; hyper-parameter trials start at effort 40.
 
     :param effort: Effort level, ``0..100``.
@@ -63,10 +65,10 @@ def effort_config(effort: int, available: int) -> Dict[str, int]:
     """
     if not 0 <= effort <= MAX_EFFORT:
         raise ValueError(f"effort must be between 0 and {MAX_EFFORT}, got {effort}")
-    share = round(available * effort / MAX_EFFORT)
+    target = effort * POSITIONS_PER_EFFORT
     trials = 0 if effort < 40 else 1 + (effort - 40) // 15
     return {
-        "positions": min(available, max(MIN_POSITIONS, share)),
+        "positions": min(available, max(MIN_POSITIONS, target)),
         "max_epochs": 1 + effort // 10,
         "patience": 2,
         "trials": trials,

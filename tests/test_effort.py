@@ -40,18 +40,17 @@ def write_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> list[s
 
 def test_effort_bounds():
     assert effort_config(0, 10**9)["positions"] == MIN_POSITIONS
-    assert effort_config(100, 10**9)["positions"] == 10**9
+    assert effort_config(100, 10**9)["positions"] == 100_000_000
 
 
-def test_effort_is_a_share_of_the_available_rows():
-    assert effort_config(30, 10**8)["positions"] == 30_000_000
-    assert effort_config(70, 10**8)["positions"] == 70_000_000
+def test_effort_is_millions_of_positions():
+    assert effort_config(30, 10**9)["positions"] == 30_000_000
+    assert effort_config(70, 10**9)["positions"] == 70_000_000
 
 
 def test_effort_floors_positions_at_the_minimum():
-    # 5 % of 10**7 rows is below the floor; 20 % is above it.
-    assert effort_config(5, 10**7)["positions"] == MIN_POSITIONS
-    assert effort_config(20, 10**7)["positions"] == 2_000_000
+    assert effort_config(0, 10**9)["positions"] == MIN_POSITIONS
+    assert effort_config(5, 10**9)["positions"] == 5_000_000
 
 
 def test_effort_is_monotonic():

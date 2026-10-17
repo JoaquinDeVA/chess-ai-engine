@@ -10,6 +10,7 @@ from chess_engine.models.linear_eval import PstTaperedModel
 from chess_engine.training import effort
 from chess_engine.training.dataset import TRAIN, VALIDATION, assign_split
 from chess_engine.training.effort import (
+    MIN_POSITIONS,
     Timing,
     available_rows,
     effort_config,
@@ -38,8 +39,19 @@ def write_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> list[s
 
 
 def test_effort_bounds():
-    assert effort_config(0, 10**9)["positions"] == 100_000
+    assert effort_config(0, 10**9)["positions"] == MIN_POSITIONS
     assert effort_config(100, 10**9)["positions"] == 10**9
+
+
+def test_effort_is_a_share_of_the_available_rows():
+    assert effort_config(30, 10**8)["positions"] == 30_000_000
+    assert effort_config(70, 10**8)["positions"] == 70_000_000
+
+
+def test_effort_floors_positions_at_the_minimum():
+    # 5 % of 10**7 rows is below the floor; 20 % is above it.
+    assert effort_config(5, 10**7)["positions"] == MIN_POSITIONS
+    assert effort_config(20, 10**7)["positions"] == 2_000_000
 
 
 def test_effort_is_monotonic():

@@ -35,7 +35,8 @@ Then run the flow. Each command works on one model; `scripts/run_all.sh` runs th
 # sidecars (split, quiet flag, side to move) for the raw Lichess shards in data/lichess/raw
 python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar
 
-# train at an effort level 0-100 (positions, epochs and hyper-parameter trials grow with it)
+# train at an effort level 0-100 (positions are that percentage of the training rows, at least 1M;
+# epochs and hyper-parameter trials grow with it)
 python -m chess_engine.training.train --model my_model --effort 40
 
 # judge on the fixed test sample: accuracy (Spearman, MAE, best-move agreement) and cost

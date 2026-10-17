@@ -23,4 +23,4 @@ elegida con una familia se reusa en otras).
 - Elegir un ganador tras la noche 1: sesgado por el margen de cada modelo.
 
 ## Consecuencias
-Los resultados de la noche 1 incluyen una columna de margen y una de coste (`docs/training/RESULTS.md`).
+Los resultados de la noche 1 incluyen una columna de margen y una de coste (plantilla en el plan de la noche 1, fuera del repo).

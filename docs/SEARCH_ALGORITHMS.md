@@ -1,5 +1,11 @@
 # Search algorithms
 
+> **Qué es:** Los algoritmos de búsqueda (minimax, alfa-beta, profundización iterativa) y sus convenciones.
+>
+> **Cuándo leerla:** Para entender cómo decide una jugada el motor.
+>
+> **Siguiente paso:** [Tactical patterns](TACTICAL_PATTERNS.md)
+
 All algorithms live in `src/chess_engine/search/game_algorithms.py` and work on any `GameProblem`.
 
 | Function | What it adds |

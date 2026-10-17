@@ -2,7 +2,7 @@
 tipo: modulo
 source:
   - src/chess_engine/comparison
-commit: 519dbfe50ce5ef01db568f2df8cffe87c2d13985
+commit: e849d32937aece4c590a1195f87e7b87a6617f8b
 last_sync: 2026-10-17
 ---
 # Torneo y comparación
@@ -24,10 +24,10 @@ Usa `training/` y `models/` solo para cargar modelos; `comparison/` nunca es imp
 `scripts/bench/run_tournament.py`, `profile_tradeoff.py` y `scripts/run_all.sh`.
 
 ## Por qué es así
-- El ancla es `h3t` (`ANCHOR`), la referencia clásica ajustada. Los Elo son relativos a ella, no absolutos.
+- El ancla es `h1` (`ANCHOR`), la referencia clásica ajustada. Los Elo son relativos a ella, no absolutos.
 - Cada apertura se juega con colores cambiados: sin eso la ventaja de blancas sesga la puntuación.
 - Un juego que muere en `MAX_DEATHS_PER_GAME` = 2 pools rotos se registra como error y no se reintenta:
   evita bucles infinitos ante un fallo sistémico.
 - El contador de reconstrucción del pool solo se reinicia con partidas jugadas, no con errores.
 - Dos modelos son distintos solo si la diferencia de Elo supera la raíz de la suma de los cuadrados de sus
-  intervalos (regla de `docs/training/RUNBOOK.md`).
+  intervalos (regla del plan de la noche 1, fuera del repo).

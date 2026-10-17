@@ -22,5 +22,5 @@ y un movimiento solo cambia unas pocas características (base de la actualizaci�
 - Optimización por autojuego (SPSA/CLOP): requiere decenas de miles de partidas por paso.
 
 ## Consecuencias
-Las familias son `pst_tapered`, `pst_terms`, `pst_kb` y `nn4` (ver `docs/training/SELECTION_PROTOCOL.md`).
+Las familias son `linear_pst` (`pst_tapered`), `linear_pst_terms` (`pst_terms`), `linear_king_bucket` (`pst_kb`) y `net4_pst` (`nn4`) (ver `docs/training/SELECTION_PROTOCOL.md`).
 Inferencia solo con NumPy, sin TensorFlow al jugar.

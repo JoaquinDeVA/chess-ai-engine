@@ -1,5 +1,11 @@
 # Architecture
 
+> **Qué es:** Los paquetes del motor, sus dependencias y el recorrido de una jugada.
+>
+> **Cuándo leerla:** Antes de tocar el código o de añadir un bot o un modelo.
+>
+> **Siguiente paso:** [Search algorithms](SEARCH_ALGORITHMS.md)
+
 The engine is split in layers; each one only depends on the ones below it. All packages live in
 `src/chess_engine/`.
 
@@ -25,8 +31,8 @@ flowchart TB
 |---|---|
 | `search/` | Game abstractions (`GameState`, `GameProblem`), the chess implementation on top of python-chess, minimax / alpha-beta / advanced alpha-beta / iterative deepening, search helpers, time management |
 | `bots/` | The playable bots and the registry that finds them |
-| `evaluation/` | Hand-crafted features (material, mobility, king safety...) and the heuristics `h1`..`h4` |
-| `models/` | Learned position evaluators behind one interface (`EvaluationModel`) and a registry. `linear_features` (sparse features: `PstFeatures`, `MaterialCountFeatures`, `PstTermsFeatures`) and `linear_eval` (`LinearEvalModel` and the `pst_tapered`, `pst_terms`, `material_linear` models) hold the linear family; `sklearn_model`, `keras_model` and `architectures` the older one. `cards` reads and writes the model cards in `models/cards/` |
+| `evaluation/` | Hand-crafted features (material, mobility, king safety...) and the heuristic `h1` (pesos ajustados a Stockfish) |
+| `models/` | Learned position evaluators behind one interface (`EvaluationModel`) and a registry. `linear_features` (sparse features: `PstFeatures`, `MaterialCountFeatures`, `PstTermsFeatures`) and `linear_eval` (`LinearEvalModel` and the `linear_pst` (`pst_tapered`), `linear_pst_terms` (`pst_terms`) and `linear_material` (`material_linear`) models) hold the linear family; `keras_model` and `architectures` the older one. `cards` reads and writes the model cards in `models/cards/` |
 | `training/` | Data preparation and training: `lichess` and `lichess_raw` (conversion of the Lichess dump into raw Parquet shards), `sidecar` (split, quiet flag and seeded sampler over the shards), `dataset` (the split), `targets` and `representation` (target scale and point of view), `effort` (training size per effort level), `stockfish` (labelling), `train` (the training command), `configs/` (TOML configurations of the older models) |
 | `comparison/` | Comparison of the trained models: `judge` (accuracy and best-move agreement against Stockfish), `metrics` (centipawn metrics of the CSV era), `evaluate` (judge and cost of a model), `tradeoff` (depth against accuracy at a fixed time per move), `tournament` (round-robin at equal time, Elo), `report` (model cards to `MODELS_HISTORY.md`) |
 | `knowledge/` | Opening book (Python) and tactical-pattern knowledge base (Prolog) |
@@ -79,7 +85,6 @@ classDiagram
         save()
         load()
     }
-    EvaluationModel <|-- SklearnModel
     EvaluationModel <|-- KerasModel
     EvaluationModel <|-- LinearEvalModel
     LinearEvalModel o-- LinearFeatures

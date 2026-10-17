@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — heuristic and model consolidation
+
+- Removed the heuristics `h2`, `h3` and `h4`. `h3t` is now `h1`: the features of the old `h3` with weights fitted to
+  Stockfish (`h1_weights.json`, `scripts/data/fit_h1.py`; held-out R2 0.233 against 0.074 for the old plain weights).
+  `h1` is the Elo anchor.
+- Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.
+- Candidate names proposed: `material_linear` -> `linear_material`, `pst_tapered` -> `linear_pst`,
+  `pst_terms` -> `linear_pst_terms`, `pst_kb` -> `linear_king_bucket`, `nn4` -> `net4_pst` (code rename pending).
+
 ## Unreleased
 
 ### Added
@@ -47,7 +56,7 @@
 - Scripts are grouped by purpose: `scripts/data/`, `scripts/bench/`, `scripts/docs/`; `run_all.sh`
   stays in `scripts/`.
 - `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now
-  `IterativeModelBookBot`. Strength matches play against H2 and H3 only.
+  `IterativeModelBookBot`. Strength matches play against the classical heuristic only.
 
 ## 1.0.0
 

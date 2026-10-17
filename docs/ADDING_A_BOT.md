@@ -1,5 +1,11 @@
 # Adding a bot
 
+> **Qué es:** Guía para añadir un bot de búsqueda en un solo fichero.
+>
+> **Cuándo leerla:** Cuando quieras un jugador nuevo con otra evaluación.
+>
+> **Siguiente paso:** [Adding an evaluation model](ADDING_A_MODEL.md)
+
 A bot is one file in `src/chess_engine/bots/`. Subclass the base in `bots/_search_bots.py` and implement
 `evaluate(state, player)`, the expected score of `player` in `state`, strictly between 0 and 1.
 

@@ -1,5 +1,11 @@
 # Adding an evaluation model
 
+> **Qué es:** Guía para añadir un modelo de evaluación y compararlo con los demás.
+>
+> **Cuándo leerla:** Cuando quieras entrenar y medir un modelo nuevo.
+>
+> **Siguiente paso:** [Models history](training/MODELS_HISTORY.md)
+
 An evaluation model answers one question: *how good is this position for White, as Stockfish
 would see it?* The search uses the answer as its evaluation function. Models are compared in the
 expected-score scale (win probability), at equal time per move, by the tools below.
@@ -36,10 +42,10 @@ python -m chess_engine.training.train --model my_model --effort 40
 python -m chess_engine.comparison.evaluate --model my_model
 
 # depth reached and search agreement at a fixed time per move, against the reference bots
-python scripts/bench/profile_tradeoff.py --players my_model,h2,h3 --seconds 1,3,10
+python scripts/bench/profile_tradeoff.py --players my_model,h1 --seconds 1,3,10
 
-# round-robin at equal time per move; must include h3 (the Elo anchor)
-python scripts/bench/run_tournament.py --players my_model,h3,pst_tapered,h2
+# round-robin at equal time per move; must include h1 (the Elo anchor)
+python scripts/bench/run_tournament.py --players my_model,h1,linear_pst
 ```
 
 `train` prints the chosen configuration and an estimated duration before it starts. The target
@@ -54,9 +60,9 @@ Once a model has a saved file, a bot can use it:
 
 ## The CSV-era models (older flow)
 
-`ridge_features`, `mlp_features`, `cnn_light` and `cnn_resnet` predate the linear flow. They take
+`mlp_features` and `cnn_resnet` predate the linear flow. They take
 an `EvaluationModel` subclass that chooses an extractor from `models/features.py` and builds a
-scikit-learn estimator or Keras network (`models/sklearn_model.py`, `models/keras_model.py`). They
+Keras network (`models/keras_model.py`). They
 train from a CSV of Stockfish evaluations and are benchmarked with the centipawn metrics:
 
 ```bash

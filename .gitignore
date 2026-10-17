@@ -60,3 +60,6 @@ CLAUDE.local.md
 # Sistema operativo
 Thumbs.db
 desktop.ini
+
+# Trabajo interno de agentes: planes, briefs, informes, notas de ejecución (no se versiona)
+.superpowers/

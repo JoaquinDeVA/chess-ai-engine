@@ -1,5 +1,11 @@
 # Tactical patterns
 
+> **Qué es:** El detector de patrones tácticos en Prolog y su coste.
+>
+> **Cuándo leerla:** Si vas a usar el conocimiento en Prolog para ordenar jugadas.
+>
+> **Siguiente paso:** [Roadmap](ROADMAP.md)
+
 `PrologPatternDetector` (`knowledge/pattern_detector.py`) asks a Prolog knowledge base,
 `knowledge/chess_patterns.pl`, which legal moves *create* a tactical pattern. No bot uses it at the
 moment.

@@ -28,18 +28,18 @@ sidecar; la búsqueda no tiene quiescencia, así que las no quietas son el punto
 `@mates5` o `@mates10` usan 0,05 o 0,10 y se etiquetan con `--tag`.
 
 **Headroom (margen de mejora)**: pérdida de validación que todavía cae al final del entrenamiento, en %. Mide si
-un modelo ha convergido. Umbrales en `docs/training/RUNBOOK.md`.
+un modelo ha convergido. Umbrales en el plan de la noche 1 (fuera del repo).
 
 **Effort (esfuerzo)**: nivel de entrenamiento (0-100) que fija cuántas posiciones se usan. Los candidatos entrenan con 30.
 
-**Ancla (h3t)**: referencia clásica con pesos ajustados (`evaluation/heuristics.py`). Los Elo del torneo son relativos a ella.
+**Ancla (h1)**: referencia clásica con pesos ajustados (`evaluation/heuristics.py`). Los Elo del torneo son relativos a ella.
 
-**h3**: heurística clásica original. **h3t** es la misma forma con pesos ajustados por mínimos cuadrados.
+**h1**: única heurística clásica que queda. Usa las características de la antigua h3 con pesos ajustados a Stockfish por mínimos cuadrados (`h1_weights.json`, R² fuera de muestra 0,233 frente a 0,074 con los pesos originales).
 
-**Familias de modelos**: `material_linear` (referencia), `pst_tapered` (principal lineal), `pst_terms` (con términos
-clásicos), `pst_kb` (con cubos por rey), `nn4` (red de 4 capas). Ver [[0001-sparse-input-evaluation-models-for-depth]].
+**Familias de modelos**: `linear_material` (`material_linear`) (referencia), `linear_pst` (`pst_tapered`) (principal lineal), `linear_pst_terms` (`pst_terms`) (con términos
+clásicos), `linear_king_bucket` (`pst_kb`) (con cubos por rey), `net4_pst` (`nn4`) (red de 4 capas). Ver [[0001-sparse-input-evaluation-models-for-depth]].
 
-**Modelo registro de precisión**: modelo antiguo (CNN, MLP, ridge) que se mide pero no se entrena ni juega.
+**Modelo registro de precisión**: modelo antiguo (CNN, MLP) que se mide pero no se entrena ni juega.
 _Evitar_: «modelo viejo», que no dice si se usa.
 
 **Profundidad completada**: última iteración de profundización terminada dentro del tiempo. Una iteración

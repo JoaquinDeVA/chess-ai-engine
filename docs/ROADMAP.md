@@ -1,5 +1,11 @@
 # Roadmap
 
+> **Qué es:** Ideas pendientes, ordenadas por lo que más aportaría.
+>
+> **Cuándo leerla:** Antes de proponer o empezar una mejora.
+>
+> **Siguiente paso:** [Architecture](ARCHITECTURE.md)
+
 Ideas, roughly in the order they would pay off.
 
 ## Evaluation models (redesign in progress)

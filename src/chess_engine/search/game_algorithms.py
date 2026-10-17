@@ -420,6 +420,8 @@ def advanced_heuristic_alphabeta_search(
     start_time: Optional[float] = None,
     max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
     epsilon: float = DEPTH_PREFERENCE_EPSILON,
+    noisy_moves: Optional[Callable[[GameState], List[Any]]] = None,
+    quiescence_plies: int = 0,
 ) -> Tuple[Any, SearchStatistics]:
     """Alpha-beta search with transposition table, killer moves and move ordering.
 
@@ -461,6 +463,11 @@ def advanced_heuristic_alphabeta_search(
     :type max_tt_entries: int
     :param epsilon: Utility given up per ply when preferring faster wins
     :type epsilon: float
+    :param noisy_moves: ``state -> moves`` searched by the quiescence search (for chess, captures
+        and promotions). Quiescence is off when it is None.
+    :type noisy_moves: Optional[Callable[[GameState], List[Any]]]
+    :param quiescence_plies: Maximum plies of quiescence search below the horizon (0 = off)
+    :type quiescence_plies: int
     :return: ``(best_move, statistics)``; ``best_move`` is None if the root itself was cut off
     :rtype: Tuple[Any, SearchStatistics]
     """
@@ -498,6 +505,9 @@ def advanced_heuristic_alphabeta_search(
             return AdversarialSearchResult(utility, None), alpha, beta
 
         if depth_remaining <= 0:
+            if noisy_moves is not None and quiescence_plies > 0:
+                value = quiescence(node, alpha, beta, quiescence_plies, ply)
+                return AdversarialSearchResult(value, None), alpha, beta
             return AdversarialSearchResult(eval_fn(node, root_player), None), alpha, beta
 
         if cutoff_test(node, depth_remaining, time.time() - time_of_start):
@@ -505,6 +515,41 @@ def advanced_heuristic_alphabeta_search(
             return AdversarialSearchResult(eval_fn(node, root_player), None), alpha, beta
 
         return None, alpha, beta
+
+    def quiescence(node: GameState, alpha: float, beta: float, plies_left: int, ply: int) -> float:
+        """Value of a horizon node searching only noisy moves (stand-pat, no table)."""
+        nonlocal nodes_visited, pruning_count
+        best_value = eval_fn(node, root_player)  # stand-pat: nobody is forced to capture
+        if plies_left <= 0:
+            return best_value
+        maximizing = node.get_current_player() == root_player
+        if maximizing:
+            alpha = max(alpha, best_value)
+        else:
+            beta = min(beta, best_value)
+        if alpha >= beta:
+            pruning_count += 1
+            return best_value
+        for action in noisy_moves(node):
+            node.apply_move(action)
+            try:
+                nodes_visited += 1
+                if game.is_terminal(node):
+                    value = _terminal_utility(game, node, root_player, ply + 1, epsilon)
+                else:
+                    value = quiescence(node, alpha, beta, plies_left - 1, ply + 1)
+            finally:
+                node.undo_move()
+            if maximizing:
+                best_value = max(best_value, value)
+                alpha = max(alpha, best_value)
+            else:
+                best_value = min(best_value, value)
+                beta = min(beta, best_value)
+            if alpha >= beta:
+                pruning_count += 1
+                break
+        return best_value
 
     def ordered_actions(node: GameState, depth_remaining: int) -> List[Any]:
         """Legal moves, killer moves first and then the optional callback ordering."""
@@ -602,6 +647,8 @@ def heuristic_alphabeta_iterative_deepening_search(
     order_moves_callback: Optional[Callable[[Any, List[Any]], List[Any]]] = None,
     max_depth: int = 3,
     time_limit: float = 2.0,
+    noisy_moves: Optional[Callable[[GameState], List[Any]]] = None,
+    quiescence_plies: int = 0,
 ) -> Tuple[Any, SearchStatistics]:
     """Iterative deepening over :func:`advanced_heuristic_alphabeta_search`.
 
@@ -629,6 +676,10 @@ def heuristic_alphabeta_iterative_deepening_search(
     :type max_depth: int
     :param time_limit: Soft time budget in seconds
     :type time_limit: float
+    :param noisy_moves: Moves searched by the quiescence search (see the advanced search)
+    :type noisy_moves: Optional[Callable[[GameState], List[Any]]]
+    :param quiescence_plies: Maximum plies of quiescence search (0 = off)
+    :type quiescence_plies: int
     :return: ``(best_move, statistics)`` with node and pruning counts summed over all iterations
     :rtype: Tuple[Any, SearchStatistics]
     """
@@ -665,6 +716,8 @@ def heuristic_alphabeta_iterative_deepening_search(
             order_moves_callback=order_moves_callback,
             max_depth=depth,
             start_time=start_time,
+            noisy_moves=noisy_moves,
+            quiescence_plies=quiescence_plies,
         )
         iteration_times.append(time.time() - iteration_start)
         total_nodes += stats.nodes_visited

@@ -5,7 +5,7 @@ from collections import defaultdict
 import chess
 
 from chess_engine.search.chess_game_state import ChessGameState
-from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
     SearchStatistics,
     advanced_heuristic_alphabeta_search,
@@ -301,3 +301,70 @@ def test_chess_root_state_is_exactly_restored_by_iterative_deepening():
     )
     assert after == before
     assert state._undo_stack == []
+
+
+PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9}
+
+
+def material_eval(state, player):
+    """Material balance for ``player`` squashed to [0, 1]."""
+    board = state.get_board()
+    balance = sum(
+        (1 if piece.color == player else -1) * PIECE_VALUES.get(piece.piece_type, 0)
+        for piece in board.piece_map().values()
+    )
+    return 0.5 + balance / 80
+
+
+def _chess_search(fen, depth, **kwargs):
+    return advanced_heuristic_alphabeta_search(
+        ChessProblem(),
+        ChessGameState(chess.Board(fen)),
+        material_eval,
+        lambda node, depth_left, elapsed: depth_left == 0,
+        max_depth=depth,
+        **kwargs,
+    )
+
+
+QUIESCENCE_FENS = [
+    chess.STARTING_FEN,
+    "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+    "4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1",
+]
+
+
+def test_quiescence_off_by_default_keeps_move_and_nodes():
+    for fen in QUIESCENCE_FENS:
+        baseline = _chess_search(fen, 3)
+        explicit = _chess_search(fen, 3, noisy_moves=chess_noisy_moves, quiescence_plies=0)
+        without_function = _chess_search(fen, 3, quiescence_plies=4)
+        assert explicit[0] == baseline[0] and explicit[1] == baseline[1]
+        assert without_function[0] == baseline[0] and without_function[1] == baseline[1]
+
+
+def test_quiescence_sees_the_recapture_at_the_horizon():
+    """Qxd5 wins a pawn on paper but cxd5 follows: only quiescence notices."""
+    fen = "4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1"
+    blind, _ = _chess_search(fen, 1)
+    careful, stats = _chess_search(fen, 1, noisy_moves=chess_noisy_moves, quiescence_plies=2)
+    assert blind == chess.Move.from_uci("d1d5")
+    assert careful != chess.Move.from_uci("d1d5")
+    assert stats.nodes_visited > _chess_search(fen, 1)[1].nodes_visited
+
+
+def test_quiescence_stand_pat_without_captures():
+    """With no noisy moves the value is the static one, never worse for the side to move."""
+    fen = "4k3/8/8/8/8/8/4P3/4K3 w - - 0 1"
+    board = chess.Board(fen)
+    assert chess_noisy_moves(ChessGameState(board)) == []
+    quiet = _chess_search(fen, 2)
+    with_q = _chess_search(fen, 2, noisy_moves=chess_noisy_moves, quiescence_plies=3)
+    assert with_q[0] == quiet[0]
+    assert with_q[1].nodes_visited == quiet[1].nodes_visited
+
+
+def test_chess_noisy_moves_are_captures_and_promotions():
+    board = chess.Board("1n2k3/P7/8/8/8/8/8/R3K3 w - - 0 1")
+    moves = {m.uci() for m in chess_noisy_moves(ChessGameState(board))}
+    assert moves == {"a7a8q", "a7a8r", "a7a8b", "a7a8n", "a7b8q", "a7b8r", "a7b8b", "a7b8n"}

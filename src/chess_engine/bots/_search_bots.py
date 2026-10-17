@@ -14,7 +14,7 @@ import chess
 
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.search.chess_game_state import ChessGameState
-from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
     SearchStatistics,
     heuristic_alphabeta_iterative_deepening_search,
@@ -103,6 +103,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param time_manager: Time budgeting policy.
     :param max_tt_entries: Size cap of the transposition table.
     :param problem: Chess problem to search; a fresh one is created by default.
+    :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off).
     """
 
     def __init__(
@@ -113,11 +114,13 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         time_manager: Optional[TimeManager] = None,
         max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
         problem: Optional[ChessProblem] = None,
+        quiescence_plies: int = 0,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
         self.time_manager = time_manager or TimeManager()
         self.max_tt_entries = max_tt_entries
+        self.quiescence_plies = quiescence_plies
         self.problem = problem if problem is not None else ChessProblem()
         self.transposition_table: Dict[Any, Any] = {}
         self.killer_moves: Dict[int, List[chess.Move]] = {}
@@ -180,6 +183,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             order_moves_callback=self.order_moves,
             max_depth=self.max_depth,
             time_limit=self.turn_budget,
+            noisy_moves=chess_noisy_moves if self.quiescence_plies else None,
+            quiescence_plies=self.quiescence_plies,
         )
         self.record_statistics(stats)
         logger.debug(

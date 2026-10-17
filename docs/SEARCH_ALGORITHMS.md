@@ -71,6 +71,14 @@ flowchart TD
   the state and extended in constant time per move), not by replaying the game as python-chess does;
   the rules are the same as `board.outcome(claim_draw=True)`.
 
+## Quiescence search (optional)
+
+Off by default. With `noisy_moves` (chess: `chess_noisy_moves`, captures and promotions) and
+`quiescence_plies > 0`, a node at the horizon is not evaluated directly: the side to move may take
+the static evaluation (stand-pat) or follow a noisy move, up to `quiescence_plies` more plies, with
+alpha-beta but without transposition table. Terminal states and time cut-offs behave as before and
+the nodes it visits count in `nodes_visited`. `IterativeDeepeningBot(quiescence_plies=n)` enables it.
+
 ## Iterative deepening and time
 
 ```mermaid

@@ -4,12 +4,22 @@ Chess problem implementation for adversarial search.
 This module implements the GameProblem interface for chess using ChessGameState.
 """
 
-from typing import Any
+from typing import Any, List
 
 import chess
 
 from .chess_game_state import ChessGameState
 from .game_problems import GameProblem, GameState
+
+
+def chess_noisy_moves(state: GameState) -> List[chess.Move]:
+    """Legal captures and promotions, the moves a quiescence search follows.
+
+    :param state: Chess position.
+    :return: Legal moves that capture or promote.
+    """
+    board = state.get_board()
+    return [m for m in board.legal_moves if m.promotion or board.is_capture(m)]
 
 
 class ChessProblem(GameProblem):

@@ -1,52 +1,17 @@
 {
-    "name": "ridge_features",
-    "status": "discontinued",
-    "architecture": "StandardScaler -> Ridge(alpha=10) on 29 features",
-    "features": "vector29",
-    "parameters": 30,
-    "size_kb": 1.8,
-    "training": {
-        "dataset": "evaluations.csv",
-        "date": "2026-10-16",
-        "config": {
-            "alpha": 10.0
-        },
-        "epochs": 1,
-        "train_samples": 745515
+  "name": "ridge_features",
+  "status": "current",
+  "architecture": "StandardScaler -> Ridge(alpha=10) on 29 features",
+  "features": "vector29",
+  "parameters": 30,
+  "size_kb": 1.8,
+  "training": {
+    "dataset": "evaluations.csv",
+    "date": "2026-10-16",
+    "config": {
+      "alpha": 10.0
     },
-    "accuracy": {
-        "all": {
-            "spearman": 0.49703847518340255,
-            "mae": 0.1553343654142138,
-            "n": 200000,
-            "best_move_agreement": 0.1652,
-            "agreement_n": 5000
-        },
-        "quiet": {
-            "spearman": 0.508863358125862,
-            "mae": 0.14304613710784883,
-            "n": 138657,
-            "best_move_agreement": 0.052585957815660216,
-            "agreement_n": 3461
-        },
-        "non_quiet": {
-            "spearman": 0.4753633344165317,
-            "mae": 0.1831101323684816,
-            "n": 61343,
-            "best_move_agreement": 0.4184535412605588,
-            "agreement_n": 1539
-        },
-        "sample": {
-            "rows": 200000,
-            "seed": 42,
-            "agreement_n": 5000
-        }
-    },
-    "cost": {
-        "us_per_eval": 334.34,
-        "samples": 1000,
-        "date": "2026-10-17",
-        "commit": "f3a2532"
-    },
-    "note": "Descontinuado: superado por mlp_features (Spearman 0,497 frente a 0,614 en el test de 200.000). Se conserva el registro, no se entrena ni se juega."
+    "epochs": 1,
+    "train_samples": 745515
+  }
 }

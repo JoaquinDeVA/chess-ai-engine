@@ -13,13 +13,15 @@ import math
 import multiprocessing
 import os
 import random
+import re
 import statistics
+import time
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, Iterator, List, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import chess
 
@@ -43,8 +45,10 @@ MAX_POOL_REBUILDS = 5
 #: Broken pools a game may be in flight for before it is recorded as an error.
 MAX_DEATHS_PER_GAME = 2
 
-#: ``(white spec, black spec, opening FEN, base seconds, increment seconds)``.
-Job = Tuple[str, str, str, float, float]
+#: ``(white spec, black spec, opening FEN, base seconds, increment seconds)``, optionally followed
+#: by the log directory (``Path`` or ``None``: no per-move log) and the game index, which names
+#: the log file ``<index>_<white>_vs_<black>.json``.
+Job = Tuple[Any, ...]
 
 #: Thread-pool variables pinned to 1 in the workers, so that timed games do not compete for cores.
 THREAD_VARIABLES = (
@@ -183,13 +187,55 @@ def single_threaded_env() -> Iterator[None]:
                 os.environ[name] = value
 
 
+class RecordingPlayer:
+    """Wraps a player and records one entry per move (position, time spent, search statistics)."""
+
+    def __init__(self, player: Any) -> None:
+        self._player = player
+        self.moves: List[Dict[str, Any]] = []
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._player, name)
+
+    def get_move(self, board: chess.Board, time_left: float) -> chess.Move:
+        """Ask the inner player for a move and record it; its exceptions propagate."""
+        fen = board.fen()
+        started = time.perf_counter()
+        move = self._player.get_move(board, time_left)
+        seconds = time.perf_counter() - started
+        stats = getattr(self._player, "last_search_stats", None)
+        self.moves.append(
+            {
+                "ply": board.ply(),
+                "color": "white" if board.turn == chess.WHITE else "black",
+                "fen": fen,
+                "move": move.uci(),
+                "time_left_before": time_left,
+                "move_seconds": seconds,
+                "budget": getattr(self._player, "turn_budget", None),
+                "completed_depth": getattr(stats, "completed_depth", None),
+                "nodes": getattr(stats, "nodes_visited", None),
+                "max_depth_reached": getattr(stats, "max_depth_reached", None),
+            }
+        )
+        return move
+
+
+def log_path(log_dir: Path, index: int, white: str, black: str) -> Path:
+    """File of the per-move log of a game, with filename-safe player names."""
+    safe = lambda name: re.sub(r"[^A-Za-z0-9_.-]", "_", name)  # noqa: E731
+    return log_dir / f"{index}_{safe(white)}_vs_{safe(black)}.json"
+
+
 def _play_game(job: Job) -> Dict[str, Any]:
     """Play one game in a worker process; a crash is returned as an ``error`` record.
 
     :param job: See :data:`Job`.
     :return: The game record.
     """
-    white, black, fen, base, increment = job
+    white, black, fen, base, increment = job[:5]
+    log_dir: Optional[Path] = job[5] if len(job) > 5 else None
+    index: int = job[6] if len(job) > 6 else 0
     record: Dict[str, Any] = {
         "white": white,
         "black": black,
@@ -198,8 +244,8 @@ def _play_game(job: Job) -> Dict[str, Any]:
         "increment": increment,
     }
     try:
-        white_player = make_player(white, TimeManager())
-        black_player = make_player(black, TimeManager())
+        white_player = RecordingPlayer(make_player(white, TimeManager()))
+        black_player = RecordingPlayer(make_player(black, TimeManager()))
         result = GameManager(BotRegistry()).play_game(
             white_player, black_player, base, increment, starting_position=fen, verbose=False
         )
@@ -212,12 +258,17 @@ def _play_game(job: Job) -> Dict[str, Any]:
         termination=result.termination,
         total_moves=result.total_moves,
     )
+    if log_dir is not None:
+        path = log_path(log_dir, index, white, black)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        moves = sorted(white_player.moves + black_player.moves, key=lambda m: m["ply"])
+        path.write_text(json.dumps({**record, "moves": moves}))
     return record
 
 
 def _error_record(job: Job, message: str) -> Dict[str, Any]:
     """Record of a game that produced no result."""
-    white, black, fen, base, increment = job
+    white, black, fen, base, increment = job[:5]
     return {
         "white": white,
         "black": black,
@@ -295,6 +346,7 @@ def run_round_robin(
     workers: int,
     out: Path,
     play: Callable[[Job], Dict[str, Any]] = _play_game,
+    log_dir: Optional[Path] = None,
 ) -> Dict[str, int]:
     """Play every pair on every opening twice, colours swapped, in parallel.
 
@@ -330,6 +382,8 @@ def run_round_robin(
     :param workers: Worker processes.
     :param out: JSON-lines file to append the games to.
     :param play: Plays one job; :func:`_play_game` unless a test substitutes its own.
+    :param log_dir: Directory for the per-move log of each game (one JSON file per game); ``None``
+        writes no logs.
     :return: ``played`` (new games), ``skipped`` (already recorded), ``errors`` (new games that
         produced no result) and ``games`` (records in ``out`` after the run).
     :raises ValueError: If a player specification cannot be built, or ``out`` holds another
@@ -344,6 +398,7 @@ def run_round_robin(
         for fen in openings
         for job in ((a, b, fen, base, increment), (b, a, fen, base, increment))
     ]
+    jobs = [(*job, log_dir, index) for index, job in enumerate(jobs)]
     existing = read_games(out)
     _check_time_control(existing, base, increment, out)
     done = {(r["white"], r["black"], r["fen"]) for r in existing}

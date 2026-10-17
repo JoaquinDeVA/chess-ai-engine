@@ -147,6 +147,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="openings per pair (two games each, colours swapped); default: sized by --hours",
     )
     parser.add_argument("--out", type=Path, default=Path("data/tournament/games.jsonl"))
+    parser.add_argument("--logs", type=Path, default=Path("data/tournament/games"))
     parser.add_argument("--report", type=Path, default=Path("docs/training/TOURNAMENT.md"))
     args = parser.parse_args(argv)
     args.specs = [s.strip() for s in args.players.split(",") if s.strip()]
@@ -184,7 +185,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"{seconds_per_game:.1f} worker-seconds per game -> {openings_per_pair} openings")
 
     openings = paired_openings(openings_per_pair)
-    run = run_round_robin(specs, openings, args.base, args.increment, workers, args.out)
+    run = run_round_robin(
+        specs, openings, args.base, args.increment, workers, args.out, log_dir=args.logs
+    )
     print(f"played {run['played']}, skipped {run['skipped']}, crashed {run['errors']}")
 
     summary = summarize(read_games(args.out), args.anchor)

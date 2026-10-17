@@ -285,3 +285,90 @@ def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, 
     assert not cards.card_path("m2").exists() and not cards.card_path("h1").exists()
     row = next(line for line in report.render_tables().splitlines() if "`m`" in line)
     assert f"{entry['score']:.1f}%" in row and "±" in row
+
+
+class _FakeStats:
+    completed_depth = 3
+    nodes_visited = 10
+    max_depth_reached = 3
+
+
+class _FakePlayer:
+    turn_budget = 0.5
+    last_search_stats = _FakeStats()
+
+    def get_move(self, board, time_left):
+        return next(iter(board.legal_moves))
+
+
+class _RaisingPlayer:
+    def get_move(self, board, time_left):
+        raise RuntimeError("fallo")
+
+
+def test_recording_player_records_one_entry_per_move():
+    board = chess.Board()
+    fen = board.fen()
+    player = tournament.RecordingPlayer(_FakePlayer())
+    move = player.get_move(board, 9.0)
+    assert len(player.moves) == 1
+    entry = player.moves[0]
+    assert entry.pop("move_seconds") >= 0
+    assert entry == {
+        "ply": 0,
+        "color": "white",
+        "fen": fen,
+        "move": move.uci(),
+        "time_left_before": 9.0,
+        "budget": 0.5,
+        "completed_depth": 3,
+        "nodes": 10,
+        "max_depth_reached": 3,
+    }
+    assert player.turn_budget == 0.5  # lo demas se delega
+
+
+def test_recording_player_without_stats_uses_none():
+    class Plain:
+        def get_move(self, board, time_left):
+            return next(iter(board.legal_moves))
+
+    player = tournament.RecordingPlayer(Plain())
+    player.get_move(chess.Board(), 1.0)
+    entry = player.moves[0]
+    assert [entry[k] for k in ("budget", "completed_depth", "nodes", "max_depth_reached")] == [
+        None
+    ] * 4
+
+
+def test_recording_player_propagates_exceptions():
+    player = tournament.RecordingPlayer(_RaisingPlayer())
+    with pytest.raises(RuntimeError, match="fallo"):
+        player.get_move(chess.Board(), 1.0)
+    assert player.moves == []
+
+
+def test_log_path_is_filename_safe(tmp_path):
+    path = tournament.log_path(tmp_path, 7, "mlp:a/b", "h1")
+    assert path == tmp_path / "7_mlp_a_b_vs_h1.json"
+
+
+def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
+    class Result:
+        winner, result, termination, total_moves = "white", "1-0", "checkmate", 1
+
+    class FakeManager:
+        def __init__(self, registry):
+            pass
+
+        def play_game(self, white, black, base, increment, **kwargs):
+            white.get_move(chess.Board(kwargs["starting_position"]), base)
+            return Result()
+
+    monkeypatch.setattr(tournament, "make_player", lambda spec, tm: _FakePlayer())
+    monkeypatch.setattr(tournament, "GameManager", FakeManager)
+    job = ("a:x", "h1", chess.STARTING_FEN, 5.0, 0.1, tmp_path / "logs", 3)
+    record = tournament._play_game(job)
+    saved = json.loads((tmp_path / "logs" / "3_a_x_vs_h1.json").read_text())
+    assert {k: saved[k] for k in record} == record
+    assert len(saved["moves"]) == 1 and saved["moves"][0]["ply"] == 0

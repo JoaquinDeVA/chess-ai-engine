@@ -20,5 +20,39 @@
     "final_loss": 0.05650566890835762,
     "final_val_loss": 0.054579321295022964,
     "final_val_mae": 0.1439572125673294
+  },
+  "accuracy": {
+    "all": {
+      "spearman": 0.6137486714071221,
+      "mae": 0.130290467276756,
+      "n": 200000,
+      "best_move_agreement": 0.1788,
+      "agreement_n": 5000
+    },
+    "quiet": {
+      "spearman": 0.6293202608197556,
+      "mae": 0.11785795161252803,
+      "n": 138657,
+      "best_move_agreement": 0.06443224501589136,
+      "agreement_n": 3461
+    },
+    "non_quiet": {
+      "spearman": 0.5846570597580836,
+      "mae": 0.1583923749835009,
+      "n": 61343,
+      "best_move_agreement": 0.4359974009096816,
+      "agreement_n": 1539
+    },
+    "sample": {
+      "rows": 200000,
+      "seed": 42,
+      "agreement_n": 5000
+    }
+  },
+  "cost": {
+    "us_per_eval": 124.18,
+    "samples": 1000,
+    "date": "2026-10-17",
+    "commit": "f3a2532+dirty"
   }
 }

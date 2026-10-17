@@ -27,7 +27,7 @@ Columns:
 | Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | Score | Elo ± interval |
 |---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | `cnn_light` | accuracy record | 109,569 | — | — | — | — | — | — | — | — | — | — | — | — |
-| `cnn_resnet` | accuracy record | 572,353 | — | — | — | — | — | — | — | — | — | — | — | — |
-| `mlp_features` | accuracy record | 1,505 | — | — | — | — | — | — | — | — | — | — | — | — |
+| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — | — | — |
+| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — | — | — |
 | `ridge_features` | accuracy record | 30 | — | — | — | — | — | — | — | — | — | — | — | — |
 <!-- END GENERATED TABLES -->

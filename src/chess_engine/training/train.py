@@ -87,6 +87,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--tag",
         help="train a variant: artifact <model>@<tag>, card <model>@<tag> (letters, digits, ._-)",
     )
+    parser.add_argument(
+        "--no-cache", action="store_true", help="do not cache the encoded training batches"
+    )
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
     parser.add_argument(
         "--sidecar", type=Path, default=DEFAULT_SIDECAR_DIR, help="sidecar directory"
@@ -212,6 +215,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         fit_config(plan, best["l2"], best["lr"]),
         quiet,
         seed=args.seed,
+        use_cache=not args.no_cache,
     )
 
     path = model.save(args.output or artifact_path(model_spec(args)))

@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from chess_engine.models import linear_eval
 from chess_engine.models.linear_eval import LinearEvalModel
 from chess_engine.models.linear_features import (
     _PAWN_CACHE,
@@ -403,3 +404,41 @@ def test_pst_kb_is_registered():
     model = get_model_class("linear_king_bucket")
     assert isinstance(model.features, KingBucketFeatures)
     assert model.architecture == "King-bucketed piece-square features (10,368 weights), logistic"
+
+
+def _cache_fit(cache_dir):
+    boards = random_positions(120, seed=21)
+    batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
+    validation = frame(random_positions(30, seed=22))
+    config = {"batch_size": 16, "max_epochs": 3, "patience": 3, "lr": 0.05}
+    model = get_model_class("linear_pst")()
+    model.fit_stream(batches, validation, config, cache_dir=cache_dir)
+    return model
+
+
+def test_cache_gives_the_same_weights_as_no_cache(tmp_path):
+    plain = _cache_fit(None)
+    cached = _cache_fit(tmp_path / "cache")
+
+    np.testing.assert_allclose(cached.weights, plain.weights, atol=0)
+    np.testing.assert_allclose(cached.bias, plain.bias, atol=0)
+    assert len(list((tmp_path / "cache").glob("*.npz"))) == 3
+    assert not list((tmp_path / "cache").glob("*.tmp"))
+
+
+def test_second_run_with_cache_does_not_encode(tmp_path, monkeypatch):
+    first = _cache_fit(tmp_path)
+
+    real = linear_eval.encode_frame
+
+    def only_validation(features, rep, frame_):
+        # The 30-row validation set is always encoded; a 40-row training batch never may be.
+        if len(frame_) != 30:
+            raise AssertionError("encoded a training batch despite the cache")
+        return real(features, rep, frame_)
+
+    monkeypatch.setattr(linear_eval, "encode_frame", only_validation)
+    second = _cache_fit(tmp_path)
+
+    np.testing.assert_allclose(second.weights, first.weights, atol=0)
+    np.testing.assert_allclose(second.bias, first.bias, atol=0)

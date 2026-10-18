@@ -233,6 +233,7 @@ class LinearEvalModel(EvaluationModel):
         batches: Iterable[pd.DataFrame],
         validation: pd.DataFrame,
         config: Dict[str, Any],
+        cache_dir: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Train with Adam on the binary cross-entropy against soft targets.
 
@@ -249,6 +250,9 @@ class LinearEvalModel(EvaluationModel):
         :param validation: Same columns, used for early stopping; must not be empty.
         :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
             ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`.
+        :param cache_dir: If set, the encoded frames are stored there (``<index>.npz``) and read
+            back instead of being encoded again; the caller must key the directory by everything
+            that determines the frames. None encodes every epoch.
         :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
             ``train_rows``, ``seconds`` and the ``config`` used.
         :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
@@ -274,7 +278,7 @@ class LinearEvalModel(EvaluationModel):
         with _featurization_pool(workers) as executor:
             for epoch in range(1, int(cfg["max_epochs"]) + 1):
                 loss_sum, rows_seen = 0.0, 0
-                for encoded in self._encoded_frames(batches, workers, executor):
+                for encoded in self._encoded_frames(batches, workers, executor, cache_dir):
                     for local in _minibatches(*encoded, batch_size):
                         local_rows, local_cols, local_vals, local_y = local
                         count = len(local_y)
@@ -342,29 +346,71 @@ class LinearEvalModel(EvaluationModel):
         batches: Iterable[pd.DataFrame],
         workers: int,
         executor: Optional[Executor],
+        cache_dir: Optional[Path] = None,
     ) -> Iterator[EncodedFrame]:
         """Encoded frames in order, featurized by the pool when there is one.
 
-        At most ``2 * workers`` frames are in flight, so memory stays bounded.
+        At most ``2 * workers`` frames are in flight, so memory stays bounded. With a cache, a
+        frame already stored is read instead of encoded, and a new one is stored once encoded.
 
         :param batches: The frames of one epoch.
         :param workers: Number of workers (``1`` means no pool).
         :param executor: The pool, or None.
+        :param cache_dir: Directory of the encoded frames, or None for no cache.
         :return: Iterator of :data:`EncodedFrame`, in the order of ``batches``.
         """
-        if executor is None:
-            for frame in batches:
-                yield self._encode(frame)
-            return
+        if cache_dir is not None:
+            cache_dir.mkdir(parents=True, exist_ok=True)
         encode = functools.partial(encode_frame, self.features, self.rep)
         window = 2 * workers
-        pending: deque = deque()
-        for frame in batches:
-            pending.append(executor.submit(encode, frame))
+        pending: deque = deque()  # (index, future)
+        for index, frame in enumerate(batches):
+            cached = _load_encoded(cache_dir, index)
+            if cached is not None:
+                pending.append((index, cached))
+            elif executor is None:
+                encoded = self._encode(frame)
+                if cache_dir is not None:
+                    _save_encoded(cache_dir, index, encoded)
+                pending.append((index, encoded))
+            else:
+                pending.append((index, executor.submit(encode, frame)))
             if len(pending) > window:
-                yield pending.popleft().result()
+                yield _resolve(pending.popleft(), cache_dir)
         while pending:
-            yield pending.popleft().result()
+            yield _resolve(pending.popleft(), cache_dir)
+
+
+def _resolve(item: Tuple[int, Any], cache_dir: Optional[Path]) -> EncodedFrame:
+    """The encoded frame of a pending item; a future is awaited and its result cached."""
+    index, value = item
+    if isinstance(value, tuple):
+        return value
+    encoded = value.result()
+    if cache_dir is not None:
+        _save_encoded(cache_dir, index, encoded)
+    return encoded
+
+
+def _load_encoded(cache_dir: Optional[Path], index: int) -> Optional[EncodedFrame]:
+    """Encoded frame ``index`` read from the cache, or None if it is not there."""
+    if cache_dir is None:
+        return None
+    path = cache_dir / f"{index:07d}.npz"
+    if not path.exists():
+        return None
+    with np.load(path) as data:
+        return data["rows"], data["cols"], data["values"], data["targets"]
+
+
+def _save_encoded(cache_dir: Path, index: int, encoded: EncodedFrame) -> None:
+    """Write an encoded frame to the cache, atomically (temporary name, then rename)."""
+    path = cache_dir / f"{index:07d}.npz"
+    tmp = cache_dir / f"{index:07d}.tmp"
+    rows, cols, values, targets = encoded
+    with open(tmp, "wb") as handle:
+        np.savez(handle, rows=rows, cols=cols, values=values, targets=targets)
+    os.replace(tmp, path)
 
 
 def encode_frame(

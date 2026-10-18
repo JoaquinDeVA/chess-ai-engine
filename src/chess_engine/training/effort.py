@@ -5,6 +5,7 @@ estimate the duration; :func:`search` runs the random hyper-parameter trials; :f
 the TRAIN split of the raw shards through :meth:`LinearEvalModel.fit_stream`.
 """
 
+import hashlib
 import math
 import os
 import time
@@ -35,6 +36,9 @@ from .dataset import TRAIN
 from .sidecar import iter_batches
 
 MAX_EFFORT = 100
+#: Version of the encoded-batch cache; bump it when the encoding changes without a visible key.
+CACHE_VERSION = 1
+CACHE_ROOT = Path("data/cache/linear")
 #: Positions per effort point: effort 30 trains on 30 M positions, effort 70 on 70 M.
 POSITIONS_PER_EFFORT = 1_000_000
 #: Floor of the positions, so that effort 0 still trains on a meaningful sample.
@@ -162,6 +166,35 @@ def fit_config(plan: Dict[str, int], l2: float, lr: float) -> Dict[str, Any]:
     }
 
 
+def cache_path(
+    model_class: type,
+    rep: Representation,
+    positions: int,
+    seed: int,
+    quiet_only: bool,
+    batch_size: int,
+    root: Path = CACHE_ROOT,
+) -> Path:
+    """Directory of the encoded batches: a short hash of everything that shapes them.
+
+    :return: ``root/<hash>``.
+    """
+    key = "|".join(
+        str(part)
+        for part in (
+            model_class.__name__,
+            rep.name,
+            positions,
+            seed,
+            quiet_only,
+            rep.mate_keep,
+            batch_size,
+            CACHE_VERSION,
+        )
+    )
+    return root / hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
 def fit(
     model_class: type,
     rep: Representation,
@@ -172,6 +205,7 @@ def fit(
     config: Dict[str, Any],
     quiet_only: bool = False,
     seed: int = SAMPLE_SEED,
+    use_cache: bool = True,
 ) -> Tuple[LinearEvalModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
@@ -184,6 +218,7 @@ def fit(
     :param config: Fit configuration (see :func:`fit_config`).
     :param quiet_only: Train on quiet positions only.
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
+    :param use_cache: Keep the encoded batches in ``data/cache/linear`` and reuse them.
     :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
@@ -200,7 +235,10 @@ def fit(
             mate_keep=rep.mate_keep,
         )
     )
-    summary = model.fit_stream(batches, validation, config)
+    cache = None
+    if use_cache:
+        cache = cache_path(model_class, rep, positions, seed, quiet_only, config["batch_size"])
+    summary = model.fit_stream(batches, validation, config, cache_dir=cache)
     return model, summary
 
 

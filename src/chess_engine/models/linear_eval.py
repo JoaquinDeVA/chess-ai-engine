@@ -17,7 +17,7 @@ from collections.abc import Iterable, Iterator
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
 
 import chess
 import numpy as np
@@ -272,80 +272,61 @@ class LinearEvalModel(EvaluationModel):
         step = 0
         validation_data = self._encode(validation)
         batch_size = int(cfg["batch_size"])
-        workers = int(cfg["workers"])
-        best_theta, best_loss, best_epoch = theta.copy(), math.inf, 0
-        train_losses: List[float] = []
-        val_losses: List[float] = []
-        bad_epochs = 0
-        train_rows = 0
         lr = float(cfg["lr"])
-        lr_decay = cfg.get("lr_decay")
-        min_lr = float(cfg.get("min_lr", 1e-5))
-        lr_history: List[float] = []
 
-        with _featurization_pool(workers) as executor:
-            for epoch in range(1, int(cfg["max_epochs"]) + 1):
-                loss_sum, rows_seen = 0.0, 0
-                lr_history.append(lr)
-                for encoded in self._encoded_frames(batches, workers, executor, cache_dir):
-                    for local in _minibatches(*encoded, batch_size):
-                        local_rows, local_cols, local_vals, local_y = local
-                        count = len(local_y)
-                        z = _scores(local_rows, local_cols, local_vals, count, theta)
-                        loss_sum += float(np.sum(_losses(z, local_y)))
-                        rows_seen += count
-                        grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
-                        grad_w = (
-                            np.bincount(
-                                local_cols,
-                                weights=local_vals * grad_z[local_rows],
-                                minlength=size,
-                            )
-                            / count
-                            + float(cfg["l2"]) * theta[:size]
-                        )
-                        grad = np.append(grad_w, grad_z.mean())
-                        step += 1
-                        moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
-                        velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
-                        m_hat = moment / (1 - _ADAM_BETA1**step)
-                        v_hat = velocity / (1 - _ADAM_BETA2**step)
-                        theta -= lr * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
-                if rows_seen == 0:
-                    raise ValueError("batches yielded no rows; pass a re-iterable collection")
-                train_rows = rows_seen
-                train_losses.append(loss_sum / rows_seen)
+        def train_batch(encoded: EncodedFrame) -> Tuple[float, int]:
+            nonlocal moment, velocity, step
+            loss_sum, rows_seen = 0.0, 0
+            for local in _minibatches(*encoded, batch_size):
+                local_rows, local_cols, local_vals, local_y = local
+                count = len(local_y)
+                z = _scores(local_rows, local_cols, local_vals, count, theta)
+                loss_sum += float(np.sum(_losses(z, local_y)))
+                rows_seen += count
+                grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
+                grad_w = (
+                    np.bincount(
+                        local_cols,
+                        weights=local_vals * grad_z[local_rows],
+                        minlength=size,
+                    )
+                    / count
+                    + float(cfg["l2"]) * theta[:size]
+                )
+                grad = np.append(grad_w, grad_z.mean())
+                step += 1
+                moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
+                velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
+                m_hat = moment / (1 - _ADAM_BETA1**step)
+                v_hat = velocity / (1 - _ADAM_BETA2**step)
+                theta[:] -= lr * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
+            return loss_sum, rows_seen
 
-                val_rows, val_cols, val_vals, val_y = validation_data
-                val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
-                val_loss = float(np.mean(_losses(val_z, val_y)))
-                if not math.isfinite(val_loss):
-                    raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
-                val_losses.append(val_loss)
-                if val_loss < best_loss:
-                    best_loss, best_epoch, best_theta = val_loss, epoch, theta.copy()
-                    bad_epochs = 0
-                elif lr_decay is not None:
-                    lr *= float(lr_decay)
-                    if lr < min_lr:
-                        break
-                else:
-                    bad_epochs += 1
-                    if bad_epochs > int(cfg["patience"]):
-                        break
+        def validation_loss() -> float:
+            val_rows, val_cols, val_vals, val_y = validation_data
+            val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
+            return float(np.mean(_losses(val_z, val_y)))
 
+        def set_lr(value: float) -> None:
+            nonlocal lr
+            lr = value
+
+        summary, best_theta = run_epochs(
+            cfg=cfg,
+            started=started,
+            frames=lambda executor: self._encoded_frames(
+                batches, int(cfg["workers"]), executor, cache_dir
+            ),
+            train_batch=train_batch,
+            validation_loss=validation_loss,
+            get_lr=lambda: lr,
+            set_lr=set_lr,
+            snapshot=theta.copy,
+            initial_best=theta.copy(),
+        )
         self.weights = best_theta[:size]
         self.bias = float(best_theta[size])
-        return {
-            "epochs": len(train_losses),
-            "best_epoch": best_epoch,
-            "train_losses": train_losses,
-            "val_losses": val_losses,
-            "lr_history": lr_history,
-            "train_rows": train_rows,
-            "seconds": round(time.perf_counter() - started, 3),
-            "config": cfg,
-        }
+        return summary
 
     def _encode(self, frame: pd.DataFrame) -> EncodedFrame:
         """Sparse features of the rows of a frame, with their soft targets.
@@ -393,6 +374,90 @@ class LinearEvalModel(EvaluationModel):
                 yield _resolve(pending.popleft(), cache_dir)
         while pending:
             yield _resolve(pending.popleft(), cache_dir)
+
+
+def run_epochs(
+    *,
+    cfg: Dict[str, Any],
+    started: float,
+    frames: Callable[[Optional[Executor]], Iterable[EncodedFrame]],
+    train_batch: Callable[[EncodedFrame], Tuple[float, int]],
+    validation_loss: Callable[[], float],
+    get_lr: Callable[[], float],
+    set_lr: Callable[[float], None],
+    snapshot: Callable[[], Any],
+    initial_best: Any,
+) -> Tuple[Dict[str, Any], Any]:
+    """Epoch loop shared by the models: encoded frames, decay or patience, best-epoch state.
+
+    Each model supplies how an encoded frame is trained and how the validation loss is computed.
+    With ``lr_decay`` in ``cfg`` an epoch without improvement multiplies the learning rate and the
+    run stops when it falls below ``min_lr``; otherwise it stops after more than ``patience``
+    epochs without improvement.
+
+    :param cfg: Fit configuration (``max_epochs``, ``workers``, ``patience``, ``lr_decay``...).
+    :param started: ``time.perf_counter()`` at the start of the fit, for ``seconds``.
+    :param frames: Given the pool (or None), the encoded frames of one epoch.
+    :param train_batch: Trains on one encoded frame; returns ``(loss_sum, rows)``.
+    :param validation_loss: Mean validation loss with the current weights.
+    :param get_lr: Current learning rate.
+    :param set_lr: Sets the learning rate.
+    :param snapshot: State to keep when an epoch is the best so far.
+    :param initial_best: State to return if no epoch improves on infinity.
+    :return: ``(summary, best_state)``; the summary has ``epochs``, ``best_epoch``,
+        ``train_losses``, ``val_losses``, ``lr_history``, ``train_rows``, ``seconds``, ``config``.
+    :raises ValueError: If an epoch yields no rows or a validation loss is not finite.
+    """
+    best_state, best_loss, best_epoch = initial_best, math.inf, 0
+    train_losses: List[float] = []
+    val_losses: List[float] = []
+    lr_history: List[float] = []
+    bad_epochs = 0
+    train_rows = 0
+    lr_decay = cfg.get("lr_decay")
+    min_lr = float(cfg.get("min_lr", 1e-5))
+
+    with _featurization_pool(int(cfg["workers"])) as executor:
+        for epoch in range(1, int(cfg["max_epochs"]) + 1):
+            loss_sum, rows_seen = 0.0, 0
+            lr_history.append(get_lr())
+            for encoded in frames(executor):
+                frame_loss, frame_rows = train_batch(encoded)
+                loss_sum += frame_loss
+                rows_seen += frame_rows
+            if rows_seen == 0:
+                raise ValueError("batches yielded no rows; pass a re-iterable collection")
+            train_rows = rows_seen
+            train_losses.append(loss_sum / rows_seen)
+
+            val_loss = validation_loss()
+            if not math.isfinite(val_loss):
+                raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
+            val_losses.append(val_loss)
+            if val_loss < best_loss:
+                best_loss, best_epoch, best_state = val_loss, epoch, snapshot()
+                bad_epochs = 0
+            elif lr_decay is not None:
+                lr = get_lr() * float(lr_decay)
+                if lr < min_lr:
+                    break
+                set_lr(lr)
+            else:
+                bad_epochs += 1
+                if bad_epochs > int(cfg["patience"]):
+                    break
+
+    summary = {
+        "epochs": len(train_losses),
+        "best_epoch": best_epoch,
+        "train_losses": train_losses,
+        "val_losses": val_losses,
+        "lr_history": lr_history,
+        "train_rows": train_rows,
+        "seconds": round(time.perf_counter() - started, 3),
+        "config": cfg,
+    }
+    return summary, best_state
 
 
 def _resolve(item: Tuple[int, Any], cache_dir: Optional[Path]) -> EncodedFrame:

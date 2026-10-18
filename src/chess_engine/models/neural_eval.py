@@ -24,8 +24,8 @@ from .linear_eval import (
     EncodedFrame,
     LinearEvalModel,
     _features_of,
-    _featurization_pool,
     _losses,
+    run_epochs,
 )
 from .linear_features import SlottedPstFeatures
 from .registry import register_model
@@ -306,6 +306,7 @@ class NeuralEvalModel(LinearEvalModel):
         batches: Iterable[pd.DataFrame],
         validation: pd.DataFrame,
         config: Dict[str, Any],
+        cache_dir: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Train with Keras (Adam, binary cross-entropy against soft targets).
 
@@ -332,7 +333,6 @@ class NeuralEvalModel(LinearEvalModel):
         keras = _training_keras()
         width = self.features.max_entries(self.rep.perspective)
         batch_size = int(cfg["batch_size"])
-        workers = int(cfg["workers"])
         model, parts = _keras_network(
             keras, [w.shape for w, _ in self.layers], width, float(cfg["l2"])
         )
@@ -343,54 +343,39 @@ class NeuralEvalModel(LinearEvalModel):
         )
         val_index, val_value, val_y = _padded(self._encode(validation), width)
 
-        best_layers, best_loss, best_epoch = self.layers, math.inf, 0
-        train_losses: List[float] = []
-        val_losses: List[float] = []
-        bad_epochs = 0
-        train_rows = 0
+        def train_batch(encoded: EncodedFrame) -> Tuple[float, int]:
+            index, value, targets = _padded(encoded, width)
+            loss_sum = 0.0
+            for start in range(0, len(targets), batch_size):
+                stop = min(len(targets), start + batch_size)
+                loss = model.train_on_batch(
+                    [index[start:stop], value[start:stop]], targets[start:stop, None]
+                )
+                loss_sum += float(loss) * (stop - start)
+            return loss_sum, len(targets)
 
-        with _featurization_pool(workers) as executor:
-            for epoch in range(1, int(cfg["max_epochs"]) + 1):
-                loss_sum, rows_seen = 0.0, 0
-                for encoded in self._encoded_frames(batches, workers, executor):
-                    index, value, targets = _padded(encoded, width)
-                    for start in range(0, len(targets), batch_size):
-                        stop = min(len(targets), start + batch_size)
-                        loss = model.train_on_batch(
-                            [index[start:stop], value[start:stop]], targets[start:stop, None]
-                        )
-                        loss_sum += float(loss) * (stop - start)
-                        rows_seen += stop - start
-                if rows_seen == 0:
-                    raise ValueError("batches yielded no rows; pass a re-iterable collection")
-                train_rows = rows_seen
-                train_losses.append(loss_sum / rows_seen)
+        def validation_loss() -> float:
+            val_z = model.predict(
+                [val_index, val_value], batch_size=_PREDICT_BATCH, verbose=0
+            ).reshape(-1)
+            return float(np.mean(_losses(val_z.astype(np.float64), val_y)))
 
-                val_z = model.predict(
-                    [val_index, val_value], batch_size=_PREDICT_BATCH, verbose=0
-                ).reshape(-1)
-                val_loss = float(np.mean(_losses(val_z.astype(np.float64), val_y)))
-                if not math.isfinite(val_loss):
-                    raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
-                val_losses.append(val_loss)
-                if val_loss < best_loss:
-                    best_loss, best_epoch, best_layers = val_loss, epoch, _export(parts)
-                    bad_epochs = 0
-                else:
-                    bad_epochs += 1
-                    if bad_epochs > int(cfg["patience"]):
-                        break
-
+        summary, best_layers = run_epochs(
+            cfg=cfg,
+            started=started,
+            frames=lambda executor: self._encoded_frames(
+                batches, int(cfg["workers"]), executor, cache_dir
+            ),
+            train_batch=train_batch,
+            validation_loss=validation_loss,
+            get_lr=lambda: float(model.optimizer.learning_rate.numpy()),
+            set_lr=model.optimizer.learning_rate.assign,
+            snapshot=lambda: _export(parts),
+            initial_best=self.layers,
+        )
         self.layers = best_layers
-        return {
-            "epochs": len(train_losses),
-            "best_epoch": best_epoch,
-            "train_losses": train_losses,
-            "val_losses": val_losses,
-            "train_rows": train_rows,
-            "seconds": round(time.perf_counter() - started, 3),
-            "config": cfg,
-        }
+        del summary["lr_history"]  # not part of this model's summary
+        return summary
 
 
 @register_model("net4_pst")

@@ -1,0 +1,53 @@
+{
+  "name": "linear_pst_terms@e30",
+  "status": "current",
+  "architecture": "Tapered piece-square tables plus 11 classical terms (790 weights), logistic",
+  "features": "linear_pst_terms",
+  "parameters": 791,
+  "size_kb": 7.5,
+  "training": {
+    "dataset": "data/lichess/raw",
+    "date": "2026-10-18",
+    "commit": "1dd8cb8+dirty",
+    "epochs": 4,
+    "best_epoch": 4,
+    "train_losses": [
+      0.6522126389093855,
+      0.6516420034178749,
+      0.6516303828922434,
+      0.6516287317711885
+    ],
+    "val_losses": [
+      0.6530252436720488,
+      0.6529977250771708,
+      0.6529943076400997,
+      0.652993940551031
+    ],
+    "train_rows": 30000000,
+    "seconds": 9874.52,
+    "config": {
+      "l2": 1e-06,
+      "lr": 0.01,
+      "batch_size": 4096,
+      "max_epochs": 4,
+      "patience": 2,
+      "workers": 4
+    },
+    "train_samples": 30000000,
+    "effort": 30,
+    "effort_config": {
+      "positions": 30000000,
+      "max_epochs": 4,
+      "patience": 2,
+      "trials": 0,
+      "batch_size": 4096
+    },
+    "representation": {
+      "scale": "winprob",
+      "k": 0.00368208,
+      "perspective": "side_to_move",
+      "filter": "all",
+      "mate_keep": 0.1
+    }
+  }
+}

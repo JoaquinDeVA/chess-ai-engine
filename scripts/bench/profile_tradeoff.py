@@ -6,7 +6,7 @@ python scripts/bench/profile_tradeoff.py --players linear_pst,h1 --seconds 1,3,1
 Use ``--parallel 1`` (the default) for published numbers: parallel workers are limited to one
 thread each but still compete for the machine.
 
-Writes the JSON results, ``docs/training/TRADEOFF.md`` and ``docs/img/depth_vs_accuracy.png``.
+Writes the JSON results, ``data/reports/TRADEOFF.md`` and ``docs/img/depth_vs_accuracy.png``.
 The ``tradeoff`` section of the model cards of the profiled models (those that have a card) is
 updated too.
 """
@@ -100,8 +100,8 @@ def main() -> None:
     )
     parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
     parser.add_argument("--sidecar", type=Path, default=Path("data/lichess/sidecar"))
-    parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "docs/training/tradeoff.json")
-    parser.add_argument("--markdown", type=Path, default=PROJECT_ROOT / "docs/training/TRADEOFF.md")
+    parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "data/reports/tradeoff.json")
+    parser.add_argument("--markdown", type=Path, default=PROJECT_ROOT / "data/reports/TRADEOFF.md")
     parser.add_argument(
         "--plot", type=Path, default=PROJECT_ROOT / "docs/img/depth_vs_accuracy.png"
     )

@@ -1,4 +1,4 @@
-"""Render the model cards into the table of ``MODELS_HISTORY.md``.
+"""Render the model cards into the table of ``RESULTS.md``.
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
 this module regenerates: ``python -m chess_engine.comparison.report``.
@@ -15,7 +15,7 @@ import chess_engine.models  # noqa: F401  (loads models first: avoids an import 
 from chess_engine.models.cards import PROJECT_ROOT, load_all_cards
 from chess_engine.training.representation import Representation
 
-HISTORY_FILE = PROJECT_ROOT / "docs" / "training" / "MODELS_HISTORY.md"
+HISTORY_FILE = PROJECT_ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 
@@ -132,9 +132,9 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
 
 
 def update_history_file(path: Optional[Path] = None) -> bool:
-    """Replace the generated block of ``MODELS_HISTORY.md``.
+    """Replace the generated block of ``RESULTS.md``.
 
-    :param path: File to update (default: ``MODELS_HISTORY.md`` of the project).
+    :param path: File to update (default: ``RESULTS.md`` of the project).
     :return: True if the file was rewritten, False if it does not exist or has no markers yet.
     """
     path = HISTORY_FILE if path is None else path

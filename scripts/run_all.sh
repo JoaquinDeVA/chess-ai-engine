@@ -75,4 +75,4 @@ TOURNAMENT_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "
 
 echo "=== report"
 "$PYTHON" -m chess_engine.comparison.report
-echo "Done. Review docs/training/ (MODELS_HISTORY.md, TRADEOFF.md, TOURNAMENT.md) and commit."
+echo "Done. Review docs/RESULTS.md, data/reports/ and the cards in src/chess_engine/models/cards/ and commit."

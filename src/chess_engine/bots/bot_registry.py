@@ -2,7 +2,7 @@
 Bot registry: automatic bot discovery and loading.
 
 Discovers every :class:`~bots.chess_bot.ChessBot` subclass defined in a public module of the
-``bots/`` directory, so adding a bot is just adding a file (see ``docs/ADDING_A_BOT.md``).
+``bots/`` directory, so adding a bot is just adding a file (see ``docs/ARCHITECTURE.md``).
 Modules whose name starts with an underscore are ignored.
 
 Originally part of the AI course framework (CEU San Pablo University); extended with

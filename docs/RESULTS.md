@@ -97,7 +97,9 @@ y la evaluación de Stockfish (todas las posiciones):
 | `linear_pst` | 0.623 | |
 | `linear_king_bucket` | 0.609 | |
 | `h1` (heurística de referencia) | 0.561 | |
-| `linear_material` | 0.475 | |
+| `linear_material` | 0.475 | esfuerzo 15 |
+| `linear_material@e90` | 0.474 | esfuerzo 90: MAE 0.158, mejor jugada 0.191 (0.549 no tranquilas); no mejora a esfuerzo 15 |
+| `linear_pst_terms@e30` | — | entrenado a esfuerzo 30; sin juicio estático ni partidas |
 
 Acierto de mejor jugada y MAE (sobre la escala de puntuación esperada) están en las fichas de cada
 modelo, sección `accuracy` (`src/chess_engine/models/cards/<modelo>.json`).
@@ -155,6 +157,22 @@ variante al 100 % se entrena con `--mate-keep 1.0 --tag mates100`.
 
 **Alcance.** Es un solo par de jugadores, una sola escala (esfuerzo 15) y 100 partidas. Este
 test no cambia la clasificación de los demás modelos.
+
+## Esfuerzo 90 (`linear_material`)
+
+Entrenado con 90 M de posiciones y 10 épocas. Con el mismo juez que la tabla anterior: Spearman
+0.474, MAE 0.158, acierto de mejor jugada 0.191 en total y 0.549 en posiciones no tranquilas. La
+pérdida de validación queda plana (0.6722 a 0.6719), así que el esfuerzo extra no añade información
+para este modelo: se queda con el esfuerzo 15.
+
+```bash
+python -m chess_engine.training.train --model linear_material --effort 90
+python -m chess_engine.comparison.evaluate --model linear_material@e90
+```
+
+**Reproducibilidad.** Las fichas `linear_material@e90` y `linear_pst_terms@e30` se generaron con el commit
+`1dd8cb8` y cambios sin confirmar (`+dirty`). Los refactors posteriores (`cba6d3a`, `d56a140`,
+`428bffb`) cambian el código pero no los números declarados; no se han vuelto a medir.
 
 ## Quiescencia a profundidad fija
 
@@ -222,4 +240,18 @@ lo confirman ahora para `linear_pst_terms` (71.0 % del 10 % frente al original).
 Generada por `python -m chess_engine.comparison.report` a partir de las fichas; no se edita a mano.
 
 <!-- BEGIN GENERATED TABLES -->
+| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | Score | Elo ± interval |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `linear_king_bucket` | plays | 10,369 | winprob-k0.00368-stm-all | 15 | 0.609 | 0.143 | 17.9% / 47.1% | 35.2 | — | — | — | — | 59.0% | +134 ± 67 |
+| `linear_material` | plays | 6 | winprob-k0.00368-stm-all | 15 | 0.475 | 0.156 | 19.1% / 54.9% | 21.0 | — | — | — | — | 69.0% | +198 ± 72 |
+| `linear_material@e90` | plays | 6 | winprob-k0.00368-stm-all-mates10 | 90 | 0.474 | 0.158 | 19.1% / 54.9% | 22.1 | — | — | — | — | — | — |
+| `linear_pst` | plays | 769 | winprob-k0.00368-stm-all | 15 | 0.623 | 0.137 | 18.8% / 50.6% | 57.2 | — | — | — | — | 48.5% | +70 ± 66 |
+| `linear_pst_terms` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 15 | 0.646 | 0.133 | 20.0% / 54.4% | 114.7 | — | — | — | — | 71.0% | +156 ± 70 |
+| `linear_pst_terms@e30` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 30 | — | — | — | — | — | — | — | — | — | — |
+| `linear_pst_terms@mates10s7` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 15 | 0.650 | 0.132 | 20.2% / 54.8% | 118.5 | — | — | — | — | — | — |
+| `linear_pst_terms@quiet` | plays | 791 | winprob-k0.00368-stm-quiet | 15 | 0.651 | 0.128 | 19.8% / 53.5% | 117.1 | — | — | — | — | — | — |
+| `linear_pst_terms@s7` | plays | 791 | winprob-k0.00368-stm-all | 15 | 0.645 | 0.131 | 18.4% / 49.1% | 115.2 | — | — | — | — | — | — |
+| `net4_pst` | plays | 206,177 | winprob-k0.00368-stm-all | 15 | 0.627 | 0.133 | 18.9% / 48.1% | 68.4 | — | — | — | — | 49.0% | +73 ± 64 |
+| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — | — | — |
+| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — | — | — |
 <!-- END GENERATED TABLES -->

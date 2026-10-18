@@ -11,7 +11,7 @@ from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.time_management import TimeManager
 
-#: Model used when none is given. Train it with ``python -m chess_engine.training.train --model mlp_features``.
+#: Model used when none is given: a course model whose weights are loaded (not retrained; see docs/RESULTS.md).
 DEFAULT_MODEL = "mlp_features"
 
 

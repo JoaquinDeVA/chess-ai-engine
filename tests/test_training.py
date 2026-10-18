@@ -133,7 +133,7 @@ class TestMetrics:
 @pytest.fixture
 def isolated_cards(tmp_path, monkeypatch):
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "MODELS_HISTORY.md")
+    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "RESULTS.md")
     return tmp_path
 
 

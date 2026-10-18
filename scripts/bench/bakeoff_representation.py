@@ -2,7 +2,7 @@
 """Representation bake-off: which target, point of view and training subset suit linear_pst.
 
 python scripts/bench/bakeoff_representation.py --train-positions 5000000 --test-positions 200000 \
-    --effort 30 --tiebreak-games 200 --out docs/training/bakeoff.json
+    --effort 30 --tiebreak-games 200 --out data/reports/bakeoff.json
 
 Every variant changes one axis of the default representation and is trained as a tagged model
 ``linear_pst@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
@@ -255,8 +255,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="tagged models are linear_pst@<prefix>-<index> (letters, digits, '.', '_', '-')",
     )
     parser.add_argument("--keep-models", action="store_true", help="keep the tagged models")
-    parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "docs/training/bakeoff.json")
-    parser.add_argument("--report", type=Path, default=PROJECT_ROOT / "docs/training/BAKEOFF.md")
+    parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "data/reports/bakeoff.json")
+    parser.add_argument("--report", type=Path, default=PROJECT_ROOT / "data/reports/BAKEOFF.md")
     args = parser.parse_args(argv)
     if not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag_prefix):
         parser.error("--tag-prefix must contain only letters, digits, '.', '_' or '-'")

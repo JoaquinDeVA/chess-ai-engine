@@ -1,6 +1,6 @@
 """Conversion of Stockfish evaluations into normalized training targets.
 
-Decisions (they define what "accuracy against Stockfish" means in ``MODELS_HISTORY.md``):
+Decisions (they define what "accuracy against Stockfish" means in ``RESULTS.md``):
 
 * A centipawn evaluation is clipped to ``+-CP_SCALE`` (1267 cp, the 0.5% quantile of the course
   dataset, so ~99% of the positions are untouched) and divided by ``CP_SCALE``: ``y`` in

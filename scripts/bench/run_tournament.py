@@ -6,7 +6,7 @@ python scripts/bench/run_tournament.py --players linear_pst,linear_pst_terms,lin
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
 the number of openings to fit ``--hours``. The games go to ``--out`` (resumable) and the results
-to ``docs/training/TOURNAMENT.md``. The ``tournament`` section of the model cards of the players
+to ``data/reports/TOURNAMENT.md``. The ``tournament`` section of the model cards of the players
 (those that have a card) is updated too.
 """
 
@@ -150,7 +150,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--out", type=Path, default=Path("data/tournament/games.jsonl"))
     parser.add_argument("--logs", type=Path, default=Path("data/tournament/games"))
-    parser.add_argument("--report", type=Path, default=Path("docs/training/TOURNAMENT.md"))
+    parser.add_argument("--report", type=Path, default=Path("data/reports/TOURNAMENT.md"))
     args = parser.parse_args(argv)
     args.specs = [s.strip() for s in args.players.split(",") if s.strip()]
     if len(set(args.specs)) < 2:

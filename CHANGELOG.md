@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Training only reads the raw shards (`--effort`); the CSV path (`--data`, `load_evaluations`,
+  `scripts/data/download_lichess_evals.py`, `scripts/data/label_with_stockfish.py`) is removed.
+- One epoch loop for the linear and network models (`run_epochs` in `models/linear_eval.py`).
+- Shared defaults in `training/spec.py` (sample seed, mate share, name suffix).
+- The generated tables go to `docs/RESULTS.md` (was a `MODELS_HISTORY.md` that no longer existed); the
+  tournament, trade-off and bake-off reports are written to `data/reports/`.
+- Measured `linear_material` at effort 90: no gain over effort 15 (see `docs/RESULTS.md`).
+
 - `h1` replaces the heuristics `h2`, `h3` and `h4`: the features of the old `h3` with weights fitted to
   Stockfish (`h1_weights.json`, `scripts/data/fit_h1.py`). `h1` is the Elo anchor.
 - Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.

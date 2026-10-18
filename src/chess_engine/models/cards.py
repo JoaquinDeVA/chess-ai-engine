@@ -1,7 +1,7 @@
 """Model cards: small JSON files with everything known about a model.
 
 Cards live in ``models/cards/<name>.json``. ``training.train`` and ``comparison.evaluate`` fill
-them in; ``comparison.report`` renders them into ``MODELS_HISTORY.md``.
+them in; ``comparison.report`` renders them into ``RESULTS.md``.
 """
 
 import json

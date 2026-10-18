@@ -127,7 +127,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Evaluate a model, store the result in its card and refresh ``MODELS_HISTORY.md``.
+    """Evaluate a model, store the result in its card and refresh ``RESULTS.md``.
 
     :param argv: Command-line arguments.
     :return: Process exit code.

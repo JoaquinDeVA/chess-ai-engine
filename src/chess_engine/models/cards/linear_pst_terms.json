@@ -47,10 +47,10 @@
     }
   },
   "tournament": {
-    "games": 10,
-    "score": 35.0,
-    "elo": -261.2192709872775,
-    "elo_interval": 269.059750906305,
+    "games": 100,
+    "score": 37.5,
+    "elo": 3.143713357074555,
+    "elo_interval": 66.21222603336778,
     "anchor": "h1",
     "base": 60.0,
     "increment": 1.0

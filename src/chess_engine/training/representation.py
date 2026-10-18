@@ -15,6 +15,8 @@ import pandas as pd
 
 from chess_engine.models.base import CP_SCALE
 
+from .spec import DEFAULT_MATE_KEEP, mates_suffix
+
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
 LICHESS_K = 0.00368208
 #: Centipawns at which the linear scale saturates.
@@ -26,8 +28,6 @@ _FILTERS = ("all", "quiet")
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
-#: Default share of the mate positions kept in training (the 100 % variant needs ``--tag``).
-DEFAULT_MATE_KEEP = 0.10
 
 
 def validate_mate_keep(mate_keep: float) -> None:
@@ -72,8 +72,7 @@ class Representation:
         """Short identifier, e.g. ``"winprob-k0.00368-stm-all"``; ``-mates5`` if mates are cut."""
         scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
         persp = "stm" if self.perspective == "side_to_move" else "white"
-        mates = f"-mates{100 * self.mate_keep:g}" if self.mate_keep < 1.0 else ""
-        return f"{scale}-{persp}-{self.filter}{mates}"
+        return f"{scale}-{persp}-{self.filter}{mates_suffix(self.mate_keep)}"
 
     def to_dict(self) -> dict:
         """Fields as a plain dictionary.

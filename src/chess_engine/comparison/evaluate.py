@@ -22,14 +22,13 @@ from chess_engine.models.cards import current_commit, load_card, today, update_c
 from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
 from chess_engine.training.dataset import TEST
 from chess_engine.training.sidecar import load_sample
+from chess_engine.training.spec import SAMPLE_SEED
 
 from .judge import judge
 from .report import update_history_file
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000
-#: Seed of the test sample; the same seed gives the same positions.
-SAMPLE_SEED = 42
 #: Leading sample rows used for best-move agreement (each costs one search step).
 AGREEMENT_ROWS = 20_000
 #: Positions timed for the cost section.

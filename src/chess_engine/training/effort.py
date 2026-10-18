@@ -34,6 +34,7 @@ from chess_engine.training.representation import (
 
 from .dataset import TRAIN
 from .sidecar import iter_batches
+from .spec import SAMPLE_SEED
 
 MAX_EFFORT = 100
 #: Version of the encoded-batch cache; bump it when the encoding changes without a visible key.
@@ -50,7 +51,6 @@ TIMED_POSITIONS = 50_000
 TRIAL_FRACTION = 0.1
 L2_RANGE = (1e-7, 1e-3)
 LR_RANGE = (1e-3, 3e-2)
-SAMPLE_SEED = 42
 #: Featurization processes of the real runs (leaves two cores free).
 WORKERS = max(1, (os.cpu_count() or 1) - 2)
 

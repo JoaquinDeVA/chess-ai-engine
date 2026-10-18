@@ -43,9 +43,10 @@ from chess_engine.models.cards import card_path, current_commit, today, update_c
 from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel
 from chess_engine.models.registry import artifact_path, get_model_class
 from chess_engine.training.dataset import TEST, TRAIN, VALIDATION
-from chess_engine.training.effort import SAMPLE_SEED, effort_config, fit_config
+from chess_engine.training.effort import effort_config, fit_config
 from chess_engine.training.representation import Representation
 from chess_engine.training.sidecar import iter_batches, load_sample
+from chess_engine.training.spec import SAMPLE_SEED
 from chess_engine.training.train import (
     DEFAULT_RAW_DIR,
     DEFAULT_SIDECAR_DIR,

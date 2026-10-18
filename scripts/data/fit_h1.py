@@ -30,6 +30,7 @@ from chess_engine.evaluation.heuristics import (
 from chess_engine.training.dataset import TRAIN
 from chess_engine.training.representation import Representation, white_score
 from chess_engine.training.sidecar import load_sample
+from chess_engine.training.spec import SAMPLE_SEED
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = PROJECT_ROOT / "src" / "chess_engine" / "evaluation" / "h1_weights.json"
@@ -38,8 +39,6 @@ DEFAULT_OUT = PROJECT_ROOT / "src" / "chess_engine" / "evaluation" / "h1_weights
 #: 2026-10-17; h3 no longer exists as a function, so the baseline is stored here.
 H3_BASELINE_R2 = 0.0740605
 
-#: Seed of the sample of TRAIN positions.
-SAMPLE_SEED = 42
 #: Salt of the hash that selects the held-out positions (share :data:`HOLDOUT_SHARE`).
 HOLDOUT_SALT = "h1-holdout"
 HOLDOUT_SHARE = 0.2

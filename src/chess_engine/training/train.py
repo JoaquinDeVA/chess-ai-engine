@@ -19,7 +19,6 @@ from chess_engine.models.registry import artifact_path, available_models, get_mo
 
 from .dataset import VALIDATION
 from .effort import (
-    SAMPLE_SEED,
     available_rows,
     calibrate,
     effort_config,
@@ -28,8 +27,9 @@ from .effort import (
     fit_config,
     search,
 )
-from .representation import DEFAULT_MATE_KEEP, Representation
+from .representation import Representation
 from .sidecar import load_sample
+from .spec import DEFAULT_MATE_KEEP, SAMPLE_SEED
 
 MAX_VALIDATION_ROWS = 50_000
 DEFAULT_RAW_DIR = Path("data/lichess/raw")

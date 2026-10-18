@@ -40,6 +40,10 @@ def fallback_move(board: chess.Board) -> chess.Move:
     return order_by_mvv_lva(board, legal)[0]
 
 
+#: Quiescence plies used by default by the search bots (see docs/SEARCH_ALGORITHMS.md).
+DEFAULT_QUIESCENCE_PLIES = 4
+
+
 class _StatisticsMixin:
     """Accumulates search statistics over a game."""
 
@@ -103,7 +107,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param time_manager: Time budgeting policy.
     :param max_tt_entries: Size cap of the transposition table.
     :param problem: Chess problem to search; a fresh one is created by default.
-    :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off).
+    :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off; default 4,
+        measured at fixed depth: +0.06 agreement at depth 3 on 2,000 positions).
     """
 
     def __init__(
@@ -114,7 +119,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         time_manager: Optional[TimeManager] = None,
         max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
         problem: Optional[ChessProblem] = None,
-        quiescence_plies: int = 0,
+        quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth

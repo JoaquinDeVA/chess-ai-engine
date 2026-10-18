@@ -50,6 +50,9 @@ MAX_DEATHS_PER_GAME = 2
 #: the log file ``<index>_<white>_vs_<black>.json``.
 Job = Tuple[Any, ...]
 
+#: Deepest iteration of a player when the tournament does not limit it (see make_player).
+DEFAULT_MAX_DEPTH = 30
+
 #: Thread-pool variables pinned to 1 in the workers, so that timed games do not compete for cores.
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
@@ -236,16 +239,18 @@ def _play_game(job: Job) -> Dict[str, Any]:
     white, black, fen, base, increment = job[:5]
     log_dir: Optional[Path] = job[5] if len(job) > 5 else None
     index: int = job[6] if len(job) > 6 else 0
+    max_depth: int = job[7] if len(job) > 7 else DEFAULT_MAX_DEPTH
     record: Dict[str, Any] = {
         "white": white,
         "black": black,
         "fen": fen,
         "base": base,
         "increment": increment,
+        "max_depth": max_depth,
     }
     try:
-        white_player = RecordingPlayer(make_player(white, TimeManager()))
-        black_player = RecordingPlayer(make_player(black, TimeManager()))
+        white_player = RecordingPlayer(make_player(white, TimeManager(), max_depth))
+        black_player = RecordingPlayer(make_player(black, TimeManager(), max_depth))
         result = GameManager(BotRegistry()).play_game(
             white_player, black_player, base, increment, starting_position=fen, verbose=False
         )
@@ -347,6 +352,7 @@ def run_round_robin(
     out: Path,
     play: Callable[[Job], Dict[str, Any]] = _play_game,
     log_dir: Optional[Path] = None,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> Dict[str, int]:
     """Play every pair on every opening twice, colours swapped, in parallel.
 
@@ -398,7 +404,7 @@ def run_round_robin(
         for fen in openings
         for job in ((a, b, fen, base, increment), (b, a, fen, base, increment))
     ]
-    jobs = [(*job, log_dir, index) for index, job in enumerate(jobs)]
+    jobs = [(*job, log_dir, index, max_depth) for index, job in enumerate(jobs)]
     existing = read_games(out)
     _check_time_control(existing, base, increment, out)
     done = {(r["white"], r["black"], r["fen"]) for r in existing}

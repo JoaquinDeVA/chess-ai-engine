@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from chess_engine.comparison.tournament import (
     ANCHOR,
+    DEFAULT_MAX_DEPTH,
     paired_openings,
     read_games,
     record_cards,
@@ -102,7 +103,9 @@ def render_markdown(
     return "\n".join(lines) + "\n"
 
 
-def calibrate(specs: List[str], base: float, increment: float, workers: int) -> Optional[float]:
+def calibrate(
+    specs: List[str], base: float, increment: float, workers: int, max_depth: int
+) -> Optional[float]:
     """Worker-seconds per game, measured by playing one opening between every pair.
 
     :return: Wall time times workers over games played, or None if no game was played.
@@ -116,6 +119,7 @@ def calibrate(specs: List[str], base: float, increment: float, workers: int) -> 
             increment,
             workers,
             Path(tmp) / "calibration.jsonl",
+            max_depth=max_depth,
         )
         elapsed = time.perf_counter() - started
     if summary["played"] == 0:
@@ -143,6 +147,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--anchor", default=ANCHOR, help="player whose Elo is 0; must be one of --players"
     )
     parser.add_argument("--hours", type=float, default=10.0, help="wall-clock budget")
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=DEFAULT_MAX_DEPTH,
+        help="deepest iteration of every player (a fixed-depth match when the clock is generous)",
+    )
     parser.add_argument(
         "--openings",
         type=int,
@@ -173,7 +183,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Using {workers} workers (cores - 1), not {args.workers}.")
 
     print("Calibrating ...")
-    seconds_per_game = calibrate(specs, args.base, args.increment, workers)
+    seconds_per_game = calibrate(specs, args.base, args.increment, workers, args.max_depth)
     if seconds_per_game is None:
         print("Calibration played no games; check the players.")
         return 1
@@ -188,7 +198,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     openings = paired_openings(openings_per_pair)
     run = run_round_robin(
-        specs, openings, args.base, args.increment, workers, args.out, log_dir=args.logs
+        specs,
+        openings,
+        args.base,
+        args.increment,
+        workers,
+        args.out,
+        log_dir=args.logs,
+        max_depth=args.max_depth,
     )
     print(f"played {run['played']}, skipped {run['skipped']}, crashed {run['errors']}")
 
@@ -199,13 +216,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         "openings": openings_per_pair,
         "games per pair": 2 * openings_per_pair,
         "seconds per game (calibration)": f"{seconds_per_game:.1f}",
+        "max depth": args.max_depth,
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_markdown(summary, specs, meta, args.anchor))
     print(f"Wrote {args.report}")
-    recorded = record_cards(summary, specs, args.anchor, args.base, args.increment)
-    if recorded:
-        print("Model cards updated: " + ", ".join(recorded))
+    if args.max_depth != DEFAULT_MAX_DEPTH:
+        print("Depth-limited match: model cards are not updated.")
+    else:
+        recorded = record_cards(summary, specs, args.anchor, args.base, args.increment)
+        if recorded:
+            print("Model cards updated: " + ", ".join(recorded))
     return 0
 
 

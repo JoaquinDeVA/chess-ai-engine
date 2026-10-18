@@ -225,15 +225,33 @@ python scripts/bench/run_tournament.py --players linear_material,net4_pst,linear
 
 (`--openings 10` son 20 partidas por pareja y `--openings 25` son 50.)
 
-## Discrepancia abierta
+## Discrepancia: velocidad frente a evaluación
 
-El juez estático pone a `linear_pst_terms` el primero y a `linear_material` el último; jugando es
-al revés (`linear_material` primero con 69.0 % y 56.5 %, `linear_pst_terms` penúltimo con 37.5 %). Con
-estos datos no hay explicación demostrada: la correlación con Stockfish en posiciones estáticas no
-predice la fuerza con búsqueda a tiempo fijo.
+El juez estático pone a `linear_pst_terms` el primero y a `linear_material` el último; jugando a tiempo
+fijo es al revés. La explicación que los datos sostienen: `linear_material` evalúa unos 16 k nodos por
+segundo frente a 9 k de `linear_pst_terms` (1 s por jugada, 200 posiciones de test), así que en el mismo
+tiempo alcanza unos 0.6 semiplies más. Ese extra de profundidad es lo que le da la ventaja en el torneo.
 
-El resultado de los mates es coherente con la mejora del acierto de mejor jugada, y las partidas
-lo confirman ahora para `linear_pst_terms` (71.0 % del 10 % frente al original).
+Prueba con profundidad fija (3 para los dos, sin reloj efectivo, 50 aperturas, 100 partidas por pareja):
+
+| jugador | puntuación % a profundidad 3 | puntuación % a 60 s + 1 s |
+|---|---|---|
+| `linear_pst_terms` | 74.8 | 37.5 (ronda 1) |
+| `linear_pst` | 38.8 | 48.5 (ronda 1) |
+| `linear_material` | 36.5 | 69.0 (ronda 1) |
+
+A igual profundidad, `linear_material` pierde con claridad (14-20-66 frente a `linear_pst_terms`). La
+ventaja de `linear_material` a tiempo fijo es, por tanto, de velocidad y no de evaluación. Lo medido
+solo cubre profundidad 3 y 1 s por jugada; no se ha medido el cruce con profundidades mayores.
+
+```bash
+python scripts/bench/run_tournament.py --players linear_material,linear_pst_terms,linear_pst \
+    --anchor linear_pst_terms --max-depth 3 --base 600 --increment 0 --openings 50 --workers 5 \
+    --out data/tournament/depth3.jsonl --report data/reports/DEPTH3.md
+```
+
+El torneo a profundidad fija no actualiza las fichas de modelo. Medición de velocidad:
+`.superpowers/experimentos/velocidad/` (no versionada).
 
 ## Tabla de modelos
 

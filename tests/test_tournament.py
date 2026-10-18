@@ -241,7 +241,7 @@ def test_parse_args_takes_an_explicit_number_of_openings(script):
 
 
 def test_calibrate_returns_none_when_no_game_is_played(script):
-    assert script.calibrate(["h1"], 2.0, 0.0, 1) is None
+    assert script.calibrate(["h1"], 2.0, 0.0, 1, max_depth=1) is None
 
 
 def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, monkeypatch, capsys):
@@ -384,10 +384,17 @@ def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
             white.get_move(chess.Board(kwargs["starting_position"]), base)
             return Result()
 
-    monkeypatch.setattr(tournament, "make_player", lambda spec, tm: _FakePlayer())
+    depths = []
+
+    def fake_make_player(spec, tm, max_depth=30):
+        depths.append(max_depth)
+        return _FakePlayer()
+
+    monkeypatch.setattr(tournament, "make_player", fake_make_player)
     monkeypatch.setattr(tournament, "GameManager", FakeManager)
-    job = ("a:x", "h1", chess.STARTING_FEN, 5.0, 0.1, tmp_path / "logs", 3)
+    job = ("a:x", "h1", chess.STARTING_FEN, 5.0, 0.1, tmp_path / "logs", 3, 2)
     record = tournament._play_game(job)
+    assert depths == [2, 2] and record["max_depth"] == 2
     saved = json.loads((tmp_path / "logs" / "3_a_x_vs_h1.json").read_text())
     assert {k: saved[k] for k in record} == record
     assert len(saved["moves"]) == 1 and saved["moves"][0]["ply"] == 0

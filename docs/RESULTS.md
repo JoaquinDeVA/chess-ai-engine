@@ -124,7 +124,37 @@ python -m chess_engine.training.train --model linear_pst_terms --effort 15 --mat
 
 Con las dos semillas el acierto de mejor jugada sube (+1 a +2 puntos en total, +3 a +6 en
 posiciones no tranquilas) y el MAE empeora ligeramente (0.133 y 0.132 frente a 0.129 y 0.131).
-Falta la validación en partidas, que está en curso; hasta entonces no hay veredicto de fuerza de juego.
+
+**Validación en partidas.** Esfuerzo 15, 100 partidas, 50 aperturas (dos partidas por apertura,
+colores cambiados), ancla `linear_pst_terms`, 60 s + 1 s por jugada. Registro local:
+`.superpowers/night1/MATES_PLAY.md` (no versionado).
+
+| jugador | puntuación % | V-T-D | intervalo 95 % | Elo frente a `linear_pst_terms` |
+|---|---|---|---|---|
+| `linear_pst_terms@mates10` | 71.0 | 64-14-22 | 62.9 - 79.1 | +156 |
+| `linear_pst_terms` (100 % de los mates, original) | 29.0 | 22-14-64 | 20.9 - 37.1 | 0 |
+
+Ninguna partida acabó por forfeit, tiempo o jugada ilegal (0 de 100). Terminaciones: 86 jaque
+mate, 12 triple repetición, 1 cincuenta jugadas, 1 material insuficiente.
+
+```bash
+python scripts/bench/run_tournament.py --players linear_pst_terms,linear_pst_terms@mates10 \
+    --anchor linear_pst_terms --openings 50 --workers 5 --base 60 --increment 1
+```
+
+**Decisión.** El entrenamiento por defecto usa ahora el 10 % de las posiciones de mate
+(`DEFAULT_MATE_KEEP = 0.10`), así que este comando produce el modelo del 10 %:
+
+```bash
+python -m chess_engine.training.train --model linear_pst_terms --effort 15
+```
+
+El `linear_pst_terms` original (100 % de los mates) se retira del repositorio; se recupera del
+historial de git en el commit `03169db` (`linear_pst_terms.npz` y `linear_pst_terms.json`). Una
+variante al 100 % se entrena con `--mate-keep 1.0 --tag mates100`.
+
+**Alcance.** Es un solo par de jugadores, una sola escala (esfuerzo 15) y 100 partidas. Este
+test no cambia la clasificación de los demás modelos.
 
 ## Quiescencia a profundidad fija
 
@@ -183,6 +213,9 @@ El juez estático pone a `linear_pst_terms` el primero y a `linear_material` el 
 al revés (`linear_material` primero con 69.0 % y 56.5 %, `linear_pst_terms` penúltimo con 37.5 %). Con
 estos datos no hay explicación demostrada: la correlación con Stockfish en posiciones estáticas no
 predice la fuerza con búsqueda a tiempo fijo.
+
+El resultado de los mates es coherente con la mejora del acierto de mejor jugada, y las partidas
+lo confirman ahora para `linear_pst_terms` (71.0 % del 10 % frente al original).
 
 ## Tabla de modelos
 

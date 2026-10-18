@@ -1,16 +1,19 @@
 # Changelog
 
-## Unreleased — heuristic and model consolidation
-
-- Removed the heuristics `h2`, `h3` and `h4`. `h3t` is now `h1`: the features of the old `h3` with weights fitted to
-  Stockfish (`h1_weights.json`, `scripts/data/fit_h1.py`; held-out R2 0.233 against 0.074 for the old plain weights).
-  `h1` is the Elo anchor.
-- Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.
-- Candidate names proposed: `material_linear` -> `linear_material`, `pst_tapered` -> `linear_pst`,
-  `pst_terms` -> `linear_pst_terms`, `pst_kb` -> `linear_king_bucket`, `nn4` -> `net4_pst` (code rename pending).
-- The agent vault (`vault/`) is no longer versioned: it stays local and is git-ignored.
-
 ## Unreleased
+
+- `h1` replaces the heuristics `h2`, `h3` and `h4`: the features of the old `h3` with weights fitted to
+  Stockfish (`h1_weights.json`, `scripts/data/fit_h1.py`). `h1` is the Elo anchor.
+- Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.
+- Models renamed: `linear_material`, `linear_pst`, `linear_pst_terms`, `linear_king_bucket`, `net4_pst`.
+- Effort is one million positions per point (`--effort 15` = 15 M positions, `1 + effort // 10` epochs).
+- Quiescence search is on by default for the search bots (4 plies; `quiescence_plies=0` turns it off).
+- Removed the Prolog pattern detector and its documentation.
+- New docs layout: five public pages plus the index (`README`, `ARCHITECTURE`, `SEARCH_ALGORITHMS`,
+  `ADDING_A_MODEL`, `RESULTS`); `ADDING_A_BOT`, `ROADMAP`, `TACTICAL_PATTERNS` and `docs/training/*` merged or removed.
+- Per-move logs of the tournament games (`--logs`).
+- New flags: `--seed` (seed of the TRAIN sample) in the training CLI and `--openings` in `run_tournament.py`.
+- The agent vault (`vault/`) is no longer versioned: it stays local and is git-ignored.
 
 ### Added
 - Linear evaluation models trained from the raw Lichess evaluations at an effort level 0-100

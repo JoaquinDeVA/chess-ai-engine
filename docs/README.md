@@ -1,47 +1,36 @@
 # Documentación
 
-Índice único de la documentación del motor. Si es tu primera vez, empieza por la primera sección.
+> **Qué es:** Índice único de la documentación del motor.
+>
+> **Cuándo leerla:** Cuando buscas una página concreta o no sabes por dónde empezar.
+>
+> **Siguiente paso:** [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## Empieza aquí
 
-- Instalar y jugar una partida: [README raíz](../README.md).
-- Entender cómo encajan las piezas: [ARCHITECTURE.md](ARCHITECTURE.md).
-- Saber qué falta por hacer: [ROADMAP.md](ROADMAP.md).
+| Página | Para qué | Cuándo leerla |
+|---|---|---|
+| [README raíz](../README.md) | Instalación y los comandos para jugar, enfrentar bots y lanzar torneos | La primera vez que abres el repo |
 
 ## Usar el motor
 
 | Página | Para qué | Cuándo leerla |
 |---|---|---|
-| [README raíz](../README.md) | Instalación y comandos para jugar, enfrentar bots y lanzar torneos | La primera vez que abres el repo |
+| [README raíz](../README.md) | `main.py`: partida contra un bot, bot contra bot, torneo, `--list-bots` | Para jugar o lanzar un torneo |
+| [RESULTS.md](RESULTS.md) | Qué modelo juega mejor y con qué comandos se midió | Para elegir el modelo de un bot |
 
 ## Entender el diseño
 
 | Página | Para qué | Cuándo leerla |
 |---|---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Paquetes, dependencias entre capas y vida de una jugada | Antes de tocar el código |
-| [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md) | Minimax, alfa-beta y profundización iterativa | Para entender cómo se elige una jugada |
-| [TACTICAL_PATTERNS.md](TACTICAL_PATTERNS.md) | Detector de clavadas, horquillas y ensartadas en Prolog | Si vas a usar conocimiento táctico |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Paquetes, dependencias entre capas, vida de una jugada y cómo añadir un bot | Antes de tocar el código |
+| [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md) | Minimax, alfa-beta, profundización iterativa y quiescencia | Para entender cómo se elige una jugada |
 
-## Modelos de evaluación
-
-| Página | Para qué | Cuándo leerla |
-|---|---|---|
-| [ADDING_A_MODEL.md](ADDING_A_MODEL.md) | Crear, entrenar y medir un modelo | Al añadir un modelo |
-| [training/MODELS_HISTORY.md](training/MODELS_HISTORY.md) | Tabla de modelos con precisión y coste | Para comparar modelos |
-| [training/SELECTION_PROTOCOL.md](training/SELECTION_PROTOCOL.md) | Cómo se entrenan, comparan y eligen los candidatos | Antes de lanzar una comparación |
-| [training/DATA.md](training/DATA.md) | Origen y formato de los datos de Lichess | Antes de preparar datos |
-
-## Extender el proyecto
+## Modelos y resultados
 
 | Página | Para qué | Cuándo leerla |
 |---|---|---|
-| [ADDING_A_BOT.md](ADDING_A_BOT.md) | Añadir un bot en un solo fichero | Al crear un jugador nuevo |
-| [ADDING_A_MODEL.md](ADDING_A_MODEL.md) | Añadir un modelo de evaluación | Al crear un evaluador nuevo |
-
-## Decisiones y roadmap
-
-| Página | Para qué | Cuándo leerla |
-|---|---|---|
-| [ROADMAP.md](ROADMAP.md) | Ideas pendientes por orden de utilidad | Antes de proponer una mejora |
+| [ADDING_A_MODEL.md](ADDING_A_MODEL.md) | Crear, entrenar y medir un modelo de evaluación | Al añadir un modelo |
+| [RESULTS.md](RESULTS.md) | Datos, escala de esfuerzo, juez estático, quiescencia, torneo y discrepancia abierta | Para comparar modelos o repetir una medición |
 
 Las decisiones y el glosario de trabajo viven en `vault/`, que es local y no se versiona.

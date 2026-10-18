@@ -4,7 +4,7 @@
 >
 > **Cuándo leerla:** Para entender cómo decide una jugada el motor.
 >
-> **Siguiente paso:** [Tactical patterns](TACTICAL_PATTERNS.md)
+> **Siguiente paso:** [Adding an evaluation model](ADDING_A_MODEL.md)
 
 All algorithms live in `src/chess_engine/search/game_algorithms.py` and work on any `GameProblem`.
 
@@ -71,13 +71,23 @@ flowchart TD
   the state and extended in constant time per move), not by replaying the game as python-chess does;
   the rules are the same as `board.outcome(claim_draw=True)`.
 
-## Quiescence search (optional)
+## Quiescencia
 
-Off by default. With `noisy_moves` (chess: `chess_noisy_moves`, captures and promotions) and
-`quiescence_plies > 0`, a node at the horizon is not evaluated directly: the side to move may take
-the static evaluation (stand-pat) or follow a noisy move, up to `quiescence_plies` more plies, with
-alpha-beta but without transposition table. Terminal states and time cut-offs behave as before and
-the nodes it visits count in `nodes_visited`. `IterativeDeepeningBot(quiescence_plies=n)` enables it.
+At the horizon a node is not scored directly. The side to move may keep the static evaluation
+(stand-pat) or follow a noisy move (`chess_noisy_moves`: captures and promotions) for up to
+`quiescence_plies` more plies, with alpha-beta and without transposition table. Terminal states and
+time cut-offs behave as before, and the nodes it visits count in `nodes_visited`. It avoids scoring
+a position in the middle of an exchange.
+
+* **Default:** the search bots (`IterativeDeepeningBot` and its subclasses) use 4 plies.
+* **Switch:** `quiescence_plies=0` turns it off (the horizon is evaluated directly, as before).
+* **Measured gain** (paired, 2,000 test positions, best-move agreement with Stockfish): at depth 3,
+  quiescence 4 adds +0.06 for `h1`, `linear_pst` and `linear_pst_terms` (paired SE 0.01). Depth 2
+  with quiescence 4 beats depth 3 without it (+0.037, SE 0.013) in about half the time.
+* **Cost** (`linear_pst_terms`, depth 3): 1,566 to 3,639 nodes per move and 0.19 s to 0.49 s per
+  move, about 2.3x nodes and 2.6x time. Quiescence 8 adds little over 4 (+0.073 against +0.067).
+
+Data, commands and logs: [RESULTS.md](RESULTS.md), section "Quiescencia a profundidad fija".
 
 ## Iterative deepening and time
 

@@ -14,5 +14,5 @@
   python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
   ```
 
-Schema, measurements and plan in `docs/training/DATA.md`. The CSV of the old pipeline
+Schema, sign convention and commands in `docs/RESULTS.md` (section "Datos"). The CSV of the old pipeline
 (`evaluations.csv`) has been retired.

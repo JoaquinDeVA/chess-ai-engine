@@ -20,7 +20,6 @@ from chess_engine.training.dataset import (
     VALIDATION,
     assign_split,
     encode_positions,
-    load_evaluations,
     split_dataset,
 )
 from chess_engine.training.lichess_raw import shard_path, write_shard
@@ -93,49 +92,7 @@ class TestDatasetSplit:
         assert not (set(train.fen) & set(test.fen))
 
 
-def write_csv(path, boards, mates=()):
-    rows = [
-        {
-            "fen": " ".join(b.fen().split()[:4]),
-            "cp": material_cp(b),
-            "is_mate": False,
-            "mate_distance": np.nan,
-        }
-        for b in boards
-    ]
-    rows += [
-        {"fen": fen, "cp": np.nan, "is_mate": True, "mate_distance": distance}
-        for fen, distance in mates
-    ]
-    pd.DataFrame(rows).to_csv(path, index=False)
-    return path
-
-
-class TestLoading:
-    def test_loads_targets_and_drops_distant_mates_and_duplicates(self, tmp_path):
-        boards = random_positions(30, seed=1)
-        path = write_csv(
-            tmp_path / "evals.csv",
-            boards + boards[:3],
-            mates=[("6k1/5ppp/8/8/8/8/8/R3K3 w - -", 1), ("6k1/5ppp/8/8/8/8/8/R3K3 b - -", 7)],
-        )
-        frame = load_evaluations(path)
-        assert list(frame.columns) == ["fen", "y"]
-        assert frame.fen.is_unique
-        assert (frame.y.abs() <= 1).all()
-        assert frame.loc[frame.fen == "6k1/5ppp/8/8/8/8/8/R3K3 w - -", "y"].item() == 1.0
-        assert not (frame.fen == "6k1/5ppp/8/8/8/8/8/R3K3 b - -").any()
-
-    def test_max_rows_reads_only_the_head(self, tmp_path):
-        path = write_csv(tmp_path / "evals.csv", random_positions(40, seed=2))
-        assert len(load_evaluations(path, max_rows=10)) <= 10
-
-    def test_missing_columns_are_reported(self, tmp_path):
-        path = tmp_path / "bad.csv"
-        path.write_text("fen,score\nx,1\n")
-        with pytest.raises(ValueError, match="missing columns"):
-            load_evaluations(path)
-
+class TestEncoding:
     def test_parallel_encoding_equals_serial_encoding(self):
         extractor = models.features.VectorFeatures()
         fens = pd.Series([" ".join(b.fen().split()[:4]) for b in random_positions(50, seed=3)])
@@ -266,15 +223,11 @@ class TestCardsAndReport:
         assert not report.update_history_file(isolated_cards / "does-not-exist.md")
 
 
-class TestCommandLines:
-    """End-to-end: CSV -> train -> save -> evaluate -> card, in a temporary directory."""
-
-    def test_config_files_are_read(self, tmp_path):
-        config = tmp_path / "c.toml"
-        config.write_text("epochs = 3\n")
-        assert train_cli.load_config("mlp_features", config) == {"epochs": 3}
-        assert train_cli.load_config("mlp_features", tmp_path / "missing.toml") == {}
-        assert train_cli.load_config("mlp_features")["epochs"] == 40
+class TestAccuracyRecords:
+    def test_csv_family_models_are_not_trained(self, capsys):
+        for name in ("mlp_features", "cnn_resnet"):
+            assert train_cli.main(["--model", name, "--effort", "0"]) == 2
+            assert f"{name} is an accuracy record" in capsys.readouterr().out
 
 
 class TestEffortCommandLine:

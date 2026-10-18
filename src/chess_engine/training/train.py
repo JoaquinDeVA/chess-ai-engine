@@ -1,24 +1,23 @@
 """Train a registered model.
 
-Models of the CSV family: ``python -m chess_engine.training.train --model <name> --data <csv>``.
-Linear models, from the raw shards: ``--model linear_pst --effort <0-100>``.
+Every model is trained from the raw shards and their sidecars, sized by effort:
+``python -m chess_engine.training.train --model linear_pst --effort <0-100>``.
 """
 
 import argparse
 import json
 import re
 import time
-import tomllib
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.comparison.report import ACCURACY_RECORDS
 from chess_engine.models.cards import current_commit, today, update_card
-from chess_engine.models.linear_eval import LinearEvalModel
 from chess_engine.models.registry import artifact_path, available_models, get_model_class
 
-from .dataset import SPLIT_SEED, VALIDATION, encode_positions, load_evaluations, split_dataset
+from .dataset import VALIDATION
 from .effort import (
     SAMPLE_SEED,
     available_rows,
@@ -32,24 +31,9 @@ from .effort import (
 from .representation import DEFAULT_MATE_KEEP, Representation
 from .sidecar import load_sample
 
-CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 MAX_VALIDATION_ROWS = 50_000
 DEFAULT_RAW_DIR = Path("data/lichess/raw")
 DEFAULT_SIDECAR_DIR = Path("data/lichess/sidecar")
-
-
-def load_config(model_name: str, explicit_path: Optional[Path] = None) -> Dict[str, Any]:
-    """Read the TOML hyper-parameters of a model.
-
-    :param model_name: Registered model name; ``configs/<name>.toml`` is used by default.
-    :param explicit_path: Use this file instead.
-    :return: The configuration (empty if there is no file).
-    """
-    path = explicit_path or CONFIG_DIR / f"{model_name}.toml"
-    if not path.exists():
-        return {}
-    with open(path, "rb") as handle:
-        return tomllib.load(handle)
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -60,15 +44,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
-    parser.add_argument("--data", type=Path, help="CSV: fen,cp,is_mate,mate_distance")
-    parser.add_argument(
-        "--config", type=Path, help="TOML file (default: training/configs/<model>.toml)"
-    )
     parser.add_argument("--output", type=Path, help="where to save (default: models/artifacts)")
-    parser.add_argument("--max-rows", type=int, help="read only the first N rows of the CSV")
-    parser.add_argument("--train-rows", type=int, help="subsample the training split to N rows")
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
-    parser.add_argument("--jobs", type=int, default=-1, help="processes used to encode positions")
     parser.add_argument("--effort", type=int, help="linear models: effort level 0-100")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
     parser.add_argument(
@@ -253,78 +230,31 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """Run the training pipeline: load, split, encode, fit, save, update the model card.
+    """Train the model chosen on the command line from the raw shards.
 
     :param argv: Command-line arguments.
     :return: Process exit code.
     """
     args = parse_args(argv)
+    if args.model in ACCURACY_RECORDS:
+        print(
+            f"{args.model} is an accuracy record: its training CSV was retired; "
+            "measure it with evaluate"
+        )
+        return 2
     model_class = get_model_class(args.model)
     if not model_class.trainable:
         print(f"{args.model} is a frozen artifact and cannot be retrained")
         return 2
 
-    is_linear = issubclass(model_class, LinearEvalModel)
-    if is_linear != (args.effort is not None):
-        print("--effort is required for linear models and only applies to them")
+    if args.effort is None:
+        print("--effort is required")
         return 2
-    if is_linear:
-        try:
-            return train_by_effort(args, model_class)
-        except (ValueError, TypeError) as error:
-            print(error)
-            return 2
-    if args.data is None:
-        print("--data is required for CSV models")
+    try:
+        return train_by_effort(args, model_class)
+    except (ValueError, TypeError) as error:
+        print(error)
         return 2
-    if args.mate_keep != DEFAULT_MATE_KEEP:
-        print("--mate-keep only applies to linear models trained with --effort")
-        return 2
-
-    config = load_config(args.model, args.config)
-    if args.epochs is not None:
-        config["epochs"] = args.epochs
-
-    print(f"Loading {args.data} ...")
-    frame = load_evaluations(args.data, max_rows=args.max_rows)
-    train, validation, _ = split_dataset(frame)
-    if args.train_rows and args.train_rows < len(train):
-        train = train.sample(args.train_rows, random_state=SPLIT_SEED)
-    validation = validation.head(MAX_VALIDATION_ROWS)
-    print(f"{len(train):,} train / {len(validation):,} validation positions")
-
-    extractor = model_class.extractor
-    train_inputs = encode_positions(extractor, train["fen"], n_jobs=args.jobs)
-    validation_inputs = encode_positions(extractor, validation["fen"], n_jobs=args.jobs)
-
-    model = model_class.new(config)
-    summary = model.fit(
-        train_inputs,
-        train["y"].to_numpy(),
-        validation=(validation_inputs, validation["y"].to_numpy()),
-        config=config,
-    )
-
-    path = model.save(args.output or artifact_path(model_spec(args)))
-    update_card(
-        model_spec(args),
-        status="current",
-        architecture=model_class.architecture,
-        features=extractor.name,
-        parameters=model.count_parameters(),
-        size_kb=round(path.stat().st_size / 1024, 1),
-        training={
-            "dataset": args.data.name,
-            "date": today(),
-            "commit": current_commit(),
-            "config": config,
-            **summary,
-        },
-    )
-    print(
-        f"Saved {path}. Next: python -m chess_engine.comparison.evaluate --model {args.model} --data {args.data}"
-    )
-    return 0
 
 
 if __name__ == "__main__":

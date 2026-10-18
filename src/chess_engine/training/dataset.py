@@ -1,18 +1,12 @@
-"""Loading, splitting and encoding of the Stockfish evaluation dataset."""
+"""Splitting and encoding of the Stockfish evaluation dataset."""
 
 import zlib
-from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 
 from chess_engine.models.features import FeatureExtractor
-
-from .targets import MAX_MATE_DISTANCE, row_targets
-
-#: Columns every evaluations CSV must have.
-REQUIRED_COLUMNS = ("fen", "cp", "is_mate", "mate_distance")
 
 TRAIN, VALIDATION, TEST = 0, 1, 2
 
@@ -21,35 +15,6 @@ DEFAULT_TEST_FRACTION = 0.10
 DEFAULT_VALIDATION_FRACTION = 0.10
 #: Salt of the split hash. Changing it changes the benchmark: keep it fixed.
 SPLIT_SEED = 42
-
-
-def load_evaluations(
-    path: Union[str, Path],
-    max_rows: Optional[int] = None,
-    max_mate_distance: int = MAX_MATE_DISTANCE,
-) -> pd.DataFrame:
-    """Read an evaluations CSV and attach the normalized target.
-
-    :param path: CSV with columns ``fen, cp, is_mate, mate_distance`` (White's point of view).
-    :param max_rows: Keep only the first ``max_rows`` rows (before filtering), for quick runs.
-    :param max_mate_distance: Mates farther than this are dropped.
-    :return: DataFrame with columns ``fen`` and ``y``; rows without a valid target are removed.
-    :raises ValueError: If a required column is missing.
-    """
-    frame = pd.read_csv(path, nrows=max_rows)
-    missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
-    if missing:
-        raise ValueError(f"{path}: missing columns {missing}; expected {list(REQUIRED_COLUMNS)}")
-
-    frame["is_mate"] = frame["is_mate"].astype(str).str.lower().isin(("true", "1", "1.0"))
-    frame["y"] = row_targets(
-        frame["is_mate"].to_numpy(),
-        frame["cp"].to_numpy(),
-        frame["mate_distance"].to_numpy(),
-        max_mate_distance,
-    )
-    frame = frame.dropna(subset=["y"]).drop_duplicates(subset="fen")
-    return frame[["fen", "y"]].reset_index(drop=True)
 
 
 def assign_split(

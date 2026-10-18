@@ -83,15 +83,6 @@ class TestLichessConversion:
         assert to_row(record, SIDE_TO_MOVE)["mate_distance"] == -2
         assert to_row(record, WHITE)["mate_distance"] == 2
 
-    def test_csv_roundtrips_through_the_training_loader(self, boards, tmp_path):
-        from chess_engine.training.dataset import load_evaluations
-
-        lines = [database_line(b, WHITE) for b in boards[:300]]
-        path = tmp_path / "evals.csv"
-        with open(path, "w", newline="") as handle:
-            assert write_csv(convert(lines, 80), handle) == 80
-        assert len(load_evaluations(path)) > 70
-
 
 @pytest.mark.skipif(find_stockfish() is None, reason="Stockfish is not installed")
 class TestStockfishLabelling:
@@ -113,11 +104,6 @@ def load_script(name: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def test_random_positions_script_helper_is_reproducible():
-    module = load_script("label_with_stockfish")
-    assert list(module.random_fens(5, seed=3)) == list(module.random_fens(5, seed=3))
 
 
 def test_write_csv_header():

@@ -442,3 +442,66 @@ def test_second_run_with_cache_does_not_encode(tmp_path, monkeypatch):
 
     np.testing.assert_allclose(second.weights, first.weights, atol=0)
     np.testing.assert_allclose(second.bias, first.bias, atol=0)
+
+
+def _flipped(boards):
+    """Validation que contradice a los datos de entrenamiento: entrenar empeora su pérdida."""
+    rows = frame(boards)
+    rows["cp"] = -rows["cp"]
+    return rows
+
+
+def _decay_fit(config):
+    boards = random_positions(120, seed=31)
+    batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
+    validation = _flipped(random_positions(60, seed=32))
+    model = get_model_class("linear_pst")()
+    summary = model.fit_stream(batches, validation, {"batch_size": 16, "lr": 0.1, **config})
+    return model, validation, summary
+
+
+def test_lr_decay_keeps_training_with_a_smaller_rate_until_max_epochs():
+    _, _, summary = _decay_fit({"max_epochs": 6, "patience": 0, "lr_decay": 0.5, "min_lr": 1e-9})
+
+    assert summary["epochs"] == 6  # la paciencia 0 no corta la ejecución
+    history, losses = summary["lr_history"], summary["val_losses"]
+    assert len(history) == 6 and history[0] == 0.1
+    assert losses[1] >= losses[0]  # la segunda época no mejora: desde ahí baja el ritmo
+    assert history[1] == 0.1 and history[2] == pytest.approx(0.05)
+    # Regla: una época sin mejora multiplica el ritmo por 0.5; una que mejora lo mantiene.
+    best = losses[0]
+    for epoch in range(1, 5):
+        if losses[epoch] < best:
+            best = losses[epoch]
+            assert history[epoch + 1] == history[epoch]
+        else:
+            assert history[epoch + 1] == pytest.approx(history[epoch] * 0.5)
+
+
+def test_lr_decay_stops_when_the_rate_falls_below_min_lr():
+    _, _, summary = _decay_fit({"max_epochs": 20, "patience": 0, "lr_decay": 0.5, "min_lr": 0.06})
+
+    # La época 2 no mejora: 0.1 * 0.5 = 0.05 < 0.06, y la ejecución termina ahí.
+    assert summary["epochs"] == 2
+    assert summary["lr_history"] == [0.1, 0.1]
+
+
+def test_without_lr_decay_patience_still_stops_and_the_rate_is_constant():
+    _, _, summary = _decay_fit({"max_epochs": 10, "patience": 1})
+
+    assert summary["epochs"] == 3  # mejor en la 1, sin mejora en 2 y 3 (> patience)
+    assert summary["lr_history"] == [0.1, 0.1, 0.1]
+
+
+def test_lr_decay_restores_the_weights_of_the_best_epoch():
+    model, validation, summary = _decay_fit(
+        {"max_epochs": 6, "patience": 0, "lr_decay": 0.5, "min_lr": 1e-9}
+    )
+
+    best = summary["best_epoch"]
+    assert summary["val_losses"][best - 1] == min(summary["val_losses"])
+    rows, cols, vals, targets = model._encode(validation)
+    theta = np.append(model.weights, model.bias)
+    z = linear_eval._scores(rows, cols, vals, len(targets), theta)
+    restored = float(np.mean(linear_eval._losses(z, targets)))
+    assert restored == pytest.approx(summary["val_losses"][best - 1])

@@ -11,7 +11,7 @@ import os
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Dict, NamedTuple, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 import chess
 import numpy as np
@@ -148,13 +148,22 @@ class _Epochs:
         return self._make()
 
 
-def fit_config(plan: Dict[str, int], l2: float, lr: float) -> Dict[str, Any]:
+def fit_config(
+    plan: Dict[str, int],
+    l2: float,
+    lr: float,
+    lr_decay: Optional[float] = None,
+    min_lr: float = 1e-5,
+) -> Dict[str, Any]:
     """Keyword configuration of :meth:`LinearEvalModel.fit_stream` for a plan.
 
     :param plan: Output of :func:`effort_config`.
     :param l2: L2 penalty.
     :param lr: Adam learning rate.
-    :return: Keys ``l2, lr, batch_size, max_epochs, patience, workers``.
+    :param lr_decay: Factor applied to the rate on each epoch without improvement (None: stop by
+        patience instead).
+    :param min_lr: With ``lr_decay``, the run stops when the rate falls below this value.
+    :return: Keys ``l2, lr, batch_size, max_epochs, patience, workers, lr_decay, min_lr``.
     """
     return {
         "l2": l2,
@@ -163,6 +172,8 @@ def fit_config(plan: Dict[str, int], l2: float, lr: float) -> Dict[str, Any]:
         "max_epochs": plan["max_epochs"],
         "patience": plan["patience"],
         "workers": WORKERS,
+        "lr_decay": lr_decay,
+        "min_lr": min_lr,
     }
 
 
@@ -294,7 +305,11 @@ def calibrate(
     )
 
 
-def estimated_seconds(plan: Dict[str, int], timing: Timing) -> float:
+#: Seconds per position and epoch to fit on cached features (measured: 2.6 s per 500,000 rows).
+CACHED_SECONDS_PER_ROW = 2.6 / 500_000
+
+
+def estimated_seconds(plan: Dict[str, int], timing: Timing, cached: bool = False) -> float:
     """Estimated duration of the trials and the final fit.
 
     The trials refit on ``TRIAL_FRACTION`` of the positions, but each of them featurizes and scores
@@ -302,16 +317,24 @@ def estimated_seconds(plan: Dict[str, int], timing: Timing) -> float:
 
     :param plan: Output of :func:`effort_config`.
     :param timing: Output of :func:`calibrate`.
+    :param cached: True when the batches are cached (only the first epoch encodes).
     :return: Training part ``(1 + trials * TRIAL_FRACTION) * positions * epochs * s_per_position``
         plus validation part ``(1 + trials) * (encode + epochs * score)``.
     """
     fits = 1 + plan["trials"]
-    training = (
-        (1 + plan["trials"] * TRIAL_FRACTION)
-        * plan["positions"]
-        * plan["max_epochs"]
-        * timing.seconds_per_position
-    )
+    if cached:
+        # The first epoch encodes and stores the batches; later epochs only fit on the cache.
+        per_position = (
+            timing.seconds_per_position + (plan["max_epochs"] - 1) * CACHED_SECONDS_PER_ROW
+        )
+        training = (1 + plan["trials"] * TRIAL_FRACTION) * plan["positions"] * per_position
+    else:
+        training = (
+            (1 + plan["trials"] * TRIAL_FRACTION)
+            * plan["positions"]
+            * plan["max_epochs"]
+            * timing.seconds_per_position
+        )
     validation = fits * (timing.encode_seconds + plan["max_epochs"] * timing.score_seconds)
     return training + validation
 

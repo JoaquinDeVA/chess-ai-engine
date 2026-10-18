@@ -84,6 +84,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         f"(default {DEFAULT_MATE_KEEP}; another value needs --tag)",
     )
     parser.add_argument(
+        "--lr-decay",
+        type=float,
+        help="multiply the learning rate by this factor on each epoch without validation "
+        "improvement; e.g. 0.5",
+    )
+    parser.add_argument(
         "--tag",
         help="train a variant: artifact <model>@<tag>, card <model>@<tag> (letters, digits, ._-)",
     )
@@ -97,6 +103,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
+    if args.lr_decay is not None and not 0 < args.lr_decay < 1:
+        parser.error(f"--lr-decay must be in (0, 1): {args.lr_decay}")
     return args
 
 
@@ -180,6 +188,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         print(f"no TRAIN rows found in {args.sidecar}")
         return 2
     plan = effort_config(args.effort, available)
+    if args.epochs is not None:
+        plan["max_epochs"] = args.epochs
     print(f"Effort {args.effort}: {available:,} TRAIN rows available")
     for key, value in plan.items():
         print(f"  {key}: {value:,}")
@@ -195,7 +205,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         mate_keep=rep.mate_keep,
     )
     timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
-    estimate = estimated_seconds(plan, timing)
+    estimate = estimated_seconds(plan, timing, cached=not args.no_cache)
     print(
         f"Timed: {timing.seconds_per_position * 1e6:.1f} us per position, "
         f"validation {timing.encode_seconds:.2f} s to featurize and "
@@ -212,7 +222,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         args.sidecar,
         validation,
         plan["positions"],
-        fit_config(plan, best["l2"], best["lr"]),
+        fit_config(plan, best["l2"], best["lr"], args.lr_decay),
         quiet,
         seed=args.seed,
         use_cache=not args.no_cache,

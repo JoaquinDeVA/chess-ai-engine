@@ -419,3 +419,10 @@ class TestCommandLineWithDoubles:
         assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
         assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912
         assert cards.load_card("linear_pst") == {"name": "linear_pst"}
+
+
+@pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])
+def test_lr_decay_outside_zero_one_exits_with_code_2(value):
+    with pytest.raises(SystemExit) as exit_info:
+        train_cli.parse_args(["--model", "linear_pst", "--effort", "0", "--lr-decay", value])
+    assert exit_info.value.code == 2

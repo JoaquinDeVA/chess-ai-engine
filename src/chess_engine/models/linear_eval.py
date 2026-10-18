@@ -249,11 +249,15 @@ class LinearEvalModel(EvaluationModel):
         :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.
         :param validation: Same columns, used for early stopping; must not be empty.
         :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
-            ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`.
+            ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`. Optional ``lr_decay`` in
+            (0, 1) and ``min_lr`` (default 1e-5): an epoch without validation improvement
+            multiplies the learning rate by ``lr_decay`` and the run goes on (``patience`` is not
+            used) until the rate falls below ``min_lr`` or ``max_epochs`` is reached.
         :param cache_dir: If set, the encoded frames are stored there (``<index>.npz``) and read
             back instead of being encoded again; the caller must key the directory by everything
             that determines the frames. None encodes every epoch.
         :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
+            ``lr_history`` (rate of each epoch),
             ``train_rows``, ``seconds`` and the ``config`` used.
         :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
             validation loss is not finite.
@@ -274,10 +278,15 @@ class LinearEvalModel(EvaluationModel):
         val_losses: List[float] = []
         bad_epochs = 0
         train_rows = 0
+        lr = float(cfg["lr"])
+        lr_decay = cfg.get("lr_decay")
+        min_lr = float(cfg.get("min_lr", 1e-5))
+        lr_history: List[float] = []
 
         with _featurization_pool(workers) as executor:
             for epoch in range(1, int(cfg["max_epochs"]) + 1):
                 loss_sum, rows_seen = 0.0, 0
+                lr_history.append(lr)
                 for encoded in self._encoded_frames(batches, workers, executor, cache_dir):
                     for local in _minibatches(*encoded, batch_size):
                         local_rows, local_cols, local_vals, local_y = local
@@ -301,7 +310,7 @@ class LinearEvalModel(EvaluationModel):
                         velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
                         m_hat = moment / (1 - _ADAM_BETA1**step)
                         v_hat = velocity / (1 - _ADAM_BETA2**step)
-                        theta -= float(cfg["lr"]) * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
+                        theta -= lr * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
                 if rows_seen == 0:
                     raise ValueError("batches yielded no rows; pass a re-iterable collection")
                 train_rows = rows_seen
@@ -316,6 +325,10 @@ class LinearEvalModel(EvaluationModel):
                 if val_loss < best_loss:
                     best_loss, best_epoch, best_theta = val_loss, epoch, theta.copy()
                     bad_epochs = 0
+                elif lr_decay is not None:
+                    lr *= float(lr_decay)
+                    if lr < min_lr:
+                        break
                 else:
                     bad_epochs += 1
                     if bad_epochs > int(cfg["patience"]):
@@ -328,6 +341,7 @@ class LinearEvalModel(EvaluationModel):
             "best_epoch": best_epoch,
             "train_losses": train_losses,
             "val_losses": val_losses,
+            "lr_history": lr_history,
             "train_rows": train_rows,
             "seconds": round(time.perf_counter() - started, 3),
             "config": cfg,

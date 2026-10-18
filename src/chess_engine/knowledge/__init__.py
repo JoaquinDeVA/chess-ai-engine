@@ -1,1 +1,1 @@
-"""Chess knowledge bases: opening book (Python) and tactical patterns (Prolog)."""
+"""Chess knowledge bases: opening book."""

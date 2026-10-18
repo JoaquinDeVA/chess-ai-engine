@@ -14,10 +14,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: System packages (Prolog for the pattern detector, Stockfish for the labelling tests)
-        run: sudo apt-get update && sudo apt-get install -y swi-prolog stockfish
+      - name: System packages (Stockfish for the labelling tests)
+        run: sudo apt-get update && sudo apt-get install -y stockfish
       - name: Install
-        run: pip install -e ".[ml,prolog,data,dev]"
+        run: pip install -e ".[ml,data,dev]"
       - name: Lint
         run: |
           ruff check .

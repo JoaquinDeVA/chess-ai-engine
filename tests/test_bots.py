@@ -19,7 +19,7 @@ MATE_MOVE = chess.Move.from_uci("a1a8")
 
 
 def make_bots(stub_model):
-    """One instance of every bot that does not need Prolog or a trained artifact."""
+    """One instance of every bot that does not need a trained artifact."""
     return {
         "heuristic": IterativeHeuristicBot(max_depth=3),
         "model_book": IterativeModelBookBot(

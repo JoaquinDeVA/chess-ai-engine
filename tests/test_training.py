@@ -341,6 +341,8 @@ class TestMateKeepGuards:
 
         flag = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "0.05", *shards]
         assert train_cli.main(flag) == 2
+        full = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "1.0", *shards]
+        assert train_cli.main(full) == 2  # el 100 % también exige --tag
         representation = [
             "--model", "linear_pst", "--effort", "0", "--representation",
             '{"mate_keep": 0.05}', *shards,

@@ -26,6 +26,8 @@ _FILTERS = ("all", "quiet")
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
+#: Default share of the mate positions kept in training (the 100 % variant needs ``--tag``).
+DEFAULT_MATE_KEEP = 0.10
 
 
 def validate_mate_keep(mate_keep: float) -> None:
@@ -47,14 +49,14 @@ class Representation:
     :param perspective: ``"white"`` or ``"side_to_move"`` (score of the player to move).
     :param filter: ``"all"`` positions or only ``"quiet"`` ones (see :func:`is_quiet`).
     :param mate_keep: Share of the mate positions kept in the training data, in ``(0, 1]``
-        (see :func:`keep_mate_rows`); 1 keeps them all.
+        (see :func:`keep_mate_rows`); 1 keeps them all. Defaults to :data:`DEFAULT_MATE_KEEP`.
     """
 
     scale: str = "winprob"
     k: float = LICHESS_K
     perspective: str = "side_to_move"
     filter: str = "all"
-    mate_keep: float = 1.0
+    mate_keep: float = DEFAULT_MATE_KEEP
 
     def __post_init__(self) -> None:
         if self.scale not in _SCALES:

@@ -29,7 +29,7 @@ from .effort import (
     fit_config,
     search,
 )
-from .representation import Representation
+from .representation import DEFAULT_MATE_KEEP, Representation
 from .sidecar import load_sample
 
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
@@ -79,8 +79,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--mate-keep",
         type=float,
-        default=1.0,
-        help="share of the mate positions kept in the TRAIN and validation sets, in (0, 1]",
+        default=DEFAULT_MATE_KEEP,
+        help="share of the mate positions kept in the TRAIN and validation sets, in (0, 1] "
+        f"(default {DEFAULT_MATE_KEEP}; another value needs --tag)",
     )
     parser.add_argument(
         "--tag",
@@ -128,9 +129,9 @@ def effort_representation(args: argparse.Namespace) -> Representation:
         ``--representation``, or is outside ``(0, 1]``.
     """
     rep = parse_representation(args.representation)
-    if args.mate_keep == 1.0:
+    if args.mate_keep == DEFAULT_MATE_KEEP:
         return rep
-    if rep.mate_keep not in (1.0, args.mate_keep):
+    if rep.mate_keep not in (DEFAULT_MATE_KEEP, args.mate_keep):
         raise ValueError(
             f"--mate-keep {args.mate_keep} disagrees with mate_keep {rep.mate_keep} "
             "of --representation"
@@ -162,10 +163,10 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     """
     started = time.perf_counter()
     rep = effort_representation(args)
-    if rep.mate_keep < 1.0 and not args.tag:
+    if rep.mate_keep != DEFAULT_MATE_KEEP and not args.tag:
         print(
-            "a mate-undersampled model needs --tag: without it the untagged model would be "
-            "overwritten"
+            f"a model with mate_keep other than {DEFAULT_MATE_KEEP} needs --tag (for example "
+            "--mate-keep 1.0 --tag mates100): without it the untagged model would be overwritten"
         )
         return 2
     quiet = rep.filter == "quiet"
@@ -262,7 +263,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.data is None:
         print("--data is required for CSV models")
         return 2
-    if args.mate_keep != 1.0:
+    if args.mate_keep != DEFAULT_MATE_KEEP:
         print("--mate-keep only applies to linear models trained with --effort")
         return 2
 

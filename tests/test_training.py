@@ -23,7 +23,7 @@ from chess_engine.training.dataset import (
     split_dataset,
 )
 from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.representation import Representation
+from chess_engine.training.representation import Representation, white_score
 from chess_engine.training.sidecar import build_sidecar
 from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
@@ -156,6 +156,31 @@ class TestCardsAndReport:
         assert card["architecture"] == "b"
         assert card["training"] == {"epochs": 4, "dataset": "x"}
         assert json.loads(cards.card_path("m").read_text())["training"]["epochs"] == 4
+
+    def test_clear_measurements_keeps_only_the_identity(self, isolated_cards):
+        cards.update_card(
+            "m",
+            status="current",
+            architecture="a",
+            features="f",
+            parameters=3,
+            size_kb=1.5,
+            training={"effort": 1},
+            accuracy=ACCURACY,
+            cost={"us_per_eval": 1.0},
+            tradeoff=TRADEOFF,
+            tournament={"score": 50.0},
+        )
+        cards.clear_measurements("m")
+        assert cards.load_card("m") == {
+            "name": "m", "status": "current", "architecture": "a", "features": "f",
+            "parameters": 3, "size_kb": 1.5,
+        }  # fmt: skip
+        assert json.loads(cards.card_path("m").read_text()) == cards.load_card("m")
+
+    def test_clear_measurements_of_a_missing_card_does_nothing(self, isolated_cards):
+        cards.clear_measurements("ghost")
+        assert not cards.card_path("ghost").exists()
 
     def test_missing_card_is_an_empty_skeleton(self, isolated_cards):
         assert cards.load_card("ghost") == {"name": "ghost"}
@@ -372,6 +397,58 @@ class TestCommandLineWithDoubles:
         assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
         assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912
         assert cards.load_card("linear_pst") == {"name": "linear_pst"}
+
+    def test_retraining_drops_the_measurements_of_the_previous_model(self, fake_training):
+        cards.update_card(
+            "linear_pst",
+            status="current",
+            training={"effort": 15, "old_key": 1},
+            accuracy=ACCURACY,
+            cost={"us_per_eval": 5.0},
+            tradeoff=TRADEOFF,
+            tournament={"games": 10, "score": 50.0},
+        )
+        assert self.train() == 0
+        card = cards.load_card("linear_pst")
+        assert not {"accuracy", "cost", "tradeoff", "tournament"} & set(card)
+        assert card["training"]["effort"] == 40 and "old_key" not in card["training"]
+        assert card["parameters"] == 7
+
+
+class TestHeuristicEvaluation:
+    def test_h1_is_accepted_and_unknown_names_are_not(self):
+        assert evaluate_cli.parse_args(["--model", "h1"]).model == "h1"
+        with pytest.raises(SystemExit):
+            evaluate_cli.parse_args(["--model", "nope"])
+        assert "h1" not in registry.available_models()
+
+    def test_adapter_scores_are_recovered_by_the_judge_scale(self):
+        model = evaluate_cli.HeuristicModel("h1")
+        boards = random_positions(5, seed=3, max_plies=12)
+        recovered = white_score(model.predict_cp_batch(boards), np.nan, Representation())
+        expected = [model.expected_score(board) for board in boards]
+        assert recovered == pytest.approx(expected)
+        assert all(0.01 <= score <= 0.99 for score in expected)
+
+    def test_main_writes_a_reference_card_that_the_report_lists(self, isolated_cards, monkeypatch):
+        boards = random_positions(30, seed=5, max_plies=20)
+        sample = pd.DataFrame(
+            {
+                "fen": [b.fen() for b in boards],
+                "cp": [float(material_cp(b)) for b in boards],
+                "mate": [np.nan] * len(boards),
+                "best_move": [next(iter(b.legal_moves)).uci() for b in boards],
+                "quiet": [i % 2 == 0 for i in range(len(boards))],
+            }
+        )
+        monkeypatch.setattr(evaluate_cli, "load_sample", lambda *a, **k: sample)
+        assert evaluate_cli.main(["--model", "h1", "--agreement-n", "5"]) == 0
+        card = cards.load_card("h1")
+        assert card["status"] == "reference" and card["features"] == "h1"
+        assert card["architecture"] == "Hand-crafted heuristic (weights fitted to Stockfish)"
+        assert card["parameters"] == 6 and "training" not in card and "size_kb" not in card
+        assert card["accuracy"]["all"]["n"] == 30 and card["cost"]["us_per_eval"] > 0
+        assert "| `h1` | plays | 6 |" in report.render_tables()
 
 
 @pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])

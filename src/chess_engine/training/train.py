@@ -14,7 +14,7 @@ from typing import List, Optional
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.comparison.report import ACCURACY_RECORDS
-from chess_engine.models.cards import current_commit, today, update_card
+from chess_engine.models.cards import clear_measurements, current_commit, today, update_card
 from chess_engine.models.registry import artifact_path, available_models, get_model_class
 
 from .dataset import VALIDATION
@@ -44,7 +44,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
-    parser.add_argument("--output", type=Path, help="where to save (default: models/artifacts)")
+    parser.add_argument(
+        "--output", type=Path, help="where to save (default: src/chess_engine/models/artifacts)"
+    )
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--effort", type=int, help="linear models: effort level 0-100")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
@@ -206,6 +208,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     )
 
     path = model.save(args.output or artifact_path(model_spec(args)))
+    clear_measurements(model_spec(args))
     update_card(
         model_spec(args),
         status="current",

@@ -28,7 +28,7 @@ DEPTH_SECONDS = ("1", "3", "10")
 #: Time per move (seconds) of the search agreement column.
 AGREEMENT_SECONDS = "10"
 
-_STATUS_ORDER = {"current": 0}
+_STATUS_ORDER = {"current": 0, "reference": 1}
 _DASH = "—"
 _HEADER = (
     "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
@@ -117,7 +117,7 @@ def _row(card: Dict[str, Any]) -> str:
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
-    Models with status ``current`` are listed; the models that play come first.
+    Models with status ``current`` or ``reference`` (the heuristic ``h1``) are listed; the models that play come first.
 
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.

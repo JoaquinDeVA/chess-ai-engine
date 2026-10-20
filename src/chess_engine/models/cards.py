@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 CARDS_DIR = Path(__file__).resolve().parent.parent / "models" / "cards"
+#: Card sections that hold measurements of one particular trained model.
+MEASUREMENT_SECTIONS = ("training", "accuracy", "cost", "tradeoff", "tournament")
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -65,6 +67,23 @@ def update_card(name: str, **sections: Any) -> Dict[str, Any]:
             card[key] = value
     save_card(name, card)
     return card
+
+
+def clear_measurements(name: str) -> None:
+    """Remove the sections that describe a trained model, keeping its identity.
+
+    Used after retraining: ``training``, ``accuracy``, ``cost``, ``tradeoff`` and ``tournament``
+    belong to the previous model and would otherwise survive the merge of :func:`update_card`.
+    Nothing happens if the card does not exist.
+
+    :param name: Model name.
+    """
+    if not card_path(name).exists():
+        return
+    card = load_card(name)
+    for key in MEASUREMENT_SECTIONS:
+        card.pop(key, None)
+    save_card(name, card)
 
 
 def load_all_cards() -> List[Dict[str, Any]]:

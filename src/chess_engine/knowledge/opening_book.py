@@ -62,6 +62,3 @@ class OpeningBook:
 
     def __len__(self) -> int:
         return len(self._moves)
-
-    def __contains__(self, board: chess.Board) -> bool:
-        return self.lookup(board) is not None

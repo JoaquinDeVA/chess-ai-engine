@@ -297,23 +297,6 @@ def extract_development_features(board: chess.Board) -> Dict[str, float]:
     }
 
 
-def extract_terminal_features(board: chess.Board) -> Dict[str, float]:
-    """
-    Extract terminal state features.
-
-    :param board: Chess board to analyze
-    :type board: chess.Board
-    :return: Dictionary containing terminal state features
-    :rtype: Dict[str, float]
-    """
-    if board.is_checkmate():
-        return {"terminal": 1.0 if not board.turn else 0.0}
-    if board.is_stalemate() or board.is_insufficient_material():
-        return {"terminal": 0.5}
-
-    return {"terminal": 0.0}
-
-
 def get_position_features(board: chess.Board) -> Dict[str, float]:
     """
     Extract all normalized features from a chess position.

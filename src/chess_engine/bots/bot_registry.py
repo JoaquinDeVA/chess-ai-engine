@@ -126,15 +126,6 @@ class BotRegistry:
         """
         return sorted(self.bot_classes.keys())
 
-    def list_loaded_bots(self) -> List[str]:
-        """
-        Get list of currently loaded (instantiated) bots.
-
-        :return: List of bot names that are currently loaded in memory
-        :rtype: List[str]
-        """
-        return list(self.loaded_bots.keys())
-
     def is_bot_available(self, bot_name: str) -> bool:
         """
         Check if a bot is available to be loaded.
@@ -238,26 +229,6 @@ class BotRegistry:
 
         return None
 
-    def reload_bots(self) -> int:
-        """
-        Reload all bots from files (useful during development).
-
-        :return: Number of bots successfully reloaded
-        :rtype: int
-        """
-        # Clear loaded bots and caches
-        self.loaded_bots.clear()
-        self.available_bots.clear()
-        self.bot_classes.clear()
-        self.bot_info_cache.clear()
-
-        # Re-discover all bots
-        self._discover_bots()
-        new_count = len(self.bot_classes)
-
-        logger.info("Reloaded bots: found %d total bots", new_count)
-        return new_count
-
     def validate_all_bots(self) -> Dict[str, bool]:
         """
         Validate all available bots.
@@ -303,36 +274,6 @@ class BotRegistry:
             for bot_name, is_valid in validation_results.items()
             if is_valid and bot_name != "HumanPlayer"
         ]  # Exclude human from tournaments
-
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about the bot registry.
-
-        :return: Dictionary with registry statistics
-        :rtype: Dict[str, Any]
-        """
-        return {
-            "total_available": len(self.bot_classes),
-            "currently_loaded": len(self.loaded_bots),
-            "builtin_bots": 1,  # HumanPlayer
-            "custom_bots": len(self.bot_classes) - 1,
-            "bot_files_found": len(self.available_bots),
-            "tournament_ready": len(self.get_tournament_ready_bots()),
-        }
-
-    def __str__(self) -> str:
-        """
-        String representation of the registry.
-
-        :return: String representation
-        :rtype: str
-        """
-        stats = self.get_stats()
-        return (
-            f"BotRegistry: {stats['total_available']} bots available, "
-            f"{stats['currently_loaded']} loaded, "
-            f"{stats['tournament_ready']} tournament-ready"
-        )
 
     def __repr__(self) -> str:
         """

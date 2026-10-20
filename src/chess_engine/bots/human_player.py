@@ -46,7 +46,7 @@ class HumanPlayer(ChessBot):
                 else:
                     print("Illegal move! Try again.")
 
-            except (ValueError, KeyboardInterrupt):
+            except ValueError:
                 print("Invalid move format! Use format like 'e2e4'")
 
     def get_info(self) -> Dict[str, Any]:

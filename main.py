@@ -69,14 +69,14 @@ Examples:
     )
 
     parser.add_argument(
-        "--position", type=str, help="FEN string or path to file with starting position"
+        "--position", type=str, help="Starting position as a FEN string (6 fields, in quotes)"
     )
 
     parser.add_argument(
         "--model",
         type=str,
         default=None,
-        help="Evaluation model for the machine-learning bots (see docs/ADDING_A_MODEL.md)",
+        help="Evaluation model for the machine-learning bots in single games; ignored in tournament mode (see docs/ADDING_A_MODEL.md)",
     )
 
     parser.add_argument(
@@ -94,7 +94,7 @@ Examples:
         "--board-style",
         choices=["ascii", "emoji"],
         default="emoji",
-        help="Board visualization style: ascii (default) or emoji pieces (default: %(default)s)",
+        help="Board visualization style: ascii or emoji pieces (default: %(default)s)",
     )
 
     parser.add_argument(
@@ -138,7 +138,7 @@ def load_position_from_argument(position_arg: str) -> Optional[str]:
     """
     Load a chess position from command line argument.
 
-    :param position_arg: Either a FEN string or file path
+    :param position_arg: A FEN string
     :type position_arg: str
     :return: Valid FEN string, or None if invalid
     :rtype: Optional[str]
@@ -353,7 +353,7 @@ def run_tournament(
             print(f"Tournament rounds: {config.rounds}")
     except Exception as e:
         print(f"Error loading configuration: {e}")
-        print("Make sure config/tournament.json exists and is valid")
+        print("The tournament settings come from chess_engine.config.settings.load_config()")
         return False
 
     available_bots = bot_registry.get_tournament_ready_bots()

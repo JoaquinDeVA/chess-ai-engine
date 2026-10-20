@@ -186,3 +186,14 @@ def test_fallback_move_prefers_captures():
     board = chess.Board("4k3/8/8/3q4/8/8/8/3QK3 w - - 0 1")
     assert fallback_move(board) == chess.Move.from_uci("d1d5")
     assert fallback_move(chess.Board("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")) == chess.Move.null()
+
+
+def test_human_player_lets_keyboard_interrupt_propagate(monkeypatch):
+    from chess_engine.bots.human_player import HumanPlayer
+
+    def interrupt(_prompt):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("builtins.input", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        HumanPlayer().get_move(chess.Board(), 1.0)

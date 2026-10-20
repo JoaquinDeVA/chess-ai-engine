@@ -1,78 +1,157 @@
 #!/usr/bin/env bash
-# Train, judge and compare the evaluation models: sidecars, the three linear models at EFFORT,
-# evaluation of every model, depth-accuracy profile, round-robin tournament, models table.
+# The reproducible pipeline: sidecars, training, evaluation, depth profile, three tournaments,
+# quiescence comparison and the results table. It is also what produces the real results.
 #
-#   EFFORT=40 bash scripts/run_all.sh
+# Steps (STEPS, in this order): sidecars train evaluate profile tournaments quiescence report.
+# Each step runs once and writes $STATE_DIR/<step>.done; a step with a .done file is skipped
+# unless FORCE=1. A failing step is logged and stops the pipeline (non-zero exit), except model
+# training: a failed model is logged and the loop continues. If the failed model is net4_pst its
+# artifact and card are deleted ("DISCARDED net4_pst"). Per-model training logs go to
+# $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
+#
+# Tournaments: A) 60+1 anchored at h1; B) 600+5 (the reference) anchored at h1; C) depth 3
+# with no clock, without h1, anchored at linear_pst_terms.
+#
+# Not here: refitting h1 (scripts/data/fit_h1.py). Run it by hand; refitting changes the anchor,
+# so every result measured against the old h1 would stop being comparable.
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
-# EFFORT_NN (30, networks), AGREEMENT_N (20000, best-move sample rows), HOURS (4, tournament
-# wall-clock budget), BASE (60) and INCREMENT (1) (tournament clock), PROFILE_SECONDS (1,3),
-# PROFILE_POSITIONS (100), PLAYERS (tournament players, anchored at h1), PYTHON.
-# Models not yet registered are skipped with a line in the log (the runbook says so too).
+# AGREEMENT_N (20000), PROFILE_SECONDS (1,3,10), PROFILE_POSITIONS (100), WORKERS (5),
+# MODELS ("linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst"),
+# STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/pipeline),
+# PYTHON (.venv/bin/python if it exists, else python).
+#
+#   Dry run:   DRY_RUN=1 bash scripts/run_all.sh
+#   Real run:  nohup setsid bash scripts/run_all.sh > data/pipeline.log 2>&1 &
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RAW="${RAW:-data/lichess/raw}"
 SIDECAR="${SIDECAR:-data/lichess/sidecar}"
 EFFORT="${EFFORT:-30}"
-EFFORT_NN="${EFFORT_NN:-30}"
 AGREEMENT_N="${AGREEMENT_N:-20000}"
-HOURS="${HOURS:-4}"
-BASE="${BASE:-60}"
-INCREMENT="${INCREMENT:-1}"
-PROFILE_SECONDS="${PROFILE_SECONDS:-1,3}"
+PROFILE_SECONDS="${PROFILE_SECONDS:-1,3,10}"
 PROFILE_POSITIONS="${PROFILE_POSITIONS:-100}"
-PLAYERS="${PLAYERS:-linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1}"
-PYTHON="${PYTHON:-python}"
+WORKERS="${WORKERS:-5}"
+MODELS="${MODELS:-linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst}"
+STEPS="${STEPS:-sidecars train evaluate profile tournaments quiescence report}"
+FORCE="${FORCE:-0}"
+DRY_RUN="${DRY_RUN:-0}"
+STATE_DIR="${STATE_DIR:-data/pipeline}"
+if [ -z "${PYTHON:-}" ]; then
+  if [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; else PYTHON=python; fi
+fi
 
-# Registered models only (a model whose code is not merged yet is skipped, with a log line).
+ARTIFACTS=src/chess_engine/models/artifacts
+CARDS=src/chess_engine/models/cards
+
+log() { echo "=== $*"; }
+
+# Run a command, or only print it when DRY_RUN=1.
+run() {
+  if [ "$DRY_RUN" = 1 ]; then echo "+ $*"; else "$@"; fi
+}
+
 registered() {
   "$PYTHON" -c "import sys; from chess_engine.models import available_models as a; sys.exit(0 if '$1' in a() else 1)" 2>/dev/null
 }
 
-# Models trained from the raw shards (order matters: cheapest first), and every model evaluated
-# (the older ones are measured only, never retrained).
-TRAINED=(linear_material linear_pst linear_pst_terms linear_king_bucket net4_pst)
-EVALUATED=(linear_material linear_pst linear_pst_terms linear_king_bucket net4_pst mlp_features cnn_resnet)
+# Models of MODELS that are registered and (outside a dry run) have a trained artifact.
+present_models() {
+  local m out=()
+  for m in $MODELS; do
+    if [ "$DRY_RUN" = 1 ]; then out+=("$m")
+    elif registered "$m" && [ -f "$ARTIFACTS/$m.npz" ]; then out+=("$m"); fi
+  done
+  echo "${out[*]:-}"
+}
 
-echo "=== sidecars"
-"$PYTHON" scripts/data/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
+join() { local IFS=,; echo "$*"; }
 
-for model in "${TRAINED[@]}"; do
-  if ! registered "$model"; then echo "=== skip train ${model}: not registered"; continue; fi
-  effort="$EFFORT"; case "$model" in nn*) effort="$EFFORT_NN" ;; esac
-  echo "=== train ${model} (effort ${effort})"
-  "$PYTHON" -m chess_engine.training.train --model "$model" --effort "$effort" \
-    --raw "$RAW" --sidecar "$SIDECAR" || echo "=== FAILED train ${model}: the other models continue"
+step_sidecars() {
+  run "$PYTHON" scripts/data/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
+}
+
+step_train() {
+  local model
+  [ "$DRY_RUN" = 1 ] || mkdir -p "$STATE_DIR/logs"
+  for model in $MODELS; do
+    if [ "$DRY_RUN" != 1 ] && ! registered "$model"; then log "skip train $model: not registered"; continue; fi
+    log "train $model"
+    if [ "$DRY_RUN" = 1 ]; then
+      echo "+ $PYTHON -m chess_engine.training.train --model $model --effort $EFFORT --raw $RAW --sidecar $SIDECAR"
+    elif ! "$PYTHON" -m chess_engine.training.train --model "$model" --effort "$EFFORT" \
+        --raw "$RAW" --sidecar "$SIDECAR" > "$STATE_DIR/logs/train_$model.log" 2>&1; then
+      log "FAILED train $model (log: $STATE_DIR/logs/train_$model.log); the other models continue"
+      if [ "$model" = net4_pst ]; then
+        rm -f "$ARTIFACTS/net4_pst.npz" "$CARDS/net4_pst.json"
+        log "DISCARDED net4_pst"
+      fi
+    fi
+  done
+}
+
+step_evaluate() {
+  local model
+  for model in $(present_models) h1; do
+    log "evaluate $model"
+    run "$PYTHON" -m chess_engine.comparison.evaluate --model "$model" \
+      --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"
+  done
+}
+
+step_profile() {
+  local players
+  players="$(join $(present_models) h1)"
+  run "$PYTHON" scripts/bench/profile_tradeoff.py --players "$players" \
+    --seconds "$PROFILE_SECONDS" --positions "$PROFILE_POSITIONS" --parallel 1 \
+    --raw "$RAW" --sidecar "$SIDECAR"
+}
+
+step_tournaments() {
+  local with_h1 without_h1
+  with_h1="$(join $(present_models) h1)"
+  without_h1="$(join $(present_models))"
+  [ "$DRY_RUN" = 1 ] || mkdir -p data/tournament data/reports
+  # A) short control
+  run "$PYTHON" scripts/bench/run_tournament.py --players "$with_h1" --anchor h1 \
+    --base 60 --increment 1 --openings 10 --workers "$WORKERS" \
+    --out data/tournament/short.jsonl --logs data/tournament/short \
+    --report data/reports/TOURNAMENT_60+1.md
+  # B) reference control
+  run "$PYTHON" scripts/bench/run_tournament.py --players "$with_h1" --anchor h1 \
+    --base 600 --increment 5 --openings 5 --workers "$WORKERS" \
+    --out data/tournament/reference.jsonl --logs data/tournament/reference \
+    --report data/reports/TOURNAMENT_600+5.md
+  # C) equal depth 3, no h1
+  run "$PYTHON" scripts/bench/run_tournament.py --players "$without_h1" --anchor linear_pst_terms \
+    --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" \
+    --out data/tournament/depth3.jsonl --logs data/tournament/depth3 \
+    --report data/reports/TOURNAMENT_depth3.md
+}
+
+step_quiescence() {
+  if [ -f scripts/bench/compare_quiescence.py ]; then
+    run "$PYTHON" scripts/bench/compare_quiescence.py --players h1,linear_pst_terms \
+      --raw "$RAW" --sidecar "$SIDECAR"
+  else
+    echo "quiescence step: script added by the supervisor"
+  fi
+}
+
+step_report() {
+  run "$PYTHON" -m chess_engine.comparison.report
+}
+
+[ "$DRY_RUN" = 1 ] || mkdir -p "$STATE_DIR"
+for step in $STEPS; do
+  done_file="$STATE_DIR/$step.done"
+  if [ "$FORCE" != 1 ] && [ -f "$done_file" ]; then log "skip $step: done"; continue; fi
+  log "$step"
+  if ! "step_$step"; then
+    log "FAILED $step: pipeline stopped"
+    exit 1
+  fi
+  [ "$DRY_RUN" = 1 ] || touch "$done_file"
 done
-
-for model in "${EVALUATED[@]}"; do
-  if ! registered "$model"; then echo "=== skip evaluate ${model}: not registered"; continue; fi
-  echo "=== evaluate ${model}"
-  "$PYTHON" -m chess_engine.comparison.evaluate --model "$model" \
-    --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N" \
-    || echo "=== FAILED evaluate ${model}"
-done
-
-echo "=== profile (depth against accuracy)"
-PROFILE_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h1 ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
-"$PYTHON" scripts/bench/profile_tradeoff.py --players "$PROFILE_PLAYERS" --seconds "$PROFILE_SECONDS" \
-  --positions "$PROFILE_POSITIONS" --parallel 1 --raw "$RAW" --sidecar "$SIDECAR"
-
-WEIGHTS="src/chess_engine/evaluation/h1_weights.json"
-if [ ! -f "$WEIGHTS" ] || [ -n "$(find "$SIDECAR" -name '*.sidecar.parquet' -newer "$WEIGHTS" -print -quit)" ]; then
-  echo "=== fit h1"
-  "$PYTHON" scripts/data/fit_h1.py --raw "$RAW" --sidecar "$SIDECAR" --positions 300000 --jobs 4 \
-    --out "$WEIGHTS"
-else
-  echo "=== fit h1 skipped (weights newer than the sidecars)"
-fi
-
-echo "=== tournament (${HOURS} h)"
-TOURNAMENT_PLAYERS="$(echo "$PLAYERS" | tr ',' '\n' | while read -r p; do if [ "$p" = h1 ] || registered "$p"; then echo "$p"; fi; done | paste -sd, -)"
-"$PYTHON" scripts/bench/run_tournament.py --players "$TOURNAMENT_PLAYERS" --anchor h1 \
-  --base "$BASE" --increment "$INCREMENT" --hours "$HOURS"
-
-echo "=== report"
-"$PYTHON" -m chess_engine.comparison.report
-echo "Done. Review docs/RESULTS.md, data/reports/ and the cards in src/chess_engine/models/cards/ and commit."
+log "Done. Review docs/RESULTS.md, data/reports/ and the cards in $CARDS and commit."

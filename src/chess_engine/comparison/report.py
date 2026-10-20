@@ -15,14 +15,12 @@ from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (loads models first: avoids an import cycle)
 from chess_engine.models.cards import PROJECT_ROOT, load_all_cards
+from chess_engine.models.registry import ACCURACY_RECORDS
 from chess_engine.training.representation import Representation
 
 HISTORY_FILE = PROJECT_ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
-
-#: Models that are not retrained nor played: only their accuracy and cost are measured.
-ACCURACY_RECORDS = frozenset({"mlp_features", "cnn_resnet"})
 
 #: Times per move (seconds) of the depth columns, as keys of the ``tradeoff`` section.
 DEPTH_SECONDS = ("1", "3", "10")

@@ -1,8 +1,8 @@
 """Data preparation and training of the evaluation models.
 
 The linear models are trained from the raw Lichess evaluations, stored as sharded Parquet
-(``data/lichess/raw``) with sidecars (split, quiet flag, side to move) next to them. The older
-CSV-era models train from a CSV. Judging and comparing the trained models is in
+(``data/lichess/raw``) with sidecars (split, quiet flag, side to move) next to them.
+Judging and comparing the trained models is in
 :mod:`chess_engine.comparison`.
 
 Typical flow::
@@ -13,8 +13,7 @@ Typical flow::
     python -m chess_engine.comparison.evaluate --model linear_pst
 
 The older CSV-family models (``mlp_features``, ``cnn_resnet``) are accuracy records: measure
-them from the raw shards with ``evaluate``. Their training CSV was retired, so they are not
-retrained::
+them from the raw shards with ``evaluate``. They are not retrained::
 
     python -m chess_engine.comparison.evaluate --model mlp_features
 """

@@ -1,42 +1,30 @@
-"""Lichess conversion, Stockfish labelling and the bake-off script."""
+"""Perspective detection, the pipeline script and the bake-off script."""
 
 import importlib.util
-import io
-import json
+import os
+import subprocess
 from pathlib import Path
 
 import chess
 import pytest
 
-from chess_engine.training.lichess import (
-    SIDE_TO_MOVE,
-    WHITE,
-    convert,
-    detect_perspective,
-    parse_record,
-    to_row,
-    write_csv,
-)
+from chess_engine.training.lichess import SIDE_TO_MOVE, WHITE, detect_perspective
 from chess_engine.training.lichess_raw import shard_path, write_shard
 from chess_engine.training.sidecar import build_sidecar
-from chess_engine.training.stockfish import find_stockfish, label_positions
 from tests.conftest import material_cp, random_positions
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def database_line(board: chess.Board, perspective: str, mate: int | None = None) -> str:
-    """A fake database line whose evaluation follows material, from the given perspective."""
-    cp = int(material_cp(board))
-    if perspective == SIDE_TO_MOVE and board.turn == chess.BLACK:
-        cp = -cp
-    pv = {"mate": mate} if mate is not None else {"cp": cp}
-    return json.dumps(
-        {
-            "fen": " ".join(board.fen().split()[:4]),
-            "evals": [{"depth": 10, "pvs": [{"cp": 0}]}, {"depth": 30, "pvs": [pv, {"cp": 9}]}],
-        }
-    )
+def records_of(boards: list[chess.Board], perspective: str) -> list[dict]:
+    """Fake records whose evaluation follows material, from the given perspective."""
+    records = []
+    for board in boards:
+        cp = int(material_cp(board))
+        if perspective == SIDE_TO_MOVE and board.turn == chess.BLACK:
+            cp = -cp
+        records.append({"fen": " ".join(board.fen().split()[:4]), "cp": cp, "mate": None})
+    return records
 
 
 @pytest.fixture(scope="module")
@@ -44,58 +32,14 @@ def boards():
     return random_positions(400, seed=21)
 
 
-class TestLichessConversion:
-    def test_the_deepest_evaluation_is_used(self, boards):
-        record = parse_record(database_line(boards[0], WHITE))
-        assert record["cp"] == int(material_cp(boards[0])) and record["mate"] is None
-
-    @pytest.mark.parametrize("line", ["", "not json", '{"fen": "x"}', '{"fen":"x","evals":[]}'])
-    def test_unusable_lines_are_skipped(self, line):
-        assert parse_record(line) is None
-
+class TestPerspectiveDetection:
     @pytest.mark.parametrize("perspective", [WHITE, SIDE_TO_MOVE])
     def test_the_perspective_is_detected_from_the_data(self, boards, perspective):
-        records = [parse_record(database_line(b, perspective)) for b in boards]
-        assert detect_perspective(records) == perspective
+        assert detect_perspective(records_of(boards, perspective)) == perspective
 
     def test_too_little_data_is_an_error(self, boards):
         with pytest.raises(ValueError, match="not enough"):
-            detect_perspective([parse_record(database_line(boards[0], WHITE))])
-
-    @pytest.mark.parametrize("perspective", [WHITE, SIDE_TO_MOVE])
-    def test_rows_are_always_from_whites_point_of_view(self, boards, perspective):
-        lines = [database_line(b, perspective) for b in boards]
-        rows = list(convert(lines, limit=len(lines)))
-        assert len(rows) == len(boards)
-        for board, row in zip(boards, rows, strict=True):
-            assert row["cp"] == int(material_cp(board))
-
-    def test_limit_is_respected_and_mates_are_converted(self, boards):
-        lines = [database_line(b, WHITE) for b in boards[:300]]
-        lines.append(database_line(boards[300], WHITE, mate=-3))
-        rows = list(convert(lines, limit=60))
-        assert len(rows) == 60
-        row = to_row(parse_record(lines[-1]), WHITE)
-        assert row == {"fen": row["fen"], "cp": "", "is_mate": True, "mate_distance": -3}
-
-    def test_mate_sign_flips_with_the_perspective(self):
-        record = {"fen": "8/8/8/8/8/8/8/k1K5 b - -", "cp": None, "mate": 2}
-        assert to_row(record, SIDE_TO_MOVE)["mate_distance"] == -2
-        assert to_row(record, WHITE)["mate_distance"] == 2
-
-
-@pytest.mark.skipif(find_stockfish() is None, reason="Stockfish is not installed")
-class TestStockfishLabelling:
-    def test_labels_are_from_whites_point_of_view(self):
-        up_a_queen = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
-        rows = list(label_positions([up_a_queen], find_stockfish(), depth=6))
-        assert rows[0]["cp"] > 300 and not rows[0]["is_mate"]
-
-    def test_mates_are_reported_as_mates(self):
-        rows = list(
-            label_positions(["6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"], find_stockfish(), depth=6)
-        )
-        assert rows[0]["is_mate"] and rows[0]["mate_distance"] == 1 and rows[0]["cp"] == ""
+            detect_perspective(records_of(boards[:1], WHITE))
 
 
 def load_script(name: str):
@@ -104,12 +48,6 @@ def load_script(name: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def test_write_csv_header():
-    handle = io.StringIO()
-    write_csv([], handle)
-    assert handle.getvalue().strip() == "fen,cp,is_mate,mate_distance"
 
 
 def bakeoff_fixture(raw: Path, side: Path, count: int = 1500) -> None:
@@ -145,3 +83,31 @@ def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
     rows = sum(len(b) for b in batches)
     assert rows == 100
     assert all((b["depth"] >= 20).all() for b in batches)
+
+
+SCRIPT = ROOT / "scripts" / "run_all.sh"
+PIPELINE_MODELS = "linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst"
+
+
+def test_run_all_is_valid_bash():
+    subprocess.run(["bash", "-n", str(SCRIPT)], check=True)
+
+
+def test_run_all_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
+    state = tmp_path / "state"
+    env = {**os.environ, "DRY_RUN": "1", "STATE_DIR": str(state)}
+    result = subprocess.run(
+        ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=True
+    )
+    lines = [line for line in result.stdout.splitlines() if line.startswith("+ ")]
+    for model in PIPELINE_MODELS.split():
+        assert any(
+            "training.train" in line and f"--model {model} " in line and "--effort 30" in line
+            for line in lines
+        ), model
+    assert any("comparison.evaluate --model h1 " in line for line in lines)
+    assert any("--base 60 " in line and "--increment 1" in line for line in lines)
+    assert any("--base 600 --increment 5" in line for line in lines)
+    assert any("--max-depth 3" in line for line in lines)
+    assert "mlp_features" not in result.stdout and "cnn_resnet" not in result.stdout
+    assert not state.exists() or not list(state.glob("*.done"))

@@ -7,6 +7,9 @@ from .base import ARTIFACTS_DIR, EvaluationModel
 
 _REGISTRY: Dict[str, Type[EvaluationModel]] = {}
 
+#: Models that are not retrained nor played: only their accuracy and cost are measured.
+ACCURACY_RECORDS = frozenset({"mlp_features", "cnn_resnet"})
+
 
 def register_model(name: str) -> Callable[[Type[EvaluationModel]], Type[EvaluationModel]]:
     """Class decorator that makes a model available under ``name``.

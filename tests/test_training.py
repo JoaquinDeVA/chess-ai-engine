@@ -1,4 +1,4 @@
-"""Tests of the training pipeline: targets, dataset split, metrics, cards, report and the CLIs."""
+"""Tests of the training pipeline: targets, dataset split, cards, report and the CLIs."""
 
 import json
 from types import SimpleNamespace
@@ -10,7 +10,6 @@ import pytest
 from chess_engine import models
 from chess_engine.comparison import evaluate as evaluate_cli
 from chess_engine.comparison import report
-from chess_engine.comparison.metrics import compute_metrics, outcome_class
 from chess_engine.models import base as models_base
 from chess_engine.models import cards, registry
 from chess_engine.training import train as train_cli
@@ -99,35 +98,6 @@ class TestEncoding:
         (serial,) = encode_positions(extractor, fens)
         (parallel,) = encode_positions(extractor, fens, n_jobs=2, chunk_size=10)
         np.testing.assert_array_equal(serial, parallel)
-
-
-class TestMetrics:
-    def test_outcome_classes_use_a_dead_zone_of_50_cp(self):
-        assert outcome_class([-51, -50, 0, 50, 51]).tolist() == [-1, 0, 0, 0, 1]
-
-    def test_perfect_predictions(self):
-        truth = np.array([-800.0, -20.0, 0.0, 120.0, 900.0])
-        metrics = compute_metrics(truth, truth)
-        assert metrics["mae_cp"] == 0 and metrics["accuracy"] == 1 and metrics["within_50"] == 1
-
-    def test_known_errors(self):
-        metrics = compute_metrics([0, 100, 300], [0, 0, 0])
-        assert metrics["mae_cp"] == pytest.approx(400 / 3)
-        assert metrics["rmse_cp"] == pytest.approx(np.sqrt(100_000 / 3))
-        assert metrics["within_50"] == pytest.approx(1 / 3)
-        assert metrics["within_100"] == pytest.approx(2 / 3)
-        assert metrics["accuracy"] == pytest.approx(1 / 3)
-
-    def test_a_small_disagreement_inside_the_equal_zone_is_not_a_miss(self):
-        assert compute_metrics([30.0], [-40.0])["accuracy"] == 1.0
-
-    def test_opposite_signs_are_a_miss(self):
-        assert compute_metrics([400.0], [-400.0])["accuracy"] == 0.0
-
-    @pytest.mark.parametrize("a,b", [([], []), ([1.0], [1.0, 2.0])])
-    def test_invalid_inputs_are_rejected(self, a, b):
-        with pytest.raises(ValueError):
-            compute_metrics(a, b)
 
 
 @pytest.fixture

@@ -69,7 +69,10 @@ class Representation:
 
     @property
     def name(self) -> str:
-        """Short identifier, e.g. ``"winprob-k0.00368-stm-all"``; ``-mates5`` if mates are cut."""
+        """Short identifier, e.g. ``"winprob-k0.00368-stm-all"`` (the default mate share).
+
+        Another mate share adds a suffix: ``-mates5`` for 5 %, ``-mates100`` for all of them.
+        """
         scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
         persp = "stm" if self.perspective == "side_to_move" else "white"
         return f"{scale}-{persp}-{self.filter}{mates_suffix(self.mate_keep)}"

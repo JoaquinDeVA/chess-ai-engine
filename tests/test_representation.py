@@ -77,8 +77,7 @@ def test_is_quiet():
 def test_representation_round_trips_through_dict():
     rep = Representation(scale="cp_linear", perspective="white", filter="quiet")
     assert Representation.from_dict(rep.to_dict()) == rep
-    assert Representation().name == "winprob-k0.00368-stm-all-mates10"
-    assert Representation(mate_keep=1.0).name == "winprob-k0.00368-stm-all"
+    assert Representation().name == "winprob-k0.00368-stm-all"
     assert LICHESS_K == 0.00368208
 
 
@@ -100,9 +99,9 @@ def test_mate_keep_outside_zero_one_is_rejected(bad):
         keep_mate_rows(pd.Series(["x"]), bad)
 
 
-def test_mate_keep_is_part_of_the_name_only_when_undersampled():
-    assert Representation().name == "winprob-k0.00368-stm-all-mates10"
-    assert Representation(mate_keep=1.0).name == "winprob-k0.00368-stm-all"
+def test_mate_keep_is_part_of_the_name_only_when_not_default():
+    assert Representation().name == "winprob-k0.00368-stm-all"
+    assert Representation(mate_keep=1.0).name == "winprob-k0.00368-stm-all-mates100"
     assert Representation(mate_keep=0.05).name == "winprob-k0.00368-stm-all-mates5"
     rep = Representation(mate_keep=0.05)
     assert Representation.from_dict(rep.to_dict()) == rep

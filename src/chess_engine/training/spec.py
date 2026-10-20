@@ -13,9 +13,10 @@ DEFAULT_MATE_KEEP = 0.10
 
 
 def mates_suffix(mate_keep: float) -> str:
-    """Name suffix of a representation that cuts the mates, e.g. ``"-mates10"``.
+    """Name suffix of a representation whose mate share is not the default, e.g. ``"-mates5"``.
 
     :param mate_keep: Share of the mates kept, in ``(0, 1]``; 1 keeps them all.
-    :return: ``""`` when every mate is kept.
+    :return: ``""`` when ``mate_keep`` is :data:`DEFAULT_MATE_KEEP`; otherwise
+        ``"-mates{100 * mate_keep}"`` (``"-mates100"`` when every mate is kept).
     """
-    return f"-mates{100 * mate_keep:g}" if mate_keep < 1.0 else ""
+    return "" if mate_keep == DEFAULT_MATE_KEEP else f"-mates{100 * mate_keep:g}"

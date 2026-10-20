@@ -164,7 +164,14 @@ class TestRegistry:
         assert get_model_class("mlp_features").trainable
 
 
+needs_keras_files = pytest.mark.skipif(
+    not all((ARTIFACTS_DIR / name).exists() for name in ("mlp_features.keras", "cnn_resnet.keras")),
+    reason="the course models (*.keras) are not versioned and are absent from a clean clone",
+)
+
+
 class TestShippedModels:
+    @needs_keras_files
     @pytest.mark.parametrize("name", ["mlp_features", "cnn_resnet"])
     def test_sign_is_white_point_of_view(self, name):
         pytest.importorskip("keras")
@@ -173,11 +180,13 @@ class TestShippedModels:
             chess.Board(BLACK_UP_A_QUEEN)
         )
 
+    @needs_keras_files
     def test_parameter_counts_match_the_architectures(self):
         pytest.importorskip("keras")
         assert load_model("mlp_features").count_parameters() == 1505
         assert load_model("cnn_resnet").count_parameters() == 572_353
 
+    @needs_keras_files
     def test_numpy_inference_of_the_mlp_matches_keras(self, sample_boards):
         pytest.importorskip("keras")
         model = load_model("mlp_features")
@@ -189,6 +198,7 @@ class TestShippedModels:
         pytest.importorskip("keras")
         assert get_model_class("cnn_resnet").new().count_parameters() == 572_353
 
+    @needs_keras_files
     def test_batch_prediction_matches_single_predictions(self, sample_boards):
         pytest.importorskip("keras")
         model = load_model("cnn_resnet")

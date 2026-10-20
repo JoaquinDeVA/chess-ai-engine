@@ -40,7 +40,7 @@ def test_unknown_player_fails_before_any_game(tmp_path):
     opening = paired_openings(1, seed=2)[0]
     with pytest.raises(ValueError, match="no_such_model"):
         run_round_robin(
-            ["mlp_features", "no_such_model"],
+            ["linear_material", "no_such_model"],
             [opening],
             base=2.0,
             increment=0.0,

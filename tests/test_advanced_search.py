@@ -1,9 +1,11 @@
 """Tests for the advanced alpha-beta search and iterative deepening."""
 
+import types
 from collections import defaultdict
 
 import chess
 
+from chess_engine.search import game_algorithms
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
@@ -383,3 +385,45 @@ def test_iterative_deepening_passes_the_table_cap_to_the_search():
         max_tt_entries=50,
     )
     assert 0 < len(table) <= 50
+
+
+def _fake_clock_search(monkeypatch, durations):
+    """Replace the single-depth search by one that only advances a fake clock by ``durations``."""
+    clock = [0.0]
+
+    def fake_search(*, max_depth, **kwargs):
+        clock[0] += durations[max_depth]
+        return "m", SearchStatistics(1, 0, max_depth, False, max_depth)
+
+    monkeypatch.setattr(game_algorithms, "advanced_heuristic_alphabeta_search", fake_search)
+    monkeypatch.setattr(game_algorithms, "time", types.SimpleNamespace(time=lambda: clock[0]))
+
+
+def test_time_estimate_cannot_stop_the_deepening_before_min_depth(monkeypatch):
+    # depth 2 is 100 times slower than depth 1, so the extrapolation predicts 10 s for depth 3
+    _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.1, 3: 1.0, 4: 10.0})
+    _, stats = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=3
+    )
+    assert stats.completed_depth == 3
+
+
+def test_time_estimate_still_stops_the_deepening_after_min_depth(monkeypatch):
+    _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.1, 3: 1.0, 4: 10.0})
+    _, stats = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1
+    )
+    assert stats.completed_depth == 2
+
+
+def test_exhausted_soft_budget_still_completes_min_depth():
+    _, stats = heuristic_alphabeta_iterative_deepening_search(
+        ChessProblem(),
+        ChessGameState(chess.Board()),
+        zero_eval,
+        never_cutoff,
+        max_depth=5,
+        time_limit=0.0,
+        min_depth=3,
+    )
+    assert stats.completed_depth == 3

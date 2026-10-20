@@ -29,6 +29,12 @@ from .search_utils import (
     store_transposition_entry,
 )
 
+#: Iterations that are always completed before the time estimate may stop the deepening. The
+#: estimate extrapolates from the two previous iterations and, when the first ones are almost
+#: instant, it wildly overestimates the next one: in a 10 min + 5 s tournament 11 % of the moves
+#: stopped at depth 2 after less than 2 s of a 40 s budget.
+DEFAULT_MIN_DEPTH = 3
+
 
 class AdversarialSearchResult(NamedTuple):
     """
@@ -475,13 +481,15 @@ def heuristic_alphabeta_iterative_deepening_search(
     noisy_moves: Optional[Callable[[GameState], List[Any]]] = None,
     quiescence_plies: int = 0,
     max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
+    min_depth: int = DEFAULT_MIN_DEPTH,
 ) -> Tuple[Any, SearchStatistics]:
     """Iterative deepening over :func:`advanced_heuristic_alphabeta_search`.
 
     Searches depth 1, 2, ... ``max_depth`` and returns the move of the deepest **completed**
     iteration. Before starting an iteration the time it would take is estimated from the
     two previous ones (growth factor = ratio of their durations) and the loop stops if it does
-    not fit in the remaining time. An iteration interrupted by ``cutoff_test`` is discarded
+    not fit in the remaining time. The estimate and the soft time budget are ignored until
+    ``min_depth`` iterations are complete; only ``cutoff_test`` (the hard limit) can stop earlier. An iteration interrupted by ``cutoff_test`` is discarded
     unless it is the very first one (some move is always needed).
 
     :param game: The game problem instance containing rules and utility function
@@ -508,6 +516,8 @@ def heuristic_alphabeta_iterative_deepening_search(
     :type quiescence_plies: int
     :param max_tt_entries: Cap on the transposition table size (see the advanced search)
     :type max_tt_entries: int
+    :param min_depth: Iterations completed regardless of the time estimate and the soft budget
+    :type min_depth: int
     :return: ``(best_move, statistics)`` with node and pruning counts summed over all iterations
     :rtype: Tuple[Any, SearchStatistics]
     """
@@ -527,7 +537,7 @@ def heuristic_alphabeta_iterative_deepening_search(
     for depth in range(1, max_depth + 1):
         remaining = time_limit - (time.time() - start_time)
 
-        if len(iteration_times) >= 2:
+        if depth > min_depth and len(iteration_times) >= 2:
             last, previous = iteration_times[-1], iteration_times[-2]
             growth = last / previous if previous > 1e-6 and last > 1e-6 else 1.5
             if last * growth > remaining * overshoot_factor:
@@ -561,7 +571,7 @@ def heuristic_alphabeta_iterative_deepening_search(
 
         best_move = move
         completed_depth = depth
-        if time.time() - start_time >= time_limit:
+        if depth >= min_depth and time.time() - start_time >= time_limit:
             break
 
     final_stats = SearchStatistics(

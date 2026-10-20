@@ -182,19 +182,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     if workers != args.workers:
         print(f"Using {workers} workers (cores - 1), not {args.workers}.")
 
-    print("Calibrating ...")
-    seconds_per_game = calibrate(specs, args.base, args.increment, workers, args.max_depth)
-    if seconds_per_game is None:
-        print("Calibration played no games; check the players.")
-        return 1
+    seconds_per_game: Optional[float] = None
     if args.openings is not None:
         openings_per_pair = args.openings
     else:
+        print("Calibrating ...")
+        seconds_per_game = calibrate(specs, args.base, args.increment, workers, args.max_depth)
+        if seconds_per_game is None:
+            print("Calibration played no games; check the players.")
+            return 1
         openings_per_pair = size_for_budget(args.hours, workers, len(specs), seconds_per_game)
-    if openings_per_pair < 1:
-        print(f"Budget too small: one opening needs about {seconds_per_game:.1f} s per game.")
-        return 1
-    print(f"{seconds_per_game:.1f} worker-seconds per game -> {openings_per_pair} openings")
+        if openings_per_pair < 1:
+            print(f"Budget too small: one opening needs about {seconds_per_game:.1f} s per game.")
+            return 1
+        print(f"{seconds_per_game:.1f} worker-seconds per game -> {openings_per_pair} openings")
 
     openings = paired_openings(openings_per_pair)
     run = run_round_robin(
@@ -215,7 +216,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "workers": workers,
         "openings": openings_per_pair,
         "games per pair": 2 * openings_per_pair,
-        "seconds per game (calibration)": f"{seconds_per_game:.1f}",
+        "seconds per game (calibration)": "—"
+        if seconds_per_game is None
+        else f"{seconds_per_game:.1f}",
         "max depth": args.max_depth,
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)

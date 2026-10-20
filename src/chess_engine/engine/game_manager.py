@@ -10,16 +10,16 @@ CEU San Pablo University).
 
 import itertools
 import json
-import random
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import chess
 
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.bots.human_player import HumanPlayer
+from chess_engine.config.settings import BLITZ_CONFIG
 from chess_engine.engine.data_classes import GameResult, TournamentConfig, TournamentResult
 
 #: Terminations in which a player loses without the game ending on the board.
@@ -43,7 +43,6 @@ class GameManager:
         :type bot_registry: BotRegistry
         """
         self.bot_registry = bot_registry
-        self.active_games: Dict[str, ActiveGame] = {}
         self.completed_games: List[GameResult] = []
 
     def _format_board_emoji(self, board: chess.Board) -> str:
@@ -234,21 +233,15 @@ class GameManager:
             # Determine final result if not already decided
             if winner is None:
                 outcome = board.outcome(claim_draw=True)
-                if outcome:
-                    if outcome.winner is not None:
-                        winner = "white" if outcome.winner == chess.WHITE else "black"
-                    termination = str(outcome.termination.name).lower()
-                else:
-                    # Game is not over according to chess rules
-                    termination = "ongoing"
+                if outcome.winner is not None:
+                    winner = "white" if outcome.winner == chess.WHITE else "black"
+                termination = str(outcome.termination.name).lower()
 
             # Create game result
             if termination in FORFEIT_TERMINATIONS:
                 game_result = "1-0" if winner == "white" else "0-1"
-            elif board.is_game_over(claim_draw=True):
-                game_result = board.result(claim_draw=True)
             else:
-                game_result = "*"
+                game_result = board.result(claim_draw=True)
 
             result = GameResult(
                 white_name=white_player.name,
@@ -283,143 +276,6 @@ class GameManager:
             if verbose:
                 print(f"Game error: {e}")
             raise
-
-    def play_human_vs_bot(
-        self,
-        bot_name: str,
-        human_color: Optional[chess.Color] = None,
-        time_limit: float = 300.0,
-        time_increment: float = 0.0,
-        starting_position: Optional[str] = None,
-        verbose: bool = False,
-    ) -> GameResult:
-        """
-        Play a single game: Human vs Bot (convenience method).
-
-        :param bot_name: Name of bot to play against
-        :type bot_name: str
-        :param human_color: Color for human (WHITE/BLACK), random if None
-        :type human_color: Optional[chess.Color]
-        :param time_limit: Total time per player in seconds
-        :type time_limit: float
-        :param time_increment: Time increment per move in seconds
-        :type time_increment: float
-        :param starting_position: FEN string for custom starting position
-        :type starting_position: Optional[str]
-        :param verbose: Enable detailed output
-        :type verbose: bool
-        :return: GameResult with complete game information
-        :rtype: GameResult
-        """
-        # Get the bot
-        bot = self.bot_registry.get_bot(bot_name)
-        if bot is None:
-            raise ValueError(f"Bot '{bot_name}' not found or failed to load")
-
-        # Create human player
-        human = HumanPlayer("Human")
-
-        # Determine colors
-        if human_color is None:
-            human_color = random.choice([chess.WHITE, chess.BLACK])
-
-        # Assign players based on colors
-        white_player = human if human_color == chess.WHITE else bot
-        black_player = bot if human_color == chess.WHITE else human
-
-        return self.play_game(
-            white_player=white_player,
-            black_player=black_player,
-            time_limit=time_limit,
-            time_increment=time_increment,
-            starting_position=starting_position,
-            verbose=verbose,
-        )
-
-    def play_bot_vs_bot(
-        self,
-        white_bot_name: str,
-        black_bot_name: str,
-        time_limit: float = 300.0,
-        time_increment: float = 0.0,
-        starting_position: Optional[str] = None,
-        verbose: bool = False,
-    ) -> GameResult:
-        """
-        Play a single game: Bot vs Bot (convenience method).
-
-        :param white_bot_name: Name of bot to play as white
-        :type white_bot_name: str
-        :param black_bot_name: Name of bot to play as black
-        :type black_bot_name: str
-        :param time_limit: Total time per player in seconds
-        :type time_limit: float
-        :param time_increment: Time increment per move in seconds
-        :type time_increment: float
-        :param starting_position: FEN string for custom starting position
-        :type starting_position: Optional[str]
-        :param verbose: Enable detailed output
-        :type verbose: bool
-        :return: GameResult with complete game information
-        :rtype: GameResult
-        """
-        # Get the bots
-        white_bot = self.bot_registry.get_bot(white_bot_name)
-        black_bot = self.bot_registry.get_bot(black_bot_name)
-
-        if white_bot is None:
-            raise ValueError(f"White bot '{white_bot_name}' not found or failed to load")
-        if black_bot is None:
-            raise ValueError(f"Black bot '{black_bot_name}' not found or failed to load")
-
-        return self.play_game(
-            white_player=white_bot,
-            black_player=black_bot,
-            time_limit=time_limit,
-            time_increment=time_increment,
-            starting_position=starting_position,
-            verbose=verbose,
-        )
-
-    def play_human_vs_human(
-        self,
-        white_name: str = "Human (White)",
-        black_name: str = "Human (Black)",
-        time_limit: float = 300.0,
-        time_increment: float = 0.0,
-        starting_position: Optional[str] = None,
-        verbose: bool = False,
-    ) -> GameResult:
-        """
-        Play a single game: Human vs Human (convenience method).
-
-        :param white_name: Name for white human player
-        :type white_name: str
-        :param black_name: Name for black human player
-        :type black_name: str
-        :param time_limit: Total time per player in seconds
-        :type time_limit: float
-        :param time_increment: Time increment per move in seconds
-        :type time_increment: float
-        :param starting_position: FEN string for custom starting position
-        :type starting_position: Optional[str]
-        :param verbose: Enable detailed output
-        :type verbose: bool
-        :return: GameResult with complete game information
-        :rtype: GameResult
-        """
-        # Create human players
-        white_human = HumanPlayer(white_name)
-        black_human = HumanPlayer(black_name)
-
-        return self.play_game(
-            white_player=white_human,
-            black_player=black_human,
-            time_limit=time_limit,
-            time_increment=time_increment,
-            starting_position=starting_position,
-            verbose=verbose,
-        )
 
     def run_tournament(
         self, bot_names: List[str], config: TournamentConfig, verbose: bool = False
@@ -496,8 +352,7 @@ class GameManager:
                     else:
                         result_str += " (draw)"
                     result_str += f" - {game_result.total_moves} moves, {game_result.duration:.1f}s"
-                    if game_result.termination != "normal":
-                        result_str += f" ({game_result.termination})"
+                    result_str += f" ({game_result.termination})"
                     print(f"  {result_str}")
 
         tournament_duration = time.time() - tournament_start
@@ -535,26 +390,7 @@ def load_config(config_path: str) -> TournamentConfig:
         return TournamentConfig(**data)
     except FileNotFoundError:
         print(f"Config file {config_path} not found, using defaults")
-        return TournamentConfig()
+        return TournamentConfig(**BLITZ_CONFIG)
     except Exception as e:
         print(f"Error loading config: {e}, using defaults")
-        return TournamentConfig()
-
-
-# Utility class for active game state (used internally)
-class ActiveGame:
-    """
-    Represents a game currently in progress.
-
-    Used internally by GameManager to track active games.
-    """
-
-    def __init__(self, white_bot: ChessBot, black_bot: ChessBot, config: TournamentConfig):
-        self.white_bot = white_bot
-        self.black_bot = black_bot
-        self.config = config
-        self.board = chess.Board()
-        self.moves = []
-        self.start_time = time.time()
-        self.white_time_left = config.total_game_time
-        self.black_time_left = config.total_game_time
+        return TournamentConfig(**BLITZ_CONFIG)

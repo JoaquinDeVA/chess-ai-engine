@@ -4,7 +4,7 @@ The helpers in this module are deliberately independent of chess so that they ca
 with hand-made game trees:
 
 * a **transposition table** (``dict`` of :class:`TTEntry`) with bound flags and a size cap,
-* **killer moves** (quiet moves that recently caused a beta cut-off at a given depth),
+* **killer moves** (moves, captures included, that recently caused a beta cut-off at a given depth),
 * **MVV-LVA** capture ordering (Most Valuable Victim, Least Valuable Attacker).
 """
 

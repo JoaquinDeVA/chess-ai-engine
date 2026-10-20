@@ -190,6 +190,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             time_limit=self.turn_budget,
             noisy_moves=chess_noisy_moves if self.quiescence_plies else None,
             quiescence_plies=self.quiescence_plies,
+            max_tt_entries=self.max_tt_entries,
         )
         self.record_statistics(stats)
         logger.debug(

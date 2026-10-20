@@ -25,11 +25,13 @@ class GameState(ABC):
     @abstractmethod
     def make_move(self, move: Any) -> "GameState":
         """
-        Apply a move to the current state and return the resulting state.
+        Apply a move to the current state in place and return that same state.
+
+        Callers that need to keep the original must :meth:`copy` it first.
 
         :param move: The move to apply
         :type move: Any
-        :return: The new game state after applying the move
+        :return: This state, after applying the move
         :rtype: GameState
         :raises ValueError: If the move is not legal
         """

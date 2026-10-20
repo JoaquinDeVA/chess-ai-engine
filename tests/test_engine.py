@@ -255,3 +255,8 @@ def test_configuration_is_loaded_from_json(tmp_path):
     config = load_config(str(path))
     assert (config.total_game_time, config.time_increment, config.rounds) == (90, 1, 3)
     assert config.scoring == {"win": 1.0, "draw": 0.5, "loss": 0.0}
+
+
+def test_missing_configuration_file_falls_back_to_the_default_preset(tmp_path):
+    config = load_config(str(tmp_path / "missing.json"))
+    assert (config.total_game_time, config.time_increment, config.rounds) == (180.0, 2.0, 1)

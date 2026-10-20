@@ -164,7 +164,7 @@ def test_value_error_wrong_state_type(problem):
     with pytest.raises(ValueError) as exc_info:
         problem.utility(invalid_state, chess.WHITE)
 
-    assert "ChessGameState" in str(exc_info.value)
+    assert "GameState" in str(exc_info.value)
 
 
 def test_value_error_none_state(problem):
@@ -173,7 +173,7 @@ def test_value_error_none_state(problem):
     with pytest.raises(ValueError) as exc_info:
         problem.utility(None, chess.WHITE)
 
-    assert "ChessGameState" in str(exc_info.value)
+    assert "GameState" in str(exc_info.value)
 
 
 # The player argument must be validated as well

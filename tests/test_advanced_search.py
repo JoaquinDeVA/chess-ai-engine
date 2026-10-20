@@ -368,3 +368,18 @@ def test_chess_noisy_moves_are_captures_and_promotions():
     board = chess.Board("1n2k3/P7/8/8/8/8/8/R3K3 w - - 0 1")
     moves = {m.uci() for m in chess_noisy_moves(ChessGameState(board))}
     assert moves == {"a7a8q", "a7a8r", "a7a8b", "a7a8n", "a7b8q", "a7b8r", "a7b8b", "a7b8n"}
+
+
+def test_iterative_deepening_passes_the_table_cap_to_the_search():
+    table = {}
+    heuristic_alphabeta_iterative_deepening_search(
+        ChessProblem(),
+        ChessGameState(chess.Board()),
+        material_eval,
+        never_cutoff,
+        transposition_table=table,
+        max_depth=3,
+        time_limit=60.0,
+        max_tt_entries=50,
+    )
+    assert 0 < len(table) <= 50

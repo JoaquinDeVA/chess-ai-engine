@@ -2,8 +2,6 @@
 
 Contents, from the simplest to the most elaborate:
 
-* :func:`random_moves` - baseline player.
-* :func:`minimax_search` and :func:`alphabeta_search` - textbook algorithms (AIMA, fig. 5.7).
 * :func:`heuristic_alphabeta_search` - alpha-beta with a heuristic evaluation and a cut-off test.
 * :func:`advanced_heuristic_alphabeta_search` - adds a transposition table, killer moves, move
   ordering and a depth-aware preference for faster wins.
@@ -16,14 +14,13 @@ The base classes of the course framework (``GameProblem``/``GameState``) are the
 the algorithms below are original work.
 """
 
-import random
 import time
 from typing import Any, Callable, Dict, Hashable, List, NamedTuple, Optional, Tuple
 
 import chess
 
 from .game_problems import GameProblem, GameState
-from .search_utils import (  # noqa: F401  (re-exported for backwards compatibility)
+from .search_utils import (
     DEFAULT_MAX_TT_ENTRIES,
     TTEntry,
     probe_transposition_table,
@@ -33,27 +30,9 @@ from .search_utils import (  # noqa: F401  (re-exported for backwards compatibil
 )
 
 
-def random_moves(game: "GameProblem", state: Any) -> Any:
-    """
-    A player that chooses a legal move at random.
-
-    This strategy function randomly selects one of the available legal moves
-    from the current game state. It provides no strategic consideration and
-    is primarily useful for testing, baseline comparisons, or educational purposes.
-
-    :param game: The game problem instance containing rules and available actions
-    :type game: GameProblem
-    :param state: The current game state to choose a move from
-    :type state: Any
-    :return: A randomly selected legal move
-    :rtype: Any
-    """
-    return random.choice(game.actions(state))
-
-
 class AdversarialSearchResult(NamedTuple):
     """
-    Result of adversarial search (minimax or alpha-beta) containing utility value and best move.
+    Result of adversarial search (alpha-beta) containing utility value and best move.
 
     :param value: The utility value of the position for the searching player
     :type value: float
@@ -63,160 +42,6 @@ class AdversarialSearchResult(NamedTuple):
 
     value: float
     move: Any | None
-
-
-def minimax_search(game: "GameProblem", state: "GameState") -> Any:
-    """
-    Search game tree to determine best move using minimax algorithm.
-
-    The minimax algorithm searches the complete game tree to find the optimal
-    move by assuming both players play perfectly. It alternates between
-    maximizing and minimizing players at each level of the tree.
-
-    :param game: The game problem instance containing rules and utility function
-    :type game: GameProblem
-    :param state: The current game state to analyze
-    :type state: GameState
-    :return: The best move for the current player
-    :rtype: Any
-    """
-    player = state.get_current_player()
-
-    def max_value(state: "GameState") -> AdversarialSearchResult:
-        """
-        Calculate the maximum value achievable from this state.
-
-        :param state: The game state to evaluate
-        :type state: GameState
-        :return: The maximum value and corresponding best move
-        :rtype: AdversarialSearchResult
-        """
-        if game.is_terminal(state):
-            return AdversarialSearchResult(game.utility(state, player), None)
-
-        best_value = float("-inf")
-        best_move = None
-
-        for action in game.actions(state):
-            result = min_value(game.result(state, action))
-            if result.value > best_value:
-                best_value = result.value
-                best_move = action
-
-        return AdversarialSearchResult(best_value, best_move)
-
-    def min_value(state: "GameState") -> AdversarialSearchResult:
-        """
-        Calculate the minimum value achievable from this state.
-
-        :param state: The game state to evaluate
-        :type state: GameState
-        :return: The minimum value and corresponding best move
-        :rtype: AdversarialSearchResult
-        """
-        if game.is_terminal(state):
-            return AdversarialSearchResult(game.utility(state, player), None)
-
-        best_value = float("inf")
-        best_move = None
-
-        for action in game.actions(state):
-            result = max_value(game.result(state, action))
-            if result.value < best_value:
-                best_value = result.value
-                best_move = action
-
-        return AdversarialSearchResult(best_value, best_move)
-
-    search_result = max_value(state)
-    return search_result.move
-
-
-def alphabeta_search(game: "GameProblem", state: "GameState") -> Any:
-    """
-    Search game tree to determine best move using alpha-beta pruning.
-
-    Alpha-beta pruning is an optimization of the minimax algorithm that
-    eliminates branches that cannot possibly influence the final decision.
-    It maintains two values: alpha (best value for maximizing player) and
-    beta (best value for minimizing player) to prune unnecessary branches.
-
-    :param game: The game problem instance containing rules and utility function
-    :type game: GameProblem
-    :param state: The current game state to analyze
-    :type state: GameState
-    :return: The best move for the current player
-    :rtype: Any
-
-    ... see also::
-       Based on Figure 5.7 from "Artificial Intelligence: A Modern Approach"
-    """
-    player = state.get_current_player()
-
-    def max_value(state: "GameState", alpha: float, beta: float) -> AdversarialSearchResult:
-        """
-        Calculate the maximum value achievable from this state with alpha-beta pruning.
-
-        :param state: The game state to evaluate
-        :type state: GameState
-        :param alpha: The best value the maximizing player can guarantee so far
-        :type alpha: float
-        :param beta: The best value the minimizing player can guarantee so far
-        :type beta: float
-        :return: The maximum value and corresponding best move
-        :rtype: AdversarialSearchResult
-        """
-        if game.is_terminal(state):
-            return AdversarialSearchResult(game.utility(state, player), None)
-
-        best_value = float("-inf")
-        best_move = None
-
-        for action in game.actions(state):
-            result = min_value(game.result(state, action), alpha, beta)
-            if result.value > best_value:
-                best_value = result.value
-                best_move = action
-                alpha = max(alpha, best_value)
-
-            if alpha >= beta:
-                return AdversarialSearchResult(best_value, best_move)
-
-        return AdversarialSearchResult(best_value, best_move)
-
-    def min_value(state: "GameState", alpha: float, beta: float) -> AdversarialSearchResult:
-        """
-        Calculate the minimum value achievable from this state with alpha-beta pruning.
-
-        :param state: The game state to evaluate
-        :type state: GameState
-        :param alpha: The best value the maximizing player can guarantee so far
-        :type alpha: float
-        :param beta: The best value the minimizing player can guarantee so far
-        :type beta: float
-        :return: The minimum value and corresponding best move
-        :rtype: AdversarialSearchResult
-        """
-        if game.is_terminal(state):
-            return AdversarialSearchResult(game.utility(state, player), None)
-
-        best_value = float("inf")
-        best_move = None
-
-        for action in game.actions(state):
-            result = max_value(game.result(state, action), alpha, beta)
-            if result.value < best_value:
-                best_value = result.value
-                best_move = action
-                beta = min(beta, best_value)
-
-            if alpha >= beta:
-                return AdversarialSearchResult(best_value, best_move)
-
-        return AdversarialSearchResult(best_value, best_move)
-
-    search_result = max_value(state, float("-inf"), float("inf"))
-    return search_result.move
 
 
 class SearchStatistics(NamedTuple):
@@ -431,7 +256,7 @@ def advanced_heuristic_alphabeta_search(
       search is hard-limited to ``max_depth`` plies;
     * results are cached in ``transposition_table`` and reused by later searches (also by the
       next move of a game);
-    * quiet moves that caused a cut-off are tried first (killer moves), followed by the
+    * moves that caused a cut-off are tried first (killer moves, captures included), followed by the
       optional ``order_moves_callback``;
     * terminal values are adjusted by ``epsilon`` per ply to prefer fast wins and slow losses.
 
@@ -649,6 +474,7 @@ def heuristic_alphabeta_iterative_deepening_search(
     time_limit: float = 2.0,
     noisy_moves: Optional[Callable[[GameState], List[Any]]] = None,
     quiescence_plies: int = 0,
+    max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
 ) -> Tuple[Any, SearchStatistics]:
     """Iterative deepening over :func:`advanced_heuristic_alphabeta_search`.
 
@@ -680,6 +506,8 @@ def heuristic_alphabeta_iterative_deepening_search(
     :type noisy_moves: Optional[Callable[[GameState], List[Any]]]
     :param quiescence_plies: Maximum plies of quiescence search (0 = off)
     :type quiescence_plies: int
+    :param max_tt_entries: Cap on the transposition table size (see the advanced search)
+    :type max_tt_entries: int
     :return: ``(best_move, statistics)`` with node and pruning counts summed over all iterations
     :rtype: Tuple[Any, SearchStatistics]
     """
@@ -718,6 +546,7 @@ def heuristic_alphabeta_iterative_deepening_search(
             start_time=start_time,
             noisy_moves=noisy_moves,
             quiescence_plies=quiescence_plies,
+            max_tt_entries=max_tt_entries,
         )
         iteration_times.append(time.time() - iteration_start)
         total_nodes += stats.nodes_visited

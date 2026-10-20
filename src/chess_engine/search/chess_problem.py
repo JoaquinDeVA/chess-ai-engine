@@ -55,10 +55,10 @@ class ChessProblem(GameProblem):
         :type player: chess.Color
         :return: 1.0 for win, 0.5 for draw, 0.0 for loss
         :rtype: float
-        :raises ValueError: If state is not ChessGameState or not terminal
+        :raises ValueError: If state is not a GameState or not terminal
         """
         if not isinstance(state, GameState) or not state.is_over():
-            raise ValueError("state must be ChessGameState and terminal.")
+            raise ValueError("state must be a terminal GameState.")
 
         if player not in (chess.WHITE, chess.BLACK):
             raise ValueError("player must be chess.WHITE or chess.BLACK.")

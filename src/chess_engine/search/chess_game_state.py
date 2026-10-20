@@ -242,15 +242,6 @@ class ChessGameState(GameState):
         """
         return self.board
 
-    def get_fen(self) -> str:
-        """
-        Get the FEN string representation of the position.
-
-        :return: FEN string of current position
-        :rtype: str
-        """
-        return self.board.fen()
-
     def key(self) -> Hashable:
         """
         Return the hashable identity of the state.

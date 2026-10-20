@@ -7,7 +7,7 @@ python scripts/bench/run_tournament.py --players linear_pst,linear_pst_terms,lin
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
 the number of openings to fit ``--hours``. The games go to ``--out`` (resumable) and the results
 to ``data/reports/TOURNAMENT.md``. The ``tournament`` section of the model cards of the players
-(those that have a card) is updated too.
+(those that have a card) gets one entry per control.
 """
 
 import argparse
@@ -224,12 +224,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_markdown(summary, specs, meta, args.anchor))
     print(f"Wrote {args.report}")
-    if args.max_depth != DEFAULT_MAX_DEPTH:
-        print("Depth-limited match: model cards are not updated.")
-    else:
-        recorded = record_cards(summary, specs, args.anchor, args.base, args.increment)
-        if recorded:
-            print("Model cards updated: " + ", ".join(recorded))
+    recorded = record_cards(
+        summary, specs, args.anchor, args.base, args.increment, max_depth=args.max_depth
+    )
+    if recorded:
+        print("Model cards updated: " + ", ".join(recorded))
     return 0
 
 

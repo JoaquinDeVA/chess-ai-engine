@@ -28,7 +28,7 @@ import chess
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.comparison.tradeoff import HEURISTICS, make_player
 from chess_engine.engine.game_manager import FORFEIT_TERMINATIONS, GameManager
-from chess_engine.models.cards import card_path, update_card
+from chess_engine.models.cards import card_path, load_card, save_card
 from chess_engine.search.time_management import TimeManager
 
 logger = logging.getLogger(__name__)
@@ -607,41 +607,69 @@ def termination_section(summary: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def record_cards(
-    summary: Dict[str, Any], specs: Sequence[str], anchor: str, base: float, increment: float
-) -> List[str]:
-    """Write the ``tournament`` section of the model cards of the players.
+def control_label(base: float, increment: float, max_depth: int = DEFAULT_MAX_DEPTH) -> str:
+    """Key of a tournament in the ``tournament`` section of a card.
 
-    Heuristic players (``h1``) have no card and are skipped; so is a model whose card does
-    not exist yet (cards are written by training, not created here) or that played no game.
+    :param base: Starting clock, in seconds.
+    :param increment: Seconds per move.
+    :param max_depth: Depth limit; a limited match is labelled by its depth, not by its clock.
+    :return: ``depthN`` for a depth-limited match, else ``base+increment`` (e.g. ``60+1``).
+    """
+    if max_depth != DEFAULT_MAX_DEPTH:
+        return f"depth{max_depth}"
+    return f"{base:g}+{increment:g}"
+
+
+def record_cards(
+    summary: Dict[str, Any],
+    specs: Sequence[str],
+    anchor: str,
+    base: float,
+    increment: float,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+) -> List[str]:
+    """Write the entry of this tournament in the ``tournament`` section of the cards.
+
+    The section holds one entry per control (see :func:`control_label`); the other controls
+    are kept. An old flat section (one tournament, with ``base``) is migrated first. A player
+    whose card does not exist yet is skipped (cards are written by training and by
+    ``comparison.evaluate``, not created here), and so is one that played no game.
 
     :param summary: Output of :func:`summarize`.
     :param specs: Players of the tournament.
     :param anchor: Elo anchor of the summary.
     :param base: Starting clock, in seconds.
     :param increment: Seconds per move.
+    :param max_depth: Depth limit of every player.
     :return: The players whose card was updated.
     """
+    label = control_label(base, increment, max_depth)
     recorded = []
     for spec in specs:
         entry = summary["players"].get(spec)
-        if spec in HEURISTICS or not entry or not entry["games"]:
+        if not entry or not entry["games"]:
             continue
         if not card_path(spec).exists():
-            logger.warning("no model card for %s: tournament section not written", spec)
+            if spec not in HEURISTICS:
+                logger.warning("no model card for %s: tournament section not written", spec)
             continue
-        update_card(
-            spec,
-            tournament={
-                "games": entry["games"],
-                "score": entry["score"],
-                "elo": entry["elo"],
-                "elo_interval": entry["elo_interval"],
-                "anchor": anchor,
-                "base": base,
-                "increment": increment,
-            },
-        )
+        card = load_card(spec)
+        section = card.get("tournament") or {}
+        if "base" in section:  # old layout: a single flat tournament
+            old = section
+            section = {control_label(old["base"], old.get("increment", 0.0)): old}
+        section[label] = {
+            "games": entry["games"],
+            "score": entry["score"],
+            "elo": entry["elo"],
+            "elo_interval": entry["elo_interval"],
+            "anchor": anchor,
+            "base": base,
+            "increment": increment,
+            "max_depth": max_depth,
+        }
+        card["tournament"] = section
+        save_card(spec, card)
         recorded.append(spec)
     return recorded
 

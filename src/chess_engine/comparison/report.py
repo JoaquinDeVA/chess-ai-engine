@@ -5,7 +5,9 @@ this module regenerates: ``python -m chess_engine.comparison.report``.
 
 Each row reads the card sections ``accuracy`` and ``cost`` (written by ``comparison.evaluate``),
 ``tradeoff`` (depth and search agreement per time per move, from the profiler) and ``tournament``
-(score and Elo, from the round-robin). A missing section shows a dash.
+(one entry per time control, from the round-robin). Each control that appears in any card gets
+two columns, score and Elo against the anchor: ``600+5`` (10 min + 5 s), ``60+1`` (1 min + 1 s),
+the depth-limited matches (``depthN``) and then any other control. A missing value shows a dash.
 """
 
 from pathlib import Path
@@ -33,9 +35,10 @@ _DASH = "—"
 _HEADER = (
     "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
     "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
-    "Search agreement, 10 s | Score | Elo ± interval |"
+    "Search agreement, 10 s |"
 )
-_ALIGNMENT = "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+_ALIGNMENT = "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+_CONTROL_TITLES = {"600+5": "10 min + 5 s", "60+1": "1 min + 1 s"}
 
 
 def _dig(card: Dict[str, Any], *keys: str) -> Any:
@@ -77,16 +80,64 @@ def _elo(tournament: Dict[str, Any]) -> str:
     return f"{elo:+.0f}" if interval is None else f"{elo:+.0f} ± {interval:.0f}"
 
 
-def _row(card: Dict[str, Any]) -> str:
+def _controls(card: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Tournament entries of a card by control label.
+
+    Accepts the current layout (a dict keyed by label) and the old flat one (a single entry
+    with ``base``), which is read as the label of its own base and increment.
+    """
+    section = card.get("tournament") or {}
+    if "base" in section:
+        label = f"{section['base']:g}+{section.get('increment', 0.0):g}"
+        return {label: section}
+    return section
+
+
+def _control_key(label: str) -> tuple:
+    """Order of the control columns: 10 min + 5 s, 1 min + 1 s, depth N, then the rest."""
+    if label == "600+5":
+        return (0, 0, label)
+    if label == "60+1":
+        return (1, 0, label)
+    if label.startswith("depth") and label[5:].isdigit():
+        return (2, int(label[5:]), label)
+    return (3, 0, label)
+
+
+def _control_title(label: str) -> str:
+    """Column title of a control."""
+    if label in _CONTROL_TITLES:
+        return _CONTROL_TITLES[label]
+    if label.startswith("depth") and label[5:].isdigit():
+        return f"Depth {label[5:]}"
+    return label
+
+
+def _control_labels(cards: List[Dict[str, Any]]) -> List[str]:
+    """Controls that appear in any card, in column order."""
+    return sorted({label for card in cards for label in _controls(card)}, key=_control_key)
+
+
+def _header(labels: List[str]) -> str:
+    """Header line of the table, with two columns per control."""
+    columns = "".join(
+        f" {_control_title(label)}, score % | {_control_title(label)}, Elo vs anchor |"
+        for label in labels
+    )
+    return _HEADER + columns
+
+
+def _row(card: Dict[str, Any], labels: List[str]) -> str:
     """One line of the history table.
 
     :param card: Model card.
+    :param labels: Controls of the table, in column order.
     :return: Markdown table row.
     """
     name = card["name"]
     accuracy = _dig(card, "accuracy", "all") or {}
     non_quiet = _dig(card, "accuracy", "non_quiet") or {}
-    tournament = card.get("tournament") or {}
+    controls = _controls(card)
     tradeoff = card.get("tradeoff") or {}
     best_move = (
         f"{_percent(accuracy.get('best_move_agreement'))} / "
@@ -108,9 +159,11 @@ def _row(card: Dict[str, Any]) -> str:
     ]
     cells += [_number(_dig(tradeoff, seconds, "mean_depth")) for seconds in DEPTH_SECONDS]
     cells.append(_percent(_dig(tradeoff, AGREEMENT_SECONDS, "search_agreement")))
-    score = tournament.get("score")
-    cells.append(_DASH if score is None else f"{score:.1f}%")
-    cells.append(_elo(tournament))
+    for label in labels:
+        tournament = controls.get(label) or {}
+        score = tournament.get("score")
+        cells.append(_DASH if score is None else f"{score:.1f}%")
+        cells.append(_elo(tournament))
     return "| " + " | ".join(cells) + " |"
 
 
@@ -128,7 +181,9 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
         if card.get("status") in _STATUS_ORDER
     ]
     rows.sort(key=lambda card: (card["name"] in ACCURACY_RECORDS, card["name"]))
-    return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
+    labels = _control_labels(rows)
+    alignment = _ALIGNMENT + "---:|---:|" * len(labels)
+    return "\n".join([_header(labels), alignment, *(_row(card, labels) for card in rows)])
 
 
 def update_history_file(path: Optional[Path] = None) -> bool:

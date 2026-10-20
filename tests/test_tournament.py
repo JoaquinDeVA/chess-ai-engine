@@ -292,18 +292,75 @@ def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, 
     assert recorded == ["m"]
     section = cards.load_card("m")["tournament"]
     entry = summary["players"]["m"]
-    assert section == {
-        "games": entry["games"],
-        "score": entry["score"],
-        "elo": entry["elo"],
-        "elo_interval": entry["elo_interval"],
-        "anchor": "h1",
-        "base": 10.0,
-        "increment": 0.1,
-    }
+    assert section == {"10+0.1": _entry(entry, "h1", 10.0, 0.1)}
     assert not cards.card_path("m2").exists() and not cards.card_path("h1").exists()
     row = next(line for line in report.render_tables().splitlines() if "`m`" in line)
     assert f"{entry['score']:.1f}%" in row and "±" in row
+
+
+def _entry(player, anchor, base, increment, max_depth=tournament.DEFAULT_MAX_DEPTH):
+    return {
+        "games": player["games"],
+        "score": player["score"],
+        "elo": player["elo"],
+        "elo_interval": player["elo_interval"],
+        "anchor": anchor,
+        "base": base,
+        "increment": increment,
+        "max_depth": max_depth,
+    }
+
+
+def _two_player_summary():
+    return summarize([game("m", "h1", "white"), game("h1", "m", "white")], anchor="h1")
+
+
+def test_control_label_rule():
+    assert tournament.control_label(60, 1) == "60+1"
+    assert tournament.control_label(600.0, 5.0) == "600+5"
+    assert tournament.control_label(10, 0.1) == "10+0.1"
+    assert tournament.control_label(60, 1, max_depth=3) == "depth3"
+    assert tournament.control_label(60, 1, max_depth=tournament.DEFAULT_MAX_DEPTH) == "60+1"
+
+
+def test_record_cards_keeps_one_entry_per_control(tmp_path, monkeypatch):
+    from chess_engine.models import cards
+
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    cards.update_card("m", status="current")
+    summary = _two_player_summary()
+    tournament.record_cards(summary, ["m", "h1"], "h1", 60, 1)
+    tournament.record_cards(summary, ["m", "h1"], "h1", 600, 5)
+    tournament.record_cards(summary, ["m", "h1"], "h1", 60, 1, max_depth=3)
+    tournament.record_cards(summary, ["m", "h1"], "h1", 60, 1)  # same control: replaced
+    section = cards.load_card("m")["tournament"]
+    assert set(section) == {"60+1", "600+5", "depth3"}
+    assert section["depth3"]["max_depth"] == 3 and section["600+5"]["base"] == 600
+
+
+def test_record_cards_migrates_an_old_flat_section(tmp_path, monkeypatch):
+    from chess_engine.models import cards
+
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    flat = {"games": 8, "score": 55.0, "elo": 10.0, "elo_interval": 5.0,
+            "anchor": "h1", "base": 60.0, "increment": 1.0}  # fmt: skip
+    cards.update_card("m", status="current", tournament=flat)
+    tournament.record_cards(_two_player_summary(), ["m"], "h1", 600, 5)
+    section = cards.load_card("m")["tournament"]
+    assert section["60+1"] == flat
+    assert set(section) == {"60+1", "600+5"}  # no stale flat keys at the top level
+
+
+def test_record_cards_records_h1_only_when_its_card_exists(tmp_path, monkeypatch):
+    from chess_engine.models import cards
+
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    cards.update_card("m", status="current")
+    summary = _two_player_summary()
+    assert tournament.record_cards(summary, ["m", "h1"], "h1", 60, 1) == ["m"]
+    cards.update_card("h1", status="reference")
+    assert tournament.record_cards(summary, ["m", "h1"], "h1", 60, 1) == ["m", "h1"]
+    assert list(cards.load_card("h1")["tournament"]) == ["60+1"]
 
 
 class _FakeStats:

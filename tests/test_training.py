@@ -196,19 +196,69 @@ class TestCardsAndReport:
             accuracy=ACCURACY,
             cost={"us_per_eval": 12.5},
             tradeoff=TRADEOFF,
-            tournament={"games": 400, "score": 56.2, "elo": 43.0, "elo_interval": 24.1},
+            tournament={"600+5": {"games": 400, "score": 56.2, "elo": 43.0, "elo_interval": 24.1}},
         )
         text = report.render_tables()
         header = (
             "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
             "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
-            "Search agreement, 10 s | Score | Elo ± interval |"
+            "Search agreement, 10 s | 10 min + 5 s, score % | 10 min + 5 s, Elo vs anchor |"
         )
         row = (
             f"| `linear_pst` | plays | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
             "34.5% / 28.0% | 12.5 | 1.0 | 3.2 | 6.0 | 40.0% | 56.2% | +43 ± 24 |"
         )
         assert header in text and row in text
+
+    def test_report_orders_controls_and_dashes_missing(self, isolated_cards):
+        def entry(score, elo):
+            return {"score": score, "elo": elo, "elo_interval": 10.0}
+
+        cards.update_card(
+            "a",
+            status="current",
+            tournament={
+                "depth3": entry(70.0, 90.0),
+                "60+1": entry(40.0, -35.0),
+                "5+0": entry(1.0, 2.0),
+            },
+        )
+        cards.update_card("b", status="current", tournament={"600+5": entry(55.0, 20.0)})
+        cards.update_card(
+            "c",
+            status="current",
+            tournament={
+                "base": 60.0,
+                "increment": 1.0,
+                "score": 30.0,
+                "elo": -60.0,
+                "elo_interval": 8.0,
+            },
+        )
+        lines = report.render_tables().splitlines()
+        titles = [t.strip() for t in lines[0].strip("|").split("|")][13:]
+        assert titles == [
+            "10 min + 5 s, score %", "10 min + 5 s, Elo vs anchor",
+            "1 min + 1 s, score %", "1 min + 1 s, Elo vs anchor",
+            "Depth 3, score %", "Depth 3, Elo vs anchor",
+            "5+0, score %", "5+0, Elo vs anchor",
+        ]  # fmt: skip
+        cells = {
+            line.split("|")[1].strip(): [c.strip() for c in line.strip("|").split("|")][13:]
+            for line in lines[2:]
+        }
+        assert cells["`a`"] == [
+            "—",
+            "—",
+            "40.0%",
+            "-35 ± 10",
+            "70.0%",
+            "+90 ± 10",
+            "1.0%",
+            "+2 ± 10",
+        ]
+        assert cells["`b`"] == ["55.0%", "+20 ± 10", *["—"] * 6]
+        assert cells["`c`"] == ["—", "—", "30.0%", "-60 ± 8", *["—"] * 4]  # old flat layout
 
     def test_accuracy_record_models_marked(self, isolated_cards):
         cards.update_card(
@@ -221,12 +271,12 @@ class TestCardsAndReport:
         text = report.render_tables()
         assert (
             "| `mlp_features` | accuracy record | 1,505 | — | — | 0.912 | 0.083 | 34.5% / 28.0% "
-            "| 12.5 | — | — | — | — | — | — |"
+            "| 12.5 | — | — | — | — |"
         ) in text
 
     def test_models_without_sections_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
-        assert f"| `fresh` | plays |{' — |' * 13}" in report.render_tables()
+        assert f"| `fresh` | plays |{' — |' * 11}" in report.render_tables()
 
     def test_history_file_is_updated_between_markers_only(self, isolated_cards):
         path = report.HISTORY_FILE

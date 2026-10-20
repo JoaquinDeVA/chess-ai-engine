@@ -49,7 +49,7 @@ def load_script(relative: str, name: str):
 
 @pytest.fixture(scope="module")
 def fit_script():
-    return load_script("scripts/data/fit_h1.py", "fit_h1")
+    return load_script("scripts/data/fit_h1_weights.py", "fit_h1_weights")
 
 
 @pytest.fixture(autouse=True)
@@ -120,7 +120,7 @@ def test_fit_script_runs_on_fixture_shards(fit_script, tmp_path, capsys):
 
 
 def test_missing_weights_file_raises_with_hint(tmp_path):
-    with pytest.raises(FileNotFoundError, match="scripts/data/fit_h1.py"):
+    with pytest.raises(FileNotFoundError, match="scripts/data/fit_h1_weights.py"):
         load_h1_weights(tmp_path / "absent.json")
 
 
@@ -148,8 +148,8 @@ def test_tradeoff_accepts_h1_spec():
     assert player.eval_function is h1
 
 
-def test_run_tournament_defaults_use_h1_anchor():
-    script = load_script("scripts/bench/run_tournament.py", "run_tournament_h1")
+def test_play_tournament_defaults_use_h1_anchor():
+    script = load_script("scripts/bench/play_tournament.py", "play_tournament_h1")
     assert tournament.ANCHOR == "h1"
     args = script.parse_args([])
     assert args.anchor == "h1"

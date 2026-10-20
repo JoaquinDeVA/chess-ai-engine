@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Scripts renamed to say what they do: `build_raw_shards.py`, `build_sidecars.py`, `fit_h1_weights.py`, `compare_target_representations.py`, `bench_search_speed.py`, `profile_depth_vs_accuracy.py`, `play_tournament.py`, `run_full_pipeline.sh`.
 - Training only reads the raw shards (`--effort`); the CSV path (`--data`, `load_evaluations`,
   `scripts/data/download_lichess_evals.py`, `scripts/data/label_with_stockfish.py`) is removed.
 - One epoch loop for the linear and network models (`run_epochs` in `models/linear_eval.py`).

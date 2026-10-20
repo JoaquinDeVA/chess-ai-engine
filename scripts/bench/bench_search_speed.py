@@ -5,8 +5,8 @@ Prints, per position and bot, the time, nodes visited, nodes per second, deepest
 the chosen move. Time varies between runs, but the chosen move and the node count are
 deterministic, so two runs (for example before and after an optimisation) can be compared:
 
-    python scripts/bench/benchmark_search.py --json docs/benchmarks/search_baseline.json
-    python scripts/bench/benchmark_search.py --compare docs/benchmarks/search_baseline.json
+    python scripts/bench/bench_search_speed.py --json docs/benchmarks/search_baseline.json
+    python scripts/bench/bench_search_speed.py --compare docs/benchmarks/search_baseline.json
 """
 
 import argparse

@@ -12,7 +12,7 @@
 # Tournaments: A) 60+1 anchored at h1; B) 600+5 (the reference) anchored at h1; C) depth 3
 # with no clock, without h1, anchored at linear_pst_terms.
 #
-# Not here: refitting h1 (scripts/data/fit_h1.py). Run it by hand; refitting changes the anchor,
+# Not here: refitting h1 (scripts/data/fit_h1_weights.py). Run it by hand; refitting changes the anchor,
 # so every result measured against the old h1 would stop being comparable.
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
@@ -21,8 +21,8 @@
 # STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/pipeline),
 # PYTHON (.venv/bin/python if it exists, else python).
 #
-#   Dry run:   DRY_RUN=1 bash scripts/run_all.sh
-#   Real run:  nohup setsid bash scripts/run_all.sh > data/pipeline.log 2>&1 &
+#   Dry run:   DRY_RUN=1 bash scripts/run_full_pipeline.sh
+#   Real run:  nohup setsid bash scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -69,7 +69,7 @@ present_models() {
 join() { local IFS=,; echo "$*"; }
 
 step_sidecars() {
-  run "$PYTHON" scripts/data/prepare_dataset.py --raw "$RAW" --out "$SIDECAR"
+  run "$PYTHON" scripts/data/build_sidecars.py --raw "$RAW" --out "$SIDECAR"
 }
 
 step_train() {
@@ -103,7 +103,7 @@ step_evaluate() {
 step_profile() {
   local players
   players="$(join $(present_models) h1)"
-  run "$PYTHON" scripts/bench/profile_tradeoff.py --players "$players" \
+  run "$PYTHON" scripts/bench/profile_depth_vs_accuracy.py --players "$players" \
     --seconds "$PROFILE_SECONDS" --positions "$PROFILE_POSITIONS" --parallel 1 \
     --raw "$RAW" --sidecar "$SIDECAR"
 }
@@ -114,17 +114,17 @@ step_tournaments() {
   without_h1="$(join $(present_models))"
   [ "$DRY_RUN" = 1 ] || mkdir -p data/tournament data/reports
   # A) short control
-  run "$PYTHON" scripts/bench/run_tournament.py --players "$with_h1" --anchor h1 \
+  run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
     --base 60 --increment 1 --openings 10 --workers "$WORKERS" \
     --out data/tournament/short.jsonl --logs data/tournament/short \
     --report data/reports/TOURNAMENT_60+1.md
   # B) reference control
-  run "$PYTHON" scripts/bench/run_tournament.py --players "$with_h1" --anchor h1 \
+  run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
     --base 600 --increment 5 --openings 5 --workers "$WORKERS" \
     --out data/tournament/reference.jsonl --logs data/tournament/reference \
     --report data/reports/TOURNAMENT_600+5.md
   # C) equal depth 3, no h1
-  run "$PYTHON" scripts/bench/run_tournament.py --players "$without_h1" --anchor linear_pst_terms \
+  run "$PYTHON" scripts/bench/play_tournament.py --players "$without_h1" --anchor linear_pst_terms \
     --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" \
     --out data/tournament/depth3.jsonl --logs data/tournament/depth3 \
     --report data/reports/TOURNAMENT_depth3.md

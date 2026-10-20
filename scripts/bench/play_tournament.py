@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round-robin at equal time per move: calibrate, play, and write the report.
 
-python scripts/bench/run_tournament.py --players linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1 \
+python scripts/bench/play_tournament.py --players linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1 \
     --base 10 --increment 0.1 --workers 5 --hours 10 --out data/tournament/games.jsonl
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes

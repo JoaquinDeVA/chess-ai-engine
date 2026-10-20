@@ -3,7 +3,7 @@
 ``h1`` has the signature ``(state, player) -> float`` and returns the expected outcome for
 ``player`` in ``[0.01, 0.99]`` (terminal values are 0, 0.5 and 1, so a heuristic value never
 outranks a real win). It is a linear combination of six normalized position features whose
-weights are fitted to Stockfish evaluations (see ``scripts/data/fit_h1.py``).
+weights are fitted to Stockfish evaluations (see ``scripts/data/fit_h1_weights.py``).
 """
 
 import json
@@ -29,7 +29,7 @@ FEATURE_NAMES = (
 #: Lowest/highest value a heuristic may return, to stay clear of the terminal values 0 and 1.
 HEURISTIC_MARGIN = 1e-2
 
-#: Versioned JSON file with the weights of :func:`h1`, written by ``scripts/data/fit_h1.py``.
+#: Versioned JSON file with the weights of :func:`h1`, written by ``scripts/data/fit_h1_weights.py``.
 H1_WEIGHTS_PATH = Path(__file__).with_name("h1_weights.json")
 
 _H1_CACHE: Dict[str, Dict[str, float]] = {}
@@ -50,7 +50,7 @@ def load_h1_weights(path: Optional[Path] = None) -> Dict[str, float]:
     if key not in _H1_CACHE:
         if not location.exists():
             raise FileNotFoundError(
-                f"{location} not found: fit it with scripts/data/fit_h1.py first"
+                f"{location} not found: fit it with scripts/data/fit_h1_weights.py first"
             )
         weights = json.loads(location.read_text())["weights"]
         if set(weights) != set(FEATURE_NAMES):

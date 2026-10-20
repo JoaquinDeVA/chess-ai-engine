@@ -75,7 +75,7 @@ def bakeoff_fixture(raw: Path, side: Path, count: int = 1500) -> None:
 
 
 def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
-    module = load_script("bakeoff_representation")
+    module = load_script("compare_target_representations")
     raw, side = tmp_path / "raw", tmp_path / "side"
     bakeoff_fixture(raw, side)
     variant = next(v for v in module.VARIANTS if v.min_depth == 20)
@@ -85,15 +85,15 @@ def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
     assert all((b["depth"] >= 20).all() for b in batches)
 
 
-SCRIPT = ROOT / "scripts" / "run_all.sh"
+SCRIPT = ROOT / "scripts" / "run_full_pipeline.sh"
 PIPELINE_MODELS = "linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst"
 
 
-def test_run_all_is_valid_bash():
+def test_run_full_pipeline_is_valid_bash():
     subprocess.run(["bash", "-n", str(SCRIPT)], check=True)
 
 
-def test_run_all_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
+def test_run_full_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
     state = tmp_path / "state"
     env = {**os.environ, "DRY_RUN": "1", "STATE_DIR": str(state)}
     result = subprocess.run(

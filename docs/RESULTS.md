@@ -59,14 +59,14 @@ descartado se cuenta en los metadatos del shard (`dropped`, `illegal`).
 aria2c -x 4 -s 4 -k 64M --continue=true --auto-file-renaming=false --file-allocation=none \
     --max-tries=0 --retry-wait=30 -d data/lichess -o lichess_db_eval.jsonl.zst \
     https://database.lichess.org/lichess_db_eval.jsonl.zst
-python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst \
+python scripts/data/build_raw_shards.py --input data/lichess/lichess_db_eval.jsonl.zst \
     --output-dir data/lichess/raw --log-file data/lichess/progress.log
 
 # 2. sidecars (los shards que ya tienen sidecar se saltan)
-python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
+python scripts/data/build_sidecars.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
 ```
 
-Opciones útiles de `fetch_lichess_raw.py`: `--rows` (solo las primeras N líneas), `--shard-rows`
+Opciones útiles de `build_raw_shards.py`: `--rows` (solo las primeras N líneas), `--shard-rows`
 (por defecto 1,000,000), `--workers`, `--url` (en lugar de `--input`, lee por HTTP, más lento y
 frágil). Cada shard se escribe en un `.tmp` y se renombra, así que existe completo o no existe;
 repetir el comando salta los shards terminados. El `.zst` descargado (22.4 GB) es temporal: se
@@ -140,7 +140,7 @@ Ninguna partida acabó por forfeit, tiempo o jugada ilegal (0 de 100). Terminaci
 mate, 12 triple repetición, 1 cincuenta jugadas, 1 material insuficiente.
 
 ```bash
-python scripts/bench/run_tournament.py --players linear_pst_terms,linear_pst_terms@mates10 \
+python scripts/bench/play_tournament.py --players linear_pst_terms,linear_pst_terms@mates10 \
     --anchor linear_pst_terms --openings 50 --workers 5 --base 60 --increment 1
 ```
 
@@ -215,10 +215,10 @@ apertura, colores cambiados), sin partidas perdidas por forfeit. Puntuación = v
 | `linear_king_bucket` | 42.5 |
 
 ```bash
-python scripts/bench/run_tournament.py --players h1,linear_material,linear_pst,linear_pst_terms,linear_king_bucket,net4_pst \
+python scripts/bench/play_tournament.py --players h1,linear_material,linear_pst,linear_pst_terms,linear_king_bucket,net4_pst \
     --anchor h1 --base 60 --increment 1 --workers 5 --openings 10 \
     --out data/tournament/games_20.jsonl --report TOURNAMENT_20.md --logs data/tournament/games_20
-python scripts/bench/run_tournament.py --players linear_material,net4_pst,linear_king_bucket \
+python scripts/bench/play_tournament.py --players linear_material,net4_pst,linear_king_bucket \
     --anchor linear_material --base 60 --increment 1 --workers 5 --openings 25 \
     --out data/tournament/games_50.jsonl --report TOURNAMENT_50.md --logs data/tournament/games_50
 ```
@@ -245,7 +245,7 @@ ventaja de `linear_material` a tiempo fijo es, por tanto, de velocidad y no de e
 solo cubre profundidad 3 y 1 s por jugada; no se ha medido el cruce con profundidades mayores.
 
 ```bash
-python scripts/bench/run_tournament.py --players linear_material,linear_pst_terms,linear_pst \
+python scripts/bench/play_tournament.py --players linear_material,linear_pst_terms,linear_pst \
     --anchor linear_pst_terms --max-depth 3 --base 600 --increment 0 --openings 50 --workers 5 \
     --out data/tournament/depth3.jsonl --report data/reports/DEPTH3.md
 ```

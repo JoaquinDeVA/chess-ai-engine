@@ -213,8 +213,8 @@ def test_truncated_multibyte_character_is_a_truncated_line(tmp_path, caplog):
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "bench" / "run_tournament.py"
-    spec = importlib.util.spec_from_file_location("run_tournament", path)
+    path = Path(__file__).resolve().parent.parent / "scripts" / "bench" / "play_tournament.py"
+    spec = importlib.util.spec_from_file_location("play_tournament", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

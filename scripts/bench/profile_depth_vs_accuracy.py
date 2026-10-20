@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Profile search depth against search accuracy at a fixed time per move.
 
-python scripts/bench/profile_tradeoff.py --players linear_pst,h1 --seconds 1,3,10 --positions 300
+python scripts/bench/profile_depth_vs_accuracy.py --players linear_pst,h1 --seconds 1,3,10 --positions 300
 
 Use ``--parallel 1`` (the default) for published numbers: parallel workers are limited to one
 thread each but still compete for the machine.

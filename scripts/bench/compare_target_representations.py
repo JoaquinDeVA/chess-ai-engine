@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Representation bake-off: which target, point of view and training subset suit linear_pst.
 
-python scripts/bench/bakeoff_representation.py --train-positions 5000000 --test-positions 200000 \
+python scripts/bench/compare_target_representations.py --train-positions 5000000 --test-positions 200000 \
     --effort 30 --tiebreak-games 200 --out data/reports/bakeoff.json
 
 Every variant changes one axis of the default representation and is trained as a tagged model

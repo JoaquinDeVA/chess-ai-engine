@@ -1,75 +1,66 @@
 # Changelog
 
+All notable changes. The newest are first; `Unreleased` is the work since version 1.0.0.
+
 ## Unreleased
 
-- Scripts renamed to say what they do: `build_raw_shards.py`, `build_sidecars.py`, `fit_h1_weights.py`, `compare_target_representations.py`, `bench_search_speed.py`, `profile_depth_vs_accuracy.py`, `play_tournament.py`, `run_full_pipeline.sh`.
-- Training only reads the raw shards (`--effort`); the CSV path (`--data`, `load_evaluations`,
-  `scripts/data/download_lichess_evals.py`, `scripts/data/label_with_stockfish.py`) is removed.
-- One epoch loop for the linear and network models (`run_epochs` in `models/linear_eval.py`).
-- Shared defaults in `training/spec.py` (sample seed, mate share, name suffix).
-- The generated tables go to `docs/RESULTS.md` (was a `MODELS_HISTORY.md` that no longer existed); the
-  tournament, trade-off and bake-off reports are written to `data/reports/`.
-- Measured `linear_material` at effort 90: no gain over effort 15 (see `docs/RESULTS.md`).
-
-- `h1` replaces the heuristics `h2`, `h3` and `h4`: the features of the old `h3` with weights fitted to
-  Stockfish (`h1_weights.json`, `scripts/data/fit_h1.py`). `h1` is the Elo anchor.
-- Removed the models `ridge_features` and `cnn_light`; recoverable from git history at the commit `e849d32`.
-- Models renamed: `linear_material`, `linear_pst`, `linear_pst_terms`, `linear_king_bucket`, `net4_pst`.
-- Effort is one million positions per point (`--effort 15` = 15 M positions, `1 + effort // 10` epochs).
-- Quiescence search is on by default for the search bots (4 plies; `quiescence_plies=0` turns it off).
-- Removed the Prolog pattern detector and its documentation.
-- New docs layout: five public pages plus the index (`README`, `ARCHITECTURE`, `SEARCH_ALGORITHMS`,
-  `ADDING_A_MODEL`, `RESULTS`); `ADDING_A_BOT`, `ROADMAP`, `TACTICAL_PATTERNS` and `docs/training/*` merged or removed.
-- Per-move logs of the tournament games (`--logs`).
-- New flags: `--seed` (seed of the TRAIN sample) in the training CLI and `--openings` in `run_tournament.py`.
-- The agent vault (`vault/`) is no longer versioned: it stays local and is git-ignored.
-
 ### Added
-- Linear evaluation models trained from the raw Lichess evaluations at an effort level 0-100
-  (`training.train --effort`): `material_linear`, `pst_tapered` and `pst_terms`. The command prints
-  the chosen configuration and an estimated duration before training.
-- `comparison/judge.py`: Spearman, mean absolute error on the expected-score scale and best-move
-  agreement with Stockfish, for all, quiet and non-quiet positions.
-- Depth-accuracy profiler at a fixed time per move (`comparison/tradeoff.py`,
-  `scripts/bench/profile_tradeoff.py`).
-- Round-robin tournament at equal time per move with paired openings, scores and Elo
-  (`comparison/tournament.py`, `scripts/bench/run_tournament.py`).
-- Raw data pipeline: Lichess dump converted to sharded Parquet (`scripts/data/fetch_lichess_raw.py`,
-  `training/lichess_raw.py`), sidecars with split and quiet flag (`scripts/data/prepare_dataset.py`,
-  `training/sidecar.py`), and a seeded sampler.
-- `scripts/bench/benchmark_search.py`: fixed-depth search benchmark that checks the chosen moves and node
-  counts between two runs.
-- Model cards carry accuracy, cost, trade-off and tournament sections; `MODELS_HISTORY.md` is
-  generated from them.
-- `tests/test_docs.py` checks the relative links, the `python -m chess_engine.*` commands and the
-  `scripts/` paths quoted in the documentation; the slow tests are marked `slow`.
-- Search speed-ups: fast transposition key and make/unmake in the advanced search, fast terminal
-  detection with the same draw rules.
-
-### Removed
-- `RandomBot`, `HeuristicAlphaBetaBot`, `MLBot`, `TacticalAlphaBetaBot`, `NonTacticalAlphaBetaBot`
-  and the `FixedDepthBot` base. `PrologPatternDetector` moved to `knowledge/pattern_detector.py`.
-- `linear_baseline`, superseded by `material_linear`.
-- `scripts/plot_models.py` (it read the legacy benchmark section of the cards).
-- The strength matches in `comparison.evaluate` and the "Playing strength" column: playing strength
-  now comes from the round-robin tournament.
+- **Training on the Lichess evaluation database.** The dump becomes raw Parquet shards
+  (`scripts/data/build_raw_shards.py`) with sidecars for the split, the quiet flag and the side to move
+  (`scripts/data/build_sidecars.py`), and a seeded sampler. `python -m chess_engine.training.train --effort N` trains on
+  N million positions (`1 + N // 10` epochs), prints the configuration and an estimated duration first, can decay the
+  learning rate on a plateau (`--lr-decay`) and caches the encoded batches on disk (`--no-cache` turns it off).
+- **Evaluation models.** Four logistic models over sparse features (`linear_material`, `linear_pst`, `linear_pst_terms`,
+  `linear_king_bucket`) and a four-layer network (`net4_pst`); `h1`, a hand-written heuristic whose six weights are fitted
+  to Stockfish (`scripts/data/fit_h1_weights.py`). Each model has a card in `models/cards/`.
+- **Search.** Quiescence search (on by default, 4 plies), transposition table, killer moves, MVV-LVA move ordering,
+  make/unmake on one state with fast transposition keys, fast terminal detection, and an iterative deepening that always
+  completes depth 3 (`min_depth`).
+- **Comparison tools.** `comparison/judge.py` (Spearman, mean absolute error and best-move agreement against Stockfish),
+  `scripts/bench/profile_depth_vs_accuracy.py` (depth and agreement at a fixed time per move),
+  `scripts/bench/play_tournament.py` (round robin at equal time, paired openings, Elo against an anchor, per-move logs,
+  `--max-depth` for fixed-depth matches), `scripts/bench/compare_quiescence.py`, `scripts/bench/compare_search_features.py`
+  (what each search technique saves), `scripts/bench/bench_search_speed.py`.
+- **`scripts/run_full_pipeline.sh`**, the reproducible flow from the sidecars to the results table: resumable steps,
+  `DRY_RUN=1` to preview the commands.
+- **Documentation** in English: README, architecture, search algorithms, data and training, models, results and the guide to
+  adding a model. `tests/test_docs.py` checks the links, the commands and the script paths they quote.
 
 ### Changed
-- `scripts/run_all.sh` runs the whole flow: sidecars, the linear models at `EFFORT`, evaluation of
-  every model, depth profile, tournament, models table.
-- `comparison.evaluate` judges every model on a fixed test sample (200,000 positions of the raw
-  shards); the CSV benchmark stays available with `--data`.
-- Code moved to an installable package in `src/chess_engine/` (`adversarial_search` is now
-  `chess_engine.search`); module commands are `python -m chess_engine.training.train` and
-  `python -m chess_engine.comparison.{evaluate,report}`.
-  `ROADMAP.md` moved to `docs/`, `TRAINING_TASKS.md` and `MODELS_HISTORY.md` to `docs/training/`.
-- Comparison tools (`judge`, `tradeoff`, `tournament`, `evaluate`, `report`, `metrics`) moved from
-  `training` to `chess_engine.comparison`; the model cards module moved to `chess_engine.models.cards`.
-  `training` no longer depends on `comparison`.
-- Scripts are grouped by purpose: `scripts/data/`, `scripts/bench/`, `scripts/docs/`; `run_all.sh`
-  stays in `scripts/`.
-- `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now
-  `IterativeModelBookBot`. Strength matches play against the classical heuristic only.
+- The default training keeps 10 % of the mate positions; the 100 % variant is `--mate-keep 1.0 --tag mates100`. The default
+  representation name no longer carries a `-mates10` suffix.
+- A model card keeps one tournament entry per time control (`60+1`, `600+5`, `depth3`), and retraining clears the
+  measurements of the previous model.
+- `evaluate` also judges `h1`.
+- Scripts were renamed to say what they do: `build_raw_shards.py`, `build_sidecars.py`, `fit_h1_weights.py`,
+  `compare_target_representations.py`, `bench_search_speed.py`, `profile_depth_vs_accuracy.py`, `play_tournament.py`,
+  `run_full_pipeline.sh`.
+- Models are presented with a full name in the documentation (for example "Material logistic model") and keep the short
+  identifier in the code (`linear_material`).
+- `h1` replaces the heuristics `h2`, `h3` and `h4`. The models `ridge_features` and `cnn_light` were removed (recoverable
+  from commit `e849d32`).
+- Code lives in an installable package, `src/chess_engine/` (`adversarial_search` became `chess_engine.search`).
+  `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now `IterativeModelBookBot`.
+
+### Removed
+- The Prolog pattern detector and its documentation (no bot used it), the CSV training path (`--data`, `load_evaluations`,
+  the CSV download and labelling scripts), `comparison/metrics.py`, `training/stockfish.py`, the TOML configurations of the
+  course models, the plain `minimax_search` / `alphabeta_search` / `random_moves`, and unused helpers of the game manager,
+  the bot registry and the opening book.
+- The simple bots (`RandomBot`, `HeuristicAlphaBetaBot`, `MLBot`, `TacticalAlphaBetaBot`, `NonTacticalAlphaBetaBot`) and the
+  `FixedDepthBot` base; the model `linear_baseline`.
+- The vault (`vault/`) is no longer versioned: it stays local.
+
+### Fixed
+- The iterative deepening could stop at depth 2 with most of the time budget unused (12 % of the moves of a
+  10 min + 5 s tournament): the rule that predicted the next iteration squared a ratio that reaches thousands when the
+  first iteration lasts microseconds. The rule is bounded now (`geometric_growth`; the old one stays selectable as
+  `ratio_squared`) and depth 3 is always completed.
+- The CI failed because the tests of the course models needed `*.keras` files that are not versioned; those tests now skip
+  when the files are absent.
+- `--epochs` was ignored when training by effort, and the bot option `max_tt_entries` never reached the search.
+- Wrong help texts in `main.py`, Ctrl-C was swallowed by the human player, and the default tournament report paths pointed to
+  a folder that did not exist.
 
 ## 1.0.0
 

@@ -188,7 +188,7 @@ posición se juega con y sin quiescencia). Registros locales: `.superpowers/nigh
 
 En `linear_pst_terms` (rejilla): profundidad 2 con quiescencia 4 supera a profundidad 3 sin ella
 (+0.037, SE 0.013) con la mitad de tiempo (0.081 s frente a 0.188 s por jugada). Detalle del
-algoritmo en [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md).
+algoritmo en [ALGORITHMS.md](ALGORITHMS.md).
 
 ## Torneo
 

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import chess
+import chess.engine
 
 API = "https://lichess.org/api/cloud-eval"
 #: Score of a forced mate, minus the moves it takes.
@@ -54,6 +55,31 @@ def fetch_cloud_eval(fen: str, lines: int, pause: float = 2.0) -> Optional[dict]
                 continue
             raise
     raise RuntimeError("the cloud evaluation keeps refusing requests (HTTP 429)")
+
+
+def local_engine_fetch(engine, depth: int) -> Fetch:
+    """Build a fetch function that asks a local UCI engine (no request limit).
+
+    :param engine: An open ``chess.engine.SimpleEngine``.
+    :param depth: Search depth for each question.
+    :return: Function ``(fen, lines) -> answer`` with the same shape as the cloud answer.
+    """
+
+    def fetch(fen: str, lines: int) -> Optional[dict]:
+        board = chess.Board(fen)
+        infos = engine.analyse(board, chess.engine.Limit(depth=depth), multipv=lines)
+        pvs = []
+        for info in infos:
+            score = info["score"].pov(board.turn)
+            line = {"moves": " ".join(m.uci() for m in info["pv"][:1])}
+            if score.is_mate():
+                line["mate"] = score.mate()
+            else:
+                line["cp"] = score.score()
+            pvs.append(line)
+        return {"pvs": pvs}
+
+    return fetch
 
 
 def line_score(line: dict) -> float:
@@ -180,6 +206,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--out", type=Path, help="where --prune writes the book")
     parser.add_argument(
+        "--engine", help="path of a local UCI engine (e.g. /usr/games/stockfish) instead of Lichess"
+    )
+    parser.add_argument("--depth", type=int, default=18, help="depth of the local engine")
+    parser.add_argument(
         "--cache",
         type=Path,
         default=Path("data/reports/opening_book_check_cache.jsonl"),
@@ -189,26 +219,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Judge the sample and write the report.
+def write_report(args: argparse.Namespace, book: Dict[str, str], result: Dict[str, object]) -> int:
+    """Write the report (and the pruned book if asked).
 
-    :param argv: Command-line arguments.
+    :param args: Parsed arguments.
+    :param book: The book that was checked.
+    :param result: Output of :func:`check_book`.
     :return: Process exit code.
     """
-    args = parse_args(argv)
-    book = json.loads(args.book.read_text(encoding="utf-8"))
-    cache = load_cache(args.cache)
-
-    def fetch(fen: str, lines: int) -> Optional[dict]:
-        key = f"{lines}|{fen}"
-        if key not in cache:
-            cache[key] = fetch_cloud_eval(fen, lines, args.pause)
-            args.cache.parent.mkdir(parents=True, exist_ok=True)
-            with open(args.cache, "a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"key": key, "answer": cache[key]}) + "\n")
-        return cache[key]
-
-    result = check_book(book, args.fraction, args.seed, args.margin, fetch)
     judged, failed = result["judged"], result["failed"]
     passed = (judged - len(failed) + result["illegal"]) / judged if judged else 0.0
     lines = [
@@ -235,6 +253,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.report.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Judge the sample and write the report.
+
+    :param argv: Command-line arguments.
+    :return: Process exit code.
+    """
+    args = parse_args(argv)
+    book = json.loads(args.book.read_text(encoding="utf-8"))
+    if args.engine:
+        with chess.engine.SimpleEngine.popen_uci(args.engine) as engine:
+            engine.configure({"Threads": 2})
+            result = check_book(
+                book, args.fraction, args.seed, args.margin, local_engine_fetch(engine, args.depth)
+            )
+        return write_report(args, book, result)
+    cache = load_cache(args.cache)
+
+    def fetch(fen: str, lines: int) -> Optional[dict]:
+        key = f"{lines}|{fen}"
+        if key not in cache:
+            cache[key] = fetch_cloud_eval(fen, lines, args.pause)
+            args.cache.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.cache, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps({"key": key, "answer": cache[key]}) + "\n")
+        return cache[key]
+
+    result = check_book(book, args.fraction, args.seed, args.margin, fetch)
+    return write_report(args, book, result)
 
 
 if __name__ == "__main__":

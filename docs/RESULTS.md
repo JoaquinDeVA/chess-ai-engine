@@ -258,18 +258,19 @@ El torneo a profundidad fija no actualiza las fichas de modelo. Medición de vel
 Generada por `python -m chess_engine.comparison.report` a partir de las fichas; no se edita a mano.
 
 <!-- BEGIN GENERATED TABLES -->
-| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | Score | Elo ± interval |
-|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `linear_king_bucket` | plays | 10,369 | winprob-k0.00368-stm-all | 15 | 0.609 | 0.143 | 17.9% / 47.1% | 35.2 | — | — | — | — | 59.0% | +134 ± 67 |
-| `linear_material` | plays | 6 | winprob-k0.00368-stm-all | 15 | 0.475 | 0.156 | 19.1% / 54.9% | 21.0 | — | — | — | — | 69.0% | +198 ± 72 |
-| `linear_material@e90` | plays | 6 | winprob-k0.00368-stm-all-mates10 | 90 | 0.474 | 0.158 | 19.1% / 54.9% | 22.1 | — | — | — | — | — | — |
-| `linear_pst` | plays | 769 | winprob-k0.00368-stm-all | 15 | 0.623 | 0.137 | 18.8% / 50.6% | 57.2 | — | — | — | — | 48.5% | +70 ± 66 |
-| `linear_pst_terms` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 15 | 0.646 | 0.133 | 20.0% / 54.4% | 114.7 | — | — | — | — | 71.0% | +156 ± 70 |
-| `linear_pst_terms@e30` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 30 | — | — | — | — | — | — | — | — | — | — |
-| `linear_pst_terms@mates10s7` | plays | 791 | winprob-k0.00368-stm-all-mates10 | 15 | 0.650 | 0.132 | 20.2% / 54.8% | 118.5 | — | — | — | — | — | — |
-| `linear_pst_terms@quiet` | plays | 791 | winprob-k0.00368-stm-quiet | 15 | 0.651 | 0.128 | 19.8% / 53.5% | 117.1 | — | — | — | — | — | — |
-| `linear_pst_terms@s7` | plays | 791 | winprob-k0.00368-stm-all | 15 | 0.645 | 0.131 | 18.4% / 49.1% | 115.2 | — | — | — | — | — | — |
-| `net4_pst` | plays | 206,177 | winprob-k0.00368-stm-all | 15 | 0.627 | 0.133 | 18.9% / 48.1% | 68.4 | — | — | — | — | 49.0% | +73 ± 64 |
-| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — | — | — |
-| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — | — | — |
+| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `h1` | plays | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 190.1 | — | — | — | — |
+| `linear_king_bucket` | plays | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 24.9 | — | — | — | — |
+| `linear_material` | plays | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 19.6 | — | — | — | — |
+| `linear_material@e90` | plays | 6 | winprob-k0.00368-stm-all | 90 | 0.474 | 0.158 | 19.1% / 54.9% | 22.1 | — | — | — | — |
+| `linear_pst` | plays | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 44.4 | — | — | — | — |
+| `linear_pst_terms` | plays | 791 | winprob-k0.00368-stm-all | 30 | 0.648 | 0.132 | 20.0% / 54.0% | 113.2 | — | — | — | — |
+| `linear_pst_terms@e30` | plays | 791 | winprob-k0.00368-stm-all | 30 | — | — | — | — | — | — | — | — |
+| `linear_pst_terms@mates10s7` | plays | 791 | winprob-k0.00368-stm-all | 15 | 0.650 | 0.132 | 20.2% / 54.8% | 118.5 | — | — | — | — |
+| `linear_pst_terms@quiet` | plays | 791 | winprob-k0.00368-stm-quiet-mates100 | 15 | 0.651 | 0.128 | 19.8% / 53.5% | 117.1 | — | — | — | — |
+| `linear_pst_terms@s7` | plays | 791 | winprob-k0.00368-stm-all-mates100 | 15 | 0.645 | 0.131 | 18.4% / 49.1% | 115.2 | — | — | — | — |
+| `net4_pst` | plays | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 46.1 | — | — | — | — |
+| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — |
+| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — |
 <!-- END GENERATED TABLES -->

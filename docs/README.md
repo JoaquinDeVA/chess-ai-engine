@@ -1,36 +1,32 @@
-# Documentación
+# Documentation
 
-> **Qué es:** Índice único de la documentación del motor.
+> **What it is:** The index of every page, in the order a newcomer should read them.
 >
-> **Cuándo leerla:** Cuando buscas una página concreta o no sabes por dónde empezar.
+> **Read it when:** You do not know where to start, or you look for one specific page.
 >
-> **Siguiente paso:** [ARCHITECTURE.md](ARCHITECTURE.md)
+> **Next:** [Architecture](ARCHITECTURE.md)
 
-## Empieza aquí
+The project is a chess engine written in Python: an alpha-beta search that asks an evaluation
+function how good a position is. The functions it can ask range from a hand-written heuristic
+to logistic models and a small neural network trained to imitate Stockfish on 125 million
+positions. The pages below tell, in this order, how the engine is put together, how it searches,
+where the training data comes from, what each model contains and what was measured.
 
-| Página | Para qué | Cuándo leerla |
+| Page | What you learn | Read it when |
 |---|---|---|
-| [README raíz](../README.md) | Instalación y los comandos para jugar, enfrentar bots y lanzar torneos | La primera vez que abres el repo |
+| [Architecture](ARCHITECTURE.md) | The packages, what depends on what, the path of one move | You are about to change the code |
+| [Search algorithms](ALGORITHMS.md) | The alpha-beta search and, one section each, every technique added on top of it, with what it saved | You want to know how the engine chooses a move |
+| [Data and training](DATA_AND_TRAINING.md) | The Lichess evaluation database, the shards, the targets, the effort scale, how to retrain | You want to rebuild the data or train a model |
+| [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns | You want to understand a model before reading its numbers |
+| [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained | You want to compare models or repeat a measurement |
+| [Adding an evaluation model](ADDING_A_MODEL.md) | The few classes a new model needs, and the commands that train and measure it | You want to add a model of your own |
 
-## Usar el motor
+The installation and the commands to play are in the [README of the repository](../README.md).
+The history of changes is in the [changelog](../CHANGELOG.md).
 
-| Página | Para qué | Cuándo leerla |
-|---|---|---|
-| [README raíz](../README.md) | `main.py`: partida contra un bot, bot contra bot, torneo, `--list-bots` | Para jugar o lanzar un torneo |
-| [RESULTS.md](RESULTS.md) | Qué modelo juega mejor y con qué comandos se midió | Para elegir el modelo de un bot |
+## How the pages are kept
 
-## Entender el diseño
-
-| Página | Para qué | Cuándo leerla |
-|---|---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Paquetes, dependencias entre capas, vida de una jugada y cómo añadir un bot | Antes de tocar el código |
-| [SEARCH_ALGORITHMS.md](SEARCH_ALGORITHMS.md) | Minimax, alfa-beta, profundización iterativa y quiescencia | Para entender cómo se elige una jugada |
-
-## Modelos y resultados
-
-| Página | Para qué | Cuándo leerla |
-|---|---|---|
-| [ADDING_A_MODEL.md](ADDING_A_MODEL.md) | Crear, entrenar y medir un modelo de evaluación | Al añadir un modelo |
-| [RESULTS.md](RESULTS.md) | Datos, escala de esfuerzo, juez estático, quiescencia, torneo y discrepancia abierta | Para comparar modelos o repetir una medición |
-
-Las decisiones y el glosario de trabajo viven en `vault/`, que es local y no se versiona.
+A change of behaviour updates its page in the same commit. The models table in `RESULTS.md` is
+generated from the model cards (`python -m chess_engine.comparison.report`) and is never edited
+by hand. Every number in these pages is followed by the command or the file it comes from, and
+`tests/test_docs.py` checks that the links, the commands and the script paths they quote exist.

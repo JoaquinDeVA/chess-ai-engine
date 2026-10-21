@@ -1,72 +1,106 @@
 # Chess AI Engine
 
-> **Qué es:** Punto de entrada: qué es el motor, cómo instalarlo y los tres comandos para usarlo.
->
-> **Cuándo leerla:** La primera vez que abres el repositorio.
->
-> **Siguiente paso:** [Índice de la documentación](docs/README.md)
-
-Motor de ajedrez en Python basado en búsqueda adversaria: minimax, poda alfa-beta y profundización
-iterativa con control de reloj. Evalúa posiciones con heurísticas a mano o con modelos entrenados para
-imitar a Stockfish, y trae gestor de partidas, torneos y un marco para añadir bots y modelos nuevos.
+A chess engine in Python. It searches with alpha-beta and asks an evaluation function how good each
+position is. The evaluation can be a hand-written heuristic, a logistic model or a small neural
+network trained to imitate Stockfish on 125 million positions of the Lichess evaluation database.
+The repository also holds the whole experiment: the data pipeline, the training, the tools that
+compare the models and the results, with the commands that reproduce them.
 
 [![CI](https://github.com/JoaquinDeVA/chess-ai-engine/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Code style](https://img.shields.io/badge/code%20style-ruff-261230)
 
-## Instalación
+## What it found
 
-Python 3.11 o superior.
+TODO-HEADLINE
+
+## What is inside
+
+| You want to | Read |
+|---|---|
+| See how the engine is organised | [Architecture](docs/ARCHITECTURE.md) |
+| Understand how it chooses a move, and what each technique saves | [Search algorithms](docs/ALGORITHMS.md) |
+| Know where the training data comes from and how to retrain | [Data and training](docs/DATA_AND_TRAINING.md) |
+| Know what each evaluation model contains | [Models](docs/MODELS.md) |
+| Read the measurements | [Results](docs/RESULTS.md) |
+| Add a model of your own | [Adding an evaluation model](docs/ADDING_A_MODEL.md) |
+
+The index of all pages is [docs/README.md](docs/README.md); the history of changes is the
+[changelog](CHANGELOG.md).
+
+## Quick start
+
+Python 3.11 or newer.
 
 ```bash
 git clone https://github.com/JoaquinDeVA/chess-ai-engine.git
 cd chess-ai-engine
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"          # motor y tests
-pip install -e ".[ml,data]"      # opcional: modelos entrenados y datos
+pip install -e ".[dev]"          # the engine and its tests
+pip install -e ".[ml,data]"      # optional: Keras and the data tools (training and the neural network)
 ```
 
-Opcional: Stockfish para etiquetar datos (`apt install stockfish`).
-
-## Uso
+Play against a bot, or watch two bots play (moves in UCI notation, for example `e2e4`):
 
 ```bash
-# tú (blancas) contra un bot, jugadas en notación UCI (por ejemplo e2e4)
+# you play White against the engine with the hand-written heuristic
 python main.py --player1 human --player2 IterativeHeuristicBot
 
-# bot contra bot, eligiendo el modelo del bot con ML y la profundidad
-python main.py --player1 IterativeModelBookBot --model linear_pst_terms --player2 IterativeHeuristicBot --depth 3
+# two bots; the model decides how the second one evaluates positions
+python main.py --player1 IterativeHeuristicBot --player2 IterativeModelBookBot --model linear_pst_terms --depth 4
 
-# torneo todos contra todos entre los bots (guarda resultados y PGN)
+# every bot against every other, saving the results and the games in PGN
 python main.py --mode tournament
 ```
 
-`python main.py --list-bots` muestra los bots disponibles; `--position` admite un FEN y `--export`
-guarda la partida en PGN.
+`python main.py --list-bots` shows the bots. `--position` starts from a FEN and `--export` saves the
+game in PGN.
 
-## Documentación
+## Reproduce the experiments
 
-Todo el resto (arquitectura, búsqueda, cómo añadir un modelo, resultados) está en
-[docs/README.md](docs/README.md).
+The data (about 24 GB) and the training are described in
+[Data and training](docs/DATA_AND_TRAINING.md). Once the shards are in `data/lichess/raw`, the
+whole flow, from the sidecars to the training of the models, the measurements, the tournaments and
+the results table, is one script. It takes TODO-DURATION on a six-core machine:
+
+```bash
+DRY_RUN=1 bash scripts/run_full_pipeline.sh      # print every command without running anything
+nohup setsid bash scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
+```
+
+## Repository map
+
+```text
+src/chess_engine/
+  search/       the game abstractions and the alpha-beta search
+  bots/         the playable bots
+  evaluation/   hand-crafted features and the heuristic h1
+  models/       the learned evaluators and their cards
+  training/     sampling, targets and the training command
+  comparison/   judge, trade-off profile, tournament and the results table
+scripts/        data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
+docs/           the documentation
+tests/          the test suite
+```
 
 ## Tests
 
 ```bash
-pytest
 pytest -m "not slow"
 ruff check . && ruff format --check .
 ```
 
-## Autoría y agradecimientos
+## Credits
 
-Joaquín De Vicente Abad. El marco base (gestor de partidas, interfaz de bots, registro, clases abstractas
-de juego) y la batería inicial de tests vienen de la asignatura *Inteligencia Artificial e Ingeniería del
-Conocimiento* (Universidad CEU San Pablo); las clases abstractas derivan del código de
-[AIMA](https://github.com/aimacode/aima-python) (MIT). La búsqueda, los bots, los modelos y las
-herramientas son trabajo original. Usa [python-chess](https://python-chess.readthedocs.io),
-[Stockfish](https://stockfishchess.org) y la [base de evaluaciones de Lichess](https://database.lichess.org) (CC0).
+Joaquín De Vicente Abad. The base framework (game manager, bot interface, registry, abstract game
+classes) and the first test suite come from the course *Inteligencia Artificial e Ingeniería del
+Conocimiento* (Universidad CEU San Pablo); the abstract classes derive from the code of
+[AIMA](https://github.com/aimacode/aima-python) (MIT). The search, the bots, the models and the
+tools are original work. The project uses [python-chess](https://python-chess.readthedocs.io),
+[Stockfish](https://stockfishchess.org) and the
+[Lichess evaluation database](https://database.lichess.org) (CC0).
 
-## Licencia
+## License
 
 [MIT](LICENSE)

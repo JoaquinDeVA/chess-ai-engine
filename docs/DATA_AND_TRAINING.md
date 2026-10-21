@@ -163,7 +163,7 @@ indexed), keeps for the side to move the best move and the others within 30 cent
 three), and follows them for 16 half-moves. Lines that already favour one side by more than 150
 centipawns are not followed, and each level keeps at most 3,000 positions, the most balanced ones.
 Every move in the book therefore leads to a position that Stockfish evaluated, and is the best one
-among the evaluated alternatives. The script indexes 39.6 million positions (about 17 minutes) and
+among the evaluated alternatives. The script indexes 39.6 million positions (about half an hour with other jobs running) and
 the book keys are the first four FEN fields, so transpositions hit.
 
 **The endgame tables** are the Syzygy tablebases for three, four and five pieces (290 files, 939 MB)

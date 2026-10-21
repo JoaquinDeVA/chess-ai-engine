@@ -57,7 +57,10 @@ def fixed_time_manager(seconds: float) -> TimeManager:
 
 
 def make_player(
-    spec: Union[str, EvaluationModel], time_manager: TimeManager, max_depth: int = 30
+    spec: Union[str, EvaluationModel],
+    time_manager: TimeManager,
+    max_depth: int = 30,
+    **search_options: Any,
 ) -> IterativeDeepeningBot:
     """Build an iterative-deepening player without an opening book.
 
@@ -66,11 +69,15 @@ def make_player(
         instance.
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.
+    :param search_options: Other options of the bot (``estimator``, ``min_depth``, ``tablebase``...).
     :return: The player.
     """
     if isinstance(spec, str) and spec in HEURISTICS:
         return IterativeHeuristicBot(
-            eval_function=HEURISTICS[spec], max_depth=max_depth, time_manager=time_manager
+            eval_function=HEURISTICS[spec],
+            max_depth=max_depth,
+            time_manager=time_manager,
+            **search_options,
         )
     name = spec if isinstance(spec, str) else type(spec).name
     return IterativeModelBookBot(
@@ -79,6 +86,7 @@ def make_player(
         max_depth=max_depth,
         name=name,
         time_manager=time_manager,
+        **search_options,
     )
 
 

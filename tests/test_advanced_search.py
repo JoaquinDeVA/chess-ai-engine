@@ -413,7 +413,7 @@ def test_time_estimate_cannot_stop_the_deepening_before_min_depth(monkeypatch):
 def test_time_estimate_still_stops_the_deepening_after_min_depth(monkeypatch):
     _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.1, 3: 1.0, 4: 10.0})
     _, stats = heuristic_alphabeta_iterative_deepening_search(
-        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1
+        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1, estimator="ratio_squared"
     )
     assert stats.completed_depth == 2
 
@@ -434,7 +434,7 @@ def test_exhausted_soft_budget_still_completes_min_depth():
 def test_statistics_record_every_iteration_and_why_the_deepening_stopped(monkeypatch):
     _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.1, 3: 1.0, 4: 10.0})
     _, stats = heuristic_alphabeta_iterative_deepening_search(
-        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1
+        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1, estimator="ratio_squared"
     )
     assert [it[0] for it in stats.iterations] == [1, 2]
     assert all(it[3] is False for it in stats.iterations)
@@ -458,7 +458,7 @@ def test_a_robust_estimator_keeps_deepening_where_the_original_stops(monkeypatch
     durations = {1: 0.001, 2: 0.5, 3: 2.0, 4: 8.0}
     _fake_clock_search(monkeypatch, durations)
     _, original = heuristic_alphabeta_iterative_deepening_search(
-        None, None, None, None, max_depth=4, time_limit=40.0, min_depth=2
+        None, None, None, None, max_depth=4, time_limit=40.0, min_depth=2, estimator="ratio_squared"
     )
     _fake_clock_search(monkeypatch, durations)
     _, robust = heuristic_alphabeta_iterative_deepening_search(
@@ -473,3 +473,12 @@ def test_a_robust_estimator_keeps_deepening_where_the_original_stops(monkeypatch
     )
     assert original.completed_depth == 2 and original.stop_reason == "estimate"
     assert robust.completed_depth == 4
+
+
+def test_the_default_estimator_is_the_bounded_one_and_survives_a_stall(monkeypatch):
+    assert game_algorithms.DEFAULT_ESTIMATOR == "geometric_growth"
+    _fake_clock_search(monkeypatch, {1: 0.0005, 2: 0.5, 3: 2.0, 4: 8.0})
+    _, stats = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=4, time_limit=40.0, min_depth=1
+    )
+    assert stats.completed_depth == 4

@@ -148,6 +148,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--hours", type=float, default=10.0, help="wall-clock budget")
     parser.add_argument(
+        "--estimator",
+        help="rule that predicts the next iteration of the deepening (default: the engine's)",
+    )
+    parser.add_argument(
         "--max-depth",
         type=int,
         default=DEFAULT_MAX_DEPTH,
@@ -207,6 +211,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.out,
         log_dir=args.logs,
         max_depth=args.max_depth,
+        estimator=args.estimator,
     )
     print(f"played {run['played']}, skipped {run['skipped']}, crashed {run['errors']}")
 

@@ -31,14 +31,16 @@ from .search_utils import (
 from .time_estimators import get_estimator
 
 #: Iterations that are always completed before the time estimate and the soft budget may stop the
-#: deepening. In a 10 min + 5 s tournament 12 % of the moves finished at depth 2 after less than
-#: 2 s of a 35-40 s budget. The estimate (it extrapolates from the two previous iterations and
-#: squares their ratio) is the main suspect, but replays with a cold and with a warm table did not
-#: reproduce the early stop, so the cause is not isolated; this floor removes the symptom.
+#: deepening. With the original estimator (``ratio_squared``) 12 % of the moves of a 10 min + 5 s
+#: tournament finished at depth 2 after less than 2 s of a 35-40 s budget: with a table warmed by the
+#: previous moves the depth-1 iteration can last microseconds, the ratio of the second to the first
+#: reaches thousands and its square predicts hours. The default estimator is bounded now; the floor
+#: stays as a guard.
 DEFAULT_MIN_DEPTH = 3
 
-#: Rule that predicts the duration of the next iteration (see ``time_estimators.py``).
-DEFAULT_ESTIMATOR = "ratio_squared"
+#: Rule that predicts the duration of the next iteration (see ``time_estimators.py``); chosen by
+#: replaying recorded games (``scripts/bench/compare_time_estimators.py``).
+DEFAULT_ESTIMATOR = "geometric_growth"
 
 
 class AdversarialSearchResult(NamedTuple):

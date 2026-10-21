@@ -29,6 +29,7 @@ from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.comparison.tradeoff import HEURISTICS, make_player
 from chess_engine.engine.game_manager import FORFEIT_TERMINATIONS, GameManager
 from chess_engine.models.cards import card_path, load_card, save_card
+from chess_engine.search.game_algorithms import DEFAULT_ESTIMATOR
 from chess_engine.search.time_management import TimeManager
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,25 @@ def _check_time_control(
             )
 
 
+#: Estimator of the games recorded before the field existed (the engine of the first tournaments).
+LEGACY_ESTIMATOR = "ratio_squared"
+
+
+def _check_estimator(records: Sequence[Dict[str, Any]], estimator: str, path: Path) -> None:
+    """Refuse to mix games played with another estimator of the next iteration into one file.
+
+    :raises ValueError: If a record was played with a different estimator; records without the
+        field count as :data:`LEGACY_ESTIMATOR`.
+    """
+    for record in records:
+        if record.get("estimator", LEGACY_ESTIMATOR) != estimator:
+            raise ValueError(
+                f"{path} already holds games played with the estimator "
+                f"{record.get('estimator', LEGACY_ESTIMATOR)!r}; requested {estimator!r}. "
+                "Use a different --out file or the same --estimator."
+            )
+
+
 def check_specs(specs: Sequence[str]) -> None:
     """Build every player once in this process, so that a bad specification fails before any game.
 
@@ -243,6 +263,7 @@ def _play_game(job: Job) -> Dict[str, Any]:
     log_dir: Optional[Path] = job[5] if len(job) > 5 else None
     index: int = job[6] if len(job) > 6 else 0
     max_depth: int = job[7] if len(job) > 7 else DEFAULT_MAX_DEPTH
+    estimator: str = job[8] if len(job) > 8 and job[8] else DEFAULT_ESTIMATOR
     record: Dict[str, Any] = {
         "white": white,
         "black": black,
@@ -250,10 +271,15 @@ def _play_game(job: Job) -> Dict[str, Any]:
         "base": base,
         "increment": increment,
         "max_depth": max_depth,
+        "estimator": estimator,
     }
     try:
-        white_player = RecordingPlayer(make_player(white, TimeManager(), max_depth))
-        black_player = RecordingPlayer(make_player(black, TimeManager(), max_depth))
+        white_player = RecordingPlayer(
+            make_player(white, TimeManager(), max_depth, estimator=estimator)
+        )
+        black_player = RecordingPlayer(
+            make_player(black, TimeManager(), max_depth, estimator=estimator)
+        )
         result = GameManager(BotRegistry()).play_game(
             white_player, black_player, base, increment, starting_position=fen, verbose=False
         )
@@ -356,12 +382,14 @@ def run_round_robin(
     play: Callable[[Job], Dict[str, Any]] = _play_game,
     log_dir: Optional[Path] = None,
     max_depth: int = DEFAULT_MAX_DEPTH,
+    estimator: Optional[str] = None,
 ) -> Dict[str, int]:
     """Play every pair on every opening twice, colours swapped, in parallel.
 
     Games already recorded in ``out`` (same white, black and opening) are skipped. Each new game
     is appended to ``out`` as soon as it finishes; every record carries ``base`` and ``increment``.
-    A file recorded at another time control is refused, since its scores would be mixed.
+    A file recorded at another time control, or with another estimator of the next iteration
+    (``estimator``, default :data:`DEFAULT_ESTIMATOR`), is refused, since its scores would be mixed.
 
     A game whose players raise is recorded with an ``"error"`` field. If a worker process dies, the
     games in flight in that pool are requeued without a record, because CPython fails all of them.
@@ -407,9 +435,10 @@ def run_round_robin(
         for fen in openings
         for job in ((a, b, fen, base, increment), (b, a, fen, base, increment))
     ]
-    jobs = [(*job, log_dir, index, max_depth) for index, job in enumerate(jobs)]
+    jobs = [(*job, log_dir, index, max_depth, estimator) for index, job in enumerate(jobs)]
     existing = read_games(out)
     _check_time_control(existing, base, increment, out)
+    _check_estimator(existing, estimator or DEFAULT_ESTIMATOR, out)
     done = {(r["white"], r["black"], r["fen"]) for r in existing}
     pending: Deque[Job] = deque(job for job in jobs if job[:3] not in done)
     played = len(pending)

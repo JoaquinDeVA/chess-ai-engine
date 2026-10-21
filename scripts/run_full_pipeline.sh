@@ -33,6 +33,11 @@ AGREEMENT_N="${AGREEMENT_N:-20000}"
 PROFILE_SECONDS="${PROFILE_SECONDS:-1,3,10}"
 PROFILE_POSITIONS="${PROFILE_POSITIONS:-100}"
 WORKERS="${WORKERS:-5}"
+# Estimator of the next iteration used by the tournament players. The games recorded in data/tournament
+# were played with the engine's original rule (ratio_squared); the engine default has been another
+# one since 2026-10-21. Keep the value to resume or reproduce those tournaments; set it to
+# "geometric_growth" (or leave the engine default with TOURNAMENT_ESTIMATOR=default) for a fresh run.
+TOURNAMENT_ESTIMATOR="${TOURNAMENT_ESTIMATOR:-ratio_squared}"
 MODELS="${MODELS:-linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst}"
 STEPS="${STEPS:-sidecars train evaluate profile tournaments quiescence report}"
 FORCE="${FORCE:-0}"
@@ -108,6 +113,10 @@ step_profile() {
     --raw "$RAW" --sidecar "$SIDECAR"
 }
 
+estimator_args() {
+  [ "$TOURNAMENT_ESTIMATOR" = default ] || echo "--estimator $TOURNAMENT_ESTIMATOR"
+}
+
 step_tournaments() {
   local with_h1 without_h1
   with_h1="$(join $(present_models) h1)"
@@ -115,17 +124,17 @@ step_tournaments() {
   [ "$DRY_RUN" = 1 ] || mkdir -p data/tournament data/reports
   # A) short control
   run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
-    --base 60 --increment 1 --openings 10 --workers "$WORKERS" \
+    --base 60 --increment 1 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/short.jsonl --logs data/tournament/short \
     --report data/reports/TOURNAMENT_60+1.md
   # B) reference control
   run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
-    --base 600 --increment 5 --openings 5 --workers "$WORKERS" \
+    --base 600 --increment 5 --openings 5 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/reference.jsonl --logs data/tournament/reference \
     --report data/reports/TOURNAMENT_600+5.md
   # C) equal depth 3, no h1
   run "$PYTHON" scripts/bench/play_tournament.py --players "$without_h1" --anchor linear_pst_terms \
-    --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" \
+    --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/depth3.jsonl --logs data/tournament/depth3 \
     --report data/reports/TOURNAMENT_depth3.md
 }

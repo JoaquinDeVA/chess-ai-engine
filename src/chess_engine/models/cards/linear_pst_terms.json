@@ -116,6 +116,16 @@
       "base": 60.0,
       "increment": 1.0,
       "max_depth": 30
+    },
+    "depth3": {
+      "games": 80,
+      "score": 72.5,
+      "elo": 0.0,
+      "elo_interval": 72.28715992052574,
+      "anchor": "linear_pst_terms",
+      "base": 600.0,
+      "increment": 0.0,
+      "max_depth": 3
     }
   }
 }

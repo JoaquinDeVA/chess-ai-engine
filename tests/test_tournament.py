@@ -449,7 +449,7 @@ def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
 
     depths = []
 
-    def fake_make_player(spec, tm, max_depth=30):
+    def fake_make_player(spec, tm, max_depth=30, **options):
         depths.append(max_depth)
         return _FakePlayer()
 
@@ -461,3 +461,55 @@ def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
     saved = json.loads((tmp_path / "logs" / "3_a_x_vs_h1.json").read_text())
     assert {k: saved[k] for k in record} == record
     assert len(saved["moves"]) == 1 and saved["moves"][0]["ply"] == 0
+
+
+def test_a_file_played_with_another_estimator_is_refused(tmp_path):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    out.write_text(
+        json.dumps({"white": "a", "black": "b", "fen": opening, "base": 2.0, "increment": 0.0})
+        + "\n"
+    )
+    with pytest.raises(ValueError, match="estimator"):
+        run_round_robin(
+            ["linear_material", "h1"],
+            [opening],
+            base=2.0,
+            increment=0.0,
+            workers=1,
+            out=out,
+            estimator="geometric_growth",
+        )
+
+
+def test_records_without_the_field_count_as_the_original_estimator():
+    tournament._check_estimator([{"white": "a"}], "ratio_squared", Path("x.jsonl"))
+    with pytest.raises(ValueError, match="ratio_squared"):
+        tournament._check_estimator([{"white": "a"}], "geometric_growth", Path("x.jsonl"))
+
+
+def test_play_game_records_and_passes_the_estimator(monkeypatch):
+    seen = []
+
+    class Result:
+        winner, result, termination, total_moves = None, "1/2-1/2", "stalemate", 0
+
+    class FakeManager:
+        def __init__(self, registry):
+            pass
+
+        def play_game(self, white, black, base, increment, **kwargs):
+            return Result()
+
+    def fake_make_player(spec, tm, max_depth=30, **options):
+        seen.append(options)
+        return _FakePlayer()
+
+    monkeypatch.setattr(tournament, "make_player", fake_make_player)
+    monkeypatch.setattr(tournament, "GameManager", FakeManager)
+    record = tournament._play_game(
+        ("a", "b", chess.STARTING_FEN, 5.0, 0.1, None, 0, 30, "node_growth")
+    )
+    assert record["estimator"] == "node_growth" and seen == [{"estimator": "node_growth"}] * 2
+    default = tournament._play_game(("a", "b", chess.STARTING_FEN, 5.0, 0.1, None, 0, 30, None))
+    assert default["estimator"] == tournament.DEFAULT_ESTIMATOR

@@ -32,7 +32,7 @@ MATE_SCORE = 100_000
 Fetch = Callable[[str, int], Optional[dict]]
 
 
-def fetch_cloud_eval(fen: str, lines: int, pause: float = 1.0) -> Optional[dict]:
+def fetch_cloud_eval(fen: str, lines: int, pause: float = 2.0) -> Optional[dict]:
     """Ask the Lichess cloud evaluation for a position.
 
     :param fen: Position.
@@ -41,7 +41,7 @@ def fetch_cloud_eval(fen: str, lines: int, pause: float = 1.0) -> Optional[dict]
     :return: The JSON answer, or ``None`` when the service does not hold the position.
     """
     url = f"{API}?{urllib.parse.urlencode({'fen': fen, 'multiPv': lines})}"
-    for _ in range(5):
+    for _ in range(30):
         time.sleep(pause)
         try:
             with urllib.request.urlopen(url, timeout=20) as response:
@@ -151,6 +151,18 @@ def check_book(
     }
 
 
+def load_cache(path: Path) -> Dict[str, Optional[dict]]:
+    """Answers saved by an earlier run.
+
+    :param path: JSON-lines file with ``key`` and ``answer`` per line.
+    :return: ``{key: answer}`` (empty if the file does not exist).
+    """
+    if not path.exists():
+        return {}
+    records = (json.loads(line) for line in path.read_text(encoding="utf-8").splitlines())
+    return {r["key"]: r["answer"] for r in records}
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line.
 
@@ -162,11 +174,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--fraction", type=float, default=0.02, help="share of entries judged")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--margin", type=float, default=50.0, help="centipawns allowed to lose")
-    parser.add_argument("--pause", type=float, default=1.0, help="seconds between requests")
+    parser.add_argument("--pause", type=float, default=2.0, help="seconds between requests")
     parser.add_argument(
         "--prune", action="store_true", help="write the book without failing entries"
     )
     parser.add_argument("--out", type=Path, help="where --prune writes the book")
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=Path("data/reports/opening_book_check_cache.jsonl"),
+        help="answers already received (the check resumes from them)",
+    )
     parser.add_argument("--report", type=Path, default=Path("data/reports/OPENING_BOOK_CHECK.md"))
     return parser.parse_args(argv)
 
@@ -179,13 +197,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = parse_args(argv)
     book = json.loads(args.book.read_text(encoding="utf-8"))
-    result = check_book(
-        book,
-        args.fraction,
-        args.seed,
-        args.margin,
-        lambda fen, lines: fetch_cloud_eval(fen, lines, args.pause),
-    )
+    cache = load_cache(args.cache)
+
+    def fetch(fen: str, lines: int) -> Optional[dict]:
+        key = f"{lines}|{fen}"
+        if key not in cache:
+            cache[key] = fetch_cloud_eval(fen, lines, args.pause)
+            args.cache.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.cache, "a", encoding="utf-8") as handle:
+                handle.write(json.dumps({"key": key, "answer": cache[key]}) + "\n")
+        return cache[key]
+
+    result = check_book(book, args.fraction, args.seed, args.margin, fetch)
     judged, failed = result["judged"], result["failed"]
     passed = (judged - len(failed) + result["illegal"]) / judged if judged else 0.0
     lines = [

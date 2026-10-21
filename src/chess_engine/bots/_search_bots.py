@@ -16,6 +16,7 @@ from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
+    DEFAULT_ESTIMATOR,
     DEFAULT_MIN_DEPTH,
     SearchStatistics,
     heuristic_alphabeta_iterative_deepening_search,
@@ -111,6 +112,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off; default 4,
         measured at fixed depth: +0.06 agreement at depth 3 on 2,000 positions).
     :param min_depth: Iterations always completed whatever the clock estimate says (default 3).
+    :param estimator: Rule that predicts the duration of the next iteration (see
+        ``search/time_estimators.py``).
     """
 
     def __init__(
@@ -123,6 +126,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         problem: Optional[ChessProblem] = None,
         quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
         min_depth: int = DEFAULT_MIN_DEPTH,
+        estimator: str = DEFAULT_ESTIMATOR,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
@@ -130,6 +134,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.max_tt_entries = max_tt_entries
         self.quiescence_plies = quiescence_plies
         self.min_depth = min_depth
+        self.estimator = estimator
         self.problem = problem if problem is not None else ChessProblem()
         self.transposition_table: Dict[Any, Any] = {}
         self.killer_moves: Dict[int, List[chess.Move]] = {}
@@ -196,6 +201,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             quiescence_plies=self.quiescence_plies,
             max_tt_entries=self.max_tt_entries,
             min_depth=self.min_depth,
+            estimator=self.estimator,
         )
         self.record_statistics(stats)
         logger.debug(

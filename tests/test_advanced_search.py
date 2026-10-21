@@ -396,7 +396,9 @@ def _fake_clock_search(monkeypatch, durations):
         return "m", SearchStatistics(1, 0, max_depth, False, max_depth)
 
     monkeypatch.setattr(game_algorithms, "advanced_heuristic_alphabeta_search", fake_search)
-    monkeypatch.setattr(game_algorithms, "time", types.SimpleNamespace(time=lambda: clock[0]))
+    monkeypatch.setattr(
+        game_algorithms, "time", types.SimpleNamespace(perf_counter=lambda: clock[0])
+    )
 
 
 def test_time_estimate_cannot_stop_the_deepening_before_min_depth(monkeypatch):
@@ -427,3 +429,47 @@ def test_exhausted_soft_budget_still_completes_min_depth():
         min_depth=3,
     )
     assert stats.completed_depth == 3
+
+
+def test_statistics_record_every_iteration_and_why_the_deepening_stopped(monkeypatch):
+    _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.1, 3: 1.0, 4: 10.0})
+    _, stats = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=4, time_limit=5.0, min_depth=1
+    )
+    assert [it[0] for it in stats.iterations] == [1, 2]
+    assert all(it[3] is False for it in stats.iterations)
+    assert stats.stop_reason == "estimate" and stats.stop_predicted > 5.0
+
+
+def test_the_deepening_reports_the_budget_and_the_depth_limit(monkeypatch):
+    _fake_clock_search(monkeypatch, {1: 0.001, 2: 0.002, 3: 0.003})
+    _, by_depth = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=3, time_limit=60.0
+    )
+    assert by_depth.stop_reason == "max_depth" and len(by_depth.iterations) == 3
+    _, by_budget = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=3, time_limit=0.0, min_depth=1
+    )
+    assert by_budget.stop_reason == "budget" and len(by_budget.iterations) == 1
+
+
+def test_a_robust_estimator_keeps_deepening_where_the_original_stops(monkeypatch):
+    # depth 2 is 500 times slower than depth 1 (a stall): the original rule predicts 250 s
+    durations = {1: 0.001, 2: 0.5, 3: 2.0, 4: 8.0}
+    _fake_clock_search(monkeypatch, durations)
+    _, original = heuristic_alphabeta_iterative_deepening_search(
+        None, None, None, None, max_depth=4, time_limit=40.0, min_depth=2
+    )
+    _fake_clock_search(monkeypatch, durations)
+    _, robust = heuristic_alphabeta_iterative_deepening_search(
+        None,
+        None,
+        None,
+        None,
+        max_depth=4,
+        time_limit=40.0,
+        min_depth=2,
+        estimator="clamped_growth",
+    )
+    assert original.completed_depth == 2 and original.stop_reason == "estimate"
+    assert robust.completed_depth == 4

@@ -28,6 +28,7 @@ from .search_utils import (
     reorder_by_killer_moves,
     store_transposition_entry,
 )
+from .time_estimators import get_estimator
 
 #: Iterations that are always completed before the time estimate and the soft budget may stop the
 #: deepening. In a 10 min + 5 s tournament 12 % of the moves finished at depth 2 after less than
@@ -35,6 +36,9 @@ from .search_utils import (
 #: squares their ratio) is the main suspect, but replays with a cold and with a warm table did not
 #: reproduce the early stop, so the cause is not isolated; this floor removes the symptom.
 DEFAULT_MIN_DEPTH = 3
+
+#: Rule that predicts the duration of the next iteration (see ``time_estimators.py``).
+DEFAULT_ESTIMATOR = "ratio_squared"
 
 
 class AdversarialSearchResult(NamedTuple):
@@ -68,6 +72,16 @@ class SearchStatistics(NamedTuple):
         without being truncated (0 if none did); ``max_depth_reached`` also counts plies seen
         in a truncated iteration
     :type completed_depth: int
+    :param iterations: One ``(depth, seconds, nodes, truncated)`` entry per iteration that was
+        started, oldest first (empty outside iterative deepening)
+    :type iterations: Tuple[Tuple[int, float, int, bool], ...]
+    :param stop_reason: Why the deepening ended: ``"max_depth"``, ``"estimate"`` (the next
+        iteration would not fit), ``"budget"`` (the soft budget is used up) or ``"truncated"``
+        (the hard limit interrupted an iteration)
+    :type stop_reason: str
+    :param stop_predicted: Seconds predicted for the iteration that the estimate refused to start
+        (0 unless ``stop_reason`` is ``"estimate"``)
+    :type stop_predicted: float
     """
 
     nodes_visited: int
@@ -75,6 +89,9 @@ class SearchStatistics(NamedTuple):
     max_depth_reached: int
     truncated: bool = False
     completed_depth: int = 0
+    iterations: Tuple[Tuple[int, float, int, bool], ...] = ()
+    stop_reason: str = ""
+    stop_predicted: float = 0.0
 
 
 def heuristic_alphabeta_search(
@@ -136,7 +153,7 @@ def heuristic_alphabeta_search(
         if game.is_terminal(state):
             return AdversarialSearchResult(game.utility(state, player), None)
 
-        if cutoff_test(state, depth, time.time() - time_of_start):
+        if cutoff_test(state, depth, time.perf_counter() - time_of_start):
             return AdversarialSearchResult(eval_fn(state, player), None)
 
         best_value = float("-inf")
@@ -187,7 +204,7 @@ def heuristic_alphabeta_search(
         if game.is_terminal(state):
             return AdversarialSearchResult(game.utility(state, player), None)
 
-        if cutoff_test(state, depth, time.time() - time_of_start):
+        if cutoff_test(state, depth, time.perf_counter() - time_of_start):
             return AdversarialSearchResult(eval_fn(state, player), None)
 
         best_value = float("inf")
@@ -211,7 +228,7 @@ def heuristic_alphabeta_search(
 
         return AdversarialSearchResult(best_value, best_move)
 
-    time_of_start = time.time()
+    time_of_start = time.perf_counter()
     search_result = max_value(state, float("-inf"), float("inf"), depth=0)
     return search_result.move, SearchStatistics(nodes_visited, pruning_count, max_depth_reached)
 
@@ -287,7 +304,7 @@ def advanced_heuristic_alphabeta_search(
     :type order_moves_callback: Optional[Callable[[Any, List[Any]], List[Any]]]
     :param max_depth: Number of plies to search
     :type max_depth: int
-    :param start_time: ``time.time()`` value ``elapsed`` is measured from (default: call time).
+    :param start_time: ``time.perf_counter()`` value ``elapsed`` is measured from (default: call time).
         Iterative deepening passes the start of the move so the clock does not restart
         at every iteration.
     :type start_time: Optional[float]
@@ -304,7 +321,7 @@ def advanced_heuristic_alphabeta_search(
     :rtype: Tuple[Any, SearchStatistics]
     """
     root_player = state.get_current_player()
-    time_of_start = time.time() if start_time is None else start_time
+    time_of_start = time.perf_counter() if start_time is None else start_time
     killers = {} if killer_moves is None else killer_moves
     table = {} if transposition_table is None else transposition_table
 
@@ -342,7 +359,7 @@ def advanced_heuristic_alphabeta_search(
                 return AdversarialSearchResult(value, None), alpha, beta
             return AdversarialSearchResult(eval_fn(node, root_player), None), alpha, beta
 
-        if cutoff_test(node, depth_remaining, time.time() - time_of_start):
+        if cutoff_test(node, depth_remaining, time.perf_counter() - time_of_start):
             truncated = True
             return AdversarialSearchResult(eval_fn(node, root_player), None), alpha, beta
 
@@ -483,6 +500,7 @@ def heuristic_alphabeta_iterative_deepening_search(
     quiescence_plies: int = 0,
     max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
     min_depth: int = DEFAULT_MIN_DEPTH,
+    estimator: str = DEFAULT_ESTIMATOR,
 ) -> Tuple[Any, SearchStatistics]:
     """Iterative deepening over :func:`advanced_heuristic_alphabeta_search`.
 
@@ -519,10 +537,13 @@ def heuristic_alphabeta_iterative_deepening_search(
     :type max_tt_entries: int
     :param min_depth: Iterations completed regardless of the time estimate and the soft budget
     :type min_depth: int
+    :param estimator: Name of the rule that predicts the duration of the next iteration (see
+        :mod:`chess_engine.search.time_estimators`)
+    :type estimator: str
     :return: ``(best_move, statistics)`` with node and pruning counts summed over all iterations
     :rtype: Tuple[Any, SearchStatistics]
     """
-    start_time = time.time()
+    start_time = time.perf_counter()
     overshoot_factor = 1.15  # tolerate slightly exceeding the budget to complete a depth
     killers = {} if killer_moves is None else killer_moves
     table = {} if transposition_table is None else transposition_table
@@ -533,18 +554,22 @@ def heuristic_alphabeta_iterative_deepening_search(
     deepest_ply = 0
     completed_depth = 0
     last_truncated = False
-    iteration_times: List[float] = []
+    estimate = get_estimator(estimator)
+    history: List[Tuple[float, int]] = []
+    iterations: List[Tuple[int, float, int, bool]] = []
+    stop_reason = "max_depth"
+    stop_predicted = 0.0
 
     for depth in range(1, max_depth + 1):
-        remaining = time_limit - (time.time() - start_time)
+        remaining = time_limit - (time.perf_counter() - start_time)
 
-        if depth > min_depth and len(iteration_times) >= 2:
-            last, previous = iteration_times[-1], iteration_times[-2]
-            growth = last / previous if previous > 1e-6 and last > 1e-6 else 1.5
-            if last * growth > remaining * overshoot_factor:
+        if depth > min_depth and history:
+            predicted = estimate(history)
+            if predicted > remaining * overshoot_factor:
+                stop_reason, stop_predicted = "estimate", predicted
                 break
 
-        iteration_start = time.time()
+        iteration_start = time.perf_counter()
         move, stats = advanced_heuristic_alphabeta_search(
             game=game,
             state=state,
@@ -559,7 +584,8 @@ def heuristic_alphabeta_iterative_deepening_search(
             quiescence_plies=quiescence_plies,
             max_tt_entries=max_tt_entries,
         )
-        iteration_times.append(time.time() - iteration_start)
+        seconds = time.perf_counter() - iteration_start
+        iterations.append((depth, seconds, stats.nodes_visited, stats.truncated))
         total_nodes += stats.nodes_visited
         total_prunings += stats.pruning_count
         last_truncated = stats.truncated
@@ -568,11 +594,14 @@ def heuristic_alphabeta_iterative_deepening_search(
         if stats.truncated:
             if best_move is None and move is not None:
                 best_move = move  # better a partial answer than none at all
+            stop_reason = "truncated"
             break
 
+        history.append((seconds, stats.nodes_visited))
         best_move = move
         completed_depth = depth
-        if depth >= min_depth and time.time() - start_time >= time_limit:
+        if depth >= min_depth and time.perf_counter() - start_time >= time_limit:
+            stop_reason = "budget"
             break
 
     final_stats = SearchStatistics(
@@ -581,5 +610,8 @@ def heuristic_alphabeta_iterative_deepening_search(
         deepest_ply,
         last_truncated and best_move is None,
         completed_depth,
+        tuple(iterations),
+        stop_reason,
+        stop_predicted,
     )
     return best_move, final_stats

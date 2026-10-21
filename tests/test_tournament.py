@@ -367,6 +367,9 @@ class _FakeStats:
     completed_depth = 3
     nodes_visited = 10
     max_depth_reached = 3
+    iterations = ((1, 0.001, 3, False), (2, 0.01, 7, False))
+    stop_reason = "estimate"
+    stop_predicted = 12.5
 
 
 class _FakePlayer:
@@ -400,6 +403,9 @@ def test_recording_player_records_one_entry_per_move():
         "completed_depth": 3,
         "nodes": 10,
         "max_depth_reached": 3,
+        "iterations": [[1, 0.001, 3, False], [2, 0.01, 7, False]],
+        "stop_reason": "estimate",
+        "stop_predicted": 12.5,
     }
     assert player.turn_budget == 0.5  # lo demas se delega
 

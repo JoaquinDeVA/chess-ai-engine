@@ -219,6 +219,9 @@ class RecordingPlayer:
                 "completed_depth": getattr(stats, "completed_depth", None),
                 "nodes": getattr(stats, "nodes_visited", None),
                 "max_depth_reached": getattr(stats, "max_depth_reached", None),
+                "iterations": [list(it) for it in getattr(stats, "iterations", ())],
+                "stop_reason": getattr(stats, "stop_reason", None),
+                "stop_predicted": getattr(stats, "stop_predicted", None),
             }
         )
         return move

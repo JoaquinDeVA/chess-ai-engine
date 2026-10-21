@@ -250,12 +250,20 @@ is also the default of the search function itself.
 
 **Measured effect.**
 
-TODO-QUIESCENCE-NUMBERS
+Measured with `python scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` on 1000
+test positions (seed 42); agreement is the share of positions where the chosen move is Stockfish's
+move (report: `data/reports/QUIESCENCE.md`).
 
-Cost, from the depth 4 table (60 positions): with quiescence the search visits 15,988 nodes per
-move, without it 6,224. Removing it therefore cuts the nodes by about 61 % (and the time per move
-from 1.365 s to 0.407 s), but it changes 33 % of the moves (`same as baseline` 0.667), and the
-agreement with Stockfish goes from 0.317 to 0.283.
+| player | depth | quiescence | agreement | nodes/move | s/move |
+|---|---|---|---|---|---|
+| Heuristic (`h1`) | 3 | off | 0.308 | 1,648 | 0.392 |
+| Heuristic (`h1`) | 3 | 4 plies | 0.355 | 5,980 | 1.454 |
+| Position-terms logistic model (`linear_pst_terms`) | 3 | off | 0.291 | 1,601 | 0.209 |
+| Position-terms logistic model (`linear_pst_terms`) | 3 | 4 plies | 0.387 | 3,974 | 0.571 |
+
+Paired difference at depth 3 (quiescence minus none): +0.047 for `h1` and +0.096 for
+`linear_pst_terms`, both with a standard error of 0.015 (three standard errors or more). The price is
+2.5 to 3.6 times the nodes and about 2.7 to 3.7 times the time per move at the same depth.
 
 **Status.** Kept and on by default in the search bots; added on 2026-10-17 (commit `40571a4`).
 
@@ -321,7 +329,11 @@ piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not 
 recording `stop_reason = "tablebase"` in the search statistics; `python main.py --endgame-db`
 turns it on. It is off by default, so that tournaments compare evaluations and search, not tables.
 
-**Measured effect.** TODO-ENDGAME-NUMBERS
+**Measured effect.** Measured with `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`
+(report: `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions with three to five pieces, the
+defender always plays the tablebase move, the winner has 0.5 s per move and 100 moves to mate. The search
+with the tables converts 52 of 60 (mean 14.2 moves to mate); the same search without them converts 8 of
+60 (20.6 moves).
 
 **Status.** Kept as an option; since 2026-10-21 (commit `2fc0f86`). It is used only at the root:
 the search never probes the tables inside the tree, and positions with six or more pieces are

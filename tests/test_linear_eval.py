@@ -445,7 +445,7 @@ def test_second_run_with_cache_does_not_encode(tmp_path, monkeypatch):
 
 
 def _flipped(boards):
-    """Validation que contradice a los datos de entrenamiento: entrenar empeora su pérdida."""
+    """Validation that contradicts the training data: training makes its loss worse."""
     rows = frame(boards)
     rows["cp"] = -rows["cp"]
     return rows
@@ -463,12 +463,12 @@ def _decay_fit(config):
 def test_lr_decay_keeps_training_with_a_smaller_rate_until_max_epochs():
     _, _, summary = _decay_fit({"max_epochs": 6, "patience": 0, "lr_decay": 0.5, "min_lr": 1e-9})
 
-    assert summary["epochs"] == 6  # la paciencia 0 no corta la ejecución
+    assert summary["epochs"] == 6  # patience 0 does not cut the run
     history, losses = summary["lr_history"], summary["val_losses"]
     assert len(history) == 6 and history[0] == 0.1
-    assert losses[1] >= losses[0]  # la segunda época no mejora: desde ahí baja el ritmo
+    assert losses[1] >= losses[0]  # the second epoch does not improve: the rate drops from there
     assert history[1] == 0.1 and history[2] == pytest.approx(0.05)
-    # Regla: una época sin mejora multiplica el ritmo por 0.5; una que mejora lo mantiene.
+    # Rule: an epoch without improvement multiplies the rate by 0.5; one that improves keeps it.
     best = losses[0]
     for epoch in range(1, 5):
         if losses[epoch] < best:
@@ -481,7 +481,7 @@ def test_lr_decay_keeps_training_with_a_smaller_rate_until_max_epochs():
 def test_lr_decay_stops_when_the_rate_falls_below_min_lr():
     _, _, summary = _decay_fit({"max_epochs": 20, "patience": 0, "lr_decay": 0.5, "min_lr": 0.06})
 
-    # La época 2 no mejora: 0.1 * 0.5 = 0.05 < 0.06, y la ejecución termina ahí.
+    # Epoch 2 does not improve: 0.1 * 0.5 = 0.05 < 0.06, and the run ends there.
     assert summary["epochs"] == 2
     assert summary["lr_history"] == [0.1, 0.1]
 
@@ -489,7 +489,7 @@ def test_lr_decay_stops_when_the_rate_falls_below_min_lr():
 def test_without_lr_decay_patience_still_stops_and_the_rate_is_constant():
     _, _, summary = _decay_fit({"max_epochs": 10, "patience": 1})
 
-    assert summary["epochs"] == 3  # mejor en la 1, sin mejora en 2 y 3 (> patience)
+    assert summary["epochs"] == 3  # best at 1, no improvement at 2 and 3 (> patience)
     assert summary["lr_history"] == [0.1, 0.1, 0.1]
 
 

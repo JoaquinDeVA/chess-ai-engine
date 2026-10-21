@@ -340,7 +340,7 @@ class TestMateKeepGuards:
         flag = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "0.05", *shards]
         assert train_cli.main(flag) == 2
         full = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "1.0", *shards]
-        assert train_cli.main(full) == 2  # el 100 % también exige --tag
+        assert train_cli.main(full) == 2  # 100 % also requires --tag
         representation = [
             "--model", "linear_pst", "--effort", "0", "--representation",
             '{"mate_keep": 0.05}', *shards,
@@ -351,7 +351,7 @@ class TestMateKeepGuards:
 
 
 class FakeLinearModel:
-    """Doble del modelo entrenado: guarda un fichero mínimo y no usa datos ni TensorFlow."""
+    """Stand-in for the trained model: saves a minimal file and uses neither data nor TensorFlow."""
 
     def save(self, path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -364,7 +364,7 @@ class FakeLinearModel:
 
 @pytest.fixture
 def fake_training(isolated_cards, monkeypatch):
-    """Sustituye lectura de datos, calibrado, búsqueda y ajuste de ``train_by_effort``."""
+    """Replaces the data reading, calibration, search and fit of ``train_by_effort``."""
     monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
     monkeypatch.setattr(models_base, "ARTIFACTS_DIR", isolated_cards / "artifacts")
     monkeypatch.setattr(train_cli, "available_rows", lambda *a, **k: 1000)
@@ -379,7 +379,7 @@ def fake_training(isolated_cards, monkeypatch):
 
 
 class TestCommandLineWithDoubles:
-    """CLI de entrenamiento y evaluación con dobles: sin entrenar ni calcular métricas."""
+    """Training and evaluation CLIs with stand-ins: nothing is trained and no metrics are computed."""
 
     def train(self, *extra):
         argv = ["--model", "linear_pst", "--effort", "40", "--raw", "r", "--sidecar", "s", *extra]

@@ -14,7 +14,8 @@ budgets, and reports what each rule would have done:
   iteration that ends within the budget plus the 15 % overshoot);
 * premature: share of moves that stopped although the next iteration would have fitted;
 * cut: share of moves where an iteration was started and interrupted by the hard limit, so its
-  time was wasted.
+  time was wasted;
+* over: share of moves that finished but used more than the budget plus the 15 % overshoot.
 
 Writes ``data/reports/TIME_ESTIMATORS.md``.
 """
@@ -58,8 +59,9 @@ def simulate(series: Series, estimator: Estimator, budget: float) -> Dict[str, A
     :param series: ``(depth, seconds, nodes, truncated)`` per iteration, in order.
     :param estimator: Rule that predicts the next duration.
     :param budget: Soft budget in seconds.
-    :return: ``depth`` completed, ``seconds`` used, ``cut`` (an iteration was interrupted) and
-        ``premature`` (the loop stopped although the next iteration would have fitted).
+    :return: ``depth`` completed, ``seconds`` used, ``cut`` (an iteration was interrupted),
+        ``premature`` (the loop stopped although the next iteration would have fitted) and ``over``
+        (the move finished but took more than the budget plus the overshoot).
     """
     hard = hard_limit(budget)
     elapsed, completed, history = 0.0, 0, []
@@ -79,7 +81,14 @@ def simulate(series: Series, estimator: Estimator, budget: float) -> Dict[str, A
         completed = depth
         if depth >= MIN_DEPTH and elapsed >= budget:
             break
-    return {"depth": completed, "seconds": elapsed, "cut": cut, "premature": premature}
+    over = not cut and elapsed > budget * OVERSHOOT
+    return {
+        "depth": completed,
+        "seconds": elapsed,
+        "cut": cut,
+        "premature": premature,
+        "over": over,
+    }
 
 
 def evaluate(all_series: Sequence[Series], estimator: Estimator, budget: float) -> Dict[str, float]:
@@ -88,7 +97,7 @@ def evaluate(all_series: Sequence[Series], estimator: Estimator, budget: float) 
     :param all_series: One series per move.
     :param estimator: Rule that predicts the next duration.
     :param budget: Soft budget in seconds.
-    :return: ``depth``, ``seconds_share``, ``regret``, ``premature`` and ``cut``.
+    :return: ``depth``, ``seconds_share``, ``regret``, ``premature``, ``cut`` and ``over``.
     :raises ValueError: If there are no series.
     """
     if not all_series:
@@ -104,6 +113,7 @@ def evaluate(all_series: Sequence[Series], estimator: Estimator, budget: float) 
         / n,
         "premature": sum(o["premature"] for o in outcomes) / n,
         "cut": sum(o["cut"] for o in outcomes) / n,
+        "over": sum(o["over"] for o in outcomes) / n,
     }
 
 
@@ -157,8 +167,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "",
             f"## Budget {budget:g} s",
             "",
-            "| estimator | depth | time | regret | premature | cut |",
-            "|---|---|---|---|---|---|",
+            "| estimator | depth | time | regret | premature | cut | over |",
+            "|---|---|---|---|---|---|---|",
         ]
         for name, estimator in ESTIMATORS.items():
             if name == "never_stop":
@@ -166,7 +176,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             r = evaluate(series, estimator, budget)
             lines.append(
                 f"| {name} | {r['depth']:.2f} | {r['seconds_share']:.0%} | {r['regret']:.2f} | "
-                f"{r['premature']:.0%} | {r['cut']:.0%} |"
+                f"{r['premature']:.0%} | {r['cut']:.0%} | {r['over']:.0%} |"
             )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text("\n".join(lines) + "\n", encoding="utf-8")

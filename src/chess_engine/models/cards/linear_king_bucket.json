@@ -7,33 +7,45 @@
   "size_kb": 82.3,
   "training": {
     "dataset": "data/lichess/raw",
-    "date": "2026-10-18",
-    "commit": "40571a4+dirty",
-    "epochs": 2,
-    "best_epoch": 2,
+    "date": "2026-10-21",
+    "commit": "e14cf12+dirty",
+    "epochs": 4,
+    "best_epoch": 4,
     "train_losses": [
-      0.6117829913192897,
-      0.6084917169781114
+      0.6563286566282499,
+      0.655266537442903,
+      0.6552660776098186,
+      0.6552659994031511
     ],
     "val_losses": [
-      0.6128128928472483,
-      0.6127855463565021
+      0.658148851732301,
+      0.6581456010657046,
+      0.6581453318990897,
+      0.6581452224356067
     ],
-    "train_rows": 15000000,
-    "seconds": 765.15,
+    "lr_history": [
+      0.01,
+      0.01,
+      0.01,
+      0.01
+    ],
+    "train_rows": 30000000,
+    "seconds": 1168.61,
     "config": {
       "l2": 1e-06,
       "lr": 0.01,
       "batch_size": 4096,
-      "max_epochs": 2,
+      "max_epochs": 4,
       "patience": 2,
-      "workers": 4
+      "workers": 4,
+      "lr_decay": null,
+      "min_lr": 1e-05
     },
-    "train_samples": 15000000,
-    "effort": 15,
+    "train_samples": 30000000,
+    "effort": 30,
     "effort_config": {
-      "positions": 15000000,
-      "max_epochs": 2,
+      "positions": 30000000,
+      "max_epochs": 4,
       "patience": 2,
       "trials": 0,
       "batch_size": 4096
@@ -43,38 +55,29 @@
       "k": 0.00368208,
       "perspective": "side_to_move",
       "filter": "all",
-      "mate_keep": 1.0
+      "mate_keep": 0.1
     }
-  },
-  "tournament": {
-    "games": 100,
-    "score": 59.0,
-    "elo": 134.05786312121327,
-    "elo_interval": 67.21189299319592,
-    "anchor": "h1",
-    "base": 60.0,
-    "increment": 1.0
   },
   "accuracy": {
     "all": {
-      "spearman": 0.6092136006085456,
-      "mae": 0.14295947252311444,
+      "spearman": 0.6126426882893508,
+      "mae": 0.14071503028491072,
       "n": 200000,
-      "best_move_agreement": 0.17875,
+      "best_move_agreement": 0.19435,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.6238896831760875,
-      "mae": 0.13176788985560905,
+      "spearman": 0.6417999807242164,
+      "mae": 0.12719565246118883,
       "n": 138657,
-      "best_move_agreement": 0.04810126582278481,
+      "best_move_agreement": 0.048969258589511754,
       "agreement_n": 13825
     },
     "non_quiet": {
-      "spearman": 0.5806756261691677,
-      "mae": 0.16825643025143375,
+      "spearman": 0.5565305061875765,
+      "mae": 0.17127363307420715,
       "n": 61343,
-      "best_move_agreement": 0.47125506072874496,
+      "best_move_agreement": 0.5198380566801619,
       "agreement_n": 6175
     },
     "sample": {
@@ -84,9 +87,35 @@
     }
   },
   "cost": {
-    "us_per_eval": 35.2,
+    "us_per_eval": 24.86,
     "samples": 1000,
-    "date": "2026-10-17",
-    "commit": "6a765d6+dirty"
+    "date": "2026-10-21",
+    "commit": "e14cf12+dirty"
+  },
+  "tradeoff": {
+    "1": {
+      "mean_depth": 3.79,
+      "search_agreement": 0.45
+    },
+    "3": {
+      "mean_depth": 4.51,
+      "search_agreement": 0.45
+    },
+    "10": {
+      "mean_depth": 5.25,
+      "search_agreement": 0.45
+    }
+  },
+  "tournament": {
+    "60+1": {
+      "games": 100,
+      "score": 50.5,
+      "elo": -20.73338767072054,
+      "elo_interval": 65.73729565695855,
+      "anchor": "h1",
+      "base": 60.0,
+      "increment": 1.0,
+      "max_depth": 30
+    }
   }
 }

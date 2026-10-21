@@ -1,0 +1,53 @@
+{
+  "name": "h1",
+  "architecture": "Hand-crafted heuristic (weights fitted to Stockfish)",
+  "features": "h1",
+  "parameters": 6,
+  "accuracy": {
+    "all": {
+      "spearman": 0.5607462883764465,
+      "mae": 0.148741825269564,
+      "n": 200000,
+      "best_move_agreement": 0.19585,
+      "agreement_n": 20000
+    },
+    "quiet": {
+      "spearman": 0.6137054793261677,
+      "mae": 0.13281368288522002,
+      "n": 138657,
+      "best_move_agreement": 0.060687160940325495,
+      "agreement_n": 13825
+    },
+    "non_quiet": {
+      "spearman": 0.47393537129100666,
+      "mae": 0.18474509277500034,
+      "n": 61343,
+      "best_move_agreement": 0.49846153846153846,
+      "agreement_n": 6175
+    },
+    "sample": {
+      "rows": 200000,
+      "seed": 42,
+      "agreement_n": 20000
+    }
+  },
+  "cost": {
+    "us_per_eval": 190.11,
+    "samples": 1000,
+    "date": "2026-10-21",
+    "commit": "e14cf12+dirty"
+  },
+  "status": "reference",
+  "tournament": {
+    "60+1": {
+      "games": 100,
+      "score": 54.0,
+      "elo": 0.0,
+      "elo_interval": 60.10006998525964,
+      "anchor": "h1",
+      "base": 60.0,
+      "increment": 1.0,
+      "max_depth": 30
+    }
+  }
+}

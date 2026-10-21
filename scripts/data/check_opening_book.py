@@ -230,12 +230,17 @@ def write_report(args: argparse.Namespace, book: Dict[str, str], result: Dict[st
     judged, failed = result["judged"], result["failed"]
     passed = (judged - len(failed) + result["illegal"]) / judged if judged else 0.0
     lines = [
-        "# Opening book check against Stockfish (Lichess cloud evaluation)",
+        "# Opening book check against Stockfish",
         "",
         f"Book `{args.book}`: {len(book):,} positions. Sample: {result['sampled']:,} entries "
-        f"({args.fraction:.1%}, seed {args.seed}).",
+        f"({args.fraction:.1%}, seed {args.seed}). Judged by "
+        + (
+            f"`{args.engine}` at depth {args.depth}."
+            if args.engine
+            else "the Lichess cloud evaluation."
+        ),
         "",
-        f"- Judged by the engine: {judged:,}; not held by the service: {result['missing']:,}",
+        f"- Judged by the engine: {judged:,}; not held by the cloud service: {result['missing']:,}",
         f"- Illegal moves: {result['illegal']}",
         f"- Within {args.margin:g} centipawns of the best line: {passed:.1%}",
         f"- Mean loss against the best line: {result['mean_loss']:.1f} centipawns",

@@ -25,6 +25,9 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
   `DRY_RUN=1` to preview the commands.
 - **Documentation** in English: README, architecture, search algorithms, data and training, models, results and the guide to
   adding a model. `tests/test_docs.py` checks the links, the commands and the script paths they quote.
+- **Opening book** rebuilt from the Lichess evaluations (121,868 positions, 24 half-moves, up to four moves per
+  position) with `scripts/data/build_opening_book.py`, and `scripts/data/check_opening_book.py`, which judges a random
+  sample of its moves with Stockfish (98.7 % within 50 centipawns of the best line on 2,438 entries).
 
 ### Changed
 - The default training keeps 10 % of the mate positions; the 100 % variant is `--mate-keep 1.0 --tag mates100`. The default

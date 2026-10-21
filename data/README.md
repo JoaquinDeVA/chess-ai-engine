@@ -4,15 +4,14 @@ What lives here and what can be deleted. Only this file and `opening_book.json` 
 
 ## Permanent (keep)
 
-* `opening_book.json` – opening book used by `IterativeModelBookBot` (`{fen: uci_move}`), versioned.
+* `opening_book.json` – the one opening book of the project, used by `IterativeModelBookBot`
+  (`{fen: uci_move}`), versioned. Built from the Lichess evaluations with
+  `python scripts/data/build_opening_book.py`.
 * `knowledge/endgame/` – the Syzygy endgame tablebases for 3, 4 and 5 pieces (290 files, 939 MB:
   the `.rtbw` win/draw/loss tables and the `.rtbz` distance-to-zeroing tables). **Not versioned**
   (too large) but not regenerable either: copy them back from `tablebase.lichess.ovh` or from
   any other Syzygy 3-4-5 set. Bots use them with `python main.py --endgame-db`; see
   `docs/ALGORITHMS.md`.
-* `knowledge/opening/` – the opening files of the course (`openings_fen7.csv`, the source of
-  `opening_book.json`, and `best_moves.json`, whose moves do not match their positions and are not
-  used).
 
 ## Training data (can be rebuilt, can be deleted)
 

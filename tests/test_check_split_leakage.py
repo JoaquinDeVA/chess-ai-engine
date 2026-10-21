@@ -92,3 +92,23 @@ def test_sample_test_fens_returns_only_test_rows(script, tmp_path):
     raw, side = write_shard(tmp_path, rows)
     fens = script.sample_test_fens(raw, side, count=10, seed=1)
     assert sorted(fens) == sorted([key("e2e4"), key("d2d4")])
+
+
+def test_has_train_child_flags_only_positions_with_a_child_in_train(script, tmp_path):
+    after_e4 = chess.Board()
+    after_e4.push_uci("e2e4")
+    raw, side = write_shard(
+        tmp_path,
+        [
+            (key(), TEST),
+            (key("e2e4"), TRAIN),
+            (key("e2e4", "e7e5"), VALIDATION),
+            (key("d2d4"), TEST),
+        ],
+    )
+    hashes, splits = script.load_index(raw, side)
+    flags = script.has_train_child(
+        hashes, splits, [chess.STARTING_FEN, after_e4.fen(), chess.Board().fen()]
+    )
+    # the start has the child e4 in train; after 1.e4 the only child in the data is in validation
+    assert flags.tolist() == [True, False, True]

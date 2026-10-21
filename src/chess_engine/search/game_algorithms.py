@@ -29,10 +29,11 @@ from .search_utils import (
     store_transposition_entry,
 )
 
-#: Iterations that are always completed before the time estimate may stop the deepening. The
-#: estimate extrapolates from the two previous iterations and, when the first ones are almost
-#: instant, it wildly overestimates the next one: in a 10 min + 5 s tournament 11 % of the moves
-#: stopped at depth 2 after less than 2 s of a 40 s budget.
+#: Iterations that are always completed before the time estimate and the soft budget may stop the
+#: deepening. In a 10 min + 5 s tournament 12 % of the moves finished at depth 2 after less than
+#: 2 s of a 35-40 s budget. The estimate (it extrapolates from the two previous iterations and
+#: squares their ratio) is the main suspect, but replays with a cold and with a warm table did not
+#: reproduce the early stop, so the cause is not isolated; this floor removes the symptom.
 DEFAULT_MIN_DEPTH = 3
 
 

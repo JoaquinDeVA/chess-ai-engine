@@ -147,7 +147,7 @@ slowest evaluation, whose depth-3 iteration is sometimes cut by the hard limit w
 estimator and the floor; the estimator above was chosen afterwards and was not replayed in games. The logs are local files.
 
 **Status.** Iterative deepening and `TimeManager`: kept, since the first commit (2026-10-16).
-Minimum depth 3: kept as a guard, since 2026-10-21 (commit `0cdf404`). Estimator `geometric_growth`: default since 2026-10-21 (commit `c72b99e`); the original rule stays available as `ratio_squared`.
+Minimum depth 3: kept as a guard, since 2026-10-21 (commit `0cdf404`). Estimator `geometric_growth`: default since 2026-10-21 (commit `d3e848c`); the original rule stays available as `ratio_squared`.
 
 ## 3. Transposition table
 
@@ -323,7 +323,7 @@ turns it on. It is off by default, so that tournaments compare evaluations and s
 
 **Measured effect.** TODO-ENDGAME-NUMBERS
 
-**Status.** Kept as an option; since 2026-10-21 (commit `3555557`). It is used only at the root:
+**Status.** Kept as an option; since 2026-10-21 (commit `2fc0f86`). It is used only at the root:
 the search never probes the tables inside the tree, and positions with six or more pieces are
 searched as usual.
 

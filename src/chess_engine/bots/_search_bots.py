@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 import chess
 
 from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
@@ -114,6 +115,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param min_depth: Iterations always completed whatever the clock estimate says (default 3).
     :param estimator: Rule that predicts the duration of the next iteration (see
         ``search/time_estimators.py``).
+    :param tablebase: Endgame tablebases; when given, positions with up to five pieces are played
+        from them without searching (default: none, so every bot searches the same way).
     """
 
     def __init__(
@@ -127,6 +130,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
         min_depth: int = DEFAULT_MIN_DEPTH,
         estimator: str = DEFAULT_ESTIMATOR,
+        tablebase: Optional[EndgameTablebase] = None,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
@@ -135,6 +139,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.quiescence_plies = quiescence_plies
         self.min_depth = min_depth
         self.estimator = estimator
+        self.tablebase = tablebase
         self.problem = problem if problem is not None else ChessProblem()
         self.transposition_table: Dict[Any, Any] = {}
         self.killer_moves: Dict[int, List[chess.Move]] = {}
@@ -219,5 +224,10 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param time_limit: Seconds left on the clock.
         :return: A legal move.
         """
+        if self.tablebase is not None:
+            move = self.tablebase.best_move(board)
+            if move is not None:
+                self.last_search_stats = SearchStatistics(0, 0, 0, False, 0, (), "tablebase", 0.0)
+                return move
         move = self.search(board, time_limit)
         return move if move is not None and move in board.legal_moves else fallback_move(board)

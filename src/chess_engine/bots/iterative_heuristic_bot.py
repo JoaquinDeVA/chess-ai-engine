@@ -1,6 +1,6 @@
 """Iterative-deepening alpha-beta with a hand-crafted heuristic, transposition table and killers."""
 
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import chess
 
@@ -18,6 +18,8 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
     :param max_depth: Deepest iteration to run.
     :param problem: Chess problem to search; a fresh one is created by default.
     :param time_manager: Time budgeting policy.
+    :param search_options: Other options of :class:`IterativeDeepeningBot` (``quiescence_plies``,
+        ``min_depth``, ``estimator``, ``max_tt_entries``, ``tablebase``).
     """
 
     def __init__(
@@ -26,8 +28,16 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
         max_depth: int = 3,
         problem: Optional[ChessProblem] = None,
         time_manager: Optional[TimeManager] = None,
+        **search_options: Any,
     ) -> None:
-        super().__init__("IterativeHeuristicBot", AUTHOR, max_depth, time_manager, problem=problem)
+        super().__init__(
+            "IterativeHeuristicBot",
+            AUTHOR,
+            max_depth,
+            time_manager,
+            problem=problem,
+            **search_options,
+        )
         self.eval_function = eval_function
 
     def evaluate(self, state: ChessGameState, player: chess.Color) -> float:

@@ -19,6 +19,7 @@ from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.human_player import HumanPlayer
 from chess_engine.config.settings import load_config
 from chess_engine.engine.game_manager import GameManager
+from chess_engine.knowledge.endgame_tablebase import DEFAULT_TABLEBASE_DIR, EndgameTablebase
 
 
 def setup_argument_parser() -> argparse.ArgumentParser:
@@ -84,6 +85,16 @@ Examples:
         type=int,
         default=None,
         help="Search depth (maximum depth for the iterative-deepening bots)",
+    )
+
+    parser.add_argument(
+        "--endgame-db",
+        nargs="?",
+        const=str(DEFAULT_TABLEBASE_DIR),
+        default=None,
+        metavar="DIR",
+        help="Play positions with up to five pieces from the Syzygy endgame tables in DIR "
+        "(default data/knowledge/endgame) instead of searching them",
     )
 
     parser.add_argument("--list-bots", action="store_true", help="List all available bots and exit")
@@ -158,8 +169,8 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
     """
     Build the constructor options requested on the command line for a bot.
 
-    ``--model`` and ``--depth`` are only passed to bots whose constructor accepts them
-    (``model`` and ``max_depth``), so they can be given freely in a mixed match.
+    ``--model``, ``--depth`` and ``--endgame-db`` are only passed to bots whose constructor accepts
+    them (``model``, ``max_depth`` and ``tablebase``), so they can be given freely in a mixed match.
 
     :param bot_registry: The bot registry instance
     :type bot_registry: BotRegistry
@@ -176,6 +187,10 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
         options["model"] = args.model
     if args.depth is not None and "max_depth" in parameters:
         options["max_depth"] = args.depth
+    if args.endgame_db is not None and (
+        "tablebase" in parameters or "search_options" in parameters
+    ):
+        options["tablebase"] = EndgameTablebase(args.endgame_db)
     return options
 
 

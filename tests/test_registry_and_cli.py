@@ -76,10 +76,25 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
 
     from main import bot_options
 
-    args = argparse.Namespace(model="linear_material", depth=3)
+    args = argparse.Namespace(model="linear_material", depth=3, endgame_db=None)
     assert bot_options(registry, "IterativeModelBookBot", args) == {
         "model": "linear_material",
         "max_depth": 3,
     }
     assert bot_options(registry, "IterativeHeuristicBot", args) == {"max_depth": 3}
+    assert bot_options(registry, "HumanPlayer", args) == {}
+
+
+def test_cli_passes_the_endgame_tables_only_to_bots_that_search(registry):
+    import argparse
+    from pathlib import Path
+
+    from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
+    from main import bot_options
+
+    tables = Path(__file__).resolve().parent / "data" / "syzygy"
+    args = argparse.Namespace(model=None, depth=None, endgame_db=str(tables))
+    options = bot_options(registry, "IterativeHeuristicBot", args)
+    assert isinstance(options["tablebase"], EndgameTablebase)
+    options["tablebase"].close()
     assert bot_options(registry, "HumanPlayer", args) == {}

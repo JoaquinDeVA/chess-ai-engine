@@ -1,6 +1,6 @@
 """Opening book, then iterative-deepening alpha-beta evaluated by a learned model."""
 
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import chess
 
@@ -27,6 +27,8 @@ class IterativeModelBookBot(IterativeDeepeningBot):
     :param max_depth: Deepest iteration to run.
     :param name: Bot name shown in games and tournaments.
     :param time_manager: Time budgeting policy.
+    :param search_options: Other options of :class:`IterativeDeepeningBot` (``quiescence_plies``,
+        ``min_depth``, ``estimator``, ``max_tt_entries``, ``tablebase``).
     :raises FileNotFoundError: If the saved model does not exist yet.
     """
 
@@ -37,8 +39,9 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         max_depth: int = 3,
         name: str = "IterativeModelBookBot",
         time_manager: Optional[TimeManager] = None,
+        **search_options: Any,
     ):
-        super().__init__(name, AUTHOR, max_depth, time_manager)
+        super().__init__(name, AUTHOR, max_depth, time_manager, **search_options)
         self.ml_model = load_model(model) if isinstance(model, str) else model
         self.evaluator = ModelEvaluator(self.ml_model)
         if opening_book is None:

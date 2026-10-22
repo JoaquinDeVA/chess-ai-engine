@@ -66,8 +66,20 @@ python main.py --player1 IterativeHeuristicBot --player2 IterativeModelBookBot -
 python main.py --mode tournament
 ```
 
-`python main.py --list-bots` shows the bots. `--position` starts from a FEN and `--export` saves the
-game in PGN.
+`python main.py --list-bots` shows the bots. `--position` starts from a FEN, `--export` saves the
+game in PGN, `--random-color` draws the colours, `--board-style` changes how the board is printed and
+`--verbose` prints more detail.
+
+### Optional knowledge
+
+These are off by default, so that the bots can be compared on their evaluation alone. They add
+knowledge that the search does not have.
+
+| Module | What it does | Option | Default | Details |
+|---|---|---|---|---|
+| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | `--opening-book [FILE]` | off (`IterativeModelBookBot` always uses it) | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
+| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables, without searching | `--endgame-db [DIR]` | off | [Algorithms](docs/ALGORITHMS.md), section 9 |
+| Quiescence, time estimator, minimum depth | Search settings of the bots: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/ALGORITHMS.md), sections 2 and 6 |
 
 ## Reproduce the experiments
 

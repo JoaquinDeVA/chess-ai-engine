@@ -350,8 +350,9 @@ was never shown to pay for its cost, and it was dropped rather than disproved.
 
 ## Around the search
 
-**The opening book.** `IterativeModelBookBot` (`src/chess_engine/bots/iterative_model_book_bot.py`) plays
-book moves while the game follows the book, then searches with the learned model. The book
+**The opening book.** Every search bot (`IterativeDeepeningBot`, `--opening-book`, off by default) plays
+book moves while the game follows the book, then searches; `IterativeModelBookBot`
+(`src/chess_engine/bots/iterative_model_book_bot.py`) always has the shipped book. The book
 (`OpeningBook`, `src/chess_engine/knowledge/opening_book.py`) is keyed by the first four FEN fields, so
 transpositions hit the same entry. Once the game leaves the book it is never consulted again;
 `on_game_start` re-enables it and clears the table, killers and statistics.

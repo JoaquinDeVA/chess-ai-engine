@@ -162,10 +162,10 @@ are in [Algorithms](ALGORITHMS.md).
 | `max_tt_entries` | 500,000 | size cap of the transposition table |
 | `time_manager` | `TimeManager()` | per-move time budgeting policy |
 
-The shipped subclasses expose only some of them: `IterativeHeuristicBot` takes `eval_function`,
-`max_depth`, `problem` and `time_manager`; `IterativeModelBookBot` takes `model`, `opening_book`,
-`max_depth`, `name` and `time_manager`. `min_depth`, `quiescence_plies` and `max_tt_entries` keep
-their defaults there unless a subclass passes them to `super().__init__`.
+The shipped subclasses take their own arguments (`IterativeHeuristicBot`: `eval_function`; `IterativeModelBookBot`:
+`model` and `opening_book`) plus `max_depth`, `time_manager` and any other option of
+`IterativeDeepeningBot` (`quiescence_plies`, `min_depth`, `estimator`, `max_tt_entries`, `tablebase`,
+`opening_book`), which they pass on.
 
 ## Adding a bot
 

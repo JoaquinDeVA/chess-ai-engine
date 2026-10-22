@@ -1,276 +1,163 @@
-# Modelos y resultados
+# Results
 
-> **Qué es:** Los datos de entrenamiento, la escala de esfuerzo y los resultados medidos de cada modelo, con el comando que reproduce cada número.
+> **What it is:** What was measured, which model plays best, why the answer depends on the time control, and the command behind every number.
 >
-> **Cuándo leerla:** Para comparar modelos, preparar datos o repetir una medición.
+> **Read it when:** You want to compare models, check a claim of the other pages, or repeat a measurement.
 >
-> **Siguiente paso:** [Añadir un modelo](ADDING_A_MODEL.md)
+> **Next:** [Adding an evaluation model](ADDING_A_MODEL.md)
 
-Los números son de este proyecto (CPU, esfuerzo 15 salvo que se diga otra cosa). Los comandos se
-lanzan desde la raíz del repositorio.
+All numbers are from this project, on a six-core CPU, with the five models trained at effort 30 (30
+million positions, 10 % of the mate positions kept; see [Data and training](DATA_AND_TRAINING.md)).
+Commands are run from the repository root.
 
-## Datos
+## The short answer
 
-**Origen.** Base pública de evaluaciones de Lichess, `lichess_db_eval.jsonl.zst`
-(<https://database.lichess.org/lichess_db_eval.jsonl.zst>, CC0, 22.4 GB, 416,442,401 posiciones
-evaluadas con Stockfish). Una línea JSON por posición: `fen` (sin contadores de jugadas) y `evals`
-(varias evaluaciones de la misma posición, cada una con `pvs`, `knodes` y `depth`). El fichero no
-está ordenado al azar: las posiciones más profundas y equilibradas vienen primero, así que las
-primeras no son una muestra uniforme de la base.
+- **Best player: the Piece-square-and-terms logistic model (`linear_pst_terms`).** It has the best
+  score in the three tournaments that were played (59.5 % at 60 s + 1 s, 66.0 % at 10 min + 5 s,
+  72.5 % at a fixed depth of 3) and is second in the static judge. Its intervals overlap those of
+  the next models, so "best" means best point estimate, not a proven gap.
+- **Worst player, with certainty: the Material logistic model (`linear_material`).** It has the
+  lowest static accuracy and the lowest score in every tournament; at 10 min + 5 s it wins 8 of 50
+  games.
+- **Best judge of a position: the Four-layer piece-square network (`net4_pst`)**, with a Spearman
+  correlation of 0.700 against Stockfish, but it does not translate into more wins (50.0 % at
+  10 min + 5 s).
+- **The order is stable across time controls**: `linear_material` is last in all three, and
+  `linear_pst_terms` first in all three. What changes is how far apart they are; see "Does the time
+  control matter?". An earlier finding that `linear_material` won at 60 s + 1 s came from training
+  every model with all the mate positions and is not reproduced with 10 % of them.
 
-**Lo que se usa:** los primeros 124,923,027 registros, en 126 shards Parquet
-(`data/lichess/raw/part-NNNNN.parquet`, git-ignorados). Cada fila sale de la evaluación de mayor
-`depth` (empate: mayor `knodes`):
+## How it is measured
 
-| columna | tipo | significado |
+| Judge | What it measures | Command |
 |---|---|---|
-| `fen` | string | posición, 4 campos |
-| `cp` | int16, nulo | centipeones de `pvs[0]` (acotado a -20000..20000) |
-| `mate` | int16, nulo | distancia al mate de `pvs[0]`; exactamente uno de `cp`/`mate` está definido |
-| `depth` | int16 | profundidad de la evaluación elegida |
-| `knodes` | int32 | miles de nodos de esa evaluación |
-| `best_move` | string | primer movimiento (UCI) de `pvs[0]` |
-| `n_evals`, `n_pvs` | uint8 | evaluaciones de la línea y PVs de la elegida |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42) | `python -m chess_engine.comparison.evaluate --model linear_pst_terms` |
+| Profile | Depth reached in 1, 3 and 10 s and agreement of the searched move with Stockfish | `python scripts/bench/profile_depth_vs_accuracy.py` |
+| Tournament | Round robin at equal time per move, paired openings (each opening is played with both colours), Elo against an anchor | `python scripts/bench/play_tournament.py` |
 
-**Convención de signo.** `cp` y `mate` están siempre **desde el punto de vista de las blancas**
-(positivo = bien para blancas, `mate > 0` = mate de blancas), mueva quien mueva. Se detectó con
-`chess_engine.training.lichess.detect_perspective` (correlación con el material en posiciones con
-negras al turno). Al entrenar, el objetivo se pasa al punto de vista del bando que mueve
-(`Representation`: `winprob`, `k = 0.00368208`, `side_to_move`).
+The tournaments report the score (wins plus half the draws) with a 95 % interval; no game in
+any of them ended by forfeit, time or illegal move. The whole flow is `bash scripts/run_full_pipeline.sh`.
 
-**Sidecars.** `part-NNNNN.sidecar.parquet` junto a cada shard (mismas filas y grupos de filas):
-partición (train, validación, test, por hash con semilla del FEN, `training.dataset.assign_split`),
-posición tranquila (sin jaque y con mejor jugada que no es captura ni promoción) y bando que mueve.
+## Tournaments
 
-| medida | valor |
+Anchor `h1` (the hand-written heuristic), 10 openings (20 games per pair, 300 games), 60 s + 1 s:
+
+| Player | Score % |
 |---|---|
-| shards / filas | 126 / 124,923,027 |
-| train / validación / test (80/10/10) | 99,935,706 / 12,496,155 / 12,491,166 |
-| posiciones tranquilas | 0.693 |
-| blancas al turno | 0.510 |
+| `linear_pst_terms` | 59.5 |
+| `net4_pst` | 57.0 |
+| `h1` | 54.0 |
+| `linear_king_bucket` | 50.5 |
+| `linear_pst` | 45.0 |
+| `linear_material` | 34.0 |
 
-Solo se admiten posiciones legales de ajedrez estándar (`chess.Board(fen).is_valid()`); lo
-descartado se cuenta en los metadatos del shard (`dropped`, `illegal`).
+The reference time control, 10 min + 5 s, 5 openings (10 games per pair, 150 games):
 
-**Comandos.**
+| Player | W-D-L | Score % | 95 % interval % |
+|---|---|---|---|
+| `linear_pst_terms` | 30-6-14 | 66.0 | 53.8 – 78.2 |
+| `linear_pst` | 27-3-20 | 57.0 | 43.7 – 70.3 |
+| `h1` | 24-7-19 | 55.0 | 42.2 – 67.8 |
+| `linear_king_bucket` | 24-3-23 | 51.0 | 37.6 – 64.4 |
+| `net4_pst` | 22-6-22 | 50.0 | 37.0 – 63.0 |
+| `linear_material` | 8-5-37 | 21.0 | 10.6 – 31.4 |
 
-```bash
-# 1. descarga reanudable (4 conexiones: con más, Lichess responde 429) y conversión a shards
-aria2c -x 4 -s 4 -k 64M --continue=true --auto-file-renaming=false --file-allocation=none \
-    --max-tries=0 --retry-wait=30 -d data/lichess -o lichess_db_eval.jsonl.zst \
-    https://database.lichess.org/lichess_db_eval.jsonl.zst
-python scripts/data/build_raw_shards.py --input data/lichess/lichess_db_eval.jsonl.zst \
-    --output-dir data/lichess/raw --log-file data/lichess/progress.log
+Fixed depth of 3 for everybody (no player can reach more depth than another), anchor
+`linear_pst_terms`, 10 openings (200 games):
 
-# 2. sidecars (los shards que ya tienen sidecar se saltan)
-python scripts/data/build_sidecars.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
-```
-
-Opciones útiles de `build_raw_shards.py`: `--rows` (solo las primeras N líneas), `--shard-rows`
-(por defecto 1,000,000), `--workers`, `--url` (en lugar de `--input`, lee por HTTP, más lento y
-frágil). Cada shard se escribe en un `.tmp` y se renombra, así que existe completo o no existe;
-repetir el comando salta los shards terminados. El `.zst` descargado (22.4 GB) es temporal: se
-borra cuando los shards están comprobados. `train` lee el flujo de filas TRAIN de los sidecars y
-los shards, y `evaluate` juzga sobre una muestra con semilla de 200,000 filas de test (semilla 42).
-
-## Escala de esfuerzo
-
-`--effort N` entrena con **N millones de posiciones** (mínimo 1 M) y `1 + N // 10` épocas. Esfuerzo
-15 = 15 M posiciones, 2 épocas; esfuerzo 30 = 30 M, 4 épocas. Es la escala de todas las tablas de
-esta página salvo que se indique otra.
-
-```bash
-python -m chess_engine.training.train --model linear_pst_terms --effort 15
-```
-
-## Juez estático
-
-200,000 posiciones de test, esfuerzo 15, semilla 42 salvo indicación. Spearman entre la predicción
-y la evaluación de Stockfish (todas las posiciones):
-
-| modelo | Spearman | notas |
-|---|---|---|
-| `linear_pst_terms` | 0.655 | semilla 7: 0.645 |
-| `linear_pst_terms@mates10` | 0.646 | semilla 7: 0.650 |
-| `linear_pst_terms@quiet` | 0.651 | entrenado solo con posiciones tranquilas |
-| `net4_pst` | 0.627 | |
-| `linear_pst` | 0.623 | |
-| `linear_king_bucket` | 0.609 | |
-| `h1` (heurística de referencia) | 0.561 | |
-| `linear_material` | 0.475 | esfuerzo 15 |
-| `linear_material@e90` | 0.474 | esfuerzo 90: MAE 0.158, mejor jugada 0.191 (0.549 no tranquilas); no mejora a esfuerzo 15 |
-| `linear_pst_terms@e30` | — | entrenado a esfuerzo 30; sin juicio estático ni partidas |
-
-Acierto de mejor jugada y MAE (sobre la escala de puntuación esperada) están en las fichas de cada
-modelo, sección `accuracy` (`src/chess_engine/models/cards/<modelo>.json`).
-
-```bash
-python -m chess_engine.training.train --model linear_pst_terms --effort 15
-python -m chess_engine.training.train --model linear_pst_terms --effort 15 --seed 7 --tag s7
-python -m chess_engine.training.train --model linear_pst_terms --effort 15 --representation '{"filter": "quiet"}' --tag quiet
-python -m chess_engine.comparison.evaluate --model linear_pst_terms
-python -m chess_engine.comparison.evaluate --model linear_pst_terms@s7
-```
-
-El resto de modelos se entrenan y evalúan igual cambiando `--model` (`linear_material`,
-`linear_pst`, `linear_king_bucket`, `net4_pst`; `h1` solo se evalúa).
-
-## Mates al 10 %
-
-`linear_pst_terms@mates10` conserva el 10 % de las posiciones de mate en TRAIN y validación:
-
-```bash
-python -m chess_engine.training.train --model linear_pst_terms --effort 15 --mate-keep 0.1 --tag mates10
-python -m chess_engine.training.train --model linear_pst_terms --effort 15 --mate-keep 0.1 --seed 7 --tag mates10s7
-```
-
-Con las dos semillas el acierto de mejor jugada sube (+1 a +2 puntos en total, +3 a +6 en
-posiciones no tranquilas) y el MAE empeora ligeramente (0.133 y 0.132 frente a 0.129 y 0.131).
-
-**Validación en partidas.** Esfuerzo 15, 100 partidas, 50 aperturas (dos partidas por apertura,
-colores cambiados), ancla `linear_pst_terms`, 60 s + 1 s por jugada. Registro local:
-`.superpowers/night1/MATES_PLAY.md` (no versionado).
-
-| jugador | puntuación % | V-T-D | intervalo 95 % | Elo frente a `linear_pst_terms` |
-|---|---|---|---|---|
-| `linear_pst_terms@mates10` | 71.0 | 64-14-22 | 62.9 - 79.1 | +156 |
-| `linear_pst_terms` (100 % de los mates, original) | 29.0 | 22-14-64 | 20.9 - 37.1 | 0 |
-
-Ninguna partida acabó por forfeit, tiempo o jugada ilegal (0 de 100). Terminaciones: 86 jaque
-mate, 12 triple repetición, 1 cincuenta jugadas, 1 material insuficiente.
-
-```bash
-python scripts/bench/play_tournament.py --players linear_pst_terms,linear_pst_terms@mates10 \
-    --anchor linear_pst_terms --openings 50 --workers 5 --base 60 --increment 1
-```
-
-**Decisión.** El entrenamiento por defecto usa ahora el 10 % de las posiciones de mate
-(`DEFAULT_MATE_KEEP = 0.10`), así que este comando produce el modelo del 10 %:
-
-```bash
-python -m chess_engine.training.train --model linear_pst_terms --effort 15
-```
-
-El `linear_pst_terms` original (100 % de los mates) se retira del repositorio; se recupera del
-historial de git en el commit `03169db` (`linear_pst_terms.npz` y `linear_pst_terms.json`). Una
-variante al 100 % se entrena con `--mate-keep 1.0 --tag mates100`.
-
-**Alcance.** Es un solo par de jugadores, una sola escala (esfuerzo 15) y 100 partidas. Este
-test no cambia la clasificación de los demás modelos.
-
-## Esfuerzo 90 (`linear_material`)
-
-Entrenado con 90 M de posiciones y 10 épocas. Con el mismo juez que la tabla anterior: Spearman
-0.474, MAE 0.158, acierto de mejor jugada 0.191 en total y 0.549 en posiciones no tranquilas. La
-pérdida de validación queda plana (0.6722 a 0.6719), así que el esfuerzo extra no añade información
-para este modelo: se queda con el esfuerzo 15.
-
-```bash
-python -m chess_engine.training.train --model linear_material --effort 90
-python -m chess_engine.comparison.evaluate --model linear_material@e90
-```
-
-**Reproducibilidad.** Las fichas `linear_material@e90` y `linear_pst_terms@e30` se generaron con el commit
-`1dd8cb8` y cambios sin confirmar (`+dirty`). Los refactors posteriores (`cba6d3a`, `d56a140`,
-`428bffb`) cambian el código pero no los números declarados; no se han vuelto a medir.
-
-## Quiescencia a profundidad fija
-
-Acuerdo de mejor jugada con Stockfish en 2,000 posiciones de test, comparación pareada (cada
-posición se juega con y sin quiescencia). Registros locales: `.superpowers/night1/players2000.log` y
-`.superpowers/night1/quiet_search_grid.log` (no versionados).
-
-| bot | profundidad 3, quiescencia 4 frente a 0 | error estándar pareado |
-|---|---|---|
-| `h1` | +0.060 | 0.010 |
-| `linear_pst` | +0.060 | 0.009 |
-| `linear_pst_terms` | +0.062 | 0.009 |
-
-En `linear_pst_terms` (rejilla): profundidad 2 con quiescencia 4 supera a profundidad 3 sin ella
-(+0.037, SE 0.013) con la mitad de tiempo (0.081 s frente a 0.188 s por jugada). Detalle del
-algoritmo en [ALGORITHMS.md](ALGORITHMS.md).
-
-## Torneo
-
-Todos contra todos a igual tiempo por jugada (60 s + 1 s), aperturas emparejadas (dos partidas por
-apertura, colores cambiados), sin partidas perdidas por forfeit. Puntuación = victorias + medias tablas.
-
-**Ronda 1:** `h1` y cinco modelos, 20 partidas por pareja (300 partidas, 0 forfeits).
-
-| jugador | puntuación % |
+| Player | Score % |
 |---|---|
-| `linear_material` | 69.0 |
-| `linear_king_bucket` | 59.0 |
-| `net4_pst` | 49.0 |
-| `linear_pst` | 48.5 |
-| `linear_pst_terms` | 37.5 |
-| `h1` | 37.0 |
-
-**Ronda 2:** los tres primeros, 50 partidas por pareja (150 partidas, 0 forfeits).
-
-| jugador | puntuación % |
-|---|---|
-| `linear_material` | 56.5 |
-| `net4_pst` | 51.0 |
-| `linear_king_bucket` | 42.5 |
+| `linear_pst_terms` | 72.5 |
+| `linear_pst` | 58.1 |
+| `net4_pst` | 47.5 |
+| `linear_king_bucket` | 44.4 |
+| `linear_material` | 27.5 |
 
 ```bash
-python scripts/bench/play_tournament.py --players h1,linear_material,linear_pst,linear_pst_terms,linear_king_bucket,net4_pst \
-    --anchor h1 --base 60 --increment 1 --workers 5 --openings 10 \
-    --out data/tournament/games_20.jsonl --report TOURNAMENT_20.md --logs data/tournament/games_20
-python scripts/bench/play_tournament.py --players linear_material,net4_pst,linear_king_bucket \
-    --anchor linear_material --base 60 --increment 1 --workers 5 --openings 25 \
-    --out data/tournament/games_50.jsonl --report TOURNAMENT_50.md --logs data/tournament/games_50
+python scripts/bench/play_tournament.py --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
+    --anchor h1 --base 60 --increment 1 --openings 10 --out data/tournament/short.jsonl
+python scripts/bench/play_tournament.py --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
+    --anchor h1 --base 600 --increment 5 --openings 5 --out data/tournament/reference.jsonl
+python scripts/bench/play_tournament.py --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst \
+    --anchor linear_pst_terms --max-depth 3 --base 600 --increment 0 --openings 10 --out data/tournament/depth3.jsonl
 ```
 
-(`--openings 10` son 20 partidas por pareja y `--openings 25` son 50.)
+Reading the 10 min + 5 s table honestly: with 50 games per player the intervals are about ±13
+points, so only the last place (`linear_material`) is separated from the rest; the order of the
+middle four could change with more games. The fixed-depth table is the cleanest comparison of the
+evaluations themselves, since speed plays no part.
 
-## Discrepancia: velocidad frente a evaluación
+## Does the time control matter?
 
-El juez estático pone a `linear_pst_terms` el primero y a `linear_material` el último; jugando a tiempo
-fijo es al revés. La explicación que los datos sostienen: `linear_material` evalúa unos 16 k nodos por
-segundo frente a 9 k de `linear_pst_terms` (1 s por jugada, 200 posiciones de test), así que en el mismo
-tiempo alcanza unos 0.6 semiplies más. Ese extra de profundidad es lo que le da la ventaja en el torneo.
+Less than it first seemed. With the five models trained the same way, the order of the extremes does
+not move: `linear_pst_terms` has 59.5 %, 66.0 % and 72.5 % and `linear_material` 34.0 %, 21.0 % and
+27.5 % in the three tournaments. The gap between the best and the worst widens with time, from
+25 points at 60 s + 1 s to 45 points at 10 min + 5 s. The models in the middle (`linear_pst`,
+`linear_king_bucket`, `net4_pst`, `h1`) swap places from one table to another, but their intervals
+overlap (±13 to ±14 points at 10 min + 5 s), so those swaps are within noise.
 
-Prueba con profundidad fija (3 para los dos, sin reloj efectivo, 50 aperturas, 100 partidas por pareja):
+Speed still matters, only not enough to reverse the order. The model table below gives the cost of
+one evaluation and the depth reached in a second: `linear_material` evaluates in 19.6 µs and
+reaches depth 4.0 in 1 s, `linear_pst_terms` takes 113 µs and reaches 3.3, and `net4_pst` takes
+46 µs and reaches 3.5. At a fixed depth of 3 (no speed advantage) `net4_pst` falls to 47.5 % and
+`linear_pst` stays second, so the network's quality as a judge (0.700) is not turned into play
+strength by a search this shallow. For a game at 10 min + 5 s use `linear_pst_terms`.
 
-| jugador | puntuación % a profundidad 3 | puntuación % a 60 s + 1 s |
+![Depth reached against agreement with Stockfish, per model](img/depth_vs_accuracy.png)
+
+*Generated by `python scripts/bench/profile_depth_vs_accuracy.py`.*
+
+## Decisions that are settled
+
+| Question | Answer | Where it comes from |
 |---|---|---|
-| `linear_pst_terms` | 74.8 | 37.5 (ronda 1) |
-| `linear_pst` | 38.8 | 48.5 (ronda 1) |
-| `linear_material` | 36.5 | 69.0 (ronda 1) |
+| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). | `python scripts/bench/play_tournament.py --players linear_pst_terms,linear_pst_terms@mates10 --anchor linear_pst_terms --openings 50 --base 60 --increment 1`; `DEFAULT_MATE_KEEP = 0.10` |
+| Does more training effort help? | Not for the Material logistic model: effort 90 gives Spearman 0.474, the same as effort 30; the validation loss stays flat (0.6722 to 0.6719). | `python -m chess_engine.training.train --model linear_material --effort 90` |
+| Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `python scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`; [Algorithms](ALGORITHMS.md), section 6 |
+| Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `python scripts/bench/compare_time_estimators.py`; [Algorithms](ALGORITHMS.md), section 2 |
+| Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`; [Algorithms](ALGORITHMS.md), section 9 |
+| Is the opening book good? | 98.7 % of 2,438 sampled moves are within 50 centipawns of Stockfish's best line, none illegal. | `python scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16` |
 
-A igual profundidad, `linear_material` pierde con claridad (14-20-66 frente a `linear_pst_terms`). La
-ventaja de `linear_material` a tiempo fijo es, por tanto, de velocidad y no de evaluación. Lo medido
-solo cubre profundidad 3 y 1 s por jugada; no se ha medido el cruce con profundidades mayores.
+The tournaments measure the evaluation alone: the endgame tables and the opening book are off in
+them, and the time estimator is pinned to the original rule (`ratio_squared`, with the floor of depth 3)
+so that a stopped tournament can be resumed with identical conditions. Quiescence is on, as in the
+bots by default.
 
-```bash
-python scripts/bench/play_tournament.py --players linear_material,linear_pst_terms,linear_pst \
-    --anchor linear_pst_terms --max-depth 3 --base 600 --increment 0 --openings 50 --workers 5 \
-    --out data/tournament/depth3.jsonl --report data/reports/DEPTH3.md
-```
+## Limits and leakage
 
-El torneo a profundidad fija no actualiza las fichas de modelo. Medición de velocidad:
-`.superpowers/experimentos/velocidad/` (no versionada).
+- **Positions, not games.** The data has no game identifiers, so the split is by a hash of the position.
+  `python scripts/data/check_split_leakage.py` found no duplicate position among the 124,923,027
+  rows; 1.1 % of the test positions have their colour-swapped image in the data and 72.0 % have a
+  position one move away (60.2 % in train).
+- **The neighbours do not flatter the models.** Judged separately on test positions with and
+  without a neighbour in train, the Spearman correlation is not higher with it
+  (`linear_pst_terms` 0.665 against 0.623, `net4_pst` 0.714 against 0.679, `linear_material` 0.493
+  against 0.446). Every model scores higher on those positions, including the 6-parameter one that
+  cannot memorise anything, so the difference comes from easier positions and not from memorisation.
+- **Statistical power.** The tournaments have 50 games per player at 10 min + 5 s and 100 to 150 per
+  player in the others; read them with the intervals.
+- **One machine, one run.** The figures depend on the CPU (the 1 s depth in particular).
 
-## Tabla de modelos
+## Model table
 
-Generada por `python -m chess_engine.comparison.report` a partir de las fichas; no se edita a mano.
+Generated by `python -m chess_engine.comparison.report` from the model cards; do not edit by hand.
 
 <!-- BEGIN GENERATED TABLES -->
-| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s |
-|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `h1` | plays | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 190.1 | — | — | — | — |
-| `linear_king_bucket` | plays | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 24.9 | — | — | — | — |
-| `linear_material` | plays | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 19.6 | — | — | — | — |
-| `linear_material@e90` | plays | 6 | winprob-k0.00368-stm-all | 90 | 0.474 | 0.158 | 19.1% / 54.9% | 22.1 | — | — | — | — |
-| `linear_pst` | plays | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 44.4 | — | — | — | — |
-| `linear_pst_terms` | plays | 791 | winprob-k0.00368-stm-all | 30 | 0.648 | 0.132 | 20.0% / 54.0% | 113.2 | — | — | — | — |
-| `linear_pst_terms@e30` | plays | 791 | winprob-k0.00368-stm-all | 30 | — | — | — | — | — | — | — | — |
-| `linear_pst_terms@mates10s7` | plays | 791 | winprob-k0.00368-stm-all | 15 | 0.650 | 0.132 | 20.2% / 54.8% | 118.5 | — | — | — | — |
-| `linear_pst_terms@quiet` | plays | 791 | winprob-k0.00368-stm-quiet-mates100 | 15 | 0.651 | 0.128 | 19.8% / 53.5% | 117.1 | — | — | — | — |
-| `linear_pst_terms@s7` | plays | 791 | winprob-k0.00368-stm-all-mates100 | 15 | 0.645 | 0.131 | 18.4% / 49.1% | 115.2 | — | — | — | — |
-| `net4_pst` | plays | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 46.1 | — | — | — | — |
-| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — |
-| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — |
+| Model | Kind | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | 10 min + 5 s, score % | 10 min + 5 s, Elo vs anchor | 1 min + 1 s, score % | 1 min + 1 s, Elo vs anchor | Depth 3, score % | Depth 3, Elo vs anchor |
+|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `h1` | plays | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 190.1 | — | — | — | — | 55.0% | +0 ± 92 | 54.0% | +0 ± 60 | — | — |
+| `linear_king_bucket` | plays | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 24.9 | 3.8 | 4.5 | 5.2 | 45.0% | 51.0% | -25 ± 96 | 50.5% | -21 ± 66 | 44.4% | -173 ± 68 |
+| `linear_material` | plays | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 19.6 | 4.0 | 4.8 | 5.7 | 43.0% | 21.0% | -227 ± 117 | 34.0% | -121 ± 66 | 27.5% | -279 ± 76 |
+| `linear_pst` | plays | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 44.4 | 3.6 | 4.2 | 5.2 | 48.0% | 57.0% | +12 ± 97 | 45.0% | -53 ± 62 | 58.1% | -91 ± 63 |
+| `linear_pst_terms` | plays | 791 | winprob-k0.00368-stm-all | 30 | 0.648 | 0.132 | 20.0% / 54.0% | 113.2 | 3.3 | 4.0 | 4.8 | 46.0% | 66.0% | +70 ± 98 | 59.5% | +33 ± 63 | 72.5% | +0 ± 72 |
+| `net4_pst` | plays | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 46.1 | 3.5 | 4.2 | 5.0 | 48.0% | 50.0% | -31 ± 92 | 57.0% | +18 ± 64 | 47.5% | -154 ± 68 |
+| `cnn_resnet` | accuracy record | 572,353 | — | — | 0.371 | 0.165 | 20.3% / 40.4% | 24,407.1 | — | — | — | — | — | — | — | — | — | — |
+| `mlp_features` | accuracy record | 1,505 | — | — | 0.614 | 0.130 | 17.9% / 43.6% | 124.2 | — | — | — | — | — | — | — | — | — | — |
 <!-- END GENERATED TABLES -->
+
+## Reproduce
+
+```bash
+DRY_RUN=1 bash scripts/run_full_pipeline.sh   # prints every command
+nohup setsid bash scripts/run_full_pipeline.sh > data/pipeline/pipeline.log 2>&1 &
+```

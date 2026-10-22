@@ -13,7 +13,19 @@ compare the models and the results, with the commands that reproduce them.
 
 ## What it found
 
-TODO-HEADLINE
+Six evaluation functions play each other at equal time, from a 6-parameter material count to a
+206,000-parameter network trained to imitate Stockfish on 125 million positions.
+
+- The best player is a **logistic model on piece-square features and a few positional terms**
+  (`linear_pst_terms`, 791 parameters): 66 % of the points at 10 min + 5 s, first at 60 s + 1 s and
+  at a fixed depth as well. The neural network judges positions better (Spearman 0.700 against
+  Stockfish) but does not win more games.
+- Counting material alone is clearly the worst (21 % at 10 min + 5 s).
+- Training for longer does not help the simplest model: effort 90 gives the same accuracy as 30.
+- Quiescence search adds up to 10 points of agreement with Stockfish at the same depth, and the
+  endgame tables convert 52 of 60 won endgames where the search alone converts 8.
+
+All the numbers, with the command behind each, are in [Results](docs/RESULTS.md).
 
 ## What is inside
 
@@ -62,7 +74,7 @@ game in PGN.
 The data (about 24 GB) and the training are described in
 [Data and training](docs/DATA_AND_TRAINING.md). Once the shards are in `data/lichess/raw`, the
 whole flow, from the sidecars to the training of the models, the measurements, the tournaments and
-the results table, is one script. It takes TODO-DURATION on a six-core machine:
+the results table, is one script. It takes roughly a day on a six-core machine, most of it the 10-minute tournament (about 13 hours):
 
 ```bash
 DRY_RUN=1 bash scripts/run_full_pipeline.sh      # print every command without running anything

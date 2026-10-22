@@ -9,7 +9,7 @@ skipped (their lines are still decompressed, not parsed), so an interrupted run 
 with the same options. Only legal standard-chess positions are kept (``chess.Board.is_valid``);
 parsing and the legality check run in ``--workers`` processes.
 
-    python scripts/data/fetch_lichess_raw.py --input data/lichess/lichess_db_eval.jsonl.zst
+    python scripts/data/build_raw_shards.py --input data/lichess/lichess_db_eval.jsonl.zst
 """
 
 import argparse

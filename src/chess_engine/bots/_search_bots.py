@@ -44,7 +44,7 @@ def fallback_move(board: chess.Board) -> chess.Move:
     return order_by_mvv_lva(board, legal)[0]
 
 
-#: Quiescence plies used by default by the search bots (see docs/SEARCH_ALGORITHMS.md).
+#: Quiescence plies used by default by the search bots (see docs/ALGORITHMS.md).
 DEFAULT_QUIESCENCE_PLIES = 4
 
 

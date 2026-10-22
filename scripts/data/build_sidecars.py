@@ -3,7 +3,7 @@
 
 One shard per worker process; existing sidecars are skipped, so the run can be repeated.
 
-    python scripts/data/prepare_dataset.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 5
+    python scripts/data/build_sidecars.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 5
 """
 
 import argparse

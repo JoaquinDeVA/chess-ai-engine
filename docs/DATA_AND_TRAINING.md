@@ -177,8 +177,8 @@ request rate; on 12 entries both judges agreed on the one failing move.
 
 **The endgame tables** are the Syzygy tablebases for three, four and five pieces (290 files, 939 MB)
 in `data/knowledge/endgame`. They are not versioned and cannot be rebuilt by this project: they
-come from `tablebase.lichess.ovh` (or any Syzygy 3-4-5 set). The bots use them only if asked
-(`python main.py --endgame-db`); see [Search algorithms](ALGORITHMS.md), section 9.
+come from `tablebase.lichess.ovh` (or any Syzygy 3-4-5 set). The search bots use them when the folder exists
+(`python main.py --no-endgame-db` switches them off); see [Search algorithms](ALGORITHMS.md), section 9.
 
 ## Reproducing everything
 

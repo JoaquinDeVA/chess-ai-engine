@@ -326,8 +326,9 @@ losing it takes the one with the largest, to resist longest.
 (`covers`, `best_move` and the move ranking), on top of `chess.syzygy` from python-chess. The 3-4-5
 piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not versioned.
 `IterativeDeepeningBot` takes a `tablebase` argument and consults it at the root of `get_move`,
-recording `stop_reason = "tablebase"` in the search statistics; `python main.py --endgame-db`
-turns it on. It is off by default, so that tournaments compare evaluations and search, not tables.
+recording `stop_reason = "tablebase"` in the search statistics; `python main.py --no-endgame-db`
+turns it off. It is on by default when the tables are present; the tournaments and measurement scripts
+build their players without it (`make_player`), so that they compare evaluations and search, not tables.
 
 **Measured effect.** Measured with `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`
 (report: `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions with three to five pieces, the
@@ -350,9 +351,9 @@ was never shown to pay for its cost, and it was dropped rather than disproved.
 
 ## Around the search
 
-**The opening book.** Every search bot (`IterativeDeepeningBot`, `--opening-book`, off by default) plays
-book moves while the game follows the book, then searches; `IterativeModelBookBot`
-(`src/chess_engine/bots/iterative_model_book_bot.py`) always has the shipped book. The book
+**The opening book.** Every search bot (`IterativeDeepeningBot`; on by default, `--no-opening-book` switches it off) plays
+book moves while the game follows the book, then searches. `IterativeModelBookBot`
+(`src/chess_engine/bots/iterative_model_book_bot.py`) is the learned-model bot of the registry. The book
 (`OpeningBook`, `src/chess_engine/knowledge/opening_book.py`) is keyed by the first four FEN fields, so
 transpositions hit the same entry. Once the game leaves the book it is never consulted again;
 `on_game_start` re-enables it and clears the table, killers and statistics.

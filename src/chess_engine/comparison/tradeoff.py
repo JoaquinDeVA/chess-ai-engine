@@ -22,7 +22,6 @@ from chess_engine.bots._search_bots import IterativeDeepeningBot
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h1
-from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, get_model_class
 from chess_engine.models.cards import card_path, update_card
 from chess_engine.models.registry import split_spec
@@ -62,16 +61,18 @@ def make_player(
     max_depth: int = 30,
     **search_options: Any,
 ) -> IterativeDeepeningBot:
-    """Build an iterative-deepening player without an opening book.
+    """Build an iterative-deepening player for measurements: no opening book and no tablebases.
 
     :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
         name or ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
         instance.
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.
-    :param search_options: Other options of the bot (``estimator``, ``min_depth``, ``tablebase``...).
+    :param search_options: Other options of the bot (``estimator``, ``min_depth``...); they may
+        switch the book (``opening_book``) or the tables (``tablebase``) on.
     :return: The player.
     """
+    search_options = {"opening_book": None, "tablebase": None, **search_options}
     if isinstance(spec, str) and spec in HEURISTICS:
         return IterativeHeuristicBot(
             eval_function=HEURISTICS[spec],
@@ -82,7 +83,6 @@ def make_player(
     name = spec if isinstance(spec, str) else type(spec).name
     return IterativeModelBookBot(
         model=spec,
-        opening_book=OpeningBook({}),
         max_depth=max_depth,
         name=name,
         time_manager=time_manager,

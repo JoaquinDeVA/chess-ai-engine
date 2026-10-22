@@ -106,7 +106,7 @@ def test_the_bot_plays_the_tablebase_move_without_searching(tablebase):
 
 def test_the_bot_without_tablebase_searches(tablebase):
     board = chess.Board("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1")
-    bot = IterativeHeuristicBot()
+    bot = IterativeHeuristicBot(tablebase=None)
     bot.get_move(board, 5.0)
     assert bot.last_search_stats.stop_reason != "tablebase"
     assert bot.last_search_stats.nodes_visited > 0

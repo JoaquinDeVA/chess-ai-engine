@@ -19,8 +19,8 @@ from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.human_player import HumanPlayer
 from chess_engine.config.settings import load_config
 from chess_engine.engine.game_manager import GameManager
-from chess_engine.knowledge.endgame_tablebase import DEFAULT_TABLEBASE_DIR, EndgameTablebase
-from chess_engine.knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook
+from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
+from chess_engine.knowledge.opening_book import OpeningBook
 
 
 def setup_argument_parser() -> argparse.ArgumentParser:
@@ -89,23 +89,25 @@ Examples:
     )
 
     parser.add_argument(
-        "--endgame-db",
-        nargs="?",
-        const=str(DEFAULT_TABLEBASE_DIR),
-        default=None,
-        metavar="DIR",
-        help="Play positions with up to five pieces from the Syzygy endgame tables in DIR "
-        "(default data/knowledge/endgame) instead of searching them",
-    )
-
-    parser.add_argument(
         "--opening-book",
-        nargs="?",
-        const=str(DEFAULT_BOOK_PATH),
         default=None,
         metavar="FILE",
-        help="Play the moves of the opening book FILE while the game follows it "
-        "(default data/opening_book.json; IterativeModelBookBot always uses its book)",
+        help="Opening book to play from (default data/opening_book.json, on for every search bot)",
+    )
+    parser.add_argument(
+        "--no-opening-book", action="store_true", help="Search from the first move: no opening book"
+    )
+    parser.add_argument(
+        "--endgame-db",
+        default=None,
+        metavar="DIR",
+        help="Syzygy endgame tables to play from (default data/knowledge/endgame, on for every "
+        "search bot when the folder exists)",
+    )
+    parser.add_argument(
+        "--no-endgame-db",
+        action="store_true",
+        help="Search every endgame position: no endgame tables",
     )
 
     parser.add_argument("--list-bots", action="store_true", help="List all available bots and exit")
@@ -180,9 +182,9 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
     """
     Build the constructor options requested on the command line for a bot.
 
-    ``--model``, ``--depth``, ``--endgame-db`` and ``--opening-book`` are only passed to bots whose
+    ``--model``, ``--depth``, the endgame tables and the opening book are only passed to bots whose
     constructor accepts them (``model``, ``max_depth``, ``tablebase`` and ``opening_book``), so they
-    can be given freely in a mixed match.
+    can be given freely in a mixed match. The book and the tables are on unless switched off.
 
     :param bot_registry: The bot registry instance
     :type bot_registry: BotRegistry
@@ -199,14 +201,17 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
         options["model"] = args.model
     if args.depth is not None and "max_depth" in parameters:
         options["max_depth"] = args.depth
-    if args.endgame_db is not None and (
-        "tablebase" in parameters or "search_options" in parameters
-    ):
-        options["tablebase"] = EndgameTablebase(args.endgame_db)
-    if args.opening_book is not None and (
-        "opening_book" in parameters or "search_options" in parameters
-    ):
-        options["opening_book"] = OpeningBook.load(args.opening_book)
+    takes_search_options = "search_options" in parameters
+    if "tablebase" in parameters or takes_search_options:
+        if args.no_endgame_db:
+            options["tablebase"] = None
+        elif args.endgame_db is not None:
+            options["tablebase"] = EndgameTablebase(args.endgame_db)
+    if "opening_book" in parameters or takes_search_options:
+        if args.no_opening_book:
+            options["opening_book"] = None
+        elif args.opening_book is not None:
+            options["opening_book"] = OpeningBook.load(args.opening_book)
     return options
 
 

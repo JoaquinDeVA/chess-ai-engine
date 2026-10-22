@@ -20,7 +20,6 @@ import chess
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h1
-from chess_engine.knowledge.opening_book import OpeningBook
 
 #: Large enough for the time manager to give every move its maximum budget (40 s).
 CLOCK = 10_000.0
@@ -105,9 +104,11 @@ def bot_factories(depth: int) -> dict[str, Callable[[], Any]]:
     :return: Mapping bot label -> constructor.
     """
     return {
-        "heuristic_h1": lambda: IterativeHeuristicBot(h1, max_depth=depth),
+        "heuristic_h1": lambda: IterativeHeuristicBot(
+            h1, max_depth=depth, opening_book=None, tablebase=None
+        ),
         "model_mlp_features": lambda: IterativeModelBookBot(
-            model="mlp_features", opening_book=OpeningBook({}), max_depth=depth
+            model="mlp_features", opening_book=None, tablebase=None, max_depth=depth
         ),
     }
 

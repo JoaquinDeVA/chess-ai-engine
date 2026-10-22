@@ -45,12 +45,15 @@ def test_random_won_positions_are_legal_wins_for_white(script, tables, monkeypat
 
 def test_the_tablebase_winner_converts_kq_against_k(script, tables):
     start = chess.Board("8/8/8/8/8/2k5/8/K6Q w - - 0 1")
-    winner = IterativeHeuristicBot(tablebase=tables)
+    winner = IterativeHeuristicBot(tablebase=tables, opening_book=None)
     assert script.convert(start, winner, tables, max_moves=30) is not None
 
 
 def test_a_game_that_is_not_mated_in_time_returns_none(script, tables):
     start = chess.Board("8/8/8/8/8/2k5/8/K6Q w - - 0 1")
     assert (
-        script.convert(start, IterativeHeuristicBot(tablebase=tables), tables, max_moves=2) is None
+        script.convert(
+            start, IterativeHeuristicBot(tablebase=tables, opening_book=None), tables, max_moves=2
+        )
+        is None
     )

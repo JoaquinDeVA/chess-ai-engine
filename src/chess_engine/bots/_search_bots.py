@@ -8,7 +8,7 @@ The leading underscore keeps this file out of the bot registry (it contains no p
 
 import logging
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import chess
 
@@ -30,6 +30,9 @@ from chess_engine.search.time_management import TimeManager
 logger = logging.getLogger(__name__)
 
 AUTHOR = "Joaquin De Vicente Abad"
+
+#: Value of ``opening_book`` and ``tablebase`` that means "the ones shipped with the project".
+SHIPPED = "shipped"
 
 
 def fallback_move(board: chess.Board) -> chess.Move:
@@ -116,10 +119,12 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param min_depth: Iterations always completed whatever the clock estimate says (default 3).
     :param estimator: Rule that predicts the duration of the next iteration (see
         ``search/time_estimators.py``).
-    :param tablebase: Endgame tablebases; when given, positions with up to five pieces are played
-        from them without searching (default: none, so every bot searches the same way).
+    :param tablebase: Endgame tablebases; positions with up to five pieces are played from them
+        without searching. ``SHIPPED`` (default) uses ``data/knowledge/endgame`` if it exists;
+        ``None`` switches them off, so the bot searches every position.
     :param opening_book: Opening book; while the game follows it the bot plays its moves, and once
-        the game leaves it the book is not consulted again (default: none).
+        the game leaves it the book is not consulted again. ``SHIPPED`` (default) uses
+        ``data/opening_book.json``; ``None`` switches it off.
     """
 
     def __init__(
@@ -133,8 +138,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
         min_depth: int = DEFAULT_MIN_DEPTH,
         estimator: str = DEFAULT_ESTIMATOR,
-        tablebase: Optional[EndgameTablebase] = None,
-        opening_book: Optional[OpeningBook] = None,
+        tablebase: Union[EndgameTablebase, None, str] = SHIPPED,
+        opening_book: Union[OpeningBook, None, str] = SHIPPED,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
@@ -143,9 +148,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.quiescence_plies = quiescence_plies
         self.min_depth = min_depth
         self.estimator = estimator
-        self.tablebase = tablebase
-        self.opening_book = opening_book
-        self.in_book = opening_book is not None
+        self.tablebase = EndgameTablebase.shipped() if tablebase == SHIPPED else tablebase
+        self.opening_book = OpeningBook.shipped() if opening_book == SHIPPED else opening_book
+        self.in_book = self.opening_book is not None
         self.problem = problem if problem is not None else ChessProblem()
         self.transposition_table: Dict[Any, Any] = {}
         self.killer_moves: Dict[int, List[chess.Move]] = {}

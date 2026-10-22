@@ -76,7 +76,14 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
 
     from main import bot_options
 
-    args = argparse.Namespace(model="linear_material", depth=3, endgame_db=None, opening_book=None)
+    args = argparse.Namespace(
+        model="linear_material",
+        depth=3,
+        endgame_db=None,
+        opening_book=None,
+        no_endgame_db=False,
+        no_opening_book=False,
+    )
     assert bot_options(registry, "IterativeModelBookBot", args) == {
         "model": "linear_material",
         "max_depth": 3,
@@ -93,7 +100,14 @@ def test_cli_passes_the_endgame_tables_only_to_bots_that_search(registry):
     from main import bot_options
 
     tables = Path(__file__).resolve().parent / "data" / "syzygy"
-    args = argparse.Namespace(model=None, depth=None, endgame_db=str(tables), opening_book=None)
+    args = argparse.Namespace(
+        model=None,
+        depth=None,
+        endgame_db=str(tables),
+        opening_book=None,
+        no_endgame_db=False,
+        no_opening_book=False,
+    )
     options = bot_options(registry, "IterativeHeuristicBot", args)
     assert isinstance(options["tablebase"], EndgameTablebase)
     options["tablebase"].close()
@@ -108,7 +122,33 @@ def test_opening_book_option_reaches_the_search_bots(registry, tmp_path):
 
     book = tmp_path / "book.json"
     book.write_text('{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -": "e2e4"}')
-    args = argparse.Namespace(model=None, depth=None, endgame_db=None, opening_book=str(book))
+    args = argparse.Namespace(
+        model=None,
+        depth=None,
+        endgame_db=None,
+        opening_book=str(book),
+        no_endgame_db=False,
+        no_opening_book=False,
+    )
     options = bot_options(registry, "IterativeHeuristicBot", args)
     assert isinstance(options["opening_book"], OpeningBook) and len(options["opening_book"]) == 1
     assert bot_options(registry, "HumanPlayer", args) == {}
+
+
+def test_no_flags_switch_the_book_and_the_tables_off(registry):
+    import argparse
+
+    from main import bot_options
+
+    args = argparse.Namespace(
+        model=None,
+        depth=None,
+        endgame_db=None,
+        opening_book=None,
+        no_endgame_db=True,
+        no_opening_book=True,
+    )
+    assert bot_options(registry, "IterativeHeuristicBot", args) == {
+        "tablebase": None,
+        "opening_book": None,
+    }

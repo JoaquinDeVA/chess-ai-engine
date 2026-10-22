@@ -24,7 +24,7 @@ def test_make_player_builds_model_and_heuristic_players(stub_model):
     model_player = make_player(stub_model, manager, max_depth=4)
     assert isinstance(model_player, IterativeModelBookBot)
     assert model_player.max_depth == 4
-    assert len(model_player.opening_book) == 0
+    assert model_player.opening_book is None and model_player.tablebase is None
     assert model_player.time_manager is manager
     player = make_player("h1", manager)
     assert isinstance(player, IterativeHeuristicBot)

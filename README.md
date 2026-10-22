@@ -70,16 +70,16 @@ python main.py --mode tournament
 game in PGN, `--random-color` draws the colours, `--board-style` changes how the board is printed and
 `--verbose` prints more detail.
 
-### Optional knowledge
+### Extras of the bots
 
-These are off by default, so that the bots can be compared on their evaluation alone. They add
-knowledge that the search does not have.
+The search bots come with everything that helps them play, and every extra can be switched off, for
+example to compare evaluations alone (the tournaments of the results page do that).
 
-| Module | What it does | Option | Default | Details |
+| Extra | What it does | Switch | Default | Details |
 |---|---|---|---|---|
-| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | `--opening-book [FILE]` | off (`IterativeModelBookBot` always uses it) | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
-| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables, without searching | `--endgame-db [DIR]` | off | [Algorithms](docs/ALGORITHMS.md), section 9 |
-| Quiescence, time estimator, minimum depth | Search settings of the bots: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/ALGORITHMS.md), sections 2 and 6 |
+| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | `--opening-book FILE` to use another one, `--no-opening-book` to switch it off | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
+| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists) | `--endgame-db DIR`, `--no-endgame-db` | on | [Algorithms](docs/ALGORITHMS.md), section 9 |
+| Quiescence, time estimator, minimum depth | Search settings: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/ALGORITHMS.md), sections 2 and 6 |
 
 ## Reproduce the experiments
 

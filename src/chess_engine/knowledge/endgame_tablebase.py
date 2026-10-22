@@ -9,6 +9,7 @@ the winning moves, the one that finishes the quickest.
 The tables are not versioned (they are large); see ``docs/DATA_AND_TRAINING.md`` for where they go.
 """
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Union
 
@@ -46,6 +47,15 @@ class EndgameTablebase:
         :return: The tablebase, or ``None`` when the folder is missing.
         """
         return cls(directory) if Path(directory).is_dir() else None
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def shipped(cls) -> Optional["EndgameTablebase"]:
+        """The tables of ``data/knowledge/endgame``, opened once and shared.
+
+        :return: The tablebase, or ``None`` when the folder is missing (a fresh clone).
+        """
+        return cls.open_if_present()
 
     def close(self) -> None:
         """Release the open table files."""

@@ -4,8 +4,8 @@ from typing import Any, Optional, Union
 
 import chess
 
-from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
-from chess_engine.knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook
+from chess_engine.bots._search_bots import AUTHOR, SHIPPED, IterativeDeepeningBot
+from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, load_model
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.search.chess_game_state import ChessGameState
@@ -23,7 +23,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
 
     :param model: Registered model name, or an already loaded :class:`EvaluationModel`.
     :param opening_book: Book to use; the one shipped in ``data/`` by default (an empty book
-        if that file is missing).
+        if that file is missing); ``None`` switches it off.
     :param max_depth: Deepest iteration to run.
     :param name: Bot name shown in games and tournaments.
     :param time_manager: Time budgeting policy.
@@ -35,14 +35,12 @@ class IterativeModelBookBot(IterativeDeepeningBot):
     def __init__(
         self,
         model: Union[str, EvaluationModel] = DEFAULT_MODEL,
-        opening_book: Optional[OpeningBook] = None,
+        opening_book: Union[OpeningBook, None, str] = SHIPPED,
         max_depth: int = 3,
         name: str = "IterativeModelBookBot",
         time_manager: Optional[TimeManager] = None,
         **search_options: Any,
     ):
-        if opening_book is None:
-            opening_book = OpeningBook.load() if DEFAULT_BOOK_PATH.exists() else OpeningBook({})
         super().__init__(
             name, AUTHOR, max_depth, time_manager, opening_book=opening_book, **search_options
         )

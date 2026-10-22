@@ -25,9 +25,11 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
   `DRY_RUN=1` to preview the commands.
 - **Documentation** in English: README, architecture, search algorithms, data and training, models, results and the guide to
   adding a model. `tests/test_docs.py` checks the links, the commands and the script paths they quote.
-- **`--opening-book`**: the opening book is an option of every search bot (off by default, so that evaluations
-  can be compared alone). `IterativeModelBookBot` defaults to `linear_pst_terms`, the best player in the
-  tournaments, which ships with the repository.
+- **The extras are part of the bots.** Every search bot plays the shipped opening book and the endgame tables (when
+  `data/knowledge/endgame` exists) unless told otherwise (`--no-opening-book`, `--no-endgame-db`, or `None` for
+  `opening_book` / `tablebase`), next to quiescence and the time estimator, which were already on. The tournaments
+  and measurement scripts build their players without book and tables, to compare evaluations alone.
+  `IterativeModelBookBot` defaults to `linear_pst_terms`, which ships with the repository.
 - **Opening book** rebuilt from the Lichess evaluations (121,868 positions, 24 half-moves, up to four moves per
   position) with `scripts/data/build_opening_book.py`, and `scripts/data/check_opening_book.py`, which judges a random
   sample of its moves with Stockfish (98.7 % within 50 centipawns of the best line on 2,438 entries).

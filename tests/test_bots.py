@@ -20,7 +20,7 @@ MATE_MOVE = chess.Move.from_uci("a1a8")
 def make_bots(stub_model):
     """One instance of every bot that does not need a trained artifact."""
     return {
-        "heuristic": IterativeHeuristicBot(max_depth=3),
+        "heuristic": IterativeHeuristicBot(max_depth=3, opening_book=None, tablebase=None),
         "model_book": IterativeModelBookBot(
             model=stub_model, opening_book=OpeningBook({}), max_depth=3
         ),
@@ -84,7 +84,7 @@ class TestEvaluation:
 
 class TestIterativeDeepening:
     def test_transposition_table_and_killers_fill_up_and_clear_on_new_game(self):
-        bot = IterativeHeuristicBot(max_depth=3)
+        bot = IterativeHeuristicBot(max_depth=3, opening_book=None, tablebase=None)
         bot.get_move(chess.Board(), 10.0)
         assert bot.transposition_table and bot.killer_moves
         bot.on_game_start(chess.BLACK, "opponent")
@@ -92,7 +92,7 @@ class TestIterativeDeepening:
 
     def test_the_capture_ordering_callback_is_used(self):
         """Regression B8: the MVV-LVA callback was defined but never passed to the search."""
-        bot = IterativeHeuristicBot(max_depth=2)
+        bot = IterativeHeuristicBot(max_depth=2, opening_book=None, tablebase=None)
         calls = []
         original = bot.order_moves
         bot.order_moves = lambda board, moves: calls.append(len(moves)) or original(board, moves)
@@ -100,19 +100,19 @@ class TestIterativeDeepening:
         assert calls
 
     def test_stays_within_the_time_budget(self):
-        bot = IterativeHeuristicBot(max_depth=30)
+        bot = IterativeHeuristicBot(max_depth=30, opening_book=None, tablebase=None)
         started = time.time()
         move = bot.get_move(chess.Board(), 2.0)
         assert time.time() - started < 2.0
         assert move in chess.Board().legal_moves
 
     def test_returns_a_legal_move_when_there_is_almost_no_time(self):
-        bot = IterativeHeuristicBot(max_depth=5)
+        bot = IterativeHeuristicBot(max_depth=5, opening_book=None, tablebase=None)
         board = chess.Board()
         assert bot.get_move(board, 0.05) in board.legal_moves
 
     def test_deepens_beyond_the_first_iterations_when_time_allows(self):
-        bot = IterativeHeuristicBot(max_depth=6)
+        bot = IterativeHeuristicBot(max_depth=6, opening_book=None, tablebase=None)
         bot.get_move(chess.Board(MATE_IN_ONE.replace("R3K3", "4K3")), 20.0)
         assert bot.last_search_stats.max_depth_reached >= 3
 
@@ -156,12 +156,17 @@ class TestMLBots:
             bot.get_move(chess.Board(), 10.0) in chess.Board().legal_moves
         )  # book no longer consulted
 
-    def test_the_book_is_an_option_of_every_search_bot_and_off_by_default(self):
+    def test_the_book_is_an_option_of_every_search_bot(self):
         book = OpeningBook({chess.Board().fen(): "d2d4"})
         with_book = IterativeHeuristicBot(max_depth=1, opening_book=book)
         assert with_book.get_move(chess.Board(), 10.0) == chess.Move.from_uci("d2d4")
         assert with_book.last_search_stats.stop_reason == "book"
-        assert IterativeHeuristicBot(max_depth=1).opening_book is None
+        assert IterativeHeuristicBot(max_depth=1, opening_book=None).opening_book is None
+
+    def test_the_shipped_book_and_tables_are_on_unless_switched_off(self):
+        bot = IterativeHeuristicBot(max_depth=1)
+        assert bot.opening_book is OpeningBook.shipped() and len(bot.opening_book) > 0
+        assert IterativeHeuristicBot(max_depth=1, tablebase=None).tablebase is None
 
     def test_a_new_game_re_enables_the_opening_book(self, stub_model):
         """Regression B16: the book flag was never reset, so the second game had no book."""

@@ -1,6 +1,7 @@
 """Opening book: a mapping from positions to the move to play in them."""
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -47,6 +48,15 @@ class OpeningBook:
         """
         with open(path, encoding="utf-8") as handle:
             return cls(json.load(handle))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def shipped(cls) -> "OpeningBook":
+        """The book shipped with the project, loaded once and shared.
+
+        :return: The book of ``data/opening_book.json``; an empty book if the file is missing.
+        """
+        return cls.load() if DEFAULT_BOOK_PATH.exists() else cls({})
 
     def lookup(self, board: chess.Board) -> Optional[chess.Move]:
         """Return the book move for ``board`` if there is one and it is legal.

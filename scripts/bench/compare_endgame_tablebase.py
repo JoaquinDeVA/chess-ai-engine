@@ -122,9 +122,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     starts = [random_won_position(rng, tables) for _ in range(args.positions)]
     variants = {
         "search with tablebases": lambda: IterativeHeuristicBot(
-            time_manager=fixed_time_manager(args.seconds), tablebase=tables
+            time_manager=fixed_time_manager(args.seconds), tablebase=tables, opening_book=None
         ),
-        "search only": lambda: IterativeHeuristicBot(time_manager=fixed_time_manager(args.seconds)),
+        "search only": lambda: IterativeHeuristicBot(
+            time_manager=fixed_time_manager(args.seconds), tablebase=None, opening_book=None
+        ),
     }
     lines = [
         "# Converting won endgames against a perfect defender",

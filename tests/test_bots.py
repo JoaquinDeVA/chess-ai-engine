@@ -10,7 +10,6 @@ from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.evaluation.heuristics import h1
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.models.base import ARTIFACTS_DIR
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.registry import get_model_class
 from tests.conftest import MATE_IN_ONE
@@ -172,12 +171,8 @@ class TestMLBots:
         bot = IterativeModelBookBot(model="linear_material", max_depth=1)
         assert bot.get_info()["model"] == "linear_material"
 
-    @pytest.mark.skipif(
-        not (ARTIFACTS_DIR / "mlp_features.keras").exists(), reason="mlp_features not trained"
-    )
     def test_default_model_loads(self):
-        """Regression B12: the default pointed to a file that did not exist."""
-        pytest.importorskip("keras")
+        """Regression B12: the default pointed to a file that did not exist in a fresh clone."""
         board = chess.Board()
         assert IterativeModelBookBot(max_depth=2).get_move(board, 10.0) in board.legal_moves
 

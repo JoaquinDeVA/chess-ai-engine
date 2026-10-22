@@ -98,8 +98,8 @@ Once a model has a saved file, a bot can use it:
 python main.py --player1 IterativeModelBookBot --model my_model --player2 IterativeHeuristicBot --depth 2
 ```
 
-Always pass `--model`: the default of `IterativeModelBookBot` is `mlp_features`, which is not
-available in a fresh clone (next section).
+Without `--model` the bot uses `linear_pst_terms`, the best player in the tournaments (see
+[Results](RESULTS.md)).
 
 ## The CSV-era models
 

@@ -126,6 +126,16 @@
       "base": 600.0,
       "increment": 0.0,
       "max_depth": 3
+    },
+    "600+5": {
+      "games": 50,
+      "score": 51.0,
+      "elo": -24.676394506220717,
+      "elo_interval": 95.74293165892513,
+      "anchor": "h1",
+      "base": 600.0,
+      "increment": 5.0,
+      "max_depth": 30
     }
   }
 }

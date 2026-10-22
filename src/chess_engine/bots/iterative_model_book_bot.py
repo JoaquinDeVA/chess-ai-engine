@@ -41,13 +41,13 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         time_manager: Optional[TimeManager] = None,
         **search_options: Any,
     ):
-        super().__init__(name, AUTHOR, max_depth, time_manager, **search_options)
-        self.ml_model = load_model(model) if isinstance(model, str) else model
-        self.evaluator = ModelEvaluator(self.ml_model)
         if opening_book is None:
             opening_book = OpeningBook.load() if DEFAULT_BOOK_PATH.exists() else OpeningBook({})
-        self.opening_book = opening_book
-        self.in_book = True
+        super().__init__(
+            name, AUTHOR, max_depth, time_manager, opening_book=opening_book, **search_options
+        )
+        self.ml_model = load_model(model) if isinstance(model, str) else model
+        self.evaluator = ModelEvaluator(self.ml_model)
 
     def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
         """Expected score of ``player`` according to the model.
@@ -57,29 +57,6 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         :return: Value in ``[0.01, 0.99]``.
         """
         return self.evaluator(state, player)
-
-    def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
-        """Start a new game: clear the search memory and re-enable the opening book.
-
-        :param color: Colour this bot plays.
-        :param opponent_name: Name of the opponent.
-        """
-        super().on_game_start(color, opponent_name)
-        self.in_book = True
-
-    def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:
-        """Play the book move if the position is in the book, otherwise search.
-
-        :param board: Current position.
-        :param time_limit: Seconds left on the clock.
-        :return: A legal move.
-        """
-        if self.in_book:
-            book_move = self.opening_book.lookup(board)
-            if book_move is not None:
-                return book_move
-            self.in_book = False
-        return super().get_move(board, time_limit)
 
     def get_info(self):
         """Describe the bot.

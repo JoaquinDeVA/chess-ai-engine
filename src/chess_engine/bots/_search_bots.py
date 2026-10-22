@@ -14,6 +14,7 @@ import chess
 
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
+from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import (
@@ -117,6 +118,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         ``search/time_estimators.py``).
     :param tablebase: Endgame tablebases; when given, positions with up to five pieces are played
         from them without searching (default: none, so every bot searches the same way).
+    :param opening_book: Opening book; while the game follows it the bot plays its moves, and once
+        the game leaves it the book is not consulted again (default: none).
     """
 
     def __init__(
@@ -131,6 +134,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         min_depth: int = DEFAULT_MIN_DEPTH,
         estimator: str = DEFAULT_ESTIMATOR,
         tablebase: Optional[EndgameTablebase] = None,
+        opening_book: Optional[OpeningBook] = None,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
@@ -140,6 +144,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.min_depth = min_depth
         self.estimator = estimator
         self.tablebase = tablebase
+        self.opening_book = opening_book
+        self.in_book = opening_book is not None
         self.problem = problem if problem is not None else ChessProblem()
         self.transposition_table: Dict[Any, Any] = {}
         self.killer_moves: Dict[int, List[chess.Move]] = {}
@@ -183,6 +189,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.transposition_table.clear()
         self.killer_moves.clear()
         self.reset_statistics()
+        self.in_book = self.opening_book is not None
 
     def search(self, board: chess.Board, time_limit: float) -> Optional[chess.Move]:
         """Run the iterative-deepening search for the position.
@@ -224,6 +231,12 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param time_limit: Seconds left on the clock.
         :return: A legal move.
         """
+        if self.in_book:
+            book_move = self.opening_book.lookup(board)
+            if book_move is not None:
+                self.last_search_stats = SearchStatistics(0, 0, 0, False, 0, (), "book", 0.0)
+                return book_move
+            self.in_book = False
         if self.tablebase is not None:
             move = self.tablebase.best_move(board)
             if move is not None:

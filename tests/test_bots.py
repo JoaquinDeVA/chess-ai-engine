@@ -156,6 +156,13 @@ class TestMLBots:
             bot.get_move(chess.Board(), 10.0) in chess.Board().legal_moves
         )  # book no longer consulted
 
+    def test_the_book_is_an_option_of_every_search_bot_and_off_by_default(self):
+        book = OpeningBook({chess.Board().fen(): "d2d4"})
+        with_book = IterativeHeuristicBot(max_depth=1, opening_book=book)
+        assert with_book.get_move(chess.Board(), 10.0) == chess.Move.from_uci("d2d4")
+        assert with_book.last_search_stats.stop_reason == "book"
+        assert IterativeHeuristicBot(max_depth=1).opening_book is None
+
     def test_a_new_game_re_enables_the_opening_book(self, stub_model):
         """Regression B16: the book flag was never reset, so the second game had no book."""
         book = OpeningBook({chess.Board().fen(): "e2e4"})

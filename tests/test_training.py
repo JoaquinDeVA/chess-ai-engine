@@ -93,7 +93,7 @@ class TestDatasetSplit:
 
 class TestEncoding:
     def test_parallel_encoding_equals_serial_encoding(self):
-        extractor = models.features.VectorFeatures()
+        extractor = models.dense_features.VectorFeatures()
         fens = pd.Series([" ".join(b.fen().split()[:4]) for b in random_positions(50, seed=3)])
         (serial,) = encode_positions(extractor, fens)
         (parallel,) = encode_positions(extractor, fens, n_jobs=2, chunk_size=10)

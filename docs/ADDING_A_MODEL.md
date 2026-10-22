@@ -104,7 +104,7 @@ Without `--model` the bot uses `linear_pst_terms`, the best player in the tourna
 ## The CSV-era models
 
 `mlp_features` and `cnn_resnet` predate the linear flow. They are an `EvaluationModel` subclass
-(`models/architectures.py`) that chooses an encoding from `models/features.py` and builds a Keras
+(`models/architectures.py`) that chooses an encoding from `models/dense_features.py` and builds a Keras
 network (`models/keras_model.py`). They were trained on a CSV of Stockfish evaluations, and that
 training code and data have been retired. **These two models are not in a fresh clone**: their
 weights (`*.keras`) are ignored by git, so the bots and tools that load them fail until you have the
@@ -120,7 +120,7 @@ python -m chess_engine.comparison.evaluate --model mlp_features
 
 | Piece | Where | What it is |
 |---|---|---|
-| Feature set | `models/linear_features.py` (or `models/features.py`) | turns a board into what the model consumes |
+| Feature set | `models/linear_features.py` (or `models/dense_features.py`) | turns a board into what the model consumes |
 | Model class | `models/linear_eval.py` (or `models/*.py`) | `EvaluationModel` with `predict_cp`, `expected_score`, `fit`, `save`, `load` |
 | Registration | `@register_model("name")` | makes it available to the CLIs and the bots by name |
 | Card | `models/cards/<name>.json` | what is known about the model; written by the commands |

@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.features import FeatureExtractor
+from chess_engine.models.dense_features import FeatureExtractor
 
 TRAIN, VALIDATION, TEST = 0, 1, 2
 

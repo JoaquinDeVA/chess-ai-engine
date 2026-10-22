@@ -13,8 +13,8 @@ from chess_engine.models import (
     load_model,
 )
 from chess_engine.models.base import ARTIFACTS_DIR, EvaluationModel
+from chess_engine.models.dense_features import BitboardFeatures, MaterialFeatures, VectorFeatures
 from chess_engine.models.evaluator import ModelEvaluator
-from chess_engine.models.features import BitboardFeatures, MaterialFeatures, VectorFeatures
 from chess_engine.models.registry import register_model
 from chess_engine.search.chess_game_state import ChessGameState
 from tests.conftest import material_cp, random_positions

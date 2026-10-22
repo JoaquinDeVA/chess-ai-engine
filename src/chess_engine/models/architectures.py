@@ -8,7 +8,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 
-from .features import BitboardFeatures, VectorFeatures
+from .dense_features import BitboardFeatures, VectorFeatures
 from .keras_model import KerasModel, _import_keras
 from .registry import register_model
 

@@ -7,7 +7,7 @@ import chess
 import pytest
 
 from chess_engine.models.base import EvaluationModel
-from chess_engine.models.features import VectorFeatures
+from chess_engine.models.dense_features import VectorFeatures
 
 PIECE_CP = {
     chess.PAWN: 100,

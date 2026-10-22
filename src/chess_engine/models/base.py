@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple
 import chess
 import numpy as np
 
-from .features import FeatureExtractor
+from .dense_features import FeatureExtractor
 
 #: Centipawns that correspond to a normalized target of ``1.0``. It is the 0.5% quantile of the
 #: course dataset: evaluations beyond it are clipped, so the target covers ~99% of the data.

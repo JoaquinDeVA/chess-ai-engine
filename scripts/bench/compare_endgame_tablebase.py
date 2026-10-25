@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import chess
-import chess.syzygy
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.comparison.tradeoff import fixed_time_manager
@@ -58,11 +57,8 @@ def random_won_position(rng: random.Random, tables: EndgameTablebase) -> chess.B
         board.turn = chess.WHITE
         if not board.is_valid() or board.is_game_over():
             continue
-        try:
-            if tables._tables.probe_wdl(board) == 2:
-                return board
-        except (KeyError, chess.syzygy.MissingTableError):
-            continue
+        if tables.wdl(board) == 2:
+            return board
 
 
 def convert(

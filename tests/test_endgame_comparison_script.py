@@ -40,7 +40,7 @@ def test_random_won_positions_are_legal_wins_for_white(script, tables, monkeypat
     for _ in range(8):
         board = script.random_won_position(rng, tables)
         assert board.is_valid() and board.turn == chess.WHITE
-        assert tables._tables.probe_wdl(board) == 2
+        assert tables.wdl(board) == 2
 
 
 def test_the_tablebase_winner_converts_kq_against_k(script, tables):

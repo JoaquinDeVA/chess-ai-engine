@@ -134,6 +134,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param opening_book: Opening book; while the game follows it the bot plays its moves, and once
         the game leaves it the book is not consulted again. ``SHIPPED`` (default) uses
         ``data/opening_book.json``; ``None`` switches it off.
+    :param threads: Threads that search (default 1). With more, they share a lock-free table
+        (Lazy SMP), the search is no longer deterministic and the evaluation must run in the core.
+    :param hash_mb: Size in MB of the table shared by several threads (ignored with one).
     :ivar disabled: Techniques of the search to switch off when measuring what each one saves:
         any of ``"table"``, ``"killers"`` and ``"ordering"`` (none by default).
     """
@@ -150,6 +153,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         estimator: str = DEFAULT_ESTIMATOR,
         tablebase: Union[EndgameTablebase, None, str] = SHIPPED,
         opening_book: Union[OpeningBook, None, str] = SHIPPED,
+        threads: int = 1,
+        hash_mb: int = 64,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth
@@ -162,7 +167,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.opening_book = OpeningBook.shipped() if opening_book == SHIPPED else opening_book
         self.in_book = self.opening_book is not None
         self.disabled: tuple = ()
-        self.searcher = _core.Searcher(max_tt_entries)
+        self.threads = threads
+        self.searcher = _core.Searcher(max_tt_entries, threads, hash_mb)
         self._native: Optional[_core.Evaluator] = None
         self.turn_budget = self.time_manager.turn_budget(float("inf"))
         self.reset_statistics()

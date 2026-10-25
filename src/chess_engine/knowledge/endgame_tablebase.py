@@ -7,6 +7,8 @@ position: :meth:`EndgameTablebase.best_move` returns a move that keeps the best 
 the winning moves, the one that finishes the quickest.
 
 The tables are not versioned (they are large); see ``docs/DATA_AND_TRAINING.md`` for where they go.
+They are probed by the Rust core (``rust/src/knowledge/tablebase.rs``); this class is its Python
+face.
 """
 
 from functools import lru_cache
@@ -14,7 +16,8 @@ from pathlib import Path
 from typing import Optional, Union
 
 import chess
-import chess.syzygy
+
+from chess_engine import _core
 
 #: Default location of the tables.
 DEFAULT_TABLEBASE_DIR = Path(__file__).resolve().parents[3] / "data" / "knowledge" / "endgame"
@@ -35,7 +38,7 @@ class EndgameTablebase:
         if not path.is_dir():
             raise FileNotFoundError(f"tablebase directory not found: {path}")
         self.directory = path
-        self._tables = chess.syzygy.open_tablebase(str(path))
+        self._tables = _core.Tablebase.open(str(path))
 
     @classmethod
     def open_if_present(
@@ -58,8 +61,8 @@ class EndgameTablebase:
         return cls.open_if_present()
 
     def close(self) -> None:
-        """Release the open table files."""
-        self._tables.close()
+        """Release the open table files (they are closed when the object is dropped)."""
+        self._tables = None
 
     def covers(self, board: chess.Board) -> bool:
         """Whether the position can be probed.
@@ -67,45 +70,28 @@ class EndgameTablebase:
         :param board: Position to check.
         :return: True with at most :data:`MAX_PIECES` pieces and no castling rights.
         """
-        return len(board.piece_map()) <= MAX_PIECES and not board.castling_rights
+        return self._tables.covers(board.fen())
+
+    def wdl(self, board: chess.Board) -> Optional[int]:
+        """Result for the side to move, ignoring the halfmove clock.
+
+        :param board: Position to probe.
+        :return: 2 win, 1 win the 50-move rule spoils, 0 draw, -1 loss the rule saves, -2 loss; or
+            ``None`` when a table is missing.
+        """
+        return self._tables.wdl(board.fen())
 
     def best_move(self, board: chess.Board) -> Optional[chess.Move]:
         """Best move according to the tables.
 
         Moves are ranked by the result they keep (win, draw, loss, counting the 50-move rule),
         then by the distance to zeroing: a winning move is the one that wins soonest, a losing
-        move the one that resists longest. A move that mates is always chosen first.
+        move the one that resists longest. A move that mates is always chosen first. Among equal
+        moves the first in python-chess' order wins.
 
         :param board: Position to play from; it is not modified.
         :return: The move, or ``None`` when the position is not covered, has no legal move or a
             needed table is missing.
         """
-        if not self.covers(board) or board.is_game_over():
-            return None
-        best_move, best_key = None, None
-        probe = board.copy(stack=False)
-        for move in list(board.legal_moves):
-            probe.push(move)
-            try:
-                key = self._rank(probe)
-            except (chess.syzygy.MissingTableError, KeyError):
-                return None
-            finally:
-                probe.pop()
-            if best_key is None or key > best_key:
-                best_move, best_key = move, key
-        return best_move
-
-    def _rank(self, after: chess.Board) -> tuple:
-        """Sort key (higher is better) of a position reached by our move, seen from the opponent."""
-        if after.is_checkmate():
-            return (3, 0)
-        if after.is_stalemate() or after.is_insufficient_material():
-            return (0, 0)
-        wdl = -self._tables.probe_wdl(after)  # result for the side that just moved
-        dtz = abs(self._tables.probe_dtz(after))
-        if wdl > 0:
-            return (2 if wdl == 2 else 1, -dtz)  # a plain win beats a win the 50-move rule spoils
-        if wdl == 0:
-            return (0, 0)
-        return (-1 if wdl == -1 else -2, dtz)  # when losing, the longer the better
+        uci = self._tables.best_move(board.fen())
+        return chess.Move.from_uci(uci) if uci else None

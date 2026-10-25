@@ -122,6 +122,27 @@ class TestIterativeDeepening:
         bot.get_move(chess.Board(MATE_IN_ONE.replace("R3K3", "4K3")), 20.0)
         assert bot.last_search_stats.max_depth_reached >= 3
 
+    def test_several_threads_play_a_legal_move_within_the_budget(self):
+        bot = IterativeHeuristicBot(
+            max_depth=8, threads=3, hash_mb=8, opening_book=None, tablebase=None
+        )
+        board = chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4")
+        started = time.time()
+        assert bot.get_move(board, 2.0) in board.legal_moves
+        assert time.time() - started < 2.0
+        assert bot.last_search_stats.nodes_visited > 0 and bot.searcher.threads == 3
+
+    def test_several_threads_need_an_evaluation_that_runs_without_python(self):
+        class Callback(IterativeDeepeningBot):
+            def __init__(self):
+                super().__init__("Callback", threads=2, opening_book=None, tablebase=None)
+
+            def evaluate(self, state, player):
+                return 0.5
+
+        with pytest.raises(ValueError, match="without Python"):
+            Callback().search(chess.Board(), 1.0)
+
     def test_abstract_bases_are_not_playable(self):
         with pytest.raises(TypeError):
             IterativeDeepeningBot("x")

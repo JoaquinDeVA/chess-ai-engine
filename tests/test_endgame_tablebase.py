@@ -84,12 +84,12 @@ def test_the_best_move_never_changes_the_theoretical_result(tablebase):
             board = random_position(rng, white, black)
             if not tablebase.covers(board):
                 continue
-            before = tablebase._tables.probe_wdl(board)
+            before = tablebase.wdl(board)
             move = tablebase.best_move(board)
             board.push(move)
             if board.is_game_over():
                 continue
-            after = -tablebase._tables.probe_wdl(board)
+            after = -tablebase.wdl(board)
             assert after == before, (board.fen(), before, after)
             checked += 1
     assert checked > 20

@@ -41,6 +41,15 @@ pub enum FeatureSet {
 }
 
 impl FeatureSet {
+    /// Names of the feature sets, as the saved models call them.
+    pub const NAMES: [&'static str; 5] = [
+        "material5",
+        "linear_pst",
+        "linear_pst_terms",
+        "king_bucket",
+        "pst_slotted",
+    ];
+
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
         Some(match name {

@@ -36,6 +36,16 @@ impl EndgameTablebase {
         pos.board().occupied().count() <= MAX_PIECES && pos.castles().castling_rights().is_empty()
     }
 
+    /// Result of the position for the side to move, ignoring the halfmove clock: 2 win, 1 win that
+    /// the 50-move rule spoils, 0 draw, -1 loss that the rule saves, -2 loss. `None` if a table is
+    /// missing.
+    pub fn wdl(&self, pos: &Chess) -> Option<i32> {
+        self.tables
+            .probe_wdl_after_zeroing(pos)
+            .ok()
+            .map(|w| w as i32)
+    }
+
     /// Sort key (higher is better) of a position reached by our move, seen from the opponent.
     fn rank(&self, after: &Chess) -> Option<(i32, i32)> {
         if after.is_checkmate() {

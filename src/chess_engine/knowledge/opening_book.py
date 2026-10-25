@@ -1,11 +1,16 @@
-"""Opening book: a mapping from positions to the move to play in them."""
+"""Opening book: a mapping from positions to the move to play in them.
 
-import json
+The book itself lives in the Rust core (``rust/src/knowledge/book.rs``); this class is its Python
+face.
+"""
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, Union
 
 import chess
+
+from chess_engine import _core
 
 #: Default location of the book shipped with the project.
 DEFAULT_BOOK_PATH = Path(__file__).resolve().parents[3] / "data" / "opening_book.json"
@@ -33,10 +38,7 @@ class OpeningBook:
     """
 
     def __init__(self, entries: Dict[str, str]):
-        self._moves: Dict[str, str] = {}
-        for fen, uci in entries.items():
-            key = " ".join(fen.split()[:4])
-            self._moves.setdefault(key, uci)
+        self._book = _core.Book.from_entries(list(entries.items()))
 
     @classmethod
     def load(cls, path: Union[str, Path] = DEFAULT_BOOK_PATH) -> "OpeningBook":
@@ -46,8 +48,11 @@ class OpeningBook:
         :return: The loaded book.
         :raises FileNotFoundError: If ``path`` does not exist.
         """
-        with open(path, encoding="utf-8") as handle:
-            return cls(json.load(handle))
+        if not Path(path).exists():
+            raise FileNotFoundError(f"opening book not found: {path}")
+        book = cls({})
+        book._book = _core.Book.load(str(path))
+        return book
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -64,11 +69,8 @@ class OpeningBook:
         :param board: Current position.
         :return: The move, or ``None`` when the position is not in the book.
         """
-        uci = self._moves.get(position_key(board))
-        if uci is None:
-            return None
-        move = chess.Move.from_uci(uci)
-        return move if move in board.legal_moves else None
+        uci = self._book.lookup(board.fen())
+        return chess.Move.from_uci(uci) if uci else None
 
     def __len__(self) -> int:
-        return len(self._moves)
+        return len(self._book)

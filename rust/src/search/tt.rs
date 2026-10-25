@@ -24,7 +24,8 @@ pub enum Flag {
 #[derive(Clone, Copy, Debug)]
 pub struct Entry {
     pub value: f64,
-    pub best: Option<Move>,
+    /// Identity of the best move (see `board::move_id`), if any.
+    pub best: Option<u32>,
     pub depth: i32,
     pub flag: Flag,
 }
@@ -94,8 +95,8 @@ impl Table {
         self.capacity = capacity;
     }
 
-    pub fn get(&self, key: &Key) -> Option<&Entry> {
-        self.map.get(key).map(|(entry, _)| entry)
+    pub fn get(&self, key: &Key) -> Option<Entry> {
+        self.map.get(key).map(|(entry, _)| *entry)
     }
 
     /// Store a result, classifying it against the original window of the search.
@@ -103,7 +104,7 @@ impl Table {
         &mut self,
         key: Key,
         value: f64,
-        best: Option<Move>,
+        best: Option<u32>,
         depth: i32,
         alpha_orig: f64,
         beta_orig: f64,
@@ -141,6 +142,62 @@ impl Table {
             let map = &self.map;
             self.order
                 .retain(|(key, seq)| map.get(key).is_some_and(|(_, s)| s == seq));
+        }
+    }
+}
+
+/// The transposition table of a search: the exact one of a single thread (bounded, oldest entries
+/// dropped first, as in the Python engine) or the lock-free one shared by several threads.
+pub enum Tt {
+    Local(Table),
+    Shared(std::sync::Arc<super::shared::SharedTable>),
+}
+
+impl Tt {
+    pub fn get(&self, key: &Key) -> Option<Entry> {
+        match self {
+            Tt::Local(table) => table.get(key),
+            Tt::Shared(table) => table.get(key),
+        }
+    }
+
+    pub fn store(
+        &mut self,
+        key: Key,
+        value: f64,
+        best: Option<u32>,
+        depth: i32,
+        alpha_orig: f64,
+        beta_orig: f64,
+    ) {
+        match self {
+            Tt::Local(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),
+            Tt::Shared(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        match self {
+            Tt::Local(table) => table.clear(),
+            Tt::Shared(table) => table.clear(),
+        }
+    }
+
+    /// Entries held (an estimate for the shared table).
+    pub fn len(&self) -> usize {
+        match self {
+            Tt::Local(table) => table.len(),
+            Tt::Shared(table) => table.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn set_capacity(&mut self, capacity: usize) {
+        if let Tt::Local(table) = self {
+            table.set_capacity(capacity);
         }
     }
 }

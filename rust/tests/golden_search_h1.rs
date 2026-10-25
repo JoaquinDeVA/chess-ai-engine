@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use _core::board::{uci_string, GameState};
 use _core::eval::h1::{FEATURE_NAMES, H1};
-use _core::search::{alpha_beta, Memory, Options};
+use _core::search::{alpha_beta, Control, Memory, Options};
 use serde_json::Value;
 
 fn root() -> PathBuf {
@@ -50,15 +50,20 @@ fn fixed_depth_search_matches_golden() {
         };
         let depth = case["depth"].as_i64().unwrap() as i32;
         let mut memory = Memory::default();
-        let (value, best, nodes, prunings, max_ply, _) = alpha_beta(
-            &mut state,
-            &eval,
-            &mut memory,
-            &options,
-            depth,
-            0.0,
-            f64::INFINITY,
-            &clock,
+        let control = Control {
+            start: 0.0,
+            hard_limit: f64::INFINITY,
+            clock: &clock,
+            stop: None,
+            rotation: 0,
+        };
+        let found = alpha_beta(&mut state, &eval, &mut memory, &options, depth, &control);
+        let (value, best, nodes, prunings, max_ply) = (
+            found.value,
+            found.best,
+            found.nodes,
+            found.prunings,
+            found.max_ply,
         );
         let label = format!("{} depth {} q {}", entry["fen"], depth, case["quiescence"]);
         assert!(

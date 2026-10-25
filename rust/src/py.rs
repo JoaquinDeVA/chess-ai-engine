@@ -20,7 +20,7 @@ use crate::eval::net::{Layer, Net};
 use crate::eval::{Eval, Evaluator};
 use crate::knowledge::book::OpeningBook;
 use crate::knowledge::tablebase::EndgameTablebase;
-use crate::search::{self, Memory, Options};
+use crate::search::{self, Control, Memory, Options};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
@@ -238,16 +238,20 @@ impl PyTablebase {
         })
     }
 
-    fn covers(&self, fen: &str) -> PyResult<bool> {
-        Ok(self
-            .tables
-            .covers(&position_from_fen(fen).map_err(value_error)?))
+    /// Whether the position can be probed (false for a position that is not legal).
+    fn covers(&self, fen: &str) -> bool {
+        position_from_fen(fen).is_ok_and(|pos| self.tables.covers(&pos))
+    }
+
+    /// Result for the side to move (2 win ... -2 loss), or `None` if a table is missing.
+    fn wdl(&self, fen: &str) -> Option<i32> {
+        position_from_fen(fen).ok().and_then(|pos| self.tables.wdl(&pos))
     }
 
     /// The best move (UCI) according to the tables, or `None`.
-    fn best_move(&self, fen: &str) -> PyResult<Option<String>> {
-        let pos = position_from_fen(fen).map_err(value_error)?;
-        Ok(self.tables.best_move(&pos).map(|m| uci_string(&m)))
+    fn best_move(&self, fen: &str) -> Option<String> {
+        let pos = position_from_fen(fen).ok()?;
+        self.tables.best_move(&pos).map(|m| uci_string(&m))
     }
 }
 
@@ -286,17 +290,25 @@ fn options(
 
 #[pymethods]
 impl PySearcher {
+    /// A searcher. With `threads > 1` the threads share a lock-free table of `hash_mb` MB and
+    /// `max_tt_entries` is ignored.
     #[new]
-    #[pyo3(signature = (max_tt_entries=search::tt::DEFAULT_MAX_TT_ENTRIES))]
-    fn new(max_tt_entries: usize) -> PySearcher {
+    #[pyo3(signature = (max_tt_entries=search::tt::DEFAULT_MAX_TT_ENTRIES, threads=1, hash_mb=64))]
+    fn new(max_tt_entries: usize, threads: usize, hash_mb: usize) -> PySearcher {
         PySearcher {
-            memory: Memory::new(max_tt_entries),
+            memory: Memory::with_threads(max_tt_entries, threads.max(1), hash_mb),
         }
     }
 
     /// Forget the table and the killer moves (a new game).
     fn clear(&mut self) {
         self.memory.clear();
+    }
+
+    /// Number of threads that search.
+    #[getter]
+    fn threads(&self) -> usize {
+        self.memory.threads
     }
 
     /// Number of entries of the transposition table.
@@ -326,6 +338,11 @@ impl PySearcher {
         estimator: &str,
         disabled: Vec<String>,
     ) -> PyResult<(Option<String>, Bound<'py, PyDict>)> {
+        if self.memory.threads > 1 && !evaluator.native() {
+            return Err(value_error(
+                "several threads need an evaluation that runs without Python",
+            ));
+        }
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
         let options = options(quiescence_plies, min_depth, estimator, &disabled)?;
         let kind = evaluator.kind.clone();
@@ -333,8 +350,15 @@ impl PySearcher {
         let mut run = move || {
             let origin = Instant::now();
             let clock = || origin.elapsed().as_secs_f64();
+            let control = Control {
+                start: clock(),
+                hard_limit,
+                clock: &clock,
+                stop: None,
+                rotation: 0,
+            };
             search::iterative_deepening(
-                &mut state, &*kind, memory, &options, max_depth, time_limit, hard_limit, &clock,
+                &mut state, &*kind, memory, &options, max_depth, time_limit, &control,
             )
         };
         // A Python callback needs the interpreter: keep it attached in that case.
@@ -372,23 +396,27 @@ impl PySearcher {
         let memory = &mut self.memory;
         let mut run = move || {
             let clock = || 0.0;
-            search::alpha_beta(
-                &mut state,
-                &*kind,
-                memory,
-                &options,
-                depth,
-                0.0,
-                f64::INFINITY,
-                &clock,
-            )
+            let control = Control {
+                start: 0.0,
+                hard_limit: f64::INFINITY,
+                clock: &clock,
+                stop: None,
+                rotation: 0,
+            };
+            search::alpha_beta(&mut state, &*kind, memory, &options, depth, &control)
         };
-        let (value, best, nodes, prunings, ply, _) = if evaluator.native() {
+        let found = if evaluator.native() {
             py.detach(run)
         } else {
             run()
         };
-        Ok((value, best.as_ref().map(uci_string), nodes, prunings, ply))
+        Ok((
+            found.value,
+            found.best.as_ref().map(uci_string),
+            found.nodes,
+            found.prunings,
+            found.max_ply,
+        ))
     }
 }
 
@@ -451,6 +479,10 @@ mod _core {
         module.add(
             "DEFAULT_MAX_TT_ENTRIES",
             crate::search::tt::DEFAULT_MAX_TT_ENTRIES,
+        )?;
+        module.add(
+            "FEATURE_SETS",
+            crate::eval::linear::FeatureSet::NAMES.to_vec(),
         )?;
         module.add("ESTIMATOR_NAMES", crate::search::estimators::NAMES.to_vec())?;
         Ok(())

@@ -1,5 +1,6 @@
 """Evaluations for the Rust core: the native version of a model, or a callback to Python."""
 
+import logging
 from typing import Callable
 
 import chess
@@ -13,6 +14,8 @@ from .base import EvaluationModel
 from .evaluator import ModelEvaluator
 from .linear_eval import LinearEvalModel
 from .neural_eval import NeuralEvalModel
+
+logger = logging.getLogger(__name__)
 
 
 def h1_evaluator() -> "_core.Evaluator":
@@ -42,12 +45,21 @@ def callback_evaluator(
 def model_evaluator(model: EvaluationModel) -> "_core.Evaluator":
     """The native evaluation of a model.
 
-    Linear and sparse-network models run inside the core; any other model (the Keras networks of
-    the course) is evaluated through a callback to Python, which works but is slow.
+    Linear and sparse-network models whose feature set is implemented in the core run inside it;
+    any other model (the Keras networks of the course, or a new feature set that has no Rust
+    version yet) is evaluated through a callback to Python, which works but is slow.
 
     :param model: A loaded model.
     :return: Evaluator that gives the same values as ``ModelEvaluator(model)``.
     """
+    sparse = isinstance(model, LinearEvalModel)
+    if sparse and model.features.name not in _core.FEATURE_SETS:
+        logger.warning(
+            "the feature set %r has no Rust version: %s is evaluated through Python (slow)",
+            model.features.name,
+            model.name,
+        )
+        return callback_evaluator(ModelEvaluator(model))
     if isinstance(model, NeuralEvalModel):
         layers = [
             (

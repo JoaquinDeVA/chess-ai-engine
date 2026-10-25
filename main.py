@@ -110,6 +110,21 @@ Examples:
         help="Search every endgame position: no endgame tables",
     )
 
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Threads that search (default 1); the search is then not deterministic",
+    )
+    parser.add_argument(
+        "--hash",
+        type=int,
+        default=None,
+        metavar="MB",
+        help="Size in MB of the transposition table shared by several threads (default 64)",
+    )
+
     parser.add_argument("--list-bots", action="store_true", help="List all available bots and exit")
 
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
@@ -202,6 +217,11 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
     if args.depth is not None and "max_depth" in parameters:
         options["max_depth"] = args.depth
     takes_search_options = "search_options" in parameters
+    if takes_search_options or "threads" in parameters:
+        if args.threads is not None:
+            options["threads"] = args.threads
+        if args.hash is not None:
+            options["hash_mb"] = args.hash
     if "tablebase" in parameters or takes_search_options:
         if args.no_endgame_db:
             options["tablebase"] = None

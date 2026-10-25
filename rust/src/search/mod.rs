@@ -7,7 +7,6 @@
 //! and promotions.
 
 pub mod estimators;
-pub mod time;
 pub mod tt;
 
 use shakmaty::{Color, Move};
@@ -76,6 +75,10 @@ pub struct Options {
     pub min_depth: usize,
     pub estimator: String,
     pub epsilon: f64,
+    /// Techniques that can be switched off to measure what each one saves (all on by default).
+    pub use_table: bool,
+    pub use_killers: bool,
+    pub use_capture_order: bool,
 }
 
 impl Default for Options {
@@ -85,6 +88,9 @@ impl Default for Options {
             min_depth: DEFAULT_MIN_DEPTH,
             estimator: DEFAULT_ESTIMATOR.to_string(),
             epsilon: DEPTH_PREFERENCE_EPSILON,
+            use_table: true,
+            use_killers: true,
+            use_capture_order: true,
         }
     }
 }
@@ -158,7 +164,12 @@ impl Search<'_> {
         self.max_ply = self.max_ply.max(ply);
 
         let key = self.state.key();
-        if let Some(entry) = self.memory.table.get(&key) {
+        let entry = if self.options.use_table {
+            self.memory.table.get(&key)
+        } else {
+            None
+        };
+        if let Some(entry) = entry {
             if entry.depth >= depth_remaining {
                 match entry.flag {
                     Flag::Exact => return (entry.value, entry.best),
@@ -188,7 +199,12 @@ impl Search<'_> {
         }
 
         let maximizing = self.state.turn() == self.root_player;
-        let ordered = order(moves, self.memory.killers.get(depth_remaining));
+        let killers: &[u32] = if self.options.use_killers {
+            self.memory.killers.get(depth_remaining)
+        } else {
+            &[]
+        };
+        let ordered = order(moves, killers, self.options.use_capture_order);
         let mut best_value = if maximizing {
             f64::NEG_INFINITY
         } else {
@@ -212,11 +228,13 @@ impl Search<'_> {
             }
             if alpha >= beta {
                 self.prunings += 1;
-                self.memory.killers.record(depth_remaining, action);
+                if self.options.use_killers {
+                    self.memory.killers.record(depth_remaining, action);
+                }
                 break;
             }
         }
-        if !self.truncated {
+        if !self.truncated && self.options.use_table {
             self.memory.table.store(
                 key,
                 best_value,

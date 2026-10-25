@@ -6,8 +6,8 @@ import chess
 
 from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
 from chess_engine.evaluation.heuristics import h1
+from chess_engine.models.native import heuristic_evaluator
 from chess_engine.search.chess_game_state import ChessGameState
-from chess_engine.search.chess_problem import ChessProblem
 from chess_engine.search.time_management import TimeManager
 
 
@@ -16,7 +16,6 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
 
     :param eval_function: Heuristic ``(state, player) -> float`` (e.g. ``h1``); default ``h1``.
     :param max_depth: Deepest iteration to run.
-    :param problem: Chess problem to search; a fresh one is created by default.
     :param time_manager: Time budgeting policy.
     :param search_options: Other options of :class:`IterativeDeepeningBot` (``quiescence_plies``,
         ``min_depth``, ``estimator``, ``max_tt_entries``, ``tablebase``).
@@ -26,7 +25,6 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
         self,
         eval_function: Callable[[ChessGameState, chess.Color], float] = h1,
         max_depth: int = 3,
-        problem: Optional[ChessProblem] = None,
         time_manager: Optional[TimeManager] = None,
         **search_options: Any,
     ) -> None:
@@ -35,10 +33,16 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
             AUTHOR,
             max_depth,
             time_manager,
-            problem=problem,
             **search_options,
         )
         self.eval_function = eval_function
+
+    def native_evaluator(self):
+        """The evaluation the core runs: ``h1`` natively, any other heuristic by callback.
+
+        :return: Evaluator for ``eval_function``.
+        """
+        return heuristic_evaluator(self.eval_function)
 
     def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
         """Evaluate with the configured heuristic.

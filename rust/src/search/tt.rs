@@ -200,7 +200,7 @@ pub fn mvv_lva_score(m: &Move) -> i32 {
 
 /// The moves in the order the search tries them: killers first, then captures (best MVV-LVA first)
 /// and then the quiet moves, each group keeping its incoming order.
-pub fn order(moves: Vec<Move>, killers: &[u32]) -> Vec<Move> {
+pub fn order(moves: Vec<Move>, killers: &[u32], capture_order: bool) -> Vec<Move> {
     let mut front: Vec<Move> = Vec::with_capacity(moves.len());
     let mut rest: Vec<Move> = Vec::new();
     for m in moves {
@@ -211,6 +211,9 @@ pub fn order(moves: Vec<Move>, killers: &[u32]) -> Vec<Move> {
         }
     }
     front.extend(rest);
+    if !capture_order {
+        return front;
+    }
     let (mut captures, quiets): (Vec<Move>, Vec<Move>) =
         front.into_iter().partition(|m| m.is_capture());
     captures.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
@@ -303,7 +306,14 @@ mod tests {
         let ordered = order(
             vec![a, queen_takes_pawn, b, pawn_takes_queen],
             &[uci_order(&b)],
+            true,
         );
         assert_eq!(ordered, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
+        let plain = order(
+            vec![a, queen_takes_pawn, b, pawn_takes_queen],
+            &[uci_order(&b)],
+            false,
+        );
+        assert_eq!(plain, vec![b, a, queen_takes_pawn, pawn_takes_queen]);
     }
 }

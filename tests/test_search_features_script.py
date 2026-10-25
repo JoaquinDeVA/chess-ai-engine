@@ -6,8 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from chess_engine.search import game_algorithms
-
 
 @pytest.fixture(scope="module")
 def script():
@@ -21,21 +19,15 @@ def script():
 
 
 def _player():
-    return SimpleNamespace(order_moves=lambda board, moves: sorted(moves), quiescence_plies=4)
+    return SimpleNamespace(disabled=(), quiescence_plies=4)
 
 
-def test_switched_off_replaces_and_restores_the_search_helpers(script):
-    original = game_algorithms.probe_transposition_table
+def test_switched_off_sets_and_restores_the_search_settings(script):
     player = _player()
-    original_order = player.order_moves
     with script.switched_off(("table", "killers", "ordering", "quiescence"), player):
-        assert game_algorithms.probe_transposition_table({}, "k", 1, 0.0, 1.0) == (None, 0.0, 1.0)
-        assert game_algorithms.reorder_by_killer_moves(["a", "b"], 2, {}) == ["a", "b"]
-        assert player.order_moves(None, ["b", "a"]) == ["b", "a"]
+        assert player.disabled == ("table", "killers", "ordering")
         assert player.quiescence_plies == 0
-    assert game_algorithms.probe_transposition_table is original
-    assert player.order_moves is original_order
-    assert player.quiescence_plies == 4
+    assert player.disabled == () and player.quiescence_plies == 4
 
 
 def test_switched_off_with_nothing_changes_nothing(script):

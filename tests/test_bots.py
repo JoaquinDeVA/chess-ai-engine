@@ -12,6 +12,7 @@ from chess_engine.evaluation.heuristics import h1
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.registry import get_model_class
+from chess_engine.search.time_management import TimeManager
 from tests.conftest import MATE_IN_ONE
 
 MATE_MOVE = chess.Move.from_uci("a1a8")
@@ -75,29 +76,34 @@ class TestEvaluation:
             def evaluate(self, state, player):
                 return 0.5
 
-            def cutoff_test(self, state, depth_left, time_used):
-                return True  # cut off at the root: the search yields no move
-
+        # no time at all: the hard limit has passed at the root and the search yields no move
+        hopeless = Hopeless()
+        hopeless.time_manager = TimeManager(min_turn_time=0.0, safety_margin=1.0)
         board = chess.Board()
-        assert Hopeless().get_move(board, 1.0) in board.legal_moves
+        assert hopeless.search(board, 0.0) is None
+        assert hopeless.get_move(board, 0.0) in board.legal_moves
 
 
 class TestIterativeDeepening:
     def test_transposition_table_and_killers_fill_up_and_clear_on_new_game(self):
         bot = IterativeHeuristicBot(max_depth=3, opening_book=None, tablebase=None)
         bot.get_move(chess.Board(), 10.0)
-        assert bot.transposition_table and bot.killer_moves
+        assert bot.searcher.table_size() > 0
         bot.on_game_start(chess.BLACK, "opponent")
-        assert not bot.transposition_table and not bot.killer_moves
+        assert bot.searcher.table_size() == 0
 
-    def test_the_capture_ordering_callback_is_used(self):
-        """Regression B8: the MVV-LVA callback was defined but never passed to the search."""
-        bot = IterativeHeuristicBot(max_depth=2, opening_book=None, tablebase=None)
-        calls = []
-        original = bot.order_moves
-        bot.order_moves = lambda board, moves: calls.append(len(moves)) or original(board, moves)
-        bot.get_move(chess.Board(), 10.0)
-        assert calls
+    def test_the_capture_ordering_is_used(self):
+        """Regression B8: the MVV-LVA ordering was defined but never passed to the search."""
+        board = chess.Board("r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7")
+        nodes = {}
+        for disabled in ((), ("ordering",)):
+            bot = IterativeHeuristicBot(
+                max_depth=4, quiescence_plies=0, opening_book=None, tablebase=None
+            )
+            bot.disabled = disabled
+            bot.get_move(board, 1e6)
+            nodes[disabled] = bot.last_search_stats.nodes_visited
+        assert nodes[()] < nodes[("ordering",)]
 
     def test_stays_within_the_time_budget(self):
         bot = IterativeHeuristicBot(max_depth=30, opening_book=None, tablebase=None)

@@ -8,24 +8,23 @@ The leading underscore keeps this file out of the bot registry (it contains no p
 
 import logging
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import chess
 
+from chess_engine import _core
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
+from chess_engine.models.native import callback_evaluator
 from chess_engine.search.chess_game_state import ChessGameState
-from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
-from chess_engine.search.game_algorithms import (
-    DEFAULT_ESTIMATOR,
-    DEFAULT_MIN_DEPTH,
-    SearchStatistics,
-    heuristic_alphabeta_iterative_deepening_search,
-)
-from chess_engine.search.game_problems import GameState
-from chess_engine.search.search_utils import DEFAULT_MAX_TT_ENTRIES, order_by_mvv_lva
+from chess_engine.search.statistics import SearchStatistics
 from chess_engine.search.time_management import TimeManager
+
+#: Defaults of the search, defined in the Rust core.
+DEFAULT_ESTIMATOR = _core.DEFAULT_ESTIMATOR
+DEFAULT_MIN_DEPTH = _core.DEFAULT_MIN_DEPTH
+DEFAULT_MAX_TT_ENTRIES = _core.DEFAULT_MAX_TT_ENTRIES
 
 logger = logging.getLogger(__name__)
 
@@ -38,17 +37,29 @@ SHIPPED = "shipped"
 def fallback_move(board: chess.Board) -> chess.Move:
     """Cheap legal move used when a search returns nothing (best capture, else first move).
 
+    The best capture is the one with the most valuable victim and, among those, the least
+    valuable attacker.
+
     :param board: Current position.
     :return: A legal move, or the null move if there is none.
     """
     legal = list(board.legal_moves)
     if not legal:
         return chess.Move.null()
-    return order_by_mvv_lva(board, legal)[0]
+
+    def score(move: chess.Move) -> int:
+        if not board.is_capture(move):
+            return 0
+        victim = (
+            chess.PAWN if board.is_en_passant(move) else board.piece_at(move.to_square).piece_type
+        )
+        return 10 * victim - board.piece_at(move.from_square).piece_type
+
+    return max(legal, key=score)  # the first of the best: quiet moves keep their order
 
 
 #: Quiescence plies used by default by the search bots (see docs/ALGORITHMS.md).
-DEFAULT_QUIESCENCE_PLIES = 4
+DEFAULT_QUIESCENCE_PLIES = _core.DEFAULT_QUIESCENCE_PLIES
 
 
 class _StatisticsMixin:
@@ -99,32 +110,32 @@ class _StatisticsMixin:
 
 
 class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
-    """Clock-aware iterative deepening alpha-beta.
+    """Clock-aware iterative deepening alpha-beta, run by the Rust core.
 
     Every move gets a time budget from the :class:`TimeManager`; the search deepens until the
     budget is used up or ``max_depth`` is reached. A transposition table (bounded) and the
     killer moves persist during a game and are cleared when a new game starts: their values are
     from the point of view of the colour the bot played.
 
-    Subclasses implement :meth:`evaluate`.
+    Subclasses implement :meth:`evaluate` and, to evaluate inside the core, :meth:`native_evaluator`.
 
     :param name: Bot name shown in games and tournaments.
     :param author: Author shown in bot listings.
     :param max_depth: Deepest iteration to run.
     :param time_manager: Time budgeting policy.
     :param max_tt_entries: Size cap of the transposition table.
-    :param problem: Chess problem to search; a fresh one is created by default.
-    :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off; default 4,
-        measured at fixed depth: +0.06 agreement at depth 3 on 2,000 positions).
+    :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off; default 4).
     :param min_depth: Iterations always completed whatever the clock estimate says (default 3).
     :param estimator: Rule that predicts the duration of the next iteration (see
-        ``search/time_estimators.py``).
+        ``rust/src/search/estimators.rs``).
     :param tablebase: Endgame tablebases; positions with up to five pieces are played from them
         without searching. ``SHIPPED`` (default) uses ``data/knowledge/endgame`` if it exists;
         ``None`` switches them off, so the bot searches every position.
     :param opening_book: Opening book; while the game follows it the bot plays its moves, and once
         the game leaves it the book is not consulted again. ``SHIPPED`` (default) uses
         ``data/opening_book.json``; ``None`` switches it off.
+    :ivar disabled: Techniques of the search to switch off when measuring what each one saves:
+        any of ``"table"``, ``"killers"`` and ``"ordering"`` (none by default).
     """
 
     def __init__(
@@ -134,7 +145,6 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         max_depth: int = 3,
         time_manager: Optional[TimeManager] = None,
         max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
-        problem: Optional[ChessProblem] = None,
         quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
         min_depth: int = DEFAULT_MIN_DEPTH,
         estimator: str = DEFAULT_ESTIMATOR,
@@ -151,9 +161,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.tablebase = EndgameTablebase.shipped() if tablebase == SHIPPED else tablebase
         self.opening_book = OpeningBook.shipped() if opening_book == SHIPPED else opening_book
         self.in_book = self.opening_book is not None
-        self.problem = problem if problem is not None else ChessProblem()
-        self.transposition_table: Dict[Any, Any] = {}
-        self.killer_moves: Dict[int, List[chess.Move]] = {}
+        self.disabled: tuple = ()
+        self.searcher = _core.Searcher(max_tt_entries)
+        self._native: Optional[_core.Evaluator] = None
         self.turn_budget = self.time_manager.turn_budget(float("inf"))
         self.reset_statistics()
 
@@ -166,24 +176,15 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :return: Expected score for ``player`` in ``[0, 1]``.
         """
 
-    def order_moves(self, board: chess.Board, moves: List[chess.Move]) -> List[chess.Move]:
-        """Captures first, best MVV-LVA first.
+    def native_evaluator(self) -> "_core.Evaluator":
+        """The evaluation the Rust core runs.
 
-        :param board: Position the moves are played from.
-        :param moves: Legal moves.
-        :return: Reordered moves.
+        Subclasses return a native evaluator; this default calls :meth:`evaluate` from the core,
+        which works for any bot but is slow.
+
+        :return: Evaluator.
         """
-        return order_by_mvv_lva(board, moves)
-
-    def cutoff_test(self, state: GameState, depth_left: int, time_used: float) -> bool:
-        """Stop when the depth is exhausted or the move's hard time limit has passed.
-
-        :param state: Node being visited.
-        :param depth_left: Plies still to search below this node.
-        :param time_used: Seconds spent on this move so far.
-        :return: True when the node must be evaluated instead of expanded.
-        """
-        return depth_left == 0 or self.time_manager.expired(self.turn_budget, time_used)
+        return callback_evaluator(self.evaluate)
 
     def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
         """Clear everything learned in the previous game.
@@ -191,8 +192,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param color: Colour this bot plays.
         :param opponent_name: Name of the opponent.
         """
-        self.transposition_table.clear()
-        self.killer_moves.clear()
+        self.searcher.clear()
         self.reset_statistics()
         self.in_book = self.opening_book is not None
 
@@ -203,23 +203,22 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param time_limit: Seconds left on the clock.
         :return: The best move found, or None if the search could not produce one.
         """
+        if self._native is None:
+            self._native = self.native_evaluator()
         self.turn_budget = self.time_manager.turn_budget(time_limit)
-        move, stats = heuristic_alphabeta_iterative_deepening_search(
-            game=self.problem,
-            state=ChessGameState(board),
-            eval_fn=self.evaluate,
-            cutoff_test=self.cutoff_test,
-            killer_moves=self.killer_moves,
-            transposition_table=self.transposition_table,
-            order_moves_callback=self.order_moves,
-            max_depth=self.max_depth,
-            time_limit=self.turn_budget,
-            noisy_moves=chess_noisy_moves if self.quiescence_plies else None,
-            quiescence_plies=self.quiescence_plies,
-            max_tt_entries=self.max_tt_entries,
-            min_depth=self.min_depth,
-            estimator=self.estimator,
+        uci, raw = self.searcher.search(
+            board.root().fen(),
+            [move.uci() for move in board.move_stack],
+            self._native,
+            self.max_depth,
+            self.turn_budget,
+            self.time_manager.hard_limit(self.turn_budget),
+            self.quiescence_plies,
+            self.min_depth,
+            self.estimator,
+            list(self.disabled),
         )
+        stats = SearchStatistics.from_core(raw)
         self.record_statistics(stats)
         logger.debug(
             "%s searched %d nodes to ply %d",
@@ -227,7 +226,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             stats.nodes_visited,
             stats.max_depth_reached,
         )
-        return move
+        return chess.Move.from_uci(uci) if uci else None
 
     def get_move(self, board: chess.Board, time_limit: float) -> chess.Move:
         """Return the best move found within the time budget.

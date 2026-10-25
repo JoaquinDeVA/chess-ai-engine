@@ -17,13 +17,11 @@ import contextlib
 import time
 from pathlib import Path
 from typing import Callable, Dict, Iterator, List, Sequence, Tuple
-from unittest import mock
 
 import chess
 
 from chess_engine.comparison.evaluate import SAMPLE_SEED, TEST, TEST_SAMPLE_ROWS
 from chess_engine.comparison.tradeoff import make_player, validate_specs
-from chess_engine.search import game_algorithms
 from chess_engine.search.time_management import TimeManager
 from chess_engine.training.sidecar import load_sample
 
@@ -45,41 +43,16 @@ def switched_off(techniques: Sequence[str], player) -> Iterator[None]:
     """Switch techniques off for the duration of the block.
 
     :param techniques: Any of ``"table"``, ``"killers"``, ``"ordering"``, ``"quiescence"``.
-    :param player: Bot whose ordering and quiescence settings are changed (and restored).
+    :param player: Bot whose search settings are changed (and restored).
     """
-    patches: List[mock._patch] = []
-    if "table" in techniques:
-        patches.append(
-            mock.patch.object(
-                game_algorithms,
-                "probe_transposition_table",
-                lambda table, key, depth_remaining, alpha, beta: (None, alpha, beta),
-            )
-        )
-        patches.append(
-            mock.patch.object(game_algorithms, "store_transposition_entry", lambda *a, **k: None)
-        )
-    if "killers" in techniques:
-        patches.append(
-            mock.patch.object(game_algorithms, "record_killer_move", lambda *a, **k: None)
-        )
-        patches.append(
-            mock.patch.object(
-                game_algorithms, "reorder_by_killer_moves", lambda actions, depth, killers: actions
-            )
-        )
-    saved_order, saved_quiescence = player.order_moves, player.quiescence_plies
-    with contextlib.ExitStack() as stack:
-        for patch in patches:
-            stack.enter_context(patch)
-        if "ordering" in techniques:
-            player.order_moves = lambda board, moves: moves
-        if "quiescence" in techniques:
-            player.quiescence_plies = 0
-        try:
-            yield
-        finally:
-            player.order_moves, player.quiescence_plies = saved_order, saved_quiescence
+    saved = player.disabled, player.quiescence_plies
+    player.disabled = tuple(name for name in techniques if name != "quiescence")
+    if "quiescence" in techniques:
+        player.quiescence_plies = 0
+    try:
+        yield
+    finally:
+        player.disabled, player.quiescence_plies = saved
 
 
 def measure(

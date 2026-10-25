@@ -257,13 +257,31 @@ struct PySearcher {
     memory: Memory,
 }
 
-fn options(quiescence_plies: u32, min_depth: usize, estimator: &str) -> Options {
-    Options {
+fn options(
+    quiescence_plies: u32,
+    min_depth: usize,
+    estimator: &str,
+    disabled: &[String],
+) -> PyResult<Options> {
+    let mut options = Options {
         quiescence_plies,
         min_depth,
         estimator: estimator.to_string(),
         ..Options::default()
+    };
+    for name in disabled {
+        match name.as_str() {
+            "table" => options.use_table = false,
+            "killers" => options.use_killers = false,
+            "ordering" => options.use_capture_order = false,
+            other => {
+                return Err(value_error(format!(
+                    "unknown technique {other:?}; available: table, killers, ordering"
+                )))
+            }
+        }
     }
+    Ok(options)
 }
 
 #[pymethods]
@@ -292,7 +310,7 @@ impl PySearcher {
     }
 
     /// Iterative deepening. Returns `(move, statistics)`; `move` is a UCI string or `None`.
-    #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator))]
+    #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator, disabled=Vec::new()))]
     #[allow(clippy::too_many_arguments)]
     fn search<'py>(
         &mut self,
@@ -306,9 +324,10 @@ impl PySearcher {
         quiescence_plies: u32,
         min_depth: usize,
         estimator: &str,
+        disabled: Vec<String>,
     ) -> PyResult<(Option<String>, Bound<'py, PyDict>)> {
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
-        let options = options(quiescence_plies, min_depth, estimator);
+        let options = options(quiescence_plies, min_depth, estimator, &disabled)?;
         let kind = evaluator.kind.clone();
         let memory = &mut self.memory;
         let mut run = move || {
@@ -330,6 +349,8 @@ impl PySearcher {
 
     /// One alpha-beta search of exactly `depth` plies with no clock. Returns
     /// `(value, move, nodes, prunings, deepest ply)`.
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (root_fen, moves, evaluator, depth, quiescence_plies, disabled=Vec::new()))]
     fn search_fixed(
         &mut self,
         py: Python<'_>,
@@ -338,13 +359,15 @@ impl PySearcher {
         evaluator: &PyEvaluator,
         depth: i32,
         quiescence_plies: u32,
+        disabled: Vec<String>,
     ) -> PyResult<(f64, Option<String>, u64, u64, i32)> {
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
         let options = options(
             quiescence_plies,
             search::DEFAULT_MIN_DEPTH,
             search::DEFAULT_ESTIMATOR,
-        );
+            &disabled,
+        )?;
         let kind = evaluator.kind.clone();
         let memory = &mut self.memory;
         let mut run = move || {
@@ -386,6 +409,21 @@ fn stats_dict<'py>(py: Python<'py>, stats: &search::Stats) -> PyResult<Bound<'py
     Ok(dict)
 }
 
+/// Predicted seconds of the next iteration, by the named estimator, from `(seconds, nodes)` pairs.
+#[pyfunction]
+fn estimate(name: &str, history: Vec<(f64, u64)>) -> PyResult<f64> {
+    let estimator = search::estimators::get(name).ok_or_else(|| {
+        value_error(format!(
+            "unknown estimator {name:?}; available: {:?}",
+            search::estimators::NAMES
+        ))
+    })?;
+    if history.is_empty() {
+        return Err(value_error("the history of iterations is empty"));
+    }
+    Ok(estimator(&history))
+}
+
 /// Version of the core.
 #[pyfunction]
 fn version() -> &'static str {
@@ -395,6 +433,26 @@ fn version() -> &'static str {
 /// Search, evaluation and knowledge of the chess engine, in Rust.
 #[pymodule]
 mod _core {
+    use pyo3::prelude::*;
+
     #[pymodule_export]
-    use super::{h1_features, terminal, version, PyBook, PyEvaluator, PySearcher, PyTablebase};
+    use super::{
+        estimate, h1_features, terminal, version, PyBook, PyEvaluator, PySearcher, PyTablebase,
+    };
+
+    #[pymodule_init]
+    fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
+        module.add("DEFAULT_ESTIMATOR", crate::search::DEFAULT_ESTIMATOR)?;
+        module.add("DEFAULT_MIN_DEPTH", crate::search::DEFAULT_MIN_DEPTH)?;
+        module.add(
+            "DEFAULT_QUIESCENCE_PLIES",
+            crate::search::DEFAULT_QUIESCENCE_PLIES,
+        )?;
+        module.add(
+            "DEFAULT_MAX_TT_ENTRIES",
+            crate::search::tt::DEFAULT_MAX_TT_ENTRIES,
+        )?;
+        module.add("ESTIMATOR_NAMES", crate::search::estimators::NAMES.to_vec())?;
+        Ok(())
+    }
 }

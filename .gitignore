@@ -73,3 +73,6 @@ docs/superpowers/
 
 # Pesos de Keras: los de cnn_resnet vienen del curso, pendientes de revisar su licencia
 *.keras
+
+# Rust
+rust/target/

@@ -1,0 +1,27 @@
+[package]
+name = "chess_core"
+version = "0.1.0"
+edition = "2021"
+description = "Search, evaluation and knowledge of the chess engine (the part that must be fast)."
+license = "MIT"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# The Python bindings; off for `cargo test`, which links the plain library.
+python = ["dep:pyo3", "dep:numpy"]
+
+[dependencies]
+shakmaty = "0.30"
+shakmaty-syzygy = "0.28"
+serde_json = "1"
+pyo3 = { version = "0.30", features = ["extension-module", "abi3-py311"], optional = true }
+numpy = { version = "0.30", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false

@@ -20,7 +20,7 @@ use shakmaty::{
 
 /// Key of a position in the transposition table: the position (placement, side to move, castling
 /// rights, legal en passant square) and the two move counters, as in `ChessGameState.key()`.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Key {
     pub zobrist: u64,
     pub halfmoves: u32,

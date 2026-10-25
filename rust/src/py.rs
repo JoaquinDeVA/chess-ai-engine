@@ -245,7 +245,9 @@ impl PyTablebase {
 
     /// Result for the side to move (2 win ... -2 loss), or `None` if a table is missing.
     fn wdl(&self, fen: &str) -> Option<i32> {
-        position_from_fen(fen).ok().and_then(|pos| self.tables.wdl(&pos))
+        position_from_fen(fen)
+            .ok()
+            .and_then(|pos| self.tables.wdl(&pos))
     }
 
     /// The best move (UCI) according to the tables, or `None`.
@@ -355,6 +357,7 @@ impl PySearcher {
                 hard_limit,
                 clock: &clock,
                 stop: None,
+                progress: None,
                 rotation: 0,
             };
             search::iterative_deepening(
@@ -401,6 +404,7 @@ impl PySearcher {
                 hard_limit: f64::INFINITY,
                 clock: &clock,
                 stop: None,
+                progress: None,
                 rotation: 0,
             };
             search::alpha_beta(&mut state, &*kind, memory, &options, depth, &control)

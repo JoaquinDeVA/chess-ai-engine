@@ -51,21 +51,22 @@ def load_fens(raw: Path, sidecar: Path, count: int) -> List[str]:
     return load_sample(raw, sidecar, TEST, count, seed=SAMPLE_SEED)["fen"].tolist()
 
 
-def run_job(job: Tuple[str, str, float, List[str]]) -> Dict[str, Any]:
+def run_job(job: Tuple[str, str, float, List[str], int]) -> Dict[str, Any]:
     """Search every position with one player and one setting.
 
-    :param job: ``(player, kind, value, fens)`` with ``kind`` ``"seconds"`` or ``"depth"``.
+    :param job: ``(player, kind, value, fens, threads)`` with ``kind`` ``"seconds"`` or ``"depth"``.
     :return: The player, the setting and the summary of the searches.
     """
     from chess_engine.comparison.tradeoff import fixed_time_manager, make_player
     from chess_engine.search.time_management import TimeManager
 
-    player_name, kind, value, fens = job
+    player_name, kind, value, fens, threads = job
+    options = {} if threads == 1 else {"threads": threads, "hash_mb": 256}
     if kind == "seconds":
-        player = make_player(player_name, fixed_time_manager(value))
+        player = make_player(player_name, fixed_time_manager(value), **options)
         clock = value
     else:
-        player = make_player(player_name, TimeManager(), max_depth=int(value))
+        player = make_player(player_name, TimeManager(), max_depth=int(value), **options)
         clock = GENEROUS_CLOCK
     depths: List[int] = []
     seconds: List[float] = []
@@ -80,6 +81,7 @@ def run_job(job: Tuple[str, str, float, List[str]]) -> Dict[str, Any]:
         nodes += player.last_search_stats.nodes_visited
     return {
         "player": player_name,
+        "threads": threads,
         "kind": kind,
         "value": value,
         "positions": len(fens),
@@ -98,25 +100,20 @@ def render(results: Sequence[Dict[str, Any]], label: str) -> str:
     :return: Markdown text.
     """
     lines = [f"# Search speed: {label}", ""]
-    for kind, title, columns in (
-        (
-            "seconds",
-            "Depth reached in a time budget",
-            "| Player | Seconds | Mean depth | Median depth | Mean s/move | Nodes/s |",
-        ),
-        (
-            "depth",
-            "Cost of a fixed depth",
-            "| Player | Depth | Mean depth | Median depth | Mean s/move | Nodes/s |",
-        ),
+    many = any(r.get("threads", 1) != 1 for r in results)
+    for kind, title, unit in (
+        ("seconds", "Depth reached in a time budget", "Seconds"),
+        ("depth", "Cost of a fixed depth", "Depth"),
     ):
         rows = [r for r in results if r["kind"] == kind]
         if not rows:
             continue
-        lines += [f"## {title}", "", columns, "|---|---|---|---|---|---|"]
+        head = f"| Player | {'Threads | ' if many else ''}{unit} | Mean depth | Median depth | Mean s/move | Nodes/s |"
+        lines += [f"## {title}", "", head, "|---|" + "---|" * (6 + many)]
         for r in rows:
+            threads = f"{r.get('threads', 1)} | " if many else ""
             lines.append(
-                f"| `{r['player']}` | {r['value']:g} | {r['mean_depth']:.2f} | "
+                f"| `{r['player']}` | {threads}{r['value']:g} | {r['mean_depth']:.2f} | "
                 f"{r['median_depth']:g} | {r['mean_seconds']:.3f} | {r['nodes_per_second']:,.0f} |"
             )
         lines.append("")
@@ -135,6 +132,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seconds", default="1,3,10", help="time budgets in seconds, or empty")
     parser.add_argument("--depths", default="4", help="fixed depths, or empty")
     parser.add_argument("--workers", type=int, default=5, help="parallel processes")
+    parser.add_argument(
+        "--threads",
+        default="1",
+        help="threads of the search, comma-separated (use --workers 1 when above 1)",
+    )
     parser.add_argument("--label", default="engine", help="name of the engine measured")
     parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
     parser.add_argument("--sidecar", type=Path, default=Path("data/lichess/sidecar"))
@@ -151,8 +153,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     fens = load_fens(args.raw, args.sidecar, args.positions)
     players = [p for p in args.players.split(",") if p]
-    jobs = [(p, "seconds", float(s), fens) for p in players for s in args.seconds.split(",") if s]
-    jobs += [(p, "depth", float(d), fens) for p in players for d in args.depths.split(",") if d]
+    threads = [int(n) for n in args.threads.split(",")]
+    jobs = [
+        (p, "seconds", float(s), fens, n)
+        for p in players
+        for n in threads
+        for s in args.seconds.split(",")
+        if s
+    ]
+    jobs += [
+        (p, "depth", float(d), fens, n)
+        for p in players
+        for n in threads
+        for d in args.depths.split(",")
+        if d
+    ]
     for name in SINGLE_THREAD:
         os.environ[name] = "1"
     context = multiprocessing.get_context("spawn")

@@ -1,6 +1,6 @@
 # Search algorithms
 
-> **What it is:** How the engine chooses a move: one main algorithm (alpha-beta search) and, one section each, the nine modifications made on it.
+> **What it is:** How the engine chooses a move: one main algorithm (alpha-beta search) and, one section each, the modifications made on it.
 >
 > **Read it when:** You want to know why the engine thinks the way it does, what each technique costs or saves, or where it lives in the code.
 >
@@ -9,7 +9,12 @@
 A chess engine tries moves, imagines the replies, and picks the move leading to the best position it
 can force. With about 30 moves per position the lines explode, so everything below is about looking at
 fewer or better positions within the clock. After the main algorithm, each modification gets a section
-with five parts. Code: `src/chess_engine/search/`, `src/chess_engine/bots/`; evaluations: [MODELS.md](MODELS.md).
+with five parts. Code: `rust/src/search/`, `rust/src/board.rs`, `src/chess_engine/bots/`; evaluations: [MODELS.md](MODELS.md).
+
+The search was first written in Python and moved to Rust (section 10). The node counts, the pruning
+counts and the moves quoted in this page were measured with the Python engine; the Rust core
+reproduces them exactly (the golden files in `tests/golden/` check it on every run), so they hold
+for both. Only the time per node changed, and section 10 gives the speed.
 
 ## The main algorithm: alpha-beta search
 
@@ -27,16 +32,15 @@ skipped (a cut-off). The result is exactly the minimax result with fewer nodes.
 via Wikimedia Commons.*
 
 **Heuristic evaluation and a depth cut-off.** Games are too deep to search to the end, so the search
-stops at a fixed depth and asks an evaluation function for a number. This is
-`heuristic_alphabeta_search` in `src/chess_engine/search/game_algorithms.py` (`max_value` / `min_value`,
-`cutoff_test`, `eval_fn`; it returns `(best_move, SearchStatistics)`). The engine plays with its
-extended sibling, `advanced_heuristic_alphabeta_search`, to which every modification below was added.
+stops at a fixed depth and asks an evaluation function for a number. This is `Search::node` in
+`rust/src/search/mod.rs` (one function for MAX and MIN nodes; `alpha_beta` runs it for a depth and
+returns the value, the best move and the counters). Every modification below was added to it.
 
 **Values.** Every value is the expected score for the player the search runs for: `1` win, `0.5` draw,
 `0` loss. Evaluations (heuristics and learned models) are clipped to `0.01 .. 0.99`, so an estimate never
 outranks a real result; terminal positions use exact `1`, `0.5`, `0`.
 
-How the advanced search visits one node (`visit`, `max_value`, `min_value`):
+How the search visits one node (`Search::node`):
 
 ```mermaid
 flowchart TD
@@ -46,7 +50,7 @@ flowchart TD
     X -- yes --> R2["return 1 - 0.003 · ply (win)<br/>0.5 (draw)<br/>0.003 · ply (loss)"]
     X -- no --> D{"depth_remaining == 0?"}
     D -- yes --> Q["quiescence search at the horizon<br/>(or evaluate(node) if switched off)"]
-    D -- no --> C{"cutoff_test: hard time limit passed?"}
+    D -- no --> C{"hard time limit passed<br/>(or stop flag raised)?"}
     C -- "yes" --> R4["evaluate(node), mark search as truncated"]
     C -- no --> O["order moves:<br/>killer moves first, then captures by MVV-LVA"]
     O --> L["for each move: make it, search the child with (alpha, beta), unmake it"]
@@ -69,9 +73,9 @@ win and keep postponing it. The same happens in reverse for losses.
 **What it does.** A terminal value is nudged by `0.003` per ply from the root: a quicker win is worth
 slightly more than a slower one, a slower loss more than a quicker one. Draws are untouched.
 
-**How it is implemented.** `DEPTH_PREFERENCE_EPSILON = 0.003` and `_terminal_utility` in
-`src/chess_engine/search/game_algorithms.py`: `utility - ply * epsilon` for a win, `utility + ply *
-epsilon` for a loss, with `ply` computed from `depth_remaining`. The quiescence search uses it too.
+**How it is implemented.** `DEPTH_PREFERENCE_EPSILON = 0.003` and `Search::terminal_utility` in
+`rust/src/search/mod.rs`: `1 - ply * epsilon` for a win, `ply * epsilon` for a loss, with `ply`
+computed from `depth_remaining`. The quiescence search uses it too.
 
 **Measured effect.** Not measured in this repository.
 
@@ -89,7 +93,7 @@ speed up the deeper ones (sections 3 and 4). The clock logic:
 * **Soft budget** (`TimeManager.turn_budget`): 15 % of the time left, between 1.5 s and 40 s and never
   more than half the clock (10 minutes left: the 40 s cap).
 * **Time estimate.** From the fourth iteration on, a rule predicts the duration of the next
-  iteration from the finished ones (`src/chess_engine/search/time_estimators.py`; the default is
+  iteration from the finished ones (`rust/src/search/estimators.rs`; the default is
   `geometric_growth`: the last duration times the geometric mean of the growth between iterations,
   kept between 2 and 8). If the prediction is more than 15 % over the remaining budget, the next
   depth is not started.
@@ -132,12 +136,12 @@ iterations at 40 s. The replay assumes each iteration lasts what it lasted in th
 change was not tested in games, where a difference of 0.2 plies (a few Elo) is far below what a
 hundred games can resolve.
 
-**How it is implemented.** `heuristic_alphabeta_iterative_deepening_search` in
-`src/chess_engine/search/game_algorithms.py` (loop, `overshoot_factor = 1.15`, discard of truncated
-iterations; `completed_depth` in `SearchStatistics`). `TimeManager` in
-`src/chess_engine/search/time_management.py` holds the numbers; `IterativeDeepeningBot.search` and
-`cutoff_test` in `src/chess_engine/bots/_search_bots.py` connect them. `elapsed` runs from the start
-of the move, not of each iteration.
+**How it is implemented.** `iterative_deepening` in `rust/src/search/mod.rs` (loop,
+`OVERSHOOT_FACTOR = 1.15`, discard of truncated iterations; `completed_depth` in the statistics).
+`TimeManager` in `src/chess_engine/search/time_management.py` holds the numbers;
+`IterativeDeepeningBot.search` in `src/chess_engine/bots/_search_bots.py` computes the soft budget and
+the hard limit and passes them to the core. `elapsed` runs from the start of the move, not of each
+iteration.
 
 **Measured effect.** Before the fix, 12.0 % of the moves of the partial tournament above finished
 below depth 3 (126 of 1,051). With the floor of three iterations, 0 of the 2,900 moves of the first 34
@@ -159,11 +163,11 @@ repeats the positions of the previous iteration. A plain search analyses them ag
 with, since a cut-off value is only a bound. If the position returns with no more depth remaining than
 stored, an exact entry is returned at once and a bound tightens the window (returning if it closes it).
 
-**How it is implemented.** `TTEntry`, `probe_transposition_table` and `store_transposition_entry`
-in `src/chess_engine/search/search_utils.py`, called from `visit` and `finish` in
-`advanced_heuristic_alphabeta_search`. A `dict` keyed by `ChessGameState.key()`, capped at 500,000
-entries (`DEFAULT_MAX_TT_ENTRIES`), oldest dropped first; nothing is stored once the clock has
-truncated a search. It is shared by the iterations of a move and by the moves of a game, and cleared in
+**How it is implemented.** `Table` and `Entry` in `rust/src/search/tt.rs`, probed at the start of
+`Search::node` and written at its end. A hash map keyed by the position key (`GameState::key()` in
+`rust/src/board.rs`), capped at 500,000 entries (`DEFAULT_MAX_TT_ENTRIES`), oldest dropped first;
+nothing is stored once the clock has truncated a search. With several threads the table is a
+lock-free one shared by all of them (section 11). It is shared by the iterations of a move and by the moves of a game, and cleared in
 `on_game_start` (values are from the point of view of the colour played). Quiescence does not use it.
 
 **Measured effect.** `python scripts/bench/compare_search_features.py --player linear_material
@@ -197,10 +201,10 @@ is often good in a sibling branch.
 **What it does.** A move that causes a cut-off is remembered as a "killer" for its depth and tried
 before the other moves in later nodes at that depth.
 
-**How it is implemented.** `record_killer_move` and `reorder_by_killer_moves` in
-`src/chess_engine/search/search_utils.py`, called from `ordered_actions` and from `max_value` /
-`min_value` in `advanced_heuristic_alphabeta_search`. Up to three killers are kept per depth
-(`MAX_KILLERS_PER_DEPTH`), shared across iterations and moves, cleared at the start of each game.
+**How it is implemented.** `Killers::record` and the first step of `order` in
+`rust/src/search/tt.rs`, called from `Search::node`. Up to three killers are kept per depth
+(`MAX_KILLERS_PER_DEPTH`), shared across iterations and moves, cleared at the start of each game. A
+killer is identified by its squares and promotion, not by what it captures, as `chess.Move` does.
 
 **Measured effect.** Depth 4, 60 positions: without killers 18,303 nodes per move against 15,988
 (killers save 12.6 % of the nodes and 7.9 % of the time, 1.482 s against 1.365 s; `same as
@@ -219,10 +223,10 @@ lists them in arbitrary order.
 taking a queen before a queen taking a pawn; en passant counts as a pawn capture). Quiet moves keep
 their order, so killers stay in front of them.
 
-**How it is implemented.** `mvv_lva_score` and `order_by_mvv_lva` in
-`src/chess_engine/search/search_utils.py` (score `10 × victim − attacker`), passed to the search as
-`order_moves_callback` by `IterativeDeepeningBot.order_moves` in `src/chess_engine/bots/_search_bots.py`.
-The same function picks the fallback move when a search returns nothing.
+**How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/tt.rs` (score
+`10 × victim − attacker`; a stable sort, so equal captures keep the order python-chess generates
+them in, `generation_order` in `rust/src/board.rs`). `fallback_move` in
+`src/chess_engine/bots/_search_bots.py` picks the best capture when a search returns nothing.
 
 **Measured effect.** Depth 4, 60 positions: without ordering 64,003 nodes per move instead of 15,988
 (ordering saves 75.0 % of the nodes) and 5.408 s instead of 1.365 s (74.8 % less time); 11.7 % of the
@@ -241,10 +245,9 @@ the recapture and scores a free pawn (the horizon effect).
 evaluation ("stand-pat": nobody is forced to capture) or follow a *noisy* move (capture or promotion)
 for a few more plies, with alpha-beta pruning, and the best option is returned.
 
-**How it is implemented.** The inner function `quiescence` of `advanced_heuristic_alphabeta_search`
-in `src/chess_engine/search/game_algorithms.py`, called from `visit` at `depth_remaining <= 0`, and
-`chess_noisy_moves` in `src/chess_engine/search/chess_problem.py` (legal captures and promotions). It
-uses neither the table nor killers; its nodes count in `nodes_visited`. The bots
+**How it is implemented.** `Search::quiescence` in `rust/src/search/mod.rs`, called from
+`Search::node` at `depth_remaining <= 0`, and `is_noisy` in `rust/src/board.rs` (legal captures and
+promotions). It uses neither the table nor killers; its nodes count in `nodes_visited`. The bots
 (`IterativeDeepeningBot`) use `DEFAULT_QUIESCENCE_PLIES = 4`; `quiescence_plies=0` switches it off, which
 is also the default of the search function itself.
 
@@ -272,22 +275,21 @@ Paired difference at depth 3 (quiescence minus none): +0.047 for `h1` and +0.096
 **Problem.** The first version copied the whole game state at every node and built the position key
 from a FEN string, which costs time at every node.
 
-**What it does.** The search plays a move in place on one `ChessGameState`, searches the child and
-takes the move back; the state keeps an undo stack (history, cached outcome). The transposition key
-is a tuple (python-chess board key, halfmove clock, fullmove number) that identifies the same
-positions as the FEN without building the string.
+**What it does.** The search plays a move in place on one `GameState`, searches the child and
+takes the move back; the state keeps an undo stack (position, history). The transposition key is
+a hash of the position plus the two move counters, which identifies the same positions as the FEN
+without building the string.
 
-**How it is implemented.** `ChessGameState.apply_move`, `undo_move` and `key` in
-`src/chess_engine/search/chess_game_state.py`; the `node.apply_move(action)` / `try ... finally:
-node.undo_move()` pairs in `max_value`, `min_value` and `quiescence` of
-`advanced_heuristic_alphabeta_search`. `make_move` and `copy` remain for code that wants a new or
-independent state.
+**How it is implemented.** `GameState::apply`, `undo` and `key` in `rust/src/board.rs`; the
+`apply` / `undo` pairs in `Search::node` and `Search::quiescence`. (The Python version was
+`ChessGameState.apply_move`, `undo_move` and `key`, which survive only as a thin wrapper of a board
+for the evaluation functions.)
 
-**Measured effect.** Commit `ea86b20` reports, on the fixed benchmark at depth 3, identical moves and
-node counts and a total time from 10.8 s to 3.7 s (2.9 times faster), *together with* the change of
-section 8. Reproduce with `python scripts/bench/bench_search_speed.py` (times depend on the machine).
+**Measured effect.** Commit `ea86b20` reports, on the fixed benchmark at depth 3 of the Python
+engine, identical moves and node counts and a total time from 10.8 s to 3.7 s (2.9 times faster),
+*together with* the change of section 8.
 
-**Status.** Kept; since 2026-10-16 (commit `ea86b20`).
+**Status.** Kept; since 2026-10-16 (commit `ea86b20`), now in Rust.
 
 ## 8. Fast terminal detection with the same draw rules
 
@@ -296,17 +298,19 @@ section 8. Reproduce with `python scripts/bench/bench_search_speed.py` (times de
 
 **What it does.** Same answer as `board.outcome(claim_draw=True)`, but the repetition is read from the
 keys of the positions since the last irreversible move, which the state extends in constant time per
-move; the result is cached per state.
+move. Checkmate, stalemate and insufficient material come from the rules of the position; the
+fifty-move claim needs 100 halfmoves and a legal move; the threefold claim holds when the position
+occurred three times or a legal move reaches one that occurred twice.
 
-**How it is implemented.** `ChessGameState.is_over`, `_compute_outcome`,
-`_can_claim_threefold_repetition` and `_build_history` in
-`src/chess_engine/search/chess_game_state.py`. Tests: `tests/test_terminal_detection.py`.
+**How it is implemented.** `GameState::outcome` and `can_claim_threefold` in `rust/src/board.rs`;
+the history is rebuilt on every call from the root FEN and the moves played. Tests:
+`rust/tests/golden_board.rs`, which checks 2,066 positions and histories against the Python engine.
 
-**Measured effect.** Commit `ba3d5cb` reports, at depth 3 on the fixed benchmark, the same moves and
-nodes as the baseline and a search 1.89 times faster (same command as in section 7; the 10.8 s to
-3.7 s there is the combined effect of both changes).
+**Measured effect.** Commit `ba3d5cb` reports, at depth 3 on the fixed benchmark of the Python
+engine, the same moves and nodes as the baseline and a search 1.89 times faster (the 10.8 s to 3.7 s
+of section 7 is the combined effect of both changes).
 
-**Status.** Kept; since 2026-10-16 (commit `ba3d5cb`).
+**Status.** Kept; since 2026-10-16 (commit `ba3d5cb`), now in Rust.
 
 ## 9. Endgame tablebases
 
@@ -322,8 +326,9 @@ next capture or pawn move (the distance to zeroing, DTZ). The bot keeps the best
 mates at once if it can; among winning moves it takes the one with the smallest DTZ, and when it is
 losing it takes the one with the largest, to resist longest.
 
-**How it is implemented.** `EndgameTablebase` in `src/chess_engine/knowledge/endgame_tablebase.py`
-(`covers`, `best_move` and the move ranking), on top of `chess.syzygy` from python-chess. The 3-4-5
+**How it is implemented.** `EndgameTablebase` in `rust/src/knowledge/tablebase.rs` (`covers`,
+`best_move` and the move ranking), on top of the `shakmaty-syzygy` crate, with
+`src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. The 3-4-5
 piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not versioned.
 `IterativeDeepeningBot` takes a `tablebase` argument and consults it at the root of `get_move`,
 recording `stop_reason = "tablebase"` in the search statistics; `python main.py --no-endgame-db`
@@ -340,6 +345,104 @@ with the tables converts 52 of 60 (mean 14.2 moves to mate); the same search wit
 the search never probes the tables inside the tree, and positions with six or more pieces are
 searched as usual.
 
+## 10. The search in Rust
+
+**Problem.** In Python the search visited 3,000 to 12,000 nodes per second, so in the 3 to 10
+seconds a move gets it reached depth 4 or 5, far from the depths where a chess engine plays well.
+The time went into the interpreter, the board of python-chess and the evaluations, not into the
+algorithm.
+
+**What it does.** The same search, in Rust: the rules of the game, the evaluations the search calls
+(`h1`, the four logistic models and the sparse network), the alpha-beta with all the techniques
+above, the opening book and the endgame tables. Python keeps the game loop, the bots' interface, the
+training and the comparison tools, and calls the core once per move with the position, the
+evaluation and the time limits.
+
+**How it is implemented.** The crate in `rust/` is built as the Python module `chess_engine._core`
+(PyO3 and `maturin`) on top of `shakmaty` for the rules. Nothing changed in the algorithm: the Rust
+core reproduces the Python engine node for node. `tests/golden/` holds what the Python engine
+produced (2,000 positions with their histories, the features and values of every evaluation,
+fixed-depth searches of `h1` and the five models with value, move, nodes and prunings, book
+lookups and tablebase moves) and `rust/tests/golden_*.rs` and `tests/test_core_golden.py` compare
+the core with it. The legal moves are listed in the order python-chess generates them
+(`generation_order`), so that moves of equal value are chosen as before. Replaying the 21,203 moves
+of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with
+the same number of nodes; the 11 others differ in the last decimal of a value.
+
+**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
+(200 test positions, seed 42, a fresh table per position, five processes of one thread each, books
+and tables off), once with the Python engine (commit `148b86d`) and once with the core. Time to search
+every position to depth 4, in seconds per move:
+
+| player | Python | Rust | times faster |
+|---|---|---|---|
+| Heuristic (`h1`) | 7.995 | 0.226 | 35.4 |
+| Position-terms logistic model (`linear_pst_terms`) | 3.429 | 0.139 | 24.7 |
+| Piece-square logistic model (`linear_pst`) | 2.279 | 0.110 | 20.6 |
+| Material logistic model (`linear_material`) | 1.335 | 0.076 | 17.6 |
+| King-bucket logistic model (`linear_king_bucket`) | 1.990 | 0.120 | 16.6 |
+| Four-layer piece-square network (`net4_pst`) | 2.266 | 0.286 | 7.9 |
+
+Mean depth completed in a time budget per move (the clock decides; the estimator stops an iteration
+that will not fit, so a move uses 50 to 80 % of the budget):
+
+| player | 1 s: Python → Rust | 3 s: Python → Rust | 10 s: Python → Rust |
+|---|---|---|---|
+| `h1` | 2.58 → 5.29 | 3.25 → 6.04 | 4.12 → 6.93 |
+| `linear_material` | 3.78 → 6.04 | 4.49 → 6.82 | 5.37 → 7.68 |
+| `linear_pst` | 3.35 → 5.60 | 4.05 → 6.34 | 4.94 → 7.18 |
+| `linear_pst_terms` | 3.19 → 5.43 | 3.85 → 6.26 | 4.62 → 7.13 |
+| `linear_king_bucket` | 3.50 → 5.63 | 4.23 → 6.36 | 5.04 → 7.51 |
+| `net4_pst` | 3.35 → 4.80 | 4.04 → 5.61 | 4.85 → 6.82 |
+
+In 10 seconds the core searches 2.0 to 2.8 plies deeper. A 200-game round robin at a fixed depth of 3
+took 56 s (it took hours in Python). The network gains least because it still adds the 768 inputs
+to its first layer at every leaf; an accumulator updated move by move, as NNUE does, would remove
+that and has not been written.
+
+**Status.** Kept; since 2026-10-25.
+
+## 11. Several threads (Lazy SMP)
+
+**Problem.** A computer has several cores and the search used one.
+
+**What it does.** With `threads = N` the search runs on N threads. They all search the same position
+and share one transposition table, without locks; the main thread runs the iterative deepening as
+usual and the others, from other depths and with the moves of the root in a different order, fill the
+table with what they find. When the main thread finishes it raises a flag and the others stop. The
+move is the main thread's. Dividing the root moves among the threads was not chosen: the first move
+takes most of the work (the others are cut off by its value), so the threads would wait for each
+other and, ignoring what the others find, they would prune less.
+
+**How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/mod.rs`; the
+table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
+XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of
+`IterativeDeepeningBot` and `--threads`, `--hash` of `main.py`. The tournaments use one thread, so
+that games are reproducible and the clock is fair among processes. With more than one thread the
+search is not deterministic and the evaluation must run in the core.
+
+**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 6
+--players linear_pst_terms --threads 1,2,4,6 --workers 1` (the Position-terms logistic model, 60 test
+positions, nothing else running on the six-core machine). The nodes per second count the nodes of all
+threads:
+
+| threads | nodes/s | seconds to depth 6 | mean depth in 3 s |
+|---|---|---|---|
+| 1 | 352,906 | 1.273 | 6.88 |
+| 2 | 673,207 | 1.185 | 6.93 |
+| 4 | 1,212,354 | 1.090 | 6.97 |
+| 6 | 1,628,464 | 1.075 | 6.95 |
+
+With a budget of 10 s (30 positions) the mean depth goes from 7.70 with one thread to 7.93 with six.
+The threads do add work (4.6 times the nodes per second with six), but most of it repeats what the
+main thread already does, so the search to a fixed depth is only 15 % faster with six threads and
+the depth gained in a given time is a fraction of a ply. The searches here are short (seconds, depth 6
+to 8) and the table has little to share yet. A first version in which the helpers started at depths
+1 to 3 gave 1.15 s to depth 6 with six threads; making them search one or two plies deeper than the
+main thread is, as here, improved it to 1.075 s. Gains in longer searches were not measured.
+
+**Status.** Kept as an option, off by default; since 2026-10-25.
+
 ## Tried and removed: tactical move ordering with Prolog
 
 The repository once had a `TacticalAlphaBetaBot` that asked a Prolog knowledge base which legal moves
@@ -354,7 +457,8 @@ was never shown to pay for its cost, and it was dropped rather than disproved.
 **The opening book.** Every search bot (`IterativeDeepeningBot`; on by default, `--no-opening-book` switches it off) plays
 book moves while the game follows the book, then searches. `IterativeModelBookBot`
 (`src/chess_engine/bots/iterative_model_book_bot.py`) is the learned-model bot of the registry. The book
-(`OpeningBook`, `src/chess_engine/knowledge/opening_book.py`) is keyed by the first four FEN fields, so
+(`OpeningBook` in `rust/src/knowledge/book.rs`, with `src/chess_engine/knowledge/opening_book.py` as its
+Python face) is keyed by the first four FEN fields, so
 transpositions hit the same entry. Once the game leaves the book it is never consulted again;
 `on_game_start` re-enables it and clears the table, killers and statistics.
 

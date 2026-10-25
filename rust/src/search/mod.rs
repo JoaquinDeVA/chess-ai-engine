@@ -10,7 +10,7 @@ pub mod estimators;
 pub mod shared;
 pub mod tt;
 
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 
 use shakmaty::{Color, Move};
@@ -155,6 +155,8 @@ pub struct Control<'a> {
     pub hard_limit: f64,
     pub clock: Clock<'a>,
     pub stop: Option<&'a AtomicBool>,
+    /// Depth the main thread is searching, written by it and read by the helpers.
+    pub progress: Option<&'a AtomicUsize>,
     /// Helper threads rotate the moves of the root by this much, so that they do not all start with
     /// the same one.
     pub rotation: usize,
@@ -389,7 +391,7 @@ pub fn alpha_beta(
 }
 
 /// The work of a helper thread: iterative deepening on its own copy of the position that only
-/// fills the shared table. It starts at a different depth from the main thread, rotates the moves
+/// fills the shared table. It searches one or two plies deeper than the main thread is, rotates the moves
 /// of the root and stops when the flag is raised. Returns the nodes it visited.
 fn helper(
     index: usize,
@@ -406,10 +408,10 @@ fn helper(
         threads: 1,
     };
     let mut nodes = 0;
-    for depth in 1 + index % 3..=max_depth {
-        if control.stop.is_some_and(|flag| flag.load(Relaxed)) {
-            break;
-        }
+    while !control.stop.is_some_and(|flag| flag.load(Relaxed)) {
+        // Stay ahead of the main thread: the table is useful with what it will need next.
+        let main_depth = control.progress.map_or(1, |p| p.load(Relaxed));
+        let depth = (main_depth + 1 + index % 2).min(max_depth).max(1);
         let result = alpha_beta(
             &mut state,
             eval,
@@ -456,16 +458,18 @@ pub fn iterative_deepening(
     table.new_search();
     let stop = AtomicBool::new(false);
     let helper_nodes = std::sync::atomic::AtomicU64::new(0);
+    let progress = AtomicUsize::new(0);
     let copies: Vec<GameState> = (0..extra).map(|_| state.clone()).collect();
     let result = std::thread::scope(|scope| {
         for (index, copy) in copies.into_iter().enumerate() {
-            let (table, stop, nodes) = (table.clone(), &stop, &helper_nodes);
+            let (table, stop, nodes, progress) = (table.clone(), &stop, &helper_nodes, &progress);
             scope.spawn(move || {
                 let helper_control = Control {
                     start: control.start,
                     hard_limit: control.hard_limit,
                     clock: control.clock,
                     stop: Some(stop),
+                    progress: Some(progress),
                     rotation: index + 1,
                 };
                 nodes.fetch_add(
@@ -482,7 +486,23 @@ pub fn iterative_deepening(
                 );
             });
         }
-        let result = deepen(state, eval, memory, options, max_depth, time_limit, control);
+        let main_control = Control {
+            start: control.start,
+            hard_limit: control.hard_limit,
+            clock: control.clock,
+            stop: control.stop,
+            progress: Some(&progress),
+            rotation: control.rotation,
+        };
+        let result = deepen(
+            state,
+            eval,
+            memory,
+            options,
+            max_depth,
+            time_limit,
+            &main_control,
+        );
         stop.store(true, Relaxed);
         result
     });
@@ -528,6 +548,9 @@ fn deepen(
                 stop_predicted = predicted;
                 break;
             }
+        }
+        if let Some(progress) = control.progress {
+            progress.store(depth, Relaxed);
         }
         let iteration_start = clock();
         let result = alpha_beta(state, eval, memory, options, depth as i32, control);
@@ -652,6 +675,7 @@ mod tests {
             hard_limit,
             clock: &now,
             stop: None,
+            progress: None,
             rotation: 0,
         };
         let mut memory = Memory::default();
@@ -685,6 +709,7 @@ mod tests {
             hard_limit: f64::INFINITY,
             clock: &now,
             stop: None,
+            progress: None,
             rotation: 0,
         };
         alpha_beta(
@@ -721,6 +746,7 @@ mod tests {
             hard_limit: f64::INFINITY,
             clock: &now,
             stop: None,
+            progress: None,
             rotation: 0,
         };
         let options = Options {
@@ -756,6 +782,7 @@ mod tests {
                 hard_limit: f64::INFINITY,
                 clock: &now,
                 stop: None,
+                progress: None,
                 rotation: 0,
             };
             let options = Options {
@@ -791,6 +818,7 @@ mod tests {
             hard_limit: -1.0,
             clock: &now,
             stop: None,
+            progress: None,
             rotation: 0,
         };
         let mut memory = Memory::default();
@@ -893,6 +921,7 @@ mod tests {
                 hard_limit: 1e9,
                 clock: &now,
                 stop: None,
+                progress: None,
                 rotation: 0,
             };
             let options = Options {

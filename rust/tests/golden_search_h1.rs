@@ -55,6 +55,7 @@ fn fixed_depth_search_matches_golden() {
             hard_limit: f64::INFINITY,
             clock: &clock,
             stop: None,
+            progress: None,
             rotation: 0,
         };
         let found = alpha_beta(&mut state, &eval, &mut memory, &options, depth, &control);

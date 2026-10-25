@@ -32,6 +32,23 @@ class MyModel(LinearEvalModel):
 The registry (`models/registry.py`) is what makes `my_model` a valid `--model` for the training
 command, the evaluation tools and the bots.
 
+### Making it fast
+
+The search runs in Rust, so a model plays at full speed only if its features are computed there too.
+`models/native.py` hands the weights of a `LinearEvalModel` or a `NeuralEvalModel` to the core by the
+**name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
+`king_bucket` and `pst_slotted`. A model with another feature set still plays: the core calls it back
+from Python for every leaf (a warning says so), which is much slower and cannot use
+several threads. To give a feature set its Rust version:
+
+1. add a variant to `FeatureSet` in `rust/src/eval/linear.rs`, with its name in `FeatureSet::NAMES`,
+   its size in `size` and its `active` function, which must give the same indices and values, in the
+   same order, as the Python `active` (the training encodes with the Python one, so a difference
+   means training on one thing and playing with another);
+2. add a test that compares the two on a few thousand positions, as `tests/test_core_golden.py` does
+   for the shipped feature sets;
+3. rebuild with `pip install -e .` and run `cargo test --manifest-path rust/Cargo.toml`.
+
 ## Train and measure
 
 Each command works on one model, and `scripts/run_full_pipeline.sh` runs the whole flow for the
@@ -99,7 +116,8 @@ python main.py --player1 IterativeModelBookBot --model my_model --player2 Iterat
 ```
 
 Without `--model` the bot uses `linear_pst_terms`, the best player in the tournaments (see
-[Results](RESULTS.md)).
+[Results](RESULTS.md)). `--threads N` makes it search on several threads (models with a Rust feature
+set only).
 
 ## The CSV-era models
 
@@ -121,6 +139,7 @@ python -m chess_engine.comparison.evaluate --model mlp_features
 | Piece | Where | What it is |
 |---|---|---|
 | Feature set | `models/linear_features.py` (or `models/dense_features.py`) | turns a board into what the model consumes |
+| Its Rust version | `rust/src/eval/linear.rs` | the same features inside the core, for speed; without it the model is evaluated through Python |
 | Model class | `models/linear_eval.py` (or `models/*.py`) | `EvaluationModel` with `predict_cp`, `expected_score`, `fit`, `save`, `load` |
 | Registration | `@register_model("name")` | makes it available to the CLIs and the bots by name |
 | Card | `models/cards/<name>.json` | what is known about the model; written by the commands |

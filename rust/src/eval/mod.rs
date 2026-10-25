@@ -6,7 +6,7 @@ pub mod h1;
 pub mod linear;
 pub mod net;
 
-use shakmaty::{Chess, Color};
+use shakmaty::{Chess, Color, Move};
 
 /// Lowest and highest value of a heuristic, to stay clear of the terminal values 0 and 1.
 pub const MARGIN: f64 = 1e-2;
@@ -14,6 +14,26 @@ pub const MARGIN: f64 = 1e-2;
 /// A position evaluation seen from a player.
 pub trait Evaluator: Send + Sync {
     /// Expected score of `player` in `pos`, in `[0.01, 0.99]`.
+    fn evaluate(&self, pos: &Chess, player: Color) -> f64;
+
+    /// An evaluation state that follows the moves of the search instead of starting from the
+    /// board at every leaf, for the evaluations that can (`None` for the others).
+    fn new_state<'a>(&'a self, _pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
+        None
+    }
+}
+
+/// An evaluation that is updated move by move.
+///
+/// The search calls `apply` for every move it plays and `undo` when it takes it back, and
+/// `evaluate` for the position it is in; the result equals the evaluator's own `evaluate` up to
+/// rounding.
+pub trait EvalState {
+    /// `mover` plays `m`.
+    fn apply(&mut self, mover: Color, m: &Move);
+    /// Take back the last move played with `apply`.
+    fn undo(&mut self);
+    /// Expected score of `player` in `pos`, the position the state is following.
     fn evaluate(&self, pos: &Chess, player: Color) -> f64;
 }
 
@@ -45,6 +65,13 @@ impl Evaluator for Eval {
             Eval::H1(e) => e.evaluate(pos, player),
             Eval::Linear(e) => e.evaluate(pos, player),
             Eval::Net(e) => e.evaluate(pos, player),
+        }
+    }
+
+    fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
+        match self {
+            Eval::Net(e) => e.new_state(pos),
+            _ => None,
         }
     }
 }

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use shakmaty::{Color, Move};
 
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
-use crate::eval::Evaluator;
+use crate::eval::{EvalState, Evaluator};
 use shared::SharedTable;
 use tt::{order, Flag, Killers, Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
@@ -91,6 +91,9 @@ pub struct Options {
 /// The techniques added to the reference search, each with its own switch (all off by default).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Techniques {
+    /// Update the evaluation move by move instead of from the board at every leaf (same values up
+    /// to rounding; only the evaluations that support it, `net4_pst`).
+    pub incremental: bool,
     /// Try the best move stored in the table first.
     pub tt_move: bool,
     /// Order quiet moves by how often they caused cut-offs.
@@ -121,6 +124,7 @@ impl Techniques {
         let mut techniques = Techniques::default();
         for name in names {
             match name.as_ref() {
+                "incremental" => techniques.incremental = true,
                 "tt_move" => techniques.tt_move = true,
                 "history" => techniques.history = true,
                 "pvs" => techniques.pvs = true,
@@ -141,6 +145,7 @@ impl Techniques {
     /// Every technique on.
     pub fn all() -> Techniques {
         Techniques {
+            incremental: true,
             tt_move: true,
             history: true,
             pvs: true,
@@ -240,6 +245,8 @@ struct Search<'a> {
     prunings: u64,
     max_ply: i32,
     truncated: bool,
+    /// Evaluation that follows the moves, when the technique is on and the evaluator supports it.
+    incremental: Option<Box<dyn EvalState + 'a>>,
 }
 
 type Outcome = (f64, Option<u32>);
@@ -255,7 +262,26 @@ impl Search<'_> {
     }
 
     fn static_value(&self) -> f64 {
-        self.eval.evaluate(self.state.pos(), self.root_player)
+        match &self.incremental {
+            Some(state) => state.evaluate(self.state.pos(), self.root_player),
+            None => self.eval.evaluate(self.state.pos(), self.root_player),
+        }
+    }
+
+    /// Play `m` in the game state and in the incremental evaluation.
+    fn play(&mut self, m: Move) {
+        if let Some(state) = &mut self.incremental {
+            state.apply(self.state.turn(), &m);
+        }
+        self.state.apply(m);
+    }
+
+    /// Take back the last move played with [`Search::play`].
+    fn unplay(&mut self) {
+        self.state.undo();
+        if let Some(state) = &mut self.incremental {
+            state.undo();
+        }
     }
 
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
@@ -318,9 +344,9 @@ impl Search<'_> {
         };
         let mut best_move = None;
         for action in ordered {
-            self.state.apply(action);
+            self.play(action);
             let (child, _) = self.node(alpha, beta, depth_remaining - 1, ply + 1);
-            self.state.undo();
+            self.unplay();
             if maximizing {
                 if child > best_value {
                     best_value = child;
@@ -377,14 +403,14 @@ impl Search<'_> {
             return best_value;
         }
         for action in moves.into_iter().filter(is_noisy) {
-            self.state.apply(action);
+            self.play(action);
             self.nodes += 1;
             let child_moves = ordered_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
                 Some(winner) => self.terminal_utility(winner, ply + 1),
                 None => self.quiescence(alpha, beta, plies_left - 1, ply + 1, child_moves),
             };
-            self.state.undo();
+            self.unplay();
             if maximizing {
                 best_value = best_value.max(value);
                 alpha = alpha.max(best_value);
@@ -430,6 +456,11 @@ pub fn alpha_beta(
 ) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
+    let incremental = if options.techniques.incremental {
+        eval.new_state(&root)
+    } else {
+        None
+    };
     let mut search = Search {
         state,
         eval,
@@ -442,6 +473,7 @@ pub fn alpha_beta(
         prunings: 0,
         max_ply: 0,
         truncated: false,
+        incremental,
     };
     let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
@@ -1006,6 +1038,82 @@ mod tests {
                 "{fen}"
             );
             assert!(stats.nodes_visited > 0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod incremental_tests {
+    use super::*;
+    use crate::board::position_from_fen;
+    use crate::eval::linear::{FeatureSet, Perspective};
+    use crate::eval::net::{Layer, Net};
+
+    fn layer(fan_in: usize, fan_out: usize, seed: u64) -> Layer {
+        let mut state = seed;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((state >> 33) as f64 / (1u64 << 31) as f64) - 0.5
+        };
+        Layer {
+            fan_in,
+            fan_out,
+            weights: (0..fan_in * fan_out).map(|_| next() * 0.3).collect(),
+            bias: (0..fan_out).map(|_| next() * 0.2).collect(),
+        }
+    }
+
+    #[test]
+    fn the_incremental_evaluation_gives_the_same_search() {
+        let net = Net::new(
+            FeatureSet::Slotted,
+            Perspective::SideToMove,
+            vec![layer(768, 32, 1), layer(32, 16, 2), layer(16, 1, 3)],
+        )
+        .unwrap();
+        let fens = [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
+            "r3k2r/pp3ppp/2n1bn2/q1pp4/3P4/2N1PN2/PP2BPPP/R2QK2R w KQkq - 0 1",
+            "8/2k5/8/3Pp3/8/8/8/4K3 w - e6 0 1",
+        ];
+        for fen in fens {
+            let mut found = Vec::new();
+            for incremental in [false, true] {
+                let options = Options {
+                    quiescence_plies: 4,
+                    techniques: Techniques {
+                        incremental,
+                        ..Techniques::default()
+                    },
+                    ..Options::default()
+                };
+                let clock = || 0.0;
+                let control = Control {
+                    start: 0.0,
+                    hard_limit: f64::INFINITY,
+                    clock: &clock,
+                    stop: None,
+                    progress: None,
+                    rotation: 0,
+                };
+                let mut game = GameState::new(position_from_fen(fen).unwrap());
+                found.push(alpha_beta(
+                    &mut game,
+                    &net,
+                    &mut Memory::default(),
+                    &options,
+                    3,
+                    &control,
+                ));
+            }
+            assert!((found[0].value - found[1].value).abs() < 1e-9, "{fen}");
+            assert_eq!(found[0].best, found[1].best, "{fen}");
+            // a different rounding can break a tie between equal values: the counts agree to 1 %
+            let (a, b) = (found[0].nodes as f64, found[1].nodes as f64);
+            assert!((a - b).abs() <= 0.01 * a, "{fen}: {a} nodes against {b}");
         }
     }
 }

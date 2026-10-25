@@ -97,3 +97,21 @@ def test_tablebase_matches_golden():
     tables = _core.Tablebase.open(str(Path(__file__).resolve().parent / "data" / "syzygy"))
     for case in expected["three_piece"]:
         assert tables.best_move(case["fen"]) == case["move"], case["fen"]
+
+
+def test_the_incremental_network_gives_the_same_search():
+    evaluator = evaluator_of("net4_pst")
+    results = golden("search_net4_pst.json")["results"]
+    positions = golden("positions.json")["positions"]
+    checked = 0
+    for case in results:
+        if case["depth"] != 3 or case["quiescence"] != 4:
+            continue
+        entry = positions[case["index"]]
+        value, move, nodes, _, _ = _core.Searcher().search_fixed(
+            entry["root"], entry["moves"], evaluator, 3, 4, [], ["incremental"]
+        )
+        assert value == pytest.approx(case["value"], abs=1e-9), entry["fen"]
+        assert abs(nodes - case["nodes"]) <= 0.01 * case["nodes"] + 1, entry["fen"]
+        checked += move == case["move"]
+    assert checked >= 0.9 * sum(c["depth"] == 3 and c["quiescence"] == 4 for c in results)

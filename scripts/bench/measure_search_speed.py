@@ -51,17 +51,18 @@ def load_fens(raw: Path, sidecar: Path, count: int) -> List[str]:
     return load_sample(raw, sidecar, TEST, count, seed=SAMPLE_SEED)["fen"].tolist()
 
 
-def run_job(job: Tuple[str, str, float, List[str], int]) -> Dict[str, Any]:
+def run_job(job: Tuple[str, str, float, List[str], int, Tuple[str, ...]]) -> Dict[str, Any]:
     """Search every position with one player and one setting.
 
-    :param job: ``(player, kind, value, fens, threads)`` with ``kind`` ``"seconds"`` or ``"depth"``.
+    :param job: ``(player, kind, value, fens, threads, techniques)`` with ``kind`` ``"seconds"`` or ``"depth"``.
     :return: The player, the setting and the summary of the searches.
     """
     from chess_engine.comparison.tradeoff import fixed_time_manager, make_player
     from chess_engine.search.time_management import TimeManager
 
-    player_name, kind, value, fens, threads = job
+    player_name, kind, value, fens, threads, techniques = job
     options = {} if threads == 1 else {"threads": threads, "hash_mb": 256}
+    options["techniques"] = techniques
     if kind == "seconds":
         player = make_player(player_name, fixed_time_manager(value), **options)
         clock = value
@@ -82,6 +83,7 @@ def run_job(job: Tuple[str, str, float, List[str], int]) -> Dict[str, Any]:
     return {
         "player": player_name,
         "threads": threads,
+        "techniques": list(techniques),
         "kind": kind,
         "value": value,
         "positions": len(fens),
@@ -133,6 +135,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--depths", default="4", help="fixed depths, or empty")
     parser.add_argument("--workers", type=int, default=5, help="parallel processes")
     parser.add_argument(
+        "--techniques",
+        default="",
+        help="techniques of selective search on (comma-separated, or all)",
+    )
+    parser.add_argument(
         "--threads",
         default="1",
         help="threads of the search, comma-separated (use --workers 1 when above 1)",
@@ -154,15 +161,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     fens = load_fens(args.raw, args.sidecar, args.positions)
     players = [p for p in args.players.split(",") if p]
     threads = [int(n) for n in args.threads.split(",")]
+    from chess_engine import _core
+
+    names = list(_core.TECHNIQUES) if args.techniques == "all" else args.techniques.split(",")
+    techniques = tuple(n for n in names if n)
     jobs = [
-        (p, "seconds", float(s), fens, n)
+        (p, "seconds", float(s), fens, n, techniques)
         for p in players
         for n in threads
         for s in args.seconds.split(",")
         if s
     ]
     jobs += [
-        (p, "depth", float(d), fens, n)
+        (p, "depth", float(d), fens, n, techniques)
         for p in players
         for n in threads
         for d in args.depths.split(",")

@@ -66,6 +66,13 @@ impl Evaluator for Kind {
             Kind::Callback(c) => c.evaluate(pos, player),
         }
     }
+
+    fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn crate::eval::EvalState + 'a>> {
+        match self {
+            Kind::Native(e) => e.new_state(pos),
+            Kind::Callback(_) => None,
+        }
+    }
 }
 
 /// An evaluation of positions.
@@ -495,6 +502,7 @@ mod _core {
             "DEFAULT_MAX_TT_ENTRIES",
             crate::search::tt::DEFAULT_MAX_TT_ENTRIES,
         )?;
+        module.add("TECHNIQUES", crate::search::Techniques::NAMES.to_vec())?;
         module.add(
             "FEATURE_SETS",
             crate::eval::linear::FeatureSet::NAMES.to_vec(),

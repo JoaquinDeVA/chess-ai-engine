@@ -1249,6 +1249,10 @@ mod tests {
             };
             let options = Options {
                 estimator: "never_stop".into(),
+                techniques: Techniques {
+                    lmr: false,
+                    ..Techniques::all()
+                },
                 ..Options::default()
             };
             let mut memory = Memory::with_threads(1000, 4, 1);

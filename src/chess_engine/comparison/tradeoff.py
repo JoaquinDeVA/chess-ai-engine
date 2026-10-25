@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import chess
 import pandas as pd
 
+from chess_engine import _core
 from chess_engine.bots._search_bots import IterativeDeepeningBot
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
@@ -55,6 +56,21 @@ def fixed_time_manager(seconds: float) -> TimeManager:
     )
 
 
+def split_techniques(spec: str) -> Tuple[str, Tuple[str, ...]]:
+    """Split ``name+tech1,tech2`` into the player and the techniques of selective search.
+
+    ``name+all`` switches every technique on. A spec without ``+`` has no techniques.
+
+    :param spec: Player specification, possibly with a ``+`` suffix.
+    :return: ``(player specification, techniques)``.
+    """
+    base, _, rest = spec.partition("+")
+    if not rest:
+        return base, ()
+    names = list(_core.TECHNIQUES) if rest == "all" else [n for n in rest.split(",") if n]
+    return base, tuple(names)
+
+
 def make_player(
     spec: Union[str, EvaluationModel],
     time_manager: TimeManager,
@@ -65,7 +81,8 @@ def make_player(
 
     :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
         name or ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
-        instance.
+        instance. A ``+`` suffix switches techniques of selective search on (``linear_pst+pvs,lmr``
+        or ``linear_pst+all``).
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.
     :param search_options: Other options of the bot (``estimator``, ``min_depth``...); they may
@@ -73,6 +90,10 @@ def make_player(
     :return: The player.
     """
     search_options = {"opening_book": None, "tablebase": None, **search_options}
+    label = spec
+    if isinstance(spec, str) and "+" in spec:
+        spec, techniques = split_techniques(spec)
+        search_options.setdefault("techniques", techniques)
     if isinstance(spec, str) and spec in HEURISTICS:
         return IterativeHeuristicBot(
             eval_function=HEURISTICS[spec],
@@ -80,7 +101,7 @@ def make_player(
             time_manager=time_manager,
             **search_options,
         )
-    name = spec if isinstance(spec, str) else type(spec).name
+    name = label if isinstance(spec, str) else type(spec).name
     return IterativeModelBookBot(
         model=spec,
         max_depth=max_depth,
@@ -157,6 +178,7 @@ def validate_specs(specs: Sequence[str]) -> None:
     :raises ValueError: If a spec is unknown.
     """
     for spec in specs:
+        spec = split_techniques(spec)[0]
         if spec in HEURISTICS:
             continue
         try:

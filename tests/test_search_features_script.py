@@ -19,7 +19,7 @@ def script():
 
 
 def _player():
-    return SimpleNamespace(disabled=(), quiescence_plies=4)
+    return SimpleNamespace(disabled=(), quiescence_plies=4, techniques=())
 
 
 def test_switched_off_sets_and_restores_the_search_settings(script):
@@ -28,6 +28,21 @@ def test_switched_off_sets_and_restores_the_search_settings(script):
         assert player.disabled == ("table", "killers", "ordering")
         assert player.quiescence_plies == 0
     assert player.disabled == () and player.quiescence_plies == 4
+
+
+def test_selective_techniques_are_switched_on_and_restored(script):
+    player = _player()
+    with script.switched_off((), player, ("pvs", "lmr")):
+        assert player.techniques == ("pvs", "lmr")
+    assert player.techniques == ()
+    assert set(script.TECHNIQUE_VARIANTS["with all of them"]) == {
+        "tt_move",
+        "history",
+        "pvs",
+        "aspiration",
+        "null_move",
+        "lmr",
+    }
 
 
 def test_switched_off_with_nothing_changes_nothing(script):

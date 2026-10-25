@@ -38,25 +38,43 @@ VARIANTS: Dict[str, Tuple[str, ...]] = {
 }
 
 
+#: Techniques of selective search measured by switching them on: name -> techniques on.
+TECHNIQUE_VARIANTS: Dict[str, Tuple[str, ...]] = {
+    "with tt_move": ("tt_move",),
+    "with history": ("history",),
+    "with pvs": ("pvs",),
+    "with aspiration": ("aspiration",),
+    "with null_move": ("null_move",),
+    "with lmr": ("lmr",),
+    "with all of them": ("tt_move", "history", "pvs", "aspiration", "null_move", "lmr"),
+}
+
+
 @contextlib.contextmanager
-def switched_off(techniques: Sequence[str], player) -> Iterator[None]:
-    """Switch techniques off for the duration of the block.
+def switched_off(techniques: Sequence[str], player, enabled: Sequence[str] = ()) -> Iterator[None]:
+    """Switch techniques off, and techniques of selective search on, for the duration of the block.
 
     :param techniques: Any of ``"table"``, ``"killers"``, ``"ordering"``, ``"quiescence"``.
     :param player: Bot whose search settings are changed (and restored).
+    :param enabled: Techniques of selective search to switch on (see ``TECHNIQUE_VARIANTS``).
     """
-    saved = player.disabled, player.quiescence_plies
+    saved = player.disabled, player.quiescence_plies, getattr(player, "techniques", ())
     player.disabled = tuple(name for name in techniques if name != "quiescence")
+    player.techniques = tuple(enabled)
     if "quiescence" in techniques:
         player.quiescence_plies = 0
     try:
         yield
     finally:
-        player.disabled, player.quiescence_plies = saved
+        player.disabled, player.quiescence_plies, player.techniques = saved
 
 
 def measure(
-    spec: str, rows: List[Tuple[str, str]], depth: int, techniques: Sequence[str]
+    spec: str,
+    rows: List[Tuple[str, str]],
+    depth: int,
+    techniques: Sequence[str],
+    enabled: Sequence[str] = (),
 ) -> Tuple[List[str], float, float]:
     """Search every position once with some techniques off.
 
@@ -64,13 +82,14 @@ def measure(
     :param rows: ``(fen, stockfish move in UCI)`` pairs.
     :param depth: Maximum search depth.
     :param techniques: Techniques switched off.
+    :param enabled: Techniques of selective search switched on.
     :return: ``(chosen moves in UCI, nodes per move, seconds per move)``.
     """
     player = make_player(spec, TimeManager(), max_depth=depth)
     moves: List[str] = []
     nodes = 0
     seconds = 0.0
-    with switched_off(techniques, player):
+    with switched_off(techniques, player, enabled):
         for fen, _ in rows:
             player.on_game_start(chess.WHITE, "profiler")  # fresh table per position
             started = time.perf_counter()
@@ -132,7 +151,7 @@ def main(argv: Sequence[str] | None = None, measure_fn: Callable = measure) -> i
     stockfish = [best for _, best in rows]
 
     lines = [
-        "# Search techniques switched off one at a time",
+        "# Search techniques switched off, or on, one at a time",
         "",
         f"`{args.player}` at depth {args.depth} on {len(rows)} test positions (seed {SAMPLE_SEED}). "
         "'Same as baseline' is the share of moves equal to the baseline's; "
@@ -142,14 +161,20 @@ def main(argv: Sequence[str] | None = None, measure_fn: Callable = measure) -> i
         "|---|---|---|---|---|",
     ]
     wanted = None if args.variants is None else {v.strip() for v in args.variants.split(",")}
-    unknown = (wanted or set()) - set(VARIANTS)
+    every = {
+        **{n: (t, ()) for n, t in VARIANTS.items()},
+        **{n: ((), t) for n, t in TECHNIQUE_VARIANTS.items()},
+    }
+    unknown = (wanted or set()) - set(every)
     if unknown:
-        raise SystemExit(f"unknown variants: {sorted(unknown)}; choose from {list(VARIANTS)}")
+        raise SystemExit(f"unknown variants: {sorted(unknown)}; choose from {list(every)}")
     baseline_moves: List[str] = []
-    for name, techniques in VARIANTS.items():
+    for name, (techniques, enabled) in every.items():
         if wanted is not None and name != "baseline" and name not in wanted:
             continue
-        moves, nodes, seconds = measure_fn(args.player, rows, args.depth, techniques)
+        if wanted is None and enabled:
+            continue  # the techniques of selective search are measured when asked for
+        moves, nodes, seconds = measure_fn(args.player, rows, args.depth, techniques, enabled)
         if not baseline_moves:
             baseline_moves = moves
         lines.append(

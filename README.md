@@ -84,6 +84,7 @@ example to compare evaluations alone (the tournaments of the results page do tha
 | Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | `--opening-book FILE` to use another one, `--no-opening-book` to switch it off | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
 | Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists) | `--endgame-db DIR`, `--no-endgame-db` | on | [Algorithms](docs/ALGORITHMS.md), section 9 |
 | Quiescence, time estimator, minimum depth | Search settings: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/ALGORITHMS.md), sections 2 and 6 |
+| Selective search | Techniques that search less where it probably does not matter: `tt_move`, `history`, `pvs`, `aspiration`, `null_move`, `lmr` | `--techniques LIST` (or `all`), constructor option `techniques` | off | [Algorithms](docs/ALGORITHMS.md), sections 12 onwards |
 | Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | `--threads N`, `--hash MB` | 1 thread | [Algorithms](docs/ALGORITHMS.md), section 11 |
 
 ## Reproduce the experiments

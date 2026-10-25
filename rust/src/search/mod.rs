@@ -84,6 +84,71 @@ pub struct Options {
     pub use_table: bool,
     pub use_killers: bool,
     pub use_capture_order: bool,
+    /// Techniques of selective search; all off reproduces the reference engine.
+    pub techniques: Techniques,
+}
+
+/// The techniques added to the reference search, each with its own switch (all off by default).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Techniques {
+    /// Try the best move stored in the table first.
+    pub tt_move: bool,
+    /// Order quiet moves by how often they caused cut-offs.
+    pub history: bool,
+    /// Principal variation search: zero-width windows after the first move.
+    pub pvs: bool,
+    /// Search the root with a narrow window around the previous value.
+    pub aspiration: bool,
+    /// Prune a node if passing the turn already cuts.
+    pub null_move: bool,
+    /// Search late quiet moves with less depth.
+    pub lmr: bool,
+}
+
+impl Techniques {
+    /// Names, as the switches are called from Python.
+    pub const NAMES: [&'static str; 6] = [
+        "tt_move",
+        "history",
+        "pvs",
+        "aspiration",
+        "null_move",
+        "lmr",
+    ];
+
+    /// The techniques with the given names.
+    pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<Techniques, String> {
+        let mut techniques = Techniques::default();
+        for name in names {
+            match name.as_ref() {
+                "tt_move" => techniques.tt_move = true,
+                "history" => techniques.history = true,
+                "pvs" => techniques.pvs = true,
+                "aspiration" => techniques.aspiration = true,
+                "null_move" => techniques.null_move = true,
+                "lmr" => techniques.lmr = true,
+                other => {
+                    return Err(format!(
+                        "unknown technique {other:?}; available: {:?}",
+                        Techniques::NAMES
+                    ))
+                }
+            }
+        }
+        Ok(techniques)
+    }
+
+    /// Every technique on.
+    pub fn all() -> Techniques {
+        Techniques {
+            tt_move: true,
+            history: true,
+            pvs: true,
+            aspiration: true,
+            null_move: true,
+            lmr: true,
+        }
+    }
 }
 
 impl Default for Options {
@@ -96,6 +161,7 @@ impl Default for Options {
             use_table: true,
             use_killers: true,
             use_capture_order: true,
+            techniques: Techniques::default(),
         }
     }
 }
@@ -193,10 +259,9 @@ impl Search<'_> {
     }
 
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
-    fn node(&mut self, mut alpha: f64, mut beta: f64, depth_remaining: i32) -> Outcome {
+    fn node(&mut self, mut alpha: f64, mut beta: f64, depth_remaining: i32, ply: i32) -> Outcome {
         let (alpha_orig, beta_orig) = (alpha, beta);
         self.nodes += 1;
-        let ply = self.max_depth - depth_remaining;
         self.max_ply = self.max_ply.max(ply);
 
         let key = self.state.key();
@@ -254,7 +319,7 @@ impl Search<'_> {
         let mut best_move = None;
         for action in ordered {
             self.state.apply(action);
-            let (child, _) = self.node(alpha, beta, depth_remaining - 1);
+            let (child, _) = self.node(alpha, beta, depth_remaining - 1, ply + 1);
             self.state.undo();
             if maximizing {
                 if child > best_value {
@@ -378,7 +443,7 @@ pub fn alpha_beta(
         max_ply: 0,
         truncated: false,
     };
-    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth);
+    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

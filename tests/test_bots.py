@@ -143,6 +143,13 @@ class TestIterativeDeepening:
         with pytest.raises(ValueError, match="without Python"):
             Callback().search(chess.Board(), 1.0)
 
+    def test_an_unknown_technique_is_rejected(self):
+        bot = IterativeHeuristicBot(
+            max_depth=2, techniques=("warp_speed",), opening_book=None, tablebase=None
+        )
+        with pytest.raises(ValueError, match="unknown technique"):
+            bot.search(chess.Board(), 1.0)
+
     def test_abstract_bases_are_not_playable(self):
         with pytest.raises(TypeError):
             IterativeDeepeningBot("x")

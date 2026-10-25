@@ -15,6 +15,7 @@ import sys
 import traceback
 from typing import Optional
 
+from chess_engine import _core
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.human_player import HumanPlayer
 from chess_engine.config.settings import load_config
@@ -116,6 +117,13 @@ Examples:
         default=None,
         metavar="N",
         help="Threads that search (default 1); the search is then not deterministic",
+    )
+    parser.add_argument(
+        "--techniques",
+        default=None,
+        metavar="LIST",
+        help="Techniques of selective search to switch on, comma-separated, or 'all' "
+        "(" + ", ".join(_core.TECHNIQUES) + "); none by default",
     )
     parser.add_argument(
         "--hash",
@@ -222,6 +230,9 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
             options["threads"] = args.threads
         if args.hash is not None:
             options["hash_mb"] = args.hash
+    if args.techniques is not None and (takes_search_options or "techniques" in parameters):
+        names = list(_core.TECHNIQUES) if args.techniques == "all" else args.techniques.split(",")
+        options["techniques"] = tuple(n for n in names if n)
     if "tablebase" in parameters or takes_search_options:
         if args.no_endgame_db:
             options["tablebase"] = None

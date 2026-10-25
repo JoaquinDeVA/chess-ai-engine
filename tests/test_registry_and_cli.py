@@ -85,6 +85,7 @@ def test_cli_passes_model_and_depth_only_to_bots_that_accept_them(registry):
         no_opening_book=False,
         threads=None,
         hash=None,
+        techniques=None,
     )
     assert bot_options(registry, "IterativeModelBookBot", args) == {
         "model": "linear_material",
@@ -111,6 +112,7 @@ def test_cli_passes_the_endgame_tables_only_to_bots_that_search(registry):
         no_opening_book=False,
         threads=None,
         hash=None,
+        techniques=None,
     )
     options = bot_options(registry, "IterativeHeuristicBot", args)
     assert isinstance(options["tablebase"], EndgameTablebase)
@@ -135,6 +137,7 @@ def test_opening_book_option_reaches_the_search_bots(registry, tmp_path):
         no_opening_book=False,
         threads=None,
         hash=None,
+        techniques=None,
     )
     options = bot_options(registry, "IterativeHeuristicBot", args)
     assert isinstance(options["opening_book"], OpeningBook) and len(options["opening_book"]) == 1
@@ -155,6 +158,7 @@ def test_no_flags_switch_the_book_and_the_tables_off(registry):
         no_opening_book=True,
         threads=None,
         hash=None,
+        techniques=None,
     )
     assert bot_options(registry, "IterativeHeuristicBot", args) == {
         "tablebase": None,

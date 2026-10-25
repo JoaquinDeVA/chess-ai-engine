@@ -268,11 +268,13 @@ fn options(
     min_depth: usize,
     estimator: &str,
     disabled: &[String],
+    techniques: &[String],
 ) -> PyResult<Options> {
     let mut options = Options {
         quiescence_plies,
         min_depth,
         estimator: estimator.to_string(),
+        techniques: search::Techniques::from_names(techniques).map_err(value_error)?,
         ..Options::default()
     };
     for name in disabled {
@@ -324,7 +326,7 @@ impl PySearcher {
     }
 
     /// Iterative deepening. Returns `(move, statistics)`; `move` is a UCI string or `None`.
-    #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator, disabled=Vec::new()))]
+    #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator, disabled=Vec::new(), techniques=Vec::new()))]
     #[allow(clippy::too_many_arguments)]
     fn search<'py>(
         &mut self,
@@ -339,6 +341,7 @@ impl PySearcher {
         min_depth: usize,
         estimator: &str,
         disabled: Vec<String>,
+        techniques: Vec<String>,
     ) -> PyResult<(Option<String>, Bound<'py, PyDict>)> {
         if self.memory.threads > 1 && !evaluator.native() {
             return Err(value_error(
@@ -346,7 +349,13 @@ impl PySearcher {
             ));
         }
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
-        let options = options(quiescence_plies, min_depth, estimator, &disabled)?;
+        let options = options(
+            quiescence_plies,
+            min_depth,
+            estimator,
+            &disabled,
+            &techniques,
+        )?;
         let kind = evaluator.kind.clone();
         let memory = &mut self.memory;
         let mut run = move || {
@@ -377,7 +386,7 @@ impl PySearcher {
     /// One alpha-beta search of exactly `depth` plies with no clock. Returns
     /// `(value, move, nodes, prunings, deepest ply)`.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (root_fen, moves, evaluator, depth, quiescence_plies, disabled=Vec::new()))]
+    #[pyo3(signature = (root_fen, moves, evaluator, depth, quiescence_plies, disabled=Vec::new(), techniques=Vec::new()))]
     fn search_fixed(
         &mut self,
         py: Python<'_>,
@@ -387,6 +396,7 @@ impl PySearcher {
         depth: i32,
         quiescence_plies: u32,
         disabled: Vec<String>,
+        techniques: Vec<String>,
     ) -> PyResult<(f64, Option<String>, u64, u64, i32)> {
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
         let options = options(
@@ -394,6 +404,7 @@ impl PySearcher {
             search::DEFAULT_MIN_DEPTH,
             search::DEFAULT_ESTIMATOR,
             &disabled,
+            &techniques,
         )?;
         let kind = evaluator.kind.clone();
         let memory = &mut self.memory;

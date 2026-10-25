@@ -252,6 +252,11 @@ impl EvalState for NetState<'_> {
         }
     }
 
+    fn apply_null(&mut self) {
+        // the accumulators of both sides are kept, so passing changes nothing
+        self.snapshots.extend_from_slice(&self.acc);
+    }
+
     fn undo(&mut self) {
         let start = self.snapshots.len() - self.acc.len();
         self.acc.copy_from_slice(&self.snapshots[start..]);

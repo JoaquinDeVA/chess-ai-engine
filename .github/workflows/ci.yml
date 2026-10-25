@@ -34,5 +34,6 @@ jobs:
           cargo fmt --check
           cargo clippy --all-targets --features python -- -D warnings
           cargo test
+          cargo test --release --test techniques
       - name: Test
         run: pytest

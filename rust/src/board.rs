@@ -252,7 +252,26 @@ impl GameState {
         self.keys.push(key);
     }
 
-    /// Take back the last move played with [`GameState::apply`].
+    /// Pass the turn (a null move): the same position with the other side to move and no en passant
+    /// square. It extends the history like a reversible move. Must not be used when the side to
+    /// move is in check.
+    pub fn apply_null(&mut self) {
+        self.undo.push(Undo {
+            pos: self.pos.clone(),
+            start: self.start,
+            has_repeated: self.has_repeated,
+        });
+        self.pos = self
+            .pos
+            .clone()
+            .swap_turn()
+            .expect("a null move is only played when the side to move is not in check");
+        let key = zobrist(&self.pos);
+        self.has_repeated = self.has_repeated || self.keys[self.start..].contains(&key);
+        self.keys.push(key);
+    }
+
+    /// Take back the last move played with [`GameState::apply`] or [`GameState::apply_null`].
     pub fn undo(&mut self) {
         self.keys.pop();
         let previous = self.undo.pop().expect("undo without a move");
@@ -541,6 +560,26 @@ mod tests {
         assert_eq!(outcome_of(&after_seven), Some(None));
         let after_four = GameState::from_moves(start, &shuffle[..4]).unwrap();
         assert_eq!(outcome_of(&after_four), None);
+    }
+
+    #[test]
+    fn a_null_move_extends_the_history_like_a_reversible_move() {
+        let mut s = state("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let before = s.key();
+        s.apply_null();
+        assert_eq!(s.turn(), Color::Black);
+        assert_ne!(s.key().zobrist, before.zobrist);
+        // passing twice in a row repeats the first position
+        s.apply_null();
+        assert_eq!(s.key().zobrist, before.zobrist);
+        let moves = ordered_moves(s.pos());
+        assert!(
+            s.outcome(&moves).is_none(),
+            "two occurrences are not yet a claim"
+        );
+        s.undo();
+        s.undo();
+        assert_eq!(s.key(), before);
     }
 
     #[test]

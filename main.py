@@ -122,8 +122,9 @@ Examples:
         "--techniques",
         default=None,
         metavar="LIST",
-        help="Techniques of selective search to switch on, comma-separated, or 'all' "
-        "(" + ", ".join(_core.TECHNIQUES) + "); none by default",
+        help="Techniques of the search, comma-separated, 'all' or 'none' ("
+        + ", ".join(_core.TECHNIQUES)
+        + "); default: all but lmr",
     )
     parser.add_argument(
         "--hash",
@@ -231,7 +232,9 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
         if args.hash is not None:
             options["hash_mb"] = args.hash
     if args.techniques is not None and (takes_search_options or "techniques" in parameters):
-        names = list(_core.TECHNIQUES) if args.techniques == "all" else args.techniques.split(",")
+        names = {"all": list(_core.TECHNIQUES), "none": []}.get(
+            args.techniques, args.techniques.split(",")
+        )
         options["techniques"] = tuple(n for n in names if n)
     if "tablebase" in parameters or takes_search_options:
         if args.no_endgame_db:

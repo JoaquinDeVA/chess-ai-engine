@@ -13,7 +13,7 @@ pub mod tt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 
-use shakmaty::{Color, Move};
+use shakmaty::{Color, Move, Position};
 
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
@@ -28,6 +28,13 @@ pub const DEFAULT_ESTIMATOR: &str = "geometric_growth";
 pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
+/// Late quiet moves are reduced from this move on (counting from 0) and at least this deep.
+const LMR_FROM_MOVE: usize = 5;
+const LMR_FROM_DEPTH: i32 = 4;
+/// From this move on the reduction is two plies.
+const LMR_DEEPER_FROM_MOVE: usize = 15;
+/// The null move is tried from this depth on.
+const NULL_MOVE_FROM_DEPTH: i32 = 3;
 /// Width of the window of the scouts of the principal variation search.
 const SCOUT_EPSILON: f64 = 1e-9;
 /// Tolerance for finishing a depth that was started within the budget.
@@ -282,6 +289,65 @@ impl Search<'_> {
         self.state.apply(m);
     }
 
+    /// Pass the turn in the game state and in the incremental evaluation.
+    fn play_null(&mut self) {
+        if let Some(state) = &mut self.incremental {
+            state.apply_null();
+        }
+        self.state.apply_null();
+    }
+
+    /// Whether `color` has a piece other than pawns and the king (otherwise passing the turn can
+    /// be the worst thing to do, and a null move is not tried).
+    fn has_pieces(&self, color: Color) -> bool {
+        let board = self.state.pos().board();
+        (board.by_color(color) & !(board.pawns() | board.kings())).any()
+    }
+
+    /// Value of the child just played, searched as the techniques say: late quiet moves with less
+    /// depth first, the moves after the first with a window of no width, and again with the whole
+    /// window and depth when the cheaper search says the move is better than the best so far.
+    fn child_value(
+        &mut self,
+        index: usize,
+        late_quiet: bool,
+        (alpha, beta): (f64, f64),
+        depth_remaining: i32,
+        ply: i32,
+        maximizing: bool,
+    ) -> f64 {
+        let (low, high) = if maximizing {
+            (alpha, alpha + SCOUT_EPSILON)
+        } else {
+            (beta - SCOUT_EPSILON, beta)
+        };
+        let narrow = beta - alpha > SCOUT_EPSILON;
+        if late_quiet && narrow {
+            let reduction = if index >= LMR_DEEPER_FROM_MOVE && depth_remaining >= 5 {
+                2
+            } else {
+                1
+            };
+            let (value, _) = self.node(low, high, depth_remaining - 1 - reduction, ply + 1, true);
+            let better = if maximizing {
+                value > alpha
+            } else {
+                value < beta
+            };
+            if !better || self.truncated {
+                return value;
+            }
+        }
+        if self.options.techniques.pvs && index > 0 && depth_remaining >= 2 && narrow {
+            let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
+            if scout > alpha && scout < beta && !self.truncated {
+                return self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0;
+            }
+            return scout;
+        }
+        self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0
+    }
+
     /// Take back the last move played with [`Search::play`].
     fn unplay(&mut self) {
         self.state.undo();
@@ -291,7 +357,14 @@ impl Search<'_> {
     }
 
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
-    fn node(&mut self, mut alpha: f64, mut beta: f64, depth_remaining: i32, ply: i32) -> Outcome {
+    fn node(
+        &mut self,
+        mut alpha: f64,
+        mut beta: f64,
+        depth_remaining: i32,
+        ply: i32,
+        allow_null: bool,
+    ) -> Outcome {
         let (alpha_orig, beta_orig) = (alpha, beta);
         self.nodes += 1;
         self.max_ply = self.max_ply.max(ply);
@@ -334,10 +407,10 @@ impl Search<'_> {
         }
 
         let maximizing = self.state.turn() == self.root_player;
-        let killers: &[u32] = if self.options.use_killers {
-            self.memory.killers.get(depth_remaining)
+        let killers: Vec<u32> = if self.options.use_killers {
+            self.memory.killers.get(depth_remaining).to_vec()
         } else {
-            &[]
+            Vec::new()
         };
         let mover = self.state.turn();
         let history = if self.options.techniques.history {
@@ -345,7 +418,7 @@ impl Search<'_> {
         } else {
             None
         };
-        let mut ordered = order(moves, killers, self.options.use_capture_order, history);
+        let mut ordered = order(moves, &killers, self.options.use_capture_order, history);
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
         if helper_root {
             let shift = self.control.rotation % ordered.len();
@@ -353,6 +426,38 @@ impl Search<'_> {
         }
         if self.options.techniques.tt_move && !helper_root {
             move_to_front(&mut ordered, table_move);
+        }
+        let in_check = self.state.pos().is_check();
+        if self.options.techniques.null_move
+            && allow_null
+            && ply > 0
+            && depth_remaining >= NULL_MOVE_FROM_DEPTH
+            && !in_check
+            && self.has_pieces(mover)
+        {
+            let enough = if maximizing {
+                self.static_value() >= beta
+            } else {
+                self.static_value() <= alpha
+            };
+            if enough {
+                // If passing the turn already cuts, playing a move will too: prune.
+                let reduction = if depth_remaining >= 6 { 3 } else { 2 };
+                let (low, high) = if maximizing {
+                    (beta - SCOUT_EPSILON, beta)
+                } else {
+                    (alpha, alpha + SCOUT_EPSILON)
+                };
+                self.play_null();
+                let (value, _) =
+                    self.node(low, high, depth_remaining - 1 - reduction, ply + 1, false);
+                self.unplay();
+                if !self.truncated
+                    && ((maximizing && value >= beta) || (!maximizing && value <= alpha))
+                {
+                    return (if maximizing { beta } else { alpha }, None);
+                }
+            }
         }
         let mut best_value = if maximizing {
             f64::NEG_INFINITY
@@ -362,27 +467,22 @@ impl Search<'_> {
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
             self.play(action);
-            let (child, _) = if self.options.techniques.pvs
-                && index > 0
-                && depth_remaining >= 2
-                && beta - alpha > SCOUT_EPSILON
-            {
-                // After the first move, the others only have to show they are better: search them
-                // with a window of no width and repeat with the whole one if they are.
-                let (low, high) = if maximizing {
-                    (alpha, alpha + SCOUT_EPSILON)
-                } else {
-                    (beta - SCOUT_EPSILON, beta)
-                };
-                let scout = self.node(low, high, depth_remaining - 1, ply + 1);
-                if scout.0 > alpha && scout.0 < beta && !self.truncated {
-                    self.node(alpha, beta, depth_remaining - 1, ply + 1)
-                } else {
-                    scout
-                }
-            } else {
-                self.node(alpha, beta, depth_remaining - 1, ply + 1)
-            };
+            let late_quiet = self.options.techniques.lmr
+                && index >= LMR_FROM_MOVE
+                && depth_remaining >= LMR_FROM_DEPTH
+                && !in_check
+                && !action.is_capture()
+                && !action.is_promotion()
+                && !killers.contains(&move_id(&action))
+                && !self.state.pos().is_check();
+            let child = self.child_value(
+                index,
+                late_quiet,
+                (alpha, beta),
+                depth_remaining,
+                ply,
+                maximizing,
+            );
             self.unplay();
             if maximizing {
                 if child > best_value {
@@ -538,7 +638,7 @@ pub fn alpha_beta_window(
         truncated: false,
         incremental,
     };
-    let (value, best) = search.node(window.0, window.1, max_depth, 0);
+    let (value, best) = search.node(window.0, window.1, max_depth, 0, true);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

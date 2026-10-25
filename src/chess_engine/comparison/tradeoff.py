@@ -82,7 +82,8 @@ def make_player(
     :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
         name or ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
         instance. A ``+`` suffix switches techniques of selective search on (``linear_pst+pvs,lmr``
-        or ``linear_pst+all``).
+        or ``linear_pst+all``); without it the player uses the reference search, so that measurements
+        compare evaluations alone.
     :param time_manager: Time budgeting policy.
     :param max_depth: Deepest iteration to run.
     :param search_options: Other options of the bot (``estimator``, ``min_depth``...); they may
@@ -91,9 +92,10 @@ def make_player(
     """
     search_options = {"opening_book": None, "tablebase": None, **search_options}
     label = spec
+    techniques: Tuple[str, ...] = ()  # the reference search, unless the spec asks for techniques
     if isinstance(spec, str) and "+" in spec:
         spec, techniques = split_techniques(spec)
-        search_options.setdefault("techniques", techniques)
+    search_options.setdefault("techniques", techniques)
     if isinstance(spec, str) and spec in HEURISTICS:
         return IterativeHeuristicBot(
             eval_function=HEURISTICS[spec],

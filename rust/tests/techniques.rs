@@ -87,6 +87,10 @@ fn same_value_as_the_reference(techniques: Techniques) {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
 fn the_table_move_does_not_change_the_value() {
     same_value_as_the_reference(Techniques {
         tt_move: true,
@@ -95,6 +99,10 @@ fn the_table_move_does_not_change_the_value() {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
 fn the_history_does_not_change_the_value() {
     same_value_as_the_reference(Techniques {
         history: true,
@@ -103,6 +111,10 @@ fn the_history_does_not_change_the_value() {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
 fn pvs_does_not_change_the_value() {
     same_value_as_the_reference(Techniques {
         pvs: true,
@@ -111,6 +123,10 @@ fn pvs_does_not_change_the_value() {
 }
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
 fn aspiration_windows_do_not_change_the_value() {
     // the iterations of this helper are searched by hand, so the windows are tested through the
     // deepening below
@@ -172,4 +188,140 @@ fn aspiration_windows_do_not_change_the_value() {
         }
     }
     assert!(checked >= 36, "{checked} of 40 moves equal");
+}
+
+/// Values of the first `count` positions at depth `depth`, one search each (no deepening).
+fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(f64, Option<String>)> {
+    let positions = read(root().join("tests/golden/positions.json"));
+    let eval = h1();
+    let clock = || 0.0;
+    let options = Options {
+        quiescence_plies: 4,
+        techniques,
+        ..Options::default()
+    };
+    let mut out = Vec::new();
+    for entry in positions["positions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .take(count)
+    {
+        let moves: Vec<String> = entry["moves"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m.as_str().unwrap().to_string())
+            .collect();
+        let mut state = GameState::from_moves(entry["root"].as_str().unwrap(), &moves).unwrap();
+        let legal = _core::board::ordered_moves(state.pos());
+        if state.outcome(&legal).is_some() {
+            continue;
+        }
+        let control = Control {
+            start: 0.0,
+            hard_limit: f64::INFINITY,
+            clock: &clock,
+            stop: None,
+            progress: None,
+            rotation: 0,
+        };
+        let found = alpha_beta(
+            &mut state,
+            &eval,
+            &mut Memory::default(),
+            &options,
+            depth,
+            &control,
+        );
+        out.push((
+            found.value,
+            found.best.map(|m| _core::board::uci_string(&m)),
+        ));
+    }
+    out
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
+fn the_selective_techniques_keep_the_forced_results_and_most_moves() {
+    let selective = Techniques {
+        null_move: true,
+        lmr: true,
+        ..Techniques::default()
+    };
+    let reference = plain_values(Techniques::default(), 5, 120);
+    let with = plain_values(selective, 5, 120);
+    assert_eq!(reference.len(), with.len());
+    let (mut forced, mut kept, mut same_move) = (0, 0, 0);
+    for ((a, move_a), (b, move_b)) in reference.iter().zip(&with) {
+        same_move += usize::from(move_a == move_b);
+        if *a > 0.97 || *a < 0.03 {
+            forced += 1;
+            kept += usize::from((*a > 0.5) == (*b > 0.5) && (b - 0.5).abs() > 0.4);
+        }
+    }
+    eprintln!(
+        "forced {forced}, kept {kept}, same move {same_move} of {}",
+        reference.len()
+    );
+    assert!(
+        forced >= 3,
+        "the sample has too few forced results ({forced})"
+    );
+    assert!(
+        kept as f64 >= 0.9 * forced as f64,
+        "{kept} of {forced} forced results kept"
+    );
+    assert!(
+        same_move as f64 >= 0.7 * reference.len() as f64,
+        "{same_move} equal moves"
+    );
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
+fn the_null_move_is_not_used_in_pawn_endings() {
+    // Lasker's zugzwang position: passing the turn would look winning, but nobody may pass.
+    let fen = "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1";
+    let eval = h1();
+    let clock = || 0.0;
+    let mut values = Vec::new();
+    for null_move in [false, true] {
+        let options = Options {
+            quiescence_plies: 4,
+            techniques: Techniques {
+                null_move,
+                ..Techniques::default()
+            },
+            ..Options::default()
+        };
+        let mut state = GameState::from_moves(fen, &[]).unwrap();
+        let control = Control {
+            start: 0.0,
+            hard_limit: f64::INFINITY,
+            clock: &clock,
+            stop: None,
+            progress: None,
+            rotation: 0,
+        };
+        values.push(
+            alpha_beta(
+                &mut state,
+                &eval,
+                &mut Memory::default(),
+                &options,
+                7,
+                &control,
+            )
+            .value,
+        );
+    }
+    assert!((values[0] - values[1]).abs() < 1e-9, "{values:?}");
 }

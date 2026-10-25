@@ -21,6 +21,10 @@ from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.statistics import SearchStatistics
 from chess_engine.search.time_management import TimeManager
 
+#: Techniques of selective search the bots use by default: the ones that won in the games against
+#: the reference search (docs/ALGORITHMS.md, sections 12 onwards). ``lmr`` is left out.
+DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", "null_move")
+
 #: Defaults of the search, defined in the Rust core.
 DEFAULT_ESTIMATOR = _core.DEFAULT_ESTIMATOR
 DEFAULT_MIN_DEPTH = _core.DEFAULT_MIN_DEPTH
@@ -137,9 +141,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     :param threads: Threads that search (default 1). With more, they share a lock-free table
         (Lazy SMP), the search is no longer deterministic and the evaluation must run in the core.
     :param hash_mb: Size in MB of the table shared by several threads (ignored with one).
-    :param techniques: Techniques of selective search to switch on, from ``_core.TECHNIQUES``:
-        ``tt_move``, ``history``, ``pvs``, ``aspiration``, ``null_move``, ``lmr`` (none by default,
-        which is the reference search).
+    :param techniques: Techniques to switch on, from ``_core.TECHNIQUES``: ``incremental``,
+        ``tt_move``, ``history``, ``pvs``, ``aspiration``, ``null_move`` (the default) and ``lmr``.
+        An empty tuple is the reference search.
     :ivar disabled: Techniques of the search to switch off when measuring what each one saves:
         any of ``"table"``, ``"killers"`` and ``"ordering"`` (none by default).
     """
@@ -158,7 +162,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         opening_book: Union[OpeningBook, None, str] = SHIPPED,
         threads: int = 1,
         hash_mb: int = 64,
-        techniques: Sequence[str] = (),
+        techniques: Sequence[str] = DEFAULT_TECHNIQUES,
     ):
         super().__init__(name, author)
         self.max_depth = max_depth

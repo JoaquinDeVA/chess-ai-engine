@@ -31,7 +31,9 @@ pub trait Evaluator: Send + Sync {
 pub trait EvalState {
     /// `mover` plays `m`.
     fn apply(&mut self, mover: Color, m: &Move);
-    /// Take back the last move played with `apply`.
+    /// The side to move passes (a null move).
+    fn apply_null(&mut self);
+    /// Take back the last move played with `apply` or `apply_null`.
     fn undo(&mut self);
     /// Expected score of `player` in `pos`, the position the state is following.
     fn evaluate(&self, pos: &Chess, player: Color) -> f64;

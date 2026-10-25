@@ -20,6 +20,9 @@ Six evaluation functions play each other at equal time, from a 6-parameter mater
   (`linear_pst_terms`, 791 parameters): 66 % of the points at 10 min + 5 s, first at 60 s + 1 s and
   at a fixed depth as well. The neural network judges positions better (Spearman 0.700 against
   Stockfish) but does not win more games.
+- The search runs in Rust: in 10 seconds per move it reaches 7 plies where the Python version reached 4 or 5
+  (8 to 35 times less time to a given depth). The tournament figures on this page were measured with the
+  Python engine.
 - Counting material alone is clearly the worst (21 % at 10 min + 5 s).
 - Training for longer does not help the simplest model: effort 90 gives the same accuracy as 30.
 - Quiescence search adds up to 10 points of agreement with Stockfish at the same depth, and the

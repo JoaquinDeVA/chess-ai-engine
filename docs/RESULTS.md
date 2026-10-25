@@ -87,6 +87,32 @@ points, so only the last place (`linear_material`) is separated from the rest; t
 middle four could change with more games. The fixed-depth table is the cleanest comparison of the
 evaluations themselves, since speed plays no part.
 
+## Engine speed
+
+The search, the evaluations and the knowledge moved from Python to Rust on 2026-10-25 (see
+[Algorithms](ALGORITHMS.md), section 10). **The tournaments of this page were played with the Python
+engine**, which searched 3 to 5 plies deep in the times they use; the Rust core plays the same
+moves from the same positions but reaches 2 to 3 plies more, so a new tournament at the same time
+control is not comparable with them and the ranking could change. The core was checked against
+the Python engine node for node, and the fixed-depth tournament gives the same standings (the
+`linear_pst_terms` score 71.9 % against 72.5 %); the tournaments at 60 s + 1 s and 10 min + 5 s have
+not been played again.
+
+Depth reached in 10 seconds per move, mean over 200 test positions (`python
+scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`, five processes of one thread):
+
+| Player | Python | Rust | Time to depth 4 (Python → Rust) |
+|---|---|---|---|
+| `h1` | 4.12 | 6.93 | 7.995 s → 0.226 s (35 times faster) |
+| `linear_material` | 5.37 | 7.68 | 1.335 s → 0.076 s (18 times) |
+| `linear_pst` | 4.94 | 7.18 | 2.279 s → 0.110 s (21 times) |
+| `linear_pst_terms` | 4.62 | 7.13 | 3.429 s → 0.139 s (25 times) |
+| `linear_king_bucket` | 5.04 | 7.51 | 1.990 s → 0.120 s (17 times) |
+| `net4_pst` | 4.85 | 6.82 | 2.266 s → 0.286 s (8 times) |
+
+With six threads (`--threads 6`) the search to depth 6 is 15 % faster and, in 10 s, 0.2 plies deeper;
+the table is in [Algorithms](ALGORITHMS.md), section 11.
+
 ## Does the time control matter?
 
 Less than it first seemed. With the five models trained the same way, the order of the extremes does

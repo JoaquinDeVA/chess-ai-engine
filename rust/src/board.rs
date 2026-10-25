@@ -3,8 +3,8 @@
 //! The terminal test is the one of `python-chess`' `board.outcome(claim_draw=True)`: checkmate,
 //! stalemate, insufficient material, the fifty-move claim and the threefold-repetition claim
 //! (a position that has occurred three times, or a move that reaches one that has occurred twice).
-//! Every legal-move list is ordered by the UCI string of the moves: that is the ordering contract
-//! of the golden files, which makes the search deterministic.
+//! Legal moves are listed in the order `python-chess` generates them, so that the search makes the
+//! same choice as the Python engine among moves of equal value.
 
 use shakmaty::attacks::{
     between, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, queen_attacks,
@@ -44,8 +44,9 @@ pub fn key_of(pos: &Chess) -> Key {
     }
 }
 
-/// Sort key that orders moves like their UCI strings (`e2e4` < `e7e8q`).
-pub fn uci_order(m: &Move) -> u32 {
+/// Identity of a move by its squares and promotion (as `chess.Move` compares moves), a number
+/// that orders like the UCI string (`e2e4` < `e7e8q`). Captured pieces do not count.
+pub fn move_id(m: &Move) -> u32 {
     let (from, to, promotion) = match *m {
         Move::Normal {
             from,
@@ -88,10 +89,57 @@ pub fn is_noisy(m: &Move) -> bool {
     m.is_capture() || m.is_promotion()
 }
 
-/// Legal moves of a position ordered by UCI.
+/// Position of a move in the order `python-chess` generates legal moves: when the side to move
+/// is in check, king moves first; then the other pieces from the highest square to the lowest
+/// (targets also from the highest), castling (rook on the highest square first), pawn captures,
+/// single pushes, double pushes and en passant. Promotions go queen, rook, bishop, knight.
+///
+/// Sorting by this key reproduces the move order of the Python engine, so the two make the same
+/// choice among moves of equal value.
+pub fn generation_order(m: &Move, in_check: bool) -> (u8, i32, i32, i32) {
+    let square = |s: shakmaty::Square| u32::from(s) as i32;
+    match *m {
+        Move::Normal {
+            role: Role::King,
+            to,
+            ..
+        } if in_check => (0, 0, -square(to), 0),
+        Move::Normal {
+            role: Role::Pawn,
+            from,
+            to,
+            capture,
+            promotion,
+        } => {
+            if capture.is_some() {
+                (3, -square(from), -square(to), promotion_order(promotion))
+            } else if (square(to) - square(from)).abs() == 8 {
+                (4, -square(to), promotion_order(promotion), 0)
+            } else {
+                (5, -square(to), 0, 0)
+            }
+        }
+        Move::Normal { from, to, .. } => (1, -square(from), -square(to), 0),
+        Move::Castle { rook, .. } => (2, -square(rook), 0, 0),
+        Move::EnPassant { .. } => (6, 0, 0, 0),
+        Move::Put { to, .. } => (7, square(to), 0, 0),
+    }
+}
+
+fn promotion_order(p: Option<Role>) -> i32 {
+    match p {
+        None | Some(Role::Queen) => 0,
+        Some(Role::Rook) => 1,
+        Some(Role::Bishop) => 2,
+        Some(_) => 3,
+    }
+}
+
+/// Legal moves of a position in the order `python-chess` generates them.
 pub fn ordered_moves(pos: &Chess) -> Vec<Move> {
+    let in_check = pos.is_check();
     let mut moves: Vec<Move> = pos.legal_moves().into_iter().collect();
-    moves.sort_by_key(uci_order);
+    moves.sort_by_key(|m| generation_order(m, in_check));
     moves
 }
 
@@ -430,13 +478,24 @@ mod tests {
     }
 
     #[test]
-    fn moves_are_ordered_like_their_uci_strings() {
+    fn moves_come_in_the_order_python_chess_generates_them() {
+        // pieces from the highest square, then castling, pawn captures, pushes
         let pos = position_from_fen("r3k2r/1P6/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         let strings: Vec<String> = ordered_moves(&pos).iter().map(uci_string).collect();
-        let mut sorted = strings.clone();
-        sorted.sort();
-        assert_eq!(strings, sorted);
-        assert!(strings.contains(&"e1g1".to_string()) && strings.contains(&"b7b8q".to_string()));
+        assert_eq!(&strings[..3], ["h1h8", "h1h7", "h1h6"]);
+        let castles = strings.iter().position(|s| s == "e1g1").unwrap();
+        assert_eq!(strings[castles + 1], "e1c1");
+        assert_eq!(
+            &strings[strings.len() - 4..],
+            ["b7b8q", "b7b8r", "b7b8b", "b7b8n"]
+        );
+    }
+
+    #[test]
+    fn in_check_the_king_moves_come_first() {
+        let pos = position_from_fen("4k3/8/8/8/8/8/4q3/R3K3 w - - 0 1").unwrap();
+        let strings: Vec<String> = ordered_moves(&pos).iter().map(uci_string).collect();
+        assert!(strings[0].starts_with("e1"), "{strings:?}");
     }
 
     #[test]

@@ -9,10 +9,9 @@ specification of the Rust core: positions, terminal tests, features, evaluations
 searches, opening-book lookups and tablebase moves. Everything is seeded, so running the script
 twice writes the same files.
 
-Ordering contract. Where the result depends on the order in which equal moves are tried, the
-legal moves are ordered by their UCI string (``move_sort_key``), here and in the Rust core. The
-production Python code orders them as python-chess generates them; the searches below use a
-subclass that sorts them, which is the only difference.
+The Python engine is used as it is: the Rust core lists legal moves in the order python-chess
+generates them (``generation_order`` in ``rust/src/board.rs``), so ties between moves of equal
+value are resolved the same way in both.
 """
 
 import argparse
@@ -32,7 +31,7 @@ from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import load_model
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.search.chess_game_state import ChessGameState
-from chess_engine.search.chess_problem import ChessProblem
+from chess_engine.search.chess_problem import ChessProblem, chess_noisy_moves
 from chess_engine.search.game_algorithms import advanced_heuristic_alphabeta_search
 from chess_engine.search.search_utils import order_by_mvv_lva
 
@@ -45,26 +44,6 @@ PLAYERS = ("h1", *MODELS)
 #: Positions searched per player at depths 1 to 3 (with and without quiescence), and at depth 4.
 SEARCH_POSITIONS, DEEP_POSITIONS = 40, 10
 START_FEN = chess.STARTING_FEN
-
-
-def move_sort_key(move: chess.Move) -> str:
-    """The ordering contract: legal moves are tried in the order of their UCI string."""
-    return move.uci()
-
-
-class SortedChessProblem(ChessProblem):
-    """Chess problem whose actions follow the ordering contract."""
-
-    def actions(self, state):
-        """Legal moves of ``state`` ordered by UCI."""
-        return sorted(state.get_legal_moves(), key=move_sort_key)
-
-
-def sorted_noisy_moves(state) -> List[chess.Move]:
-    """Captures and promotions, ordered by the contract."""
-    board = state.get_board()
-    noisy = [m for m in board.legal_moves if m.promotion or board.is_capture(m)]
-    return sorted(noisy, key=move_sort_key)
 
 
 def write(name: str, payload: Any) -> None:
@@ -233,7 +212,7 @@ def search_player(player: str, entries: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 table: Dict[Any, Any] = {}
                 move, stats = advanced_heuristic_alphabeta_search(
-                    game=SortedChessProblem(),
+                    game=ChessProblem(),
                     state=state,
                     eval_fn=evaluate,
                     cutoff_test=lambda s, d, t: d == 0,
@@ -241,7 +220,7 @@ def search_player(player: str, entries: List[Dict[str, Any]]) -> Dict[str, Any]:
                     transposition_table=table,
                     order_moves_callback=order_by_mvv_lva,
                     max_depth=depth,
-                    noisy_moves=sorted_noisy_moves if quiescence else None,
+                    noisy_moves=chess_noisy_moves if quiescence else None,
                     quiescence_plies=quiescence,
                 )
                 root = table[state.key()].result
@@ -306,29 +285,10 @@ def tablebase_cases(directory: Path, pieces: List[str], count: int, seed: int) -
         board.turn = rng.choice([chess.WHITE, chess.BLACK])
         if not board.is_valid() or board.is_game_over():
             continue
-        move = sorted_best_move(tables, board)
+        move = tables.best_move(board)
         cases.append({"fen": board.fen(), "move": move.uci() if move else None})
     tables.close()
     return cases
-
-
-def sorted_best_move(tables: EndgameTablebase, board: chess.Board):
-    """``EndgameTablebase.best_move`` with ties resolved by the ordering contract."""
-    if not tables.covers(board) or board.is_game_over():
-        return None
-    best_move, best_key = None, None
-    probe = board.copy(stack=False)
-    for move in sorted(board.legal_moves, key=move_sort_key):
-        probe.push(move)
-        try:
-            key = tables._rank(probe)
-        except Exception:  # missing table
-            return None
-        finally:
-            probe.pop()
-        if best_key is None or key > best_key:
-            best_move, best_key = move, key
-    return best_move
 
 
 def golden_tablebase() -> None:

@@ -5,7 +5,7 @@ use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 use shakmaty::{Move, Role};
 
-use crate::board::{uci_order, Key};
+use crate::board::{move_id, Key};
 
 /// Number of killer moves remembered per depth.
 pub const MAX_KILLERS_PER_DEPTH: usize = 3;
@@ -170,7 +170,7 @@ impl Killers {
             self.by_depth.resize_with(depth + 1, Vec::new);
         }
         let moves = &mut self.by_depth[depth];
-        let id = uci_order(&m);
+        let id = move_id(&m);
         if moves.contains(&id) {
             return;
         }
@@ -204,7 +204,7 @@ pub fn order(moves: Vec<Move>, killers: &[u32], capture_order: bool) -> Vec<Move
     let mut front: Vec<Move> = Vec::with_capacity(moves.len());
     let mut rest: Vec<Move> = Vec::new();
     for m in moves {
-        if killers.contains(&uci_order(&m)) {
+        if killers.contains(&move_id(&m)) {
             front.push(m);
         } else {
             rest.push(m);
@@ -280,7 +280,7 @@ mod tests {
         killers.record(4, moves[4]);
         assert_eq!(
             killers.get(4),
-            &moves[2..5].iter().map(uci_order).collect::<Vec<_>>()[..]
+            &moves[2..5].iter().map(move_id).collect::<Vec<_>>()[..]
         );
         assert!(killers.get(2).is_empty());
     }
@@ -305,13 +305,13 @@ mod tests {
         let b = quiet(Square::G1, Square::F3);
         let ordered = order(
             vec![a, queen_takes_pawn, b, pawn_takes_queen],
-            &[uci_order(&b)],
+            &[move_id(&b)],
             true,
         );
         assert_eq!(ordered, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
         let plain = order(
             vec![a, queen_takes_pawn, b, pawn_takes_queen],
-            &[uci_order(&b)],
+            &[move_id(&b)],
             false,
         );
         assert_eq!(plain, vec![b, a, queen_takes_pawn, pawn_takes_queen]);

@@ -25,11 +25,11 @@ from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequenc
 
 import chess
 
+from chess_engine import _core
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.comparison.tradeoff import HEURISTICS, make_player
 from chess_engine.engine.game_manager import FORFEIT_TERMINATIONS, GameManager
 from chess_engine.models.cards import card_path, load_card, save_card
-from chess_engine.search.game_algorithms import DEFAULT_ESTIMATOR
 from chess_engine.search.time_management import TimeManager
 
 logger = logging.getLogger(__name__)
@@ -263,7 +263,7 @@ def _play_game(job: Job) -> Dict[str, Any]:
     log_dir: Optional[Path] = job[5] if len(job) > 5 else None
     index: int = job[6] if len(job) > 6 else 0
     max_depth: int = job[7] if len(job) > 7 else DEFAULT_MAX_DEPTH
-    estimator: str = job[8] if len(job) > 8 and job[8] else DEFAULT_ESTIMATOR
+    estimator: str = job[8] if len(job) > 8 and job[8] else _core.DEFAULT_ESTIMATOR
     record: Dict[str, Any] = {
         "white": white,
         "black": black,
@@ -389,7 +389,7 @@ def run_round_robin(
     Games already recorded in ``out`` (same white, black and opening) are skipped. Each new game
     is appended to ``out`` as soon as it finishes; every record carries ``base`` and ``increment``.
     A file recorded at another time control, or with another estimator of the next iteration
-    (``estimator``, default :data:`DEFAULT_ESTIMATOR`), is refused, since its scores would be mixed.
+    (``estimator``, default :data:`_core.DEFAULT_ESTIMATOR`), is refused, since its scores would be mixed.
 
     A game whose players raise is recorded with an ``"error"`` field. If a worker process dies, the
     games in flight in that pool are requeued without a record, because CPython fails all of them.
@@ -438,7 +438,7 @@ def run_round_robin(
     jobs = [(*job, log_dir, index, max_depth, estimator) for index, job in enumerate(jobs)]
     existing = read_games(out)
     _check_time_control(existing, base, increment, out)
-    _check_estimator(existing, estimator or DEFAULT_ESTIMATOR, out)
+    _check_estimator(existing, estimator or _core.DEFAULT_ESTIMATOR, out)
     done = {(r["white"], r["black"], r["fen"]) for r in existing}
     pending: Deque[Job] = deque(job for job in jobs if job[:3] not in done)
     played = len(pending)

@@ -5,7 +5,7 @@ python scripts/bench/compare_time_estimators.py data/reports/iteration_times.jso
 
 The input is the output of ``record_iteration_times.py``: for each move the duration and node count
 of every iteration, measured without any stopping rule. The script replays the deepening loop on
-those series with each estimator of ``chess_engine.search.time_estimators`` and several time
+those series with each estimator of the Rust core (``rust/src/search/estimators.rs``) and several time
 budgets, and reports what each rule would have done:
 
 * depth: mean completed depth of the move;
@@ -23,9 +23,17 @@ Writes ``data/reports/TIME_ESTIMATORS.md``.
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
-from chess_engine.search.time_estimators import ESTIMATORS, Estimator
+from chess_engine import _core
+
+#: A rule: finished iterations ``(seconds, nodes)`` to the predicted seconds of the next one.
+Estimator = Callable[[Sequence[Tuple[float, int]]], float]
+#: The rules of the core, by name.
+ESTIMATORS: Dict[str, Estimator] = {
+    name: (lambda history, name=name: _core.estimate(name, [tuple(h) for h in history]))
+    for name in _core.ESTIMATOR_NAMES
+}
 
 #: The numbers of ``TimeManager`` and of the iterative deepening loop.
 OVERSHOOT = 1.15

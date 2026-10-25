@@ -59,7 +59,7 @@ Outside the packages, `scripts/data/` builds the data (`build_raw_shards.py`, `b
 `fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
 `scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`, `play_tournament.py`,
 `measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,
-`compare_target_representations.py`, `bench_search_speed.py`) and `scripts/run_full_pipeline.sh`
+`compare_target_representations.py`) and `scripts/run_full_pipeline.sh`
 runs the whole flow. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and
 [MODELS.md](MODELS.md) for the models themselves.
 

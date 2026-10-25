@@ -10,6 +10,7 @@ from pathlib import Path
 import chess
 import pytest
 
+from chess_engine import _core
 from chess_engine.comparison import tournament
 from chess_engine.comparison.tournament import (
     paired_openings,
@@ -512,4 +513,4 @@ def test_play_game_records_and_passes_the_estimator(monkeypatch):
     )
     assert record["estimator"] == "node_growth" and seen == [{"estimator": "node_growth"}] * 2
     default = tournament._play_game(("a", "b", chess.STARTING_FEN, 5.0, 0.1, None, 0, 30, None))
-    assert default["estimator"] == tournament.DEFAULT_ESTIMATOR
+    assert default["estimator"] == _core.DEFAULT_ESTIMATOR

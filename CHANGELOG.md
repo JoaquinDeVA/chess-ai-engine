@@ -11,6 +11,14 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
   opening book and the Syzygy tables. It plays the same moves with the same node counts as the Python engine it
   replaces (`tests/golden/`, `tests/test_core_golden.py`, `rust/tests/`), only faster. Installing needs a Rust
   toolchain; CI runs `cargo fmt`, `clippy` and `cargo test`. See [Algorithms](docs/ALGORITHMS.md), sections 10 and 11.
+- **Six search techniques** behind switches (`--techniques LIST|all|none`, constructor option `techniques`): incremental
+  accumulator for `net4_pst`, table move first, history heuristic, principal variation search, aspiration windows
+  and null move; late move reductions (`lmr`) are implemented but off because they lost games. The bots use all but
+  `lmr`: 76.5 % against the reference search in 100 games at equal time (+205 Elo, one model). Measurements and
+  tournaments (`make_player`) keep the reference search unless the player is written `model+tech1,tech2`. See
+  [Algorithms](docs/ALGORITHMS.md), sections 12 to 19.
+- `scripts/bench/compare_engine_versions.py`: two search configurations of the same model play each other.
+  `tests/test_feature_parity.py`: each feature family matches its Rust version or falls back with a warning.
 - **`--threads N` / `--hash MB`**: Lazy SMP, the search on several threads sharing a lock-free table. One thread by
   default; the search is not deterministic with more.
 - `scripts/bench/measure_search_speed.py`: depth reached in a time budget and cost of a fixed depth, per player.

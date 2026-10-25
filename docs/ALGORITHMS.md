@@ -421,27 +421,177 @@ XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options
 that games are reproducible and the clock is fair among processes. With more than one thread the
 search is not deterministic and the evaluation must run in the core.
 
-**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 6
---players linear_pst_terms --threads 1,2,4,6 --workers 1` (the Position-terms logistic model, 60 test
-positions, nothing else running on the six-core machine). The nodes per second count the nodes of all
-threads:
+**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8
+--players linear_pst_terms --threads 1,2,4,6 --workers 1 --techniques incremental,tt_move,history,pvs,aspiration,null_move`
+(the Position-terms logistic model, 60 test positions, the default techniques of section 12 on, nothing
+else running on the six-core machine). The nodes per second count the nodes of all threads:
 
-| threads | nodes/s | seconds to depth 6 | mean depth in 3 s |
+| threads | nodes/s (3 s) | mean depth in 3 s | seconds to depth 8 |
 |---|---|---|---|
-| 1 | 352,906 | 1.273 | 6.88 |
-| 2 | 673,207 | 1.185 | 6.93 |
-| 4 | 1,212,354 | 1.090 | 6.97 |
-| 6 | 1,628,464 | 1.075 | 6.95 |
+| 1 | 483,810 | 9.08 | 1.930 |
+| 2 | 925,702 | 9.28 | 1.522 |
+| 4 | 1,605,067 | 9.50 | 1.180 |
+| 6 | 2,099,554 | 9.43 | 1.211 |
 
-With a budget of 10 s (30 positions) the mean depth goes from 7.70 with one thread to 7.93 with six.
-The threads do add work (4.6 times the nodes per second with six), but most of it repeats what the
-main thread already does, so the search to a fixed depth is only 15 % faster with six threads and
-the depth gained in a given time is a fraction of a ply. The searches here are short (seconds, depth 6
-to 8) and the table has little to share yet. A first version in which the helpers started at depths
-1 to 3 gave 1.15 s to depth 6 with six threads; making them search one or two plies deeper than the
-main thread is, as here, improved it to 1.075 s. Gains in longer searches were not measured.
+With the techniques on, the searches are deeper and share more, so the threads pay off more than with the
+reference search (there, six threads gave only 15 % less time to depth 6 and +0.23 plies in 10 s): four
+threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s. Six threads are no better than four
+on this machine (six cores, with the main thread of the measurement and the operating system on them).
+A first version in which the helpers started at depths 1 to 3 was slower; making them search one or two plies
+deeper than the main thread is, as here, improved it. Longer searches and further variants were not measured.
 
-**Status.** Kept as an option, off by default; since 2026-10-25.
+**Status.** Kept as an option, off by default (tournaments need one thread); since 2026-10-25.
+
+## 12. Search techniques: the switches and how they were judged
+
+The search of sections 1 to 11 is the *reference*: every technique below is off in it, and `tests/golden/` pins
+its values, moves and node counts. Each technique is a field of `Techniques` (`rust/src/search/mod.rs`), a
+name in `_core.TECHNIQUES`, the option `techniques` of `IterativeDeepeningBot` and `--techniques` of `main.py`
+(`list`, `all` or `none`). The bots use `DEFAULT_TECHNIQUES` (`src/chess_engine/bots/_search_bots.py`): all but
+`lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
+so results of different engines are never mixed.
+
+**How they were judged.** Two measurements, both repeatable.
+
+1. Nodes and time at depth 6 over 100 positions, and how often the move equals the reference's:
+   `python scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
+   Position-terms model:
+
+| variant | nodes per move | s per move | same move as reference |
+|---|---|---|---|
+| reference | 672,800 | 1.86 | - |
+| `tt_move` | 256,693 | 0.71 | 98 % |
+| `history` | 391,130 | 1.16 | 100 % |
+| `pvs` | 487,244 | 1.33 | 100 % |
+| `aspiration` | 440,213 | 1.20 | 100 % |
+| `null_move` | 446,129 | 1.25 | 99 % |
+| `lmr` (first, aggressive) | 86,830 | 0.23 | 70 % |
+| `lmr` (mild) | 146,356 | 0.395 | 82 % |
+
+2. Games against the reference at equal time (4 s + 0.05 s per move, 100 games, colours swapped, same model):
+   `python scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
+
+| candidate | score | Elo | mean depth (reference 4.68) |
+|---|---|---|---|
+| `tt_move,history` | 63.0 % | +92 | 5.20 |
+| `+ pvs, aspiration` | 64.5 % | +104 | 5.20 |
+| `+ null_move` | 76.5 % (95 % interval 69.0-84.0) | +205 | 5.54 |
+| all, aggressive `lmr` | 63.5 % | +96 | 6.26 |
+| mild `lmr` against the set without it | 49.0 % | -7 | 6.08 against 5.55 |
+
+A technique is on if it does not lose to the reference and gains depth or time. Fewer nodes alone is not
+enough: `lmr` searched deeper and played worse. The intervals of 100 games are wide (about +-8 points), so
+the table shows what was decided, not small differences.
+
+## 13. Incremental network accumulator
+
+**Problem.** `net4_pst` (768 -> 256 -> 32 -> 32 -> 1) spent most of its time in the first layer, summing the
+rows of every piece again at each leaf.
+
+**What it does.** Keeps the first-layer sum updated move by move: a move adds and removes only the rows of the
+pieces that change. The features are relative to the side to move, so two accumulators are kept (White and
+Black as the reference) and the one of the player to move is read.
+
+**How it is implemented.** `NetState` in `rust/src/eval/net.rs` behind the `EvalState` trait (`apply`,
+`apply_null`, `undo`, `evaluate`), with a stack of snapshots so `undo` is a pop. The search holds the state
+beside `GameState`. Switch: `incremental`. Test: `incremental_equals_full` (same values as the full evaluation up
+to rounding) and `tests/test_core_golden.py::test_the_incremental_network_gives_the_same_search`.
+
+**Measured effect.** About 15 % more nodes per second for `net4_pst`
+(`python scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts
+agree within 1 %, not exactly.
+
+**Status.** On by default; since 2026-10-25.
+
+## 14. Table move first (`tt_move`)
+
+**Problem.** A node whose table entry is too shallow to cut still knows the best move found there; the reference
+ignores it and orders by MVV-LVA and killers.
+
+**What it does.** Tries the stored best move before every other move.
+
+**How it is implemented.** `move_to_front` in `rust/src/search/tt.rs`, called in `Search::node`. The value does
+not change (same tree, other order), only how soon a cut-off comes.
+
+**Measured effect.** Nodes at depth 6 fall from 672,800 to 256,693 (2.6 times); same move as the reference in 98 %
+(ties resolve differently). In games, with `history`: +92 Elo.
+
+**Status.** On by default.
+
+## 15. History heuristic (`history`)
+
+**Problem.** Among quiet moves nothing says which to try first; killers only remember two or three per depth.
+
+**What it does.** Counts, for each (colour, move), how often it produced a cut-off, weighted by depth, and orders
+quiet moves by that count.
+
+**How it is implemented.** `History` in `rust/src/search/tt.rs`, indexed by `move_id`; `reward` is called at a
+cut-off by a quiet move. Part of `order`.
+
+**Measured effect.** Nodes 672,800 -> 391,130; same move as the reference 100 %.
+
+**Status.** On by default.
+
+## 16. Principal variation search (`pvs`)
+
+**Problem.** After the first move, the rest are only checked to see that none is better; a full window wastes work.
+
+**What it does.** Searches the first move with the full window and the others with a zero-width window around alpha;
+only a move that beats alpha is searched again with the full window.
+
+**How it is implemented.** `child_value` in `rust/src/search/mod.rs`; the scout window uses
+`SCOUT_EPSILON = 1e-9` because values are continuous probabilities.
+
+**Measured effect.** Nodes 672,800 -> 487,244; same move 100 %.
+
+**Status.** On by default.
+
+## 17. Aspiration windows (`aspiration`)
+
+**Problem.** Each iteration starts from the whole `[0.01, 0.99]` window although the previous iteration's value
+is almost always close.
+
+**What it does.** From depth 4, searches with a window of +-0.02 around the last value; if the result falls
+outside, widens it by 4 times and searches again.
+
+**How it is implemented.** `iteration` in `rust/src/search/mod.rs`. A repeat cut short by the clock keeps the
+last complete result, and nothing reduced is stored as complete in the table.
+
+**Measured effect.** Nodes 672,800 -> 440,213; same move 100 %. With `pvs`: +104 Elo (with `tt_move`, `history`).
+
+**Status.** On by default.
+
+## 18. Null move (`null_move`)
+
+**Problem.** Many nodes are so good for the side to move that even passing the turn would cut.
+
+**What it does.** Passes the turn and searches 2 plies less (3 from depth 6) with a zero-width window; if even
+that cuts, the node is cut. Not in check, not at the root, not twice in a row, only if the mover has pieces
+besides king and pawns (zugzwang), and only if the static value already reaches beta.
+
+**How it is implemented.** `apply_null` in `rust/src/board.rs` and the branch at the start of `Search::node`.
+Test: a pawn ending (Lasker position) where the null move would be wrong, in `rust/tests/techniques.rs`.
+
+**Measured effect.** Nodes 672,800 -> 446,129; same move 99 %. The biggest gain in games: the set with it
+scored 76.5 % (+205 Elo) against the reference.
+
+**Status.** On by default.
+
+## 19. Late move reductions (`lmr`) - tried, not adopted
+
+**Problem.** The last quiet moves of an ordered list are rarely best but cost as much as the first.
+
+**What it does.** From the 5th move (15th for a deeper cut) at depth 4 or more, quiet moves are searched one ply
+less, and again in full if they beat alpha.
+
+**How it is implemented.** `child_value` with `LMR_FROM_MOVE`, `LMR_FROM_DEPTH`, `LMR_DEEPER_FROM_MOVE`.
+
+**Measured effect.** Aggressive: 86,830 nodes but the same move as the reference in only 70 %, and 63.5 % in games
+with all techniques (below the 76.5 % without it). Mild: 49.0 % against the set without it (-7 Elo) although it
+searched half a ply deeper.
+
+**Status.** Implemented, off by default; rejected on the evidence of games. Re-measure it with a stronger
+evaluation, which orders moves better and would make reductions safer.
 
 ## Tried and removed: tactical move ordering with Prolog
 

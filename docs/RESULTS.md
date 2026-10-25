@@ -110,8 +110,12 @@ scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 
 | `linear_king_bucket` | 5.04 | 7.51 | 1.990 s → 0.120 s (17 times) |
 | `net4_pst` | 4.85 | 6.82 | 2.266 s → 0.286 s (8 times) |
 
-With six threads (`--threads 6`) the search to depth 6 is 15 % faster and, in 10 s, 0.2 plies deeper;
-the table is in [Algorithms](ALGORITHMS.md), section 11.
+The table above is the reference search (no selective techniques). The bots add six techniques
+(section 12 of [Algorithms](ALGORITHMS.md)); in 100 games at 4 s + 0.05 s they scored 76.5 % against the
+reference with the same model (`python scripts/bench/compare_engine_versions.py --candidate
+incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`), and reached 5.54
+plies against 4.68. With the techniques on, four threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s
+(section 11). The model tournaments of this page were played without them.
 
 ## Does the time control matter?
 

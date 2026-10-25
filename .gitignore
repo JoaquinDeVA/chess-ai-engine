@@ -76,3 +76,7 @@ docs/superpowers/
 
 # Rust
 rust/target/
+
+# Compiled extension
+*.so
+*.pyd

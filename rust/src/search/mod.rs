@@ -18,7 +18,7 @@ use shakmaty::{Color, Move};
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
 use shared::SharedTable;
-use tt::{order, Flag, Killers, Table, Tt, DEFAULT_MAX_TT_ENTRIES};
+use tt::{move_to_front, order, Flag, History, Killers, Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
 /// Iterations that are always completed before the time estimate may stop the deepening.
 pub const DEFAULT_MIN_DEPTH: usize = 3;
@@ -28,6 +28,8 @@ pub const DEFAULT_ESTIMATOR: &str = "geometric_growth";
 pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
+/// Width of the window of the scouts of the principal variation search.
+const SCOUT_EPSILON: f64 = 1e-9;
 /// Tolerance for finishing a depth that was started within the budget.
 const OVERSHOOT_FACTOR: f64 = 1.15;
 
@@ -176,6 +178,7 @@ impl Default for Options {
 pub struct Memory {
     pub table: Tt,
     pub killers: Killers,
+    pub history: History,
     pub threads: usize,
 }
 
@@ -185,6 +188,7 @@ impl Memory {
         Memory {
             table: Tt::Local(Table::new(max_tt_entries)),
             killers: Killers::default(),
+            history: History::default(),
             threads: 1,
         }
     }
@@ -198,6 +202,7 @@ impl Memory {
         Memory {
             table: Tt::Shared(Arc::new(SharedTable::with_megabytes(hash_megabytes))),
             killers: Killers::default(),
+            history: History::default(),
             threads,
         }
     }
@@ -205,6 +210,7 @@ impl Memory {
     pub fn clear(&mut self) {
         self.table.clear();
         self.killers.clear();
+        self.history.clear();
     }
 }
 
@@ -296,6 +302,7 @@ impl Search<'_> {
         } else {
             None
         };
+        let table_move = entry.and_then(|e| e.best);
         if let Some(entry) = entry {
             if entry.depth >= depth_remaining {
                 match entry.flag {
@@ -332,10 +339,20 @@ impl Search<'_> {
         } else {
             &[]
         };
-        let mut ordered = order(moves, killers, self.options.use_capture_order);
-        if depth_remaining == self.max_depth && self.control.rotation > 0 {
+        let mover = self.state.turn();
+        let history = if self.options.techniques.history {
+            Some((&self.memory.history, mover))
+        } else {
+            None
+        };
+        let mut ordered = order(moves, killers, self.options.use_capture_order, history);
+        let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
+        if helper_root {
             let shift = self.control.rotation % ordered.len();
             ordered.rotate_left(shift);
+        }
+        if self.options.techniques.tt_move && !helper_root {
+            move_to_front(&mut ordered, table_move);
         }
         let mut best_value = if maximizing {
             f64::NEG_INFINITY
@@ -343,9 +360,29 @@ impl Search<'_> {
             f64::INFINITY
         };
         let mut best_move = None;
-        for action in ordered {
+        for (index, action) in ordered.into_iter().enumerate() {
             self.play(action);
-            let (child, _) = self.node(alpha, beta, depth_remaining - 1, ply + 1);
+            let (child, _) = if self.options.techniques.pvs
+                && index > 0
+                && depth_remaining >= 2
+                && beta - alpha > SCOUT_EPSILON
+            {
+                // After the first move, the others only have to show they are better: search them
+                // with a window of no width and repeat with the whole one if they are.
+                let (low, high) = if maximizing {
+                    (alpha, alpha + SCOUT_EPSILON)
+                } else {
+                    (beta - SCOUT_EPSILON, beta)
+                };
+                let scout = self.node(low, high, depth_remaining - 1, ply + 1);
+                if scout.0 > alpha && scout.0 < beta && !self.truncated {
+                    self.node(alpha, beta, depth_remaining - 1, ply + 1)
+                } else {
+                    scout
+                }
+            } else {
+                self.node(alpha, beta, depth_remaining - 1, ply + 1)
+            };
             self.unplay();
             if maximizing {
                 if child > best_value {
@@ -362,6 +399,10 @@ impl Search<'_> {
                 self.prunings += 1;
                 if self.options.use_killers {
                     self.memory.killers.record(depth_remaining, action);
+                }
+                if self.options.techniques.history && !action.is_capture() && !action.is_promotion()
+                {
+                    self.memory.history.reward(mover, &action, depth_remaining);
                 }
                 break;
             }
@@ -454,6 +495,28 @@ pub fn alpha_beta(
     max_depth: i32,
     control: &Control,
 ) -> SearchResult {
+    alpha_beta_window(
+        state,
+        eval,
+        memory,
+        options,
+        max_depth,
+        control,
+        (f64::NEG_INFINITY, f64::INFINITY),
+    )
+}
+
+/// [`alpha_beta`] with a window other than the whole interval: a value inside it is exact, one on
+/// its edge (or outside) only says that the true value is on that side.
+pub fn alpha_beta_window(
+    state: &mut GameState,
+    eval: &dyn Evaluator,
+    memory: &mut Memory,
+    options: &Options,
+    max_depth: i32,
+    control: &Control,
+    window: (f64, f64),
+) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
     let incremental = if options.techniques.incremental {
@@ -475,7 +538,7 @@ pub fn alpha_beta(
         truncated: false,
         incremental,
     };
-    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0);
+    let (value, best) = search.node(window.0, window.1, max_depth, 0);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,
@@ -484,6 +547,58 @@ pub fn alpha_beta(
         prunings: search.prunings,
         max_ply: search.max_ply,
         truncated: search.truncated,
+    }
+}
+
+/// First depth searched with an aspiration window (the first iterations are too unstable).
+const ASPIRATION_FROM_DEPTH: i32 = 4;
+/// Half-width of the first aspiration window, in expected score.
+const ASPIRATION_DELTA: f64 = 0.02;
+/// Half-width beyond which the window is the whole interval.
+const ASPIRATION_LIMIT: f64 = 0.4;
+
+/// One iteration of the deepening: [`alpha_beta`], or, with the aspiration technique, a search
+/// in a narrow window around the previous value that is repeated wider when the value falls
+/// outside. The counters are those of all the searches of the iteration. A search cut by the
+/// clock ends the iteration at once.
+fn iteration(
+    state: &mut GameState,
+    eval: &dyn Evaluator,
+    memory: &mut Memory,
+    options: &Options,
+    depth: i32,
+    control: &Control,
+    previous: Option<f64>,
+) -> SearchResult {
+    let Some(value) =
+        previous.filter(|_| options.techniques.aspiration && depth >= ASPIRATION_FROM_DEPTH)
+    else {
+        return alpha_beta(state, eval, memory, options, depth, control);
+    };
+    let mut delta = ASPIRATION_DELTA;
+    let (mut low, mut high) = (value - delta, value + delta);
+    let (mut nodes, mut prunings, mut max_ply) = (0, 0, 0);
+    loop {
+        let mut result =
+            alpha_beta_window(state, eval, memory, options, depth, control, (low, high));
+        nodes += result.nodes;
+        prunings += result.prunings;
+        max_ply = max_ply.max(result.max_ply);
+        let inside = result.value > low && result.value < high;
+        if result.truncated || inside || (low == f64::NEG_INFINITY && high == f64::INFINITY) {
+            result.nodes = nodes;
+            result.prunings = prunings;
+            result.max_ply = max_ply;
+            return result;
+        }
+        delta *= 4.0;
+        if delta > ASPIRATION_LIMIT {
+            (low, high) = (f64::NEG_INFINITY, f64::INFINITY);
+        } else if result.value <= low {
+            low = value - delta;
+        } else {
+            high = value + delta;
+        }
     }
 }
 
@@ -502,6 +617,7 @@ fn helper(
     let mut memory = Memory {
         table: Tt::Shared(table),
         killers: Killers::default(),
+        history: History::default(),
         threads: 1,
     };
     let mut nodes = 0;
@@ -635,6 +751,7 @@ fn deepen(
     let mut iterations: Vec<IterationInfo> = Vec::new();
     let mut stop_reason = StopReason::MaxDepth;
     let mut stop_predicted = 0.0;
+    let mut last_value: Option<f64> = None;
 
     for depth in 1..=max_depth {
         let remaining = time_limit - (clock() - start);
@@ -650,7 +767,15 @@ fn deepen(
             progress.store(depth, Relaxed);
         }
         let iteration_start = clock();
-        let result = alpha_beta(state, eval, memory, options, depth as i32, control);
+        let result = iteration(
+            state,
+            eval,
+            memory,
+            options,
+            depth as i32,
+            control,
+            last_value,
+        );
         let seconds = clock() - iteration_start;
         iterations.push(IterationInfo {
             depth,
@@ -671,6 +796,7 @@ fn deepen(
             break;
         }
         history.push((seconds, result.nodes));
+        last_value = Some(result.value);
         best_move = result.best;
         completed_depth = depth;
         if depth >= options.min_depth && clock() - start >= time_limit {

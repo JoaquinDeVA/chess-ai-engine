@@ -17,13 +17,13 @@ from chess_engine.comparison.tradeoff import (
     validate_specs,
 )
 from chess_engine.evaluation import heuristics
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.evaluation.heuristics import (
     FEATURE_NAMES,
     h1,
     load_h1_weights,
     reset_h1_cache,
 )
-from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.training.lichess_raw import shard_path, write_shard
 from chess_engine.training.sidecar import build_sidecar
 from tests.conftest import random_positions

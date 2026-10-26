@@ -5,9 +5,9 @@ from typing import Any, Callable, Optional
 import chess
 
 from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.evaluation.heuristics import h1
 from chess_engine.models.native import heuristic_evaluator
-from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.time_management import TimeManager
 
 

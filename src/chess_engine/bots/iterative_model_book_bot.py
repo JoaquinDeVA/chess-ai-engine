@@ -5,11 +5,11 @@ from typing import Any, Optional, Union
 import chess
 
 from chess_engine.bots._search_bots import AUTHOR, SHIPPED, IterativeDeepeningBot
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, load_model
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.native import model_evaluator
-from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.time_management import TimeManager
 
 #: Model used when none is given: the best player in the tournaments (see docs/RESULTS.md), shipped with the repository.

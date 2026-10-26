@@ -14,10 +14,10 @@ import chess
 
 from chess_engine import _core
 from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models.native import callback_evaluator
-from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.search.statistics import SearchStatistics
 from chess_engine.search.time_management import TimeManager
 

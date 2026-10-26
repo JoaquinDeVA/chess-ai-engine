@@ -7,8 +7,8 @@ import chess
 import numpy as np
 
 from chess_engine import _core
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.evaluation.heuristics import FEATURE_NAMES, h1, load_h1_weights
-from chess_engine.search.chess_game_state import ChessGameState
 
 from .base import EvaluationModel
 from .evaluator import ModelEvaluator

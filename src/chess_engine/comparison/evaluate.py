@@ -18,11 +18,11 @@ import chess
 import numpy as np
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.evaluation.heuristics import load_h1_weights
 from chess_engine.models.base import EvaluationModel
 from chess_engine.models.cards import current_commit, load_card, today, update_card
 from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
-from chess_engine.search.chess_game_state import ChessGameState
 from chess_engine.training.dataset import TEST
 from chess_engine.training.representation import Representation, score_to_cp
 from chess_engine.training.sidecar import load_sample

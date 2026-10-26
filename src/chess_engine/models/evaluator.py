@@ -2,7 +2,7 @@
 
 import chess
 
-from chess_engine.search.chess_game_state import ChessGameState
+from chess_engine.evaluation.chess_game_state import ChessGameState
 
 from .base import EXPECTED_SCORE_MARGIN, EvaluationModel
 

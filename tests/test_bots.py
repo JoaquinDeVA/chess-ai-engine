@@ -62,7 +62,7 @@ class TestEveryBot:
 
 class TestEvaluation:
     def test_h1_stays_inside_the_open_unit_interval(self, sample_boards):
-        from chess_engine.search.chess_game_state import ChessGameState
+        from chess_engine.evaluation.chess_game_state import ChessGameState
 
         for board in sample_boards[:15]:
             for player in (chess.WHITE, chess.BLACK):
@@ -158,7 +158,7 @@ class TestIterativeDeepening:
 class TestMLBots:
     def test_evaluator_scale_uses_the_whole_interval(self, stub_model):
         """Regression B10: centipawns were divided by 20000, squeezing evaluations into 0.47-0.53."""
-        from chess_engine.search.chess_game_state import ChessGameState
+        from chess_engine.evaluation.chess_game_state import ChessGameState
 
         evaluate = ModelEvaluator(stub_model)
         up_a_queen = ChessGameState(

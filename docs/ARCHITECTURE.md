@@ -30,8 +30,7 @@ flowchart TB
 Dependencies, as the imports stand:
 
 - `rust/` imports nothing from Python except the weights it is given (`models/native.py` builds the evaluators).
-- `evaluation/` imports `search/` (heuristics receive a `ChessGameState`, a thin wrapper of a board).
-- `models/` imports `search/` (`evaluator.py`, `native.py`) and, for the target representation, `training/`.
+- `models/` imports `evaluation/` (`evaluator.py`, `native.py`, for `ChessGameState`) and, for the target representation, `training/`.
 - `training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). So `models/` and `training/` depend on each other; the only edge from `models/` to `training/` is `training/representation.py`.
 - `bots/` imports `search/`, `evaluation/`, `models/` and `knowledge/`.
 - `engine/` imports `bots/` and `config/`; `config/` imports the data classes of `engine/`.
@@ -46,9 +45,9 @@ Dependencies, as the imports stand:
 | `rust/src/search/` | `mod.rs`: alpha-beta, quiescence, iterative deepening, the `Techniques` switches and the threads. `tt.rs`: transposition table, killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
-| `search/` | `statistics.py`: `SearchStatistics`. `chess_game_state.py`: a thin wrapper of a board for the evaluation functions. `time_management.py`: per-move time budget |
+| `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
 | `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py`, `human_player.py` |
-| `evaluation/` | `features.py`: hand-crafted features (material, mobility, king safety...). `heuristics.py`: the heuristic `h1` and its fitted weights |
+| `evaluation/` | `features.py`: hand-crafted features (material, mobility, king safety...). `heuristics.py`: the heuristic `h1` and its fitted weights. `chess_game_state.py`: a thin wrapper of a board for the evaluation functions |
 | `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py` (which also lists `ACCURACY_RECORDS`, the models that are only measured). Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`). Course models: `architectures.py` and `keras_model.py` (`mlp_features`, `cnn_resnet`) with the dense encodings of `dense_features.py`. `evaluator.py` adapts a model to a search; `native.py` hands a model's weights to the Rust core; `cards.py` reads and writes the model cards in `models/cards/` |
 | `training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`, `targets.py` and `representation.py`: split, target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept). `effort.py`: training size per effort level. `train.py`: the training command |
 | `comparison/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `tournament.py` (round-robin at equal time, Elo), `report.py` (model cards into the models table of `RESULTS.md`) |

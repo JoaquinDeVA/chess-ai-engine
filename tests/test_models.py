@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.models import (
     CP_SCALE,
     available_models,
@@ -16,7 +17,6 @@ from chess_engine.models.base import ARTIFACTS_DIR, EvaluationModel
 from chess_engine.models.dense_features import BitboardFeatures, MaterialFeatures, VectorFeatures
 from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.registry import register_model
-from chess_engine.search.chess_game_state import ChessGameState
 from tests.conftest import material_cp, random_positions
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

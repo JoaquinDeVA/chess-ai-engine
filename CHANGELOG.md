@@ -31,6 +31,9 @@ results published for 1.1 were played with the Python engine and are not compara
 - **`python main.py` with no arguments** starts a game of you (White) against `IterativeModelBookBot` with
   `linear_pst_terms`, 3 s per move (`--move-time`) and up to four threads. Naming one player completes the other so
   that a human faces a bot.
+- **Resumed tournament files must come from the same core version**: every game record carries `core`
+  (`chess_engine._core.version()`); records without it count as `python` (the engine before 2.0) and resuming with a
+  different version is refused.
 - `IterativeDeepeningBot` takes `threads` and `hash_mb`, no longer takes `problem`, and has no `order_moves` or
   `cutoff_test` to override; a bot says which evaluation the core runs with `native_evaluator()` (the default calls
   `evaluate` back from Python, which is slow). `scripts/bench/compare_search_features.py` switches the table, the

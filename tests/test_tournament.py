@@ -514,3 +514,44 @@ def test_play_game_records_and_passes_the_estimator(monkeypatch):
     assert record["estimator"] == "node_growth" and seen == [{"estimator": "node_growth"}] * 2
     default = tournament._play_game(("a", "b", chess.STARTING_FEN, 5.0, 0.1, None, 0, 30, None))
     assert default["estimator"] == _core.DEFAULT_ESTIMATOR
+
+
+def test_records_without_a_core_count_as_the_python_engine():
+    tournament._check_core([{"white": "a"}], "python", Path("x.jsonl"))
+    with pytest.raises(ValueError, match="'python'.*'2.0.0'.*--out"):
+        tournament._check_core([{"white": "a"}], "2.0.0", Path("x.jsonl"))
+
+
+def test_games_of_the_same_core_and_an_empty_file_pass_the_core_check():
+    tournament._check_core([{"white": "a", "core": "2.0.0"}], "2.0.0", Path("x.jsonl"))
+    tournament._check_core([], "2.0.0", Path("x.jsonl"))
+    with pytest.raises(ValueError, match="'1.9.0'"):
+        tournament._check_core([{"core": "1.9.0"}], "2.0.0", Path("x.jsonl"))
+
+
+def test_a_file_played_by_another_core_is_refused(tmp_path):
+    out = tmp_path / "games.jsonl"
+    opening = paired_openings(1, seed=2)[0]
+    out.write_text(
+        json.dumps(
+            {
+                "white": "a",
+                "black": "b",
+                "fen": opening,
+                "base": 2.0,
+                "increment": 0.0,
+                "estimator": _core.DEFAULT_ESTIMATOR,
+            }
+        )
+        + "\n"
+    )
+    with pytest.raises(ValueError, match="core"):
+        run_round_robin(
+            ["linear_material", "h1"], [opening], base=2.0, increment=0.0, workers=1, out=out
+        )
+
+
+def test_play_game_records_the_core_version(monkeypatch):
+    record = tournament._play_game(("a", "b", chess.STARTING_FEN, 5.0, 0.1))
+    assert record["core"] == _core.version()
+    assert tournament._error_record(("a", "b", "fen", 5.0, 0.1), "boom")["core"] == _core.version()

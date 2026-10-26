@@ -179,6 +179,26 @@ def _check_estimator(records: Sequence[Dict[str, Any]], estimator: str, path: Pa
             )
 
 
+#: Core of the games recorded before the field existed (the Python engine, before 2.0).
+LEGACY_CORE = "python"
+
+
+def _check_core(records: Sequence[Dict[str, Any]], version: str, path: Path) -> None:
+    """Refuse to mix games played by another version of the Rust core into one file.
+
+    The version changes with each release, not with each commit.
+
+    :raises ValueError: If a record was played by another core; records without the field count
+        as :data:`LEGACY_CORE`.
+    """
+    for record in records:
+        if record.get("core", LEGACY_CORE) != version:
+            raise ValueError(
+                f"{path} already holds games played by the core {record.get('core', LEGACY_CORE)!r}; "
+                f"this one is {version!r}. Use a different --out file or the same version."
+            )
+
+
 def check_specs(specs: Sequence[str]) -> None:
     """Build every player once in this process, so that a bad specification fails before any game.
 
@@ -272,6 +292,7 @@ def _play_game(job: Job) -> Dict[str, Any]:
         "increment": increment,
         "max_depth": max_depth,
         "estimator": estimator,
+        "core": _core.version(),
     }
     try:
         white_player = RecordingPlayer(
@@ -309,6 +330,7 @@ def _error_record(job: Job, message: str) -> Dict[str, Any]:
         "fen": fen,
         "base": base,
         "increment": increment,
+        "core": _core.version(),
         "error": message,
     }
 
@@ -439,6 +461,7 @@ def run_round_robin(
     existing = read_games(out)
     _check_time_control(existing, base, increment, out)
     _check_estimator(existing, estimator or _core.DEFAULT_ESTIMATOR, out)
+    _check_core(existing, _core.version(), out)
     done = {(r["white"], r["black"], r["fen"]) for r in existing}
     pending: Deque[Job] = deque(job for job in jobs if job[:3] not in done)
     played = len(pending)

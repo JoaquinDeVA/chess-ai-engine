@@ -151,7 +151,10 @@ strength by a search this shallow. For a game at 10 min + 5 s use `linear_pst_te
 The tournaments measure the evaluation alone: the endgame tables and the opening book are off in
 them, and the time estimator is pinned to the original rule (`ratio_squared`, with the floor of depth 3)
 so that a stopped tournament can be resumed with identical conditions. Quiescence is on, as in the
-bots by default.
+bots by default. Each game record also carries the version of the Rust core that played it (`core`,
+`chess_engine._core.version()`); a file is never resumed with another version, and records without the
+field count as `python`, the engine before 2.0 (`tests/test_tournament.py::test_a_file_played_by_another_core_is_refused`).
+The published tournaments below were played by that Python engine.
 
 ## Limits and leakage
 

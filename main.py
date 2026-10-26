@@ -79,7 +79,7 @@ Examples:
         "--model",
         type=str,
         default=None,
-        help="Evaluation model for the machine-learning bots in single games; ignored in tournament mode (see docs/ADDING_A_MODEL.md)",
+        help="Evaluation model for the machine-learning bots in single games; ignored in tournament mode",
     )
 
     parser.add_argument(

@@ -8,7 +8,6 @@ Based on the AI course framework (Inteligencia Artificial e Ingeniería del Cono
 CEU San Pablo University).
 """
 
-import itertools
 import json
 import time
 from datetime import datetime
@@ -20,7 +19,7 @@ from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.bots.human_player import HumanPlayer
 from chess_engine.config.settings import BLITZ_CONFIG
-from chess_engine.engine.data_classes import GameResult, TournamentConfig, TournamentResult
+from chess_engine.engine.data_classes import GameResult, TournamentConfig
 
 #: Terminations in which a player loses without the game ending on the board.
 FORFEIT_TERMINATIONS = ("time_forfeit", "illegal_move", "player_error")
@@ -276,102 +275,6 @@ class GameManager:
             if verbose:
                 print(f"Game error: {e}")
             raise
-
-    def run_tournament(
-        self, bot_names: List[str], config: TournamentConfig, verbose: bool = False
-    ) -> "TournamentResult":
-        """
-        Run a round-robin tournament between bots.
-
-        Each bot plays every other bot twice (once as white, once as black)
-        for the specified number of rounds.
-
-        :param bot_names: List of bot names to include in tournament
-        :type bot_names: List[str]
-        :param config: Tournament configuration
-        :type config: TournamentConfig
-        :param verbose: Enable detailed output
-        :type verbose: bool
-        :return: TournamentResult with complete tournament information
-        :rtype: TournamentResult
-        """
-        if len(bot_names) < 2:
-            raise ValueError("Tournament requires at least 2 bots")
-
-        tournament_start = time.time()
-        tournament_id = f"tournament_{int(tournament_start)}"
-
-        # Load all bots
-        bots = {}
-        for bot_name in bot_names:
-            bot = self.bot_registry.get_bot(bot_name)
-            if bot is None:
-                raise ValueError(f"Bot '{bot_name}' not found or failed to load")
-            bots[bot_name] = bot
-
-        if verbose:
-            print(f"Loaded {len(bots)} bots for tournament")
-            print(f"Tournament format: {config.rounds} round(s), round-robin")
-            print(f"Time control: {config.total_game_time}s + {config.time_increment}s")
-
-        all_games = []
-        game_number = 0
-
-        # Run the specified number of rounds
-        for round_num in range(1, config.rounds + 1):
-            if verbose:
-                print(f"\n=== Round {round_num} ===")
-
-            # Generate all pairings (each bot plays every other bot twice per round)
-            for white_name, black_name in itertools.permutations(bot_names, 2):
-                game_number += 1
-                white_bot = bots[white_name]
-                black_bot = bots[black_name]
-
-                if verbose:
-                    print(f"Game {game_number}: {white_name} (White) vs {black_name} (Black)")
-
-                # Play the game using the improved play_game method
-                # All error handling is done in play_game - it will return a proper GameResult
-                game_result = self.play_game(
-                    white_player=white_bot,
-                    black_player=black_bot,
-                    time_limit=config.total_game_time,
-                    time_increment=config.time_increment,
-                    starting_position=None,
-                    verbose=False,  # Keep individual games quiet unless very verbose
-                    round_number=round_num,
-                )
-
-                all_games.append(game_result)
-
-                if verbose:
-                    result_str = f"Result: {game_result.result}"
-                    if game_result.winner:
-                        result_str += f" ({game_result.winner} wins)"
-                    else:
-                        result_str += " (draw)"
-                    result_str += f" - {game_result.total_moves} moves, {game_result.duration:.1f}s"
-                    result_str += f" ({game_result.termination})"
-                    print(f"  {result_str}")
-
-        tournament_duration = time.time() - tournament_start
-
-        # Create tournament result
-        tournament_result = TournamentResult(
-            tournament_id=tournament_id,
-            timestamp=datetime.now().isoformat(),
-            config=config,
-            bot_names=bot_names,
-            games=all_games,
-            duration=tournament_duration,
-        )
-
-        if verbose:
-            print(f"\nTournament completed in {tournament_duration:.1f} seconds")
-            print(f"Total games played: {len(all_games)}")
-
-        return tournament_result
 
 
 def load_config(config_path: str) -> TournamentConfig:

@@ -28,6 +28,9 @@ results published for 1.1 were played with the Python engine and are not compara
 - `scripts/bench/measure_search_speed.py`: depth reached in a time budget and cost of a fixed depth, per player.
 
 ### Changed
+- **`python main.py` with no arguments** starts a game of you (White) against `IterativeModelBookBot` with
+  `linear_pst_terms`, 3 s per move (`--move-time`) and up to four threads. Naming one player completes the other so
+  that a human faces a bot.
 - `IterativeDeepeningBot` takes `threads` and `hash_mb`, no longer takes `problem`, and has no `order_moves` or
   `cutoff_test` to override; a bot says which evaluation the core runs with `native_evaluator()` (the default calls
   `evaluate` back from Python, which is slow). `scripts/bench/compare_search_features.py` switches the table, the
@@ -39,6 +42,9 @@ results published for 1.1 were played with the Python engine and are not compara
 - The Python search (`game_algorithms`, `search_utils`, `time_estimators`, `game_problems`, `chess_problem`), its tests,
   `scripts/bench/bench_search_speed.py` (replaced by `measure_search_speed.py`) and `docs/benchmarks/`. The Python
   engine is recoverable from git history; `tests/golden/` keeps its behaviour.
+- `main.py --mode tournament`, `GameManager.run_tournament`, `TournamentResult` and
+  `BotRegistry.get_tournament_ready_bots`: tournaments run from `scripts/bench/play_tournament.py`. `--export` now
+  only names the PGN file of the game.
 
 ## 1.1.0
 

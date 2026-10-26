@@ -2,14 +2,16 @@
 """
 Chess AI Engine - command-line interface.
 
-Play a game between any two players (humans or bots), or run a round-robin tournament between
-all the bots. The CLI skeleton comes from the AI course framework (CEU San Pablo University);
-``--model`` and ``--depth`` are additions.
+Play a game between any two players (humans or bots). With no arguments you play White against
+the default bot. Tournaments between bots run from ``scripts/bench/play_tournament.py``. The CLI
+skeleton comes from the AI course framework (CEU San Pablo University); ``--model`` and ``--depth``
+are additions.
 """
 
 import argparse
 import inspect
 import logging
+import os
 import random
 import sys
 import traceback
@@ -22,6 +24,15 @@ from chess_engine.config.settings import load_config
 from chess_engine.engine.game_manager import GameManager
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
+from chess_engine.search.time_management import TimeManager
+
+#: Bot that plays against a human when no opponent is named.
+DEFAULT_BOT = "IterativeModelBookBot"
+#: Seconds the bot thinks per move against a human, unless ``--move-time`` says otherwise.
+DEFAULT_MOVE_TIME = 3.0
+#: Threads of a bot that plays a human, at most (``--threads`` overrides).
+MAX_DEFAULT_THREADS = 4
+HUMAN_NAMES = ("human", "humanplayer", "human_player")
 
 
 def setup_argument_parser() -> argparse.ArgumentParser:
@@ -32,37 +43,32 @@ def setup_argument_parser() -> argparse.ArgumentParser:
     :rtype: argparse.ArgumentParser
     """
     parser = argparse.ArgumentParser(
-        description="Chess Engine - Play against bots and run tournaments",
+        description="Chess Engine - Play against the engine or watch bots play each other",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  %(prog)s                                                          # You (White) vs the default bot
   %(prog)s --player1 human --player2 IterativeHeuristicBot          # Human(White) vs bot(Black)
   %(prog)s --player1 IterativeHeuristicBot --player2 HumanPlayer    # bot(White) vs Human(Black)
   %(prog)s --player1 IterativeHeuristicBot --random-color           # Human vs bot (random colors)
   %(prog)s --player2 IterativeHeuristicBot                          # Human vs bot (human=white)
   %(prog)s --player1 IterativeModelBookBot --model cnn_resnet --player2 IterativeHeuristicBot --depth 2
-  %(prog)s --mode tournament
   %(prog)s --list-bots
         """,
     )
 
     parser.add_argument(
-        "--mode",
-        choices=["single", "tournament"],
-        default="single",
-        help="Game mode: single (Player vs Player) or tournament (all bots) (default: %(default)s)",
-    )
-
-    parser.add_argument(
         "--player1",
         type=str,
-        help="First player (bot name or 'human'/'HumanPlayer'). Defaults to 'human' if not specified.",
+        help="First player (bot name or 'human'/'HumanPlayer'). Defaults to a human, or to the "
+        "default bot when --player2 is a human.",
     )
 
     parser.add_argument(
         "--player2",
         type=str,
-        help="Second player (bot name or 'human'/'HumanPlayer'). Defaults to 'human' if not specified.",
+        help="Second player (bot name or 'human'/'HumanPlayer'). Defaults to the default bot "
+        "(" + DEFAULT_BOT + "), or to a human when --player1 is a bot.",
     )
 
     parser.add_argument(
@@ -112,11 +118,19 @@ Examples:
     )
 
     parser.add_argument(
+        "--move-time",
+        type=float,
+        default=DEFAULT_MOVE_TIME,
+        metavar="SECONDS",
+        help="Seconds a bot thinks per move when it plays a human (default %(default)s)",
+    )
+    parser.add_argument(
         "--threads",
         type=int,
         default=None,
         metavar="N",
-        help="Threads that search (default 1); the search is then not deterministic",
+        help="Threads that search; more than one makes the search non-deterministic (default 1, or "
+        f"min({MAX_DEFAULT_THREADS}, cores) against a human)",
     )
     parser.add_argument(
         "--techniques",
@@ -149,7 +163,7 @@ Examples:
         "--export",
         type=str,
         default=None,
-        help="Export games to PGN. For single games: specify .pgn file (default: last_game.pgn). For tournaments: specify directory (default: last_tournament/)",
+        help="PGN file to save the game to (default: last_game.pgn)",
     )
 
     return parser
@@ -202,13 +216,52 @@ def load_position_from_argument(position_arg: str) -> Optional[str]:
     return None
 
 
-def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespace) -> dict:
+def is_human_name(name: str) -> bool:
+    """
+    Whether a player name refers to a human.
+
+    :param name: Player name given on the command line
+    :type name: str
+    :return: True for ``human``, ``HumanPlayer`` and ``human_player`` (any case)
+    :rtype: bool
+    """
+    return name.lower() in HUMAN_NAMES
+
+
+def fill_players(player1: Optional[str], player2: Optional[str]) -> tuple:
+    """
+    Complete the players so that, unless both are given, a human faces a bot.
+
+    :param player1: ``--player1`` or None
+    :type player1: Optional[str]
+    :param player2: ``--player2`` or None
+    :type player2: Optional[str]
+    :return: Names of the first and second player
+    :rtype: tuple
+    """
+    if player1 is None and player2 is None:
+        return "human", DEFAULT_BOT
+    if player1 is None:
+        return (DEFAULT_BOT if is_human_name(player2) else "human"), player2
+    if player2 is None:
+        return player1, (DEFAULT_BOT if is_human_name(player1) else "human")
+    return player1, player2
+
+
+def bot_options(
+    bot_registry: BotRegistry,
+    bot_name: str,
+    args: argparse.Namespace,
+    versus_human: bool = False,
+) -> dict:
     """
     Build the constructor options requested on the command line for a bot.
 
     ``--model``, ``--depth``, the endgame tables and the opening book are only passed to bots whose
     constructor accepts them (``model``, ``max_depth``, ``tablebase`` and ``opening_book``), so they
     can be given freely in a mixed match. The book and the tables are on unless switched off.
+    Against a human the bot thinks ``--move-time`` seconds per move (no clock runs) and, unless
+    ``--threads`` says otherwise, searches with up to :data:`MAX_DEFAULT_THREADS` threads.
 
     :param bot_registry: The bot registry instance
     :type bot_registry: BotRegistry
@@ -216,6 +269,8 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
     :type bot_name: str
     :param args: Parsed command line arguments
     :type args: argparse.Namespace
+    :param versus_human: Whether the opponent is a human
+    :type versus_human: bool
     :return: Keyword arguments for :meth:`BotRegistry.get_bot`
     :rtype: dict
     """
@@ -229,6 +284,8 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
     if takes_search_options or "threads" in parameters:
         if args.threads is not None:
             options["threads"] = args.threads
+        elif versus_human:
+            options["threads"] = max(1, min(MAX_DEFAULT_THREADS, os.cpu_count() or 1))
         if args.hash is not None:
             options["hash_mb"] = args.hash
     if args.techniques is not None and (takes_search_options or "techniques" in parameters):
@@ -246,6 +303,10 @@ def bot_options(bot_registry: BotRegistry, bot_name: str, args: argparse.Namespa
             options["opening_book"] = None
         elif args.opening_book is not None:
             options["opening_book"] = OpeningBook.load(args.opening_book)
+    if versus_human and "time_manager" in parameters:
+        options["time_manager"] = TimeManager(
+            min_turn_time=args.move_time, max_turn_time=args.move_time
+        )
     return options
 
 
@@ -255,8 +316,8 @@ def run_single_game(
     """
     Run a single chess game between two players.
 
-    Supports any combination of human and bot players.
-    If no players specified, defaults to human vs human.
+    Supports any combination of human and bot players. With none given, a human (White) plays
+    :data:`DEFAULT_BOT`; with one given, the other is completed (see :func:`fill_players`).
 
     :param args: Parsed command line arguments
     :type args: argparse.Namespace
@@ -267,44 +328,24 @@ def run_single_game(
     :return: True if game completed successfully, False otherwise
     :rtype: bool
     """
-    # Get player names (default to human if not specified)
-    player1_name = args.player1 or "human"
-    player2_name = args.player2 or "human"
+    player1_name, player2_name = fill_players(args.player1, args.player2)
+    versus_human = is_human_name(player1_name) or is_human_name(player2_name)
 
-    # Helper function to check if a player name refers to a human
-    def is_human_player(name: str) -> bool:
-        return name.lower() in ["human", "humanplayer", "human_player"]
-
-    # Create players
-    # Player 1
-    if is_human_player(player1_name):
-        player1 = HumanPlayer("Human (Player 1)")
-    else:
-        if not bot_registry.is_bot_available(player1_name):
-            print(f"Error: Bot '{player1_name}' not found")
+    players = []
+    for number, name in enumerate((player1_name, player2_name), 1):
+        if is_human_name(name):
+            players.append(HumanPlayer(f"Human (Player {number})"))
+            continue
+        if not bot_registry.is_bot_available(name):
+            print(f"Error: Bot '{name}' not found")
             print("Use --list-bots to see available bots")
             return False
-        player1 = bot_registry.get_bot(
-            player1_name, **bot_options(bot_registry, player1_name, args)
-        )
-        if player1 is None:
-            print(f"Error: Bot '{player1_name}' could not be loaded (see the log above)")
+        bot = bot_registry.get_bot(name, **bot_options(bot_registry, name, args, versus_human))
+        if bot is None:
+            print(f"Error: Bot '{name}' could not be loaded (see the log above)")
             return False
-
-    # Player 2
-    if is_human_player(player2_name):
-        player2 = HumanPlayer("Human (Player 2)")
-    else:
-        if not bot_registry.is_bot_available(player2_name):
-            print(f"Error: Bot '{player2_name}' not found")
-            print("Use --list-bots to see available bots")
-            return False
-        player2 = bot_registry.get_bot(
-            player2_name, **bot_options(bot_registry, player2_name, args)
-        )
-        if player2 is None:
-            print(f"Error: Bot '{player2_name}' could not be loaded (see the log above)")
-            return False
+        players.append(bot)
+    player1, player2 = players
 
     # Assign colors
     if args.random_color:
@@ -401,97 +442,6 @@ def run_single_game(
         return False
 
 
-def run_tournament(
-    args: argparse.Namespace, game_manager: GameManager, bot_registry: BotRegistry
-) -> bool:
-    """
-    Run tournament with all available bots.
-
-    :param args: Parsed command line arguments
-    :type args: argparse.Namespace
-    :param game_manager: Game manager instance
-    :type game_manager: GameManager
-    :param bot_registry: Bot registry instance
-    :type bot_registry: BotRegistry
-    :return: True if tournament completed successfully, False otherwise
-    :rtype: bool
-    """
-    try:
-        config = load_config()
-        if args.verbose:
-            print("Loaded tournament config from default location")
-            print(f"Tournament rounds: {config.rounds}")
-    except Exception as e:
-        print(f"Error loading configuration: {e}")
-        print("The tournament settings come from chess_engine.config.settings.load_config()")
-        return False
-
-    available_bots = bot_registry.get_tournament_ready_bots()
-
-    if len(available_bots) < 2:
-        print("Error: Tournament requires at least 2 bots")
-        print(
-            f"Found {len(available_bots)} tournament-ready bots. Use --list-bots to see all available bots."
-        )
-        print("Make sure you have implemented multiple bot classes.")
-        return False
-
-    print(f"Starting tournament with {len(available_bots)} bots")
-    print(f"Bots: {', '.join(available_bots)}")
-    print(f"Format: {config.rounds} round(s), round-robin")
-    print("-" * 50)
-
-    try:
-        tournament_result = game_manager.run_tournament(
-            bot_names=available_bots, config=config, verbose=args.verbose
-        )
-
-        print("\nTournament Complete!")
-        print("=" * 50)
-
-        # Show final standings
-        standings = tournament_result.get_standings()
-        print("\nFinal Standings:")
-        print("-" * 40)
-        print(f"{'Rank':<4} {'Bot':<15} {'Score':<6} {'W-D-L':<8} {'Games'}")
-        print("-" * 40)
-
-        for rank, (bot_name, stats) in enumerate(standings, 1):
-            wdl = f"{stats['wins']}-{stats['draws']}-{stats['losses']}"
-            games_played = stats["wins"] + stats["draws"] + stats["losses"]
-            print(f"{rank:<4} {bot_name:<15} {stats['score']:<6.1f} {wdl:<8} {games_played}")
-
-        print(f"\nTotal games played: {len(tournament_result.games)}")
-        print(f"Tournament duration: {tournament_result.duration:.1f} seconds")
-
-        safe_timestamp = tournament_result.timestamp.replace(":", "-")
-        results_file = f"tournament_results_{safe_timestamp}.json"
-        tournament_result.save_to_file(results_file)
-        print(f"Detailed results saved to: {results_file}")
-
-        # Export tournament games to PGN
-        export_path = args.export if args.export else "last_tournament/"
-        try:
-            tournament_result.export_games_to_pgn_directory(export_path)
-            print(f"Tournament games exported to directory: {export_path}")
-            print(f"Exported {len(tournament_result.games)} PGN files")
-        except Exception as e:
-            print(f"Error exporting tournament games: {e}")
-            if args.verbose:
-                traceback.print_exc()
-
-        return True
-
-    except KeyboardInterrupt:
-        print("\nTournament cancelled by user")
-        return False
-    except Exception as e:
-        print(f"Error during tournament: {e}")
-        if args.verbose:
-            traceback.print_exc()
-        return False
-
-
 def main() -> int:
     """
     Main entry point for the chess engine.
@@ -533,16 +483,7 @@ def main() -> int:
 
     success = False
     try:
-        if args.mode == "single":
-            success = run_single_game(args, game_manager, bot_registry)
-
-        elif args.mode == "tournament":
-            success = run_tournament(args, game_manager, bot_registry)
-
-        else:
-            print(f"Error: Unknown mode '{args.mode}'")
-            parser.print_help()
-            return 1
+        success = run_single_game(args, game_manager, bot_registry)
 
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")

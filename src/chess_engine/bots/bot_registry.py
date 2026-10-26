@@ -261,20 +261,6 @@ class BotRegistry:
 
         return results
 
-    def get_tournament_ready_bots(self) -> List[str]:
-        """
-        Get list of bots that are ready for tournament play.
-
-        :return: List of bot names that passed validation
-        :rtype: List[str]
-        """
-        validation_results = self.validate_all_bots()
-        return [
-            bot_name
-            for bot_name, is_valid in validation_results.items()
-            if is_valid and bot_name != "HumanPlayer"
-        ]  # Exclude human from tournaments
-
     def __repr__(self) -> str:
         """
         Developer representation of the registry.

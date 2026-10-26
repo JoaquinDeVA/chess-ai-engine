@@ -9,7 +9,7 @@ import chess.pgn
 import pytest
 
 from chess_engine.bots.chess_bot import ChessBot
-from chess_engine.engine.data_classes import GameResult, TournamentConfig, TournamentResult
+from chess_engine.engine.data_classes import GameResult
 from chess_engine.engine.game_manager import GameManager, load_config
 
 SCHOLARS_MATE_WHITE = ["e2e4", "f1c4", "d1h5", "h5f7"]
@@ -162,91 +162,6 @@ def finished_game(white, black, winner, round_number=None):
         0.0,
         round_number,
     )
-
-
-class TestTournamentResults:
-    def results(self):
-        games = [
-            finished_game("A", "B", "white", 1),
-            finished_game("B", "A", None, 1),
-            finished_game("A", "C", "black", 1),
-            finished_game("C", "A", "white", 1),
-            finished_game("B", "C", None, 1),
-            finished_game("C", "B", "black", 1),
-        ]
-        return TournamentResult(
-            "id", "now", TournamentConfig(60, 0, 1), ["A", "B", "C"], games, 1.0
-        )
-
-    def test_standings_use_the_scoring_system_and_sort_by_score_then_wins(self):
-        standings = dict(self.results().get_standings())
-        assert standings["A"] == {
-            "score": 1.5,
-            "wins": 1,
-            "draws": 1,
-            "losses": 2,
-            "games_played": 4,
-        }
-        assert standings["B"]["score"] == 2.0 and standings["C"]["score"] == 2.5
-        assert [name for name, _ in self.results().get_standings()] == ["C", "B", "A"]
-
-    def test_custom_scoring_is_honoured(self):
-        result = self.results()
-        result.config = TournamentConfig(60, 0, 1, {"win": 3, "draw": 1, "loss": 0})
-        assert dict(result.get_standings())["A"]["score"] == 4
-
-    def test_results_are_saved_as_json(self, tmp_path):
-        path = tmp_path / "t.json"
-        self.results().save_to_file(str(path))
-        data = json.loads(path.read_text())
-        assert data["bot_names"] == ["A", "B", "C"] and len(data["games"]) == 6
-
-    def test_games_are_exported_as_one_pgn_each(self, tmp_path):
-        result = self.results()
-        result.games[0] = GameResult(
-            *[
-                getattr(result.games[0], f)
-                for f in ("white_name", "black_name", "game_id", "timestamp")
-            ],
-            "1-0",
-            "white",
-            "checkmate",
-            ["e2e4"],
-            1,
-            0.0,
-            chess.STARTING_FEN,
-            chess.Board().fen(),
-            0.0,
-            0.0,
-            1,
-        )
-        result.export_games_to_pgn_directory(str(tmp_path / "pgn"))
-        assert (tmp_path / "pgn" / "A-B-1.pgn").exists()
-
-
-class TestTournament:
-    def test_round_robin_plays_every_ordered_pair(self):
-        def fool(name):
-            return ScriptedBot(name, ["f2f3", "g2g4", "e7e5", "d8h4"])
-
-        # Each bot is scripted for both colours: as White f3, g4; as Black e5, Qh4#.
-        class FoolBot(ScriptedBot):
-            def on_game_start(self, color, opponent_name):
-                self.moves = ["f2f3", "g2g4"] if color == chess.WHITE else ["e7e5", "d8h4"]
-
-        registry = FakeRegistry({"X": FoolBot("X", []), "Y": FoolBot("Y", [])})
-        result = GameManager(registry).run_tournament(["X", "Y"], TournamentConfig(30, 0, 2))
-        assert len(result.games) == 4
-        assert {game.winner for game in result.games} == {"black"}
-        standings = dict(result.get_standings())
-        assert standings["X"]["score"] == standings["Y"]["score"] == 2.0
-
-    def test_unknown_bots_and_too_few_bots_are_rejected(self):
-        manager = GameManager(FakeRegistry({}))
-        with pytest.raises(ValueError, match="at least 2"):
-            manager.run_tournament(["X"], TournamentConfig(30, 0, 1))
-        with pytest.raises(ValueError, match="not found"):
-            manager.run_tournament(["X", "Y"], TournamentConfig(30, 0, 1))
 
 
 def test_configuration_is_loaded_from_json(tmp_path):

@@ -56,22 +56,25 @@ pip install -e ".[dev]"          # the engine and its tests
 pip install -e ".[ml,data]"      # optional: Keras and the data tools (training and the neural network)
 ```
 
-Play against a bot, or watch two bots play (moves in UCI notation, for example `e2e4`):
+Play against the engine, or watch two bots play (moves in UCI notation, for example `e2e4`):
 
 ```bash
-# you play White against the engine with the hand-written heuristic
+# you play White against the default bot (IterativeModelBookBot, `linear_pst_terms`, 3 s per move)
+python main.py
+
+# you play White against the bot with the hand-written heuristic
 python main.py --player1 human --player2 IterativeHeuristicBot
 
 # two bots; the model decides how the second one evaluates positions
 python main.py --player1 IterativeHeuristicBot --player2 IterativeModelBookBot --model linear_pst_terms --depth 4
-
-# every bot against every other, saving the results and the games in PGN
-python main.py --mode tournament
 ```
 
-`python main.py --list-bots` shows the bots. `--position` starts from a FEN, `--export` saves the
-game in PGN, `--random-color` draws the colours, `--board-style` changes how the board is printed and
-`--verbose` prints more detail.
+Tournaments between bots run from `scripts/bench/play_tournament.py`
+(see [Results](docs/RESULTS.md)). `python main.py --list-bots` shows the bots. If you name one player,
+the other is completed so that a human faces a bot. Against a human the bot thinks `--move-time` seconds
+per move (default 3) with up to four threads unless `--threads` says otherwise. `--position` starts
+from a FEN, `--export` saves the game in PGN, `--random-color` draws the colours, `--board-style`
+changes how the board is printed and `--verbose` prints more detail.
 
 ### Extras of the bots
 

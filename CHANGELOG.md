@@ -1,8 +1,12 @@
 # Changelog
 
-All notable changes. The newest are first; `Unreleased` is the work since version 1.0.0.
+All notable changes. The newest are first.
 
-## Unreleased
+## 2.0.0
+
+The search moves to Rust. The engine plays the same moves as 1.1 with the reference search, 8 to 35 times faster,
+and adds six selective-search techniques and several threads. Installing needs a Rust toolchain. Tournament
+results published for 1.1 were played with the Python engine and are not comparable with 2.0.
 
 ### Added
 - **The search, the evaluations and the knowledge in Rust** (`rust/`, the Python module `chess_engine._core`, built
@@ -22,6 +26,25 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
 - **`--threads N` / `--hash MB`**: Lazy SMP, the search on several threads sharing a lock-free table. One thread by
   default; the search is not deterministic with more.
 - `scripts/bench/measure_search_speed.py`: depth reached in a time budget and cost of a fixed depth, per player.
+
+### Changed
+- `IterativeDeepeningBot` takes `threads` and `hash_mb`, no longer takes `problem`, and has no `order_moves` or
+  `cutoff_test` to override; a bot says which evaluation the core runs with `native_evaluator()` (the default calls
+  `evaluate` back from Python, which is slow). `scripts/bench/compare_search_features.py` switches the table, the
+  killers and the ordering off through `player.disabled`.
+- The abstract `GameState` / `GameProblem` of the course framework and the Python search were removed with the move
+  to Rust; `ChessGameState` stays as a thin wrapper of a board for the evaluation functions.
+
+### Removed
+- The Python search (`game_algorithms`, `search_utils`, `time_estimators`, `game_problems`, `chess_problem`), its tests,
+  `scripts/bench/bench_search_speed.py` (replaced by `measure_search_speed.py`) and `docs/benchmarks/`. The Python
+  engine is recoverable from git history; `tests/golden/` keeps its behaviour.
+
+## 1.1.0
+
+Training on the Lichess evaluation database, the model family, the opening book and the endgame tables.
+
+### Added
 - **Training on the Lichess evaluation database.** The dump becomes raw Parquet shards
   (`scripts/data/build_raw_shards.py`) with sidecars for the split, the quiet flag and the side to move
   (`scripts/data/build_sidecars.py`), and a seeded sampler. `python -m chess_engine.training.train --effort N` trains on
@@ -52,12 +75,6 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
   sample of its moves with Stockfish (98.7 % within 50 centipawns of the best line on 2,438 entries).
 
 ### Changed
-- `IterativeDeepeningBot` takes `threads` and `hash_mb`, no longer takes `problem`, and has no `order_moves` or
-  `cutoff_test` to override; a bot says which evaluation the core runs with `native_evaluator()` (the default calls
-  `evaluate` back from Python, which is slow). `scripts/bench/compare_search_features.py` switches the table, the
-  killers and the ordering off through `player.disabled`.
-- The abstract `GameState` / `GameProblem` of the course framework and the Python search were removed with the move
-  to Rust; `ChessGameState` stays as a thin wrapper of a board for the evaluation functions.
 - The default training keeps 10 % of the mate positions; the 100 % variant is `--mate-keep 1.0 --tag mates100`. The default
   representation name no longer carries a `-mates10` suffix.
 - A model card keeps one tournament entry per time control (`60+1`, `600+5`, `depth3`), and retraining clears the
@@ -72,6 +89,7 @@ All notable changes. The newest are first; `Unreleased` is the work since versio
   from commit `e849d32`).
 - Code lives in an installable package, `src/chess_engine/` (`adversarial_search` became `chess_engine.search`).
   `AdvancedHeuristicAlphaBetaBot` is now `IterativeHeuristicBot` and `AdvancedMLBot` is now `IterativeModelBookBot`.
+
 
 ### Removed
 - The Prolog pattern detector and its documentation (no bot used it), the CSV training path (`--data`, `load_evaluations`,

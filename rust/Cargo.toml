@@ -1,6 +1,6 @@
 [package]
 name = "chess_core"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
 description = "Search, evaluation and knowledge of the chess engine (the part that must be fast)."
 license = "MIT"

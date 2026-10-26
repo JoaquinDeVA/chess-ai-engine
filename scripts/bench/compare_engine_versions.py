@@ -19,13 +19,8 @@ import statistics
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-from chess_engine.comparison.tournament import (
-    DEFAULT_MAX_DEPTH,
-    paired_openings,
-    read_games,
-    run_round_robin,
-    summarize,
-)
+from chess_engine.comparison.standings import DEFAULT_MAX_DEPTH, summarize
+from chess_engine.comparison.tournament import paired_openings, read_games, run_round_robin
 
 
 def spec_of(model: str, techniques: str) -> str:

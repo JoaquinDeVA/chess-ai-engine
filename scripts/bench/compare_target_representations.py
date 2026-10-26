@@ -32,13 +32,8 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.comparison.judge import judge
-from chess_engine.comparison.tournament import (
-    paired_openings,
-    read_games,
-    record_cards,
-    run_round_robin,
-    summarize,
-)
+from chess_engine.comparison.standings import record_cards, summarize
+from chess_engine.comparison.tournament import paired_openings, read_games, run_round_robin
 from chess_engine.models.cards import card_path, current_commit, today, update_card
 from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel
 from chess_engine.models.registry import artifact_path, get_model_class

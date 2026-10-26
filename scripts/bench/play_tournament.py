@@ -17,17 +17,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from chess_engine.comparison.tournament import (
+from chess_engine.comparison.standings import (
     ANCHOR,
     DEFAULT_MAX_DEPTH,
-    paired_openings,
-    read_games,
     record_cards,
-    run_round_robin,
     size_for_budget,
     summarize,
     termination_section,
 )
+from chess_engine.comparison.tournament import paired_openings, read_games, run_round_robin
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

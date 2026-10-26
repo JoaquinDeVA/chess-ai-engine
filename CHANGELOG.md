@@ -2,7 +2,7 @@
 
 All notable changes. The newest are first.
 
-## 2.0.0
+## 2.0.0 (2026-10-26)
 
 The search moves to Rust. The engine plays the same moves as 1.1 with the reference search, 8 to 35 times faster,
 and adds six selective-search techniques and several threads. Installing needs a Rust toolchain. Tournament
@@ -52,7 +52,7 @@ results published for 1.1 were played with the Python engine and are not compara
   `BotRegistry.get_tournament_ready_bots`: tournaments run from `scripts/bench/play_tournament.py`. `--export` now
   only names the PGN file of the game.
 
-## 1.1.0
+## 1.1.0 (2026-10-22)
 
 Training on the Lichess evaluation database, the model family, the opening book and the endgame tables.
 
@@ -123,7 +123,7 @@ Training on the Lichess evaluation database, the model family, the opening book 
 - Wrong help texts in `main.py`, Ctrl-C was swallowed by the human player, and the default tournament report paths pointed to
   a folder that did not exist.
 
-## 1.0.0
+## 1.0.0 (2026-10-16)
 
 First public version, derived from four chained university practicals (adversarial search,
 logical reasoning, machine learning, optional extension) and then reworked.

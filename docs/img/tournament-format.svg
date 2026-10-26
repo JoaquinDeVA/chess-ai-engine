@@ -17,7 +17,7 @@
     .step { fill: #ffffff; stroke: #475569; stroke-width: 2; }
     .t-step { fill: #0f172a; }
     .t-red { fill: #7f1d1d; }
-    .t-blue { fill: #1e3a8a; }
+    .t-step { fill: #1e3a8a; }
     .t-gray { fill: #374151; }
   </style>
   <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
@@ -45,10 +45,10 @@
   <text x="546" y="128" text-anchor="middle" class="small t-step">one line a game</text>
   <text x="546" y="146" text-anchor="middle" class="small t-step">resumable</text>
 
-  <rect x="624" y="84" width="136" height="76" rx="8" class="blue"/>
-  <text x="692" y="108" text-anchor="middle" class="label bold t-blue">Elo</text>
-  <text x="692" y="128" text-anchor="middle" class="small t-blue">anchor = 0 Elo</text>
-  <text x="692" y="146" text-anchor="middle" class="small t-blue">others vs anchor</text>
+  <rect x="624" y="84" width="136" height="76" rx="8" class="step"/>
+  <text x="692" y="108" text-anchor="middle" class="label bold t-step">Elo</text>
+  <text x="692" y="128" text-anchor="middle" class="small t-step">anchor = 0 Elo</text>
+  <text x="692" y="146" text-anchor="middle" class="small t-step">others vs anchor</text>
 
   <path class="edge" d="M 176 122 L 186 122"/>
   <path class="edge" d="M 322 122 L 332 122"/>
@@ -81,8 +81,6 @@
   <!-- legend -->
   <rect x="24" y="372" width="18" height="18" rx="4" class="step"/>
   <text x="50" y="387" class="small">step of the run</text>
-  <rect x="180" y="372" width="18" height="18" rx="4" class="blue"/>
-  <text x="206" y="387" class="small">anchor (Elo = 0)</text>
 
   <text x="24" y="418" class="q bold">How are players compared when every pair meets on the same openings?</text>
   <text x="24" y="438" class="q">Each pair plays the same openings in both colours; the anchor is fixed at 0 Elo.</text>

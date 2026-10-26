@@ -131,7 +131,7 @@ last complete result, and nothing reduced is stored as complete in the table.
 
 **Problem.** Many nodes are so good for the side to move that even passing the turn would cut.
 
-**What it does.** Passes the turn and searches 2 plies less (3 from depth 6) with a zero-width window; if even
+**What it does.** Passes the turn and searches R = 2 plies below the pass (R = 3 from depth 6) with a zero-width window; if even
 that cuts, the node is cut. Not in check, not at the root, not twice in a row, only if the mover has pieces
 besides king and pawns (zugzwang), and only if the static value already reaches beta.
 

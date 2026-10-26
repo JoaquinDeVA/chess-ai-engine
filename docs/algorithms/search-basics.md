@@ -31,8 +31,6 @@ positions and flags in sharp ones, and a search interrupted at a random moment h
 iteration. The cheap shallow iterations also fill the transposition table and killer moves that
 speed up the deeper ones (the transposition table and killer moves, below). The clock logic:
 
-![Decision path of one move: opening book, then endgame tables, then iterative-deepening search; the first that applies chooses the move](../img/path-of-a-move.svg)
-
 * **Soft budget** (`TimeManager.turn_budget`): 15 % of the time left, between 1.5 s and 40 s and never
   more than half the clock (10 minutes left: the 40 s cap).
 * **Time estimate.** From the fourth iteration on, a rule predicts the duration of the next
@@ -155,6 +153,11 @@ baseline` 0.983). At depth 6 on 20 positions the baseline visited 224,896 nodes 
 search without killers 175,520 (baseline +28.1 % nodes; 16.562 s against 13.408 s): killers did *not*
 reduce the nodes there. Same caveat as in the transposition table section: small sample, no explanation here.
 
+The whole decision of a move, around that search: the opening book answers first while the game follows
+it, then the endgame tables (five pieces or fewer), and only otherwise the search above runs.
+
+![Decision path of one move: opening book, then endgame tables, then iterative-deepening search; the first that applies chooses the move](../img/path-of-a-move.svg)
+
 **Status.** Kept; since the first commit (2026-10-16).
 
 ## Move ordering by MVV-LVA
@@ -164,7 +167,9 @@ lists them in arbitrary order.
 
 **What it does.** Captures go first, best Most Valuable Victim / Least Valuable Attacker first (a pawn
 taking a queen before a queen taking a pawn; en passant counts as a pawn capture). Quiet moves keep
-their order, so killers stay in front of them.
+their order, so killers stay in front of them. The full order a node uses is: the move stored in the
+transposition table (`tt_move`, if that technique is on), the captures by MVV-LVA, the killers, and the
+rest of the quiet moves by their history score (`history`, if on).
 
 ![Order in which moves are tried: table move, captures by MVV-LVA, killers, then history; an early cut-off skips the later moves](../img/move-ordering.svg)
 

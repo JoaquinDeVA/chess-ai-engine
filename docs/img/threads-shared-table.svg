@@ -62,5 +62,5 @@
   <text x="156" y="387" class="small">shared table</text>
 
   <text x="24" y="418" class="q bold">What happens when two threads write the same slot at the same time?</text>
-  <text x="24" y="438" class="q">A torn slot fails its XOR check and is ignored: the cost is a lost entry, not bad data.</text>
+  <text x="24" y="438" class="q">A torn slot fails its XOR check and is ignored: the cost is a lost entry, practically never bad data.</text>
 </svg>

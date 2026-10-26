@@ -46,7 +46,7 @@
 
   <!-- 2. tablebases -->
   <rect x="40" y="196" width="440" height="40" rx="8" class="step"/>
-  <text x="260" y="221" text-anchor="middle" class="label bold t-step">Syzygy tables cover it? (≤ 5 pieces, no castling)</text>
+  <text x="260" y="221" text-anchor="middle" class="label bold t-step">Syzygy tables cover it? (≤ 5 pieces)</text>
   <rect x="548" y="196" width="228" height="40" rx="8" class="on"/>
   <text x="662" y="221" text-anchor="middle" class="label bold t-green">Play the tablebase move</text>
   <text x="514" y="210" text-anchor="middle" class="small">yes</text>

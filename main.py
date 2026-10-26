@@ -24,6 +24,7 @@ from chess_engine.config.settings import load_config
 from chess_engine.engine.game_manager import GameManager
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
+from chess_engine.models.registry import available_models
 from chess_engine.search.time_management import TimeManager
 
 #: Bot that plays against a human when no opponent is named.
@@ -85,7 +86,7 @@ Examples:
         "--model",
         type=str,
         default=None,
-        help="Evaluation model for the machine-learning bots in single games; ignored in tournament mode",
+        help="Evaluation model for the machine-learning bots",
     )
 
     parser.add_argument(
@@ -480,6 +481,10 @@ def main() -> int:
         if args.verbose:
             traceback.print_exc()
         return 1
+
+    if args.model is not None and args.model not in available_models():
+        print(f"Error: unknown model '{args.model}'; available: {', '.join(available_models())}")
+        return 2
 
     success = False
     try:

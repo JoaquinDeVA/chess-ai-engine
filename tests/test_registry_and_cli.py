@@ -189,6 +189,12 @@ def test_two_given_players_are_left_alone():
     assert fill_players("human", "human") == ("human", "human")
 
 
+def test_an_unknown_model_exits_with_code_2_and_lists_the_models():
+    result = run_cli("--model", "nope")
+    assert result.returncode == 2
+    assert "unknown model 'nope'" in result.stdout and "linear_pst_terms" in result.stdout
+
+
 def test_the_tournament_mode_is_gone():
     from main import setup_argument_parser
 

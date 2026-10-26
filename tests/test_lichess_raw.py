@@ -87,6 +87,7 @@ def test_shard_roundtrip(tmp_path):
     assert not list(tmp_path.glob("*.tmp"))
 
 
+@pytest.mark.slow  # starts a pool of worker processes
 def test_fetch_is_sharded_and_restartable(tmp_path):
     import importlib.util
     from pathlib import Path

@@ -1,6 +1,8 @@
 import json
+import random
 
 import chess
+import pytest
 
 from chess_engine.knowledge.opening_book import DEFAULT_BOOK_PATH, OpeningBook, position_key
 
@@ -40,10 +42,20 @@ def test_load_from_file(tmp_path):
     assert OpeningBook.load(path).lookup(chess.Board()) == chess.Move.from_uci("g1f3")
 
 
-def test_shipped_book_is_legal_and_covers_the_starting_position():
+def shipped_entries():
+    with open(DEFAULT_BOOK_PATH, encoding="utf-8") as handle:
+        return list(json.load(handle).items())
+
+
+def test_shipped_book_covers_the_starting_position_and_a_sample_is_legal():
     book = OpeningBook.load(DEFAULT_BOOK_PATH)
     assert len(book) > 2000
     assert book.lookup(chess.Board()) is not None
-    with open(DEFAULT_BOOK_PATH, encoding="utf-8") as handle:
-        for fen, uci in json.load(handle).items():
-            assert chess.Move.from_uci(uci) in chess.Board(fen).legal_moves
+    for fen, uci in random.Random(0).sample(shipped_entries(), 2000):
+        assert chess.Move.from_uci(uci) in chess.Board(fen).legal_moves
+
+
+@pytest.mark.slow
+def test_every_move_of_the_shipped_book_is_legal():
+    for fen, uci in shipped_entries():
+        assert chess.Move.from_uci(uci) in chess.Board(fen).legal_moves

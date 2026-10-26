@@ -170,6 +170,7 @@ needs_keras_files = pytest.mark.skipif(
 )
 
 
+@pytest.mark.slow  # loading Keras takes several seconds
 class TestShippedModels:
     @needs_keras_files
     @pytest.mark.parametrize("name", ["mlp_features", "cnn_resnet"])
@@ -237,6 +238,7 @@ class TestMaterialLinear:
         assert abs(model.predict_cp(extreme)) <= CP_SCALE
 
 
+@pytest.mark.slow  # loading Keras takes several seconds
 @pytest.mark.skipif(
     not (ARTIFACTS_DIR / "mlp_features.keras").exists(), reason="mlp_features not trained"
 )

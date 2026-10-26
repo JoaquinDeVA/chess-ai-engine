@@ -39,7 +39,6 @@ All the numbers, with the command behind each, are in [Results](docs/RESULTS.md)
 | Know where the training data comes from and how to retrain | [Data and training](docs/DATA_AND_TRAINING.md) |
 | Know what each evaluation model contains | [Models](docs/MODELS.md) |
 | Read the measurements | [Results](docs/RESULTS.md) |
-| Add a model of your own | [Adding an evaluation model](docs/ADDING_A_MODEL.md) |
 
 The index of all pages is [docs/README.md](docs/README.md); the history of changes is the
 [changelog](CHANGELOG.md).
@@ -82,10 +81,10 @@ example to compare evaluations alone (the tournaments of the results page do tha
 | Extra | What it does | Switch | Default | Details |
 |---|---|---|---|---|
 | Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | `--opening-book FILE` to use another one, `--no-opening-book` to switch it off | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
-| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists) | `--endgame-db DIR`, `--no-endgame-db` | on | [Algorithms](docs/ALGORITHMS.md), section 9 |
-| Quiescence, time estimator, minimum depth | Search settings: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/ALGORITHMS.md), sections 2 and 6 |
-| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | `--techniques LIST` (`all`, `none`), constructor option `techniques` | on (all but `lmr`) | [Algorithms](docs/ALGORITHMS.md), sections 12 onwards |
-| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | `--threads N`, `--hash MB` | 1 thread | [Algorithms](docs/ALGORITHMS.md), section 11 |
+| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists) | `--endgame-db DIR`, `--no-endgame-db` | on | [Algorithms](docs/algorithms/search-basics.md#endgame-tablebases) |
+| Quiescence, time estimator, minimum depth | Search settings: quiescence 4 plies, estimator `geometric_growth`, minimum depth 3 | constructor options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/algorithms/search-basics.md) |
+| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | `--techniques LIST` (`all`, `none`), constructor option `techniques` | on (all but `lmr`) | [Algorithms](docs/algorithms/selective-techniques.md) |
+| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | `--threads N`, `--hash MB` | 1 thread | [Algorithms](docs/algorithms/rust-and-threads.md#several-threads-lazy-smp) |
 
 ## Reproduce the experiments
 

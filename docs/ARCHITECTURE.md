@@ -207,7 +207,7 @@ class MaterialBot(IterativeDeepeningBot):
 
 This bot works as it stands, but the core calls `evaluate` back from Python for every leaf, which
 is slow. To run an evaluation at full speed it must be written in Rust and returned by
-`native_evaluator()` (see [Adding an evaluation model](ADDING_A_MODEL.md)).
+`native_evaluator()` (see "Running a model in Rust" below).
 
 Rules: the constructor must work without arguments; override `on_game_start` to reset per-game
 state and `get_info()` to describe the bot. Use `ChessBot` directly only if you do not want a tree
@@ -219,8 +219,25 @@ several positions, mate in one (`tests.conftest.MATE_IN_ONE`) and the board left
 | To add... | Implement | Guide |
 |---|---|---|
 | a bot | `evaluate()` in a subclass of `IterativeDeepeningBot` | the section above |
-| an evaluation model | a `LinearFeatures` and a `LinearEvalModel`, or any `EvaluationModel`; register it by name | [ADDING_A_MODEL.md](ADDING_A_MODEL.md) |
+| an evaluation model | a `LinearFeatures` and a `LinearEvalModel` (`models/linear_features.py`, `models/linear_eval.py`), or any `EvaluationModel`; register it by name in `models/registry.py`; train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
 | a search technique | a change in `rust/src/search/`, measured and documented like the others | [Algorithms](ALGORITHMS.md) |
+
+### Running a model in Rust
+
+The search runs in Rust, so a model plays at full speed only if its features are computed there too.
+`models/native.py` hands the weights of a `LinearEvalModel` or a `NeuralEvalModel` to the core by the
+**name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
+`king_bucket` and `pst_slotted`. A model with another feature set still plays: the core calls it back
+from Python for every leaf (a warning says so), which is much slower and cannot use
+several threads. To give a feature set its Rust version:
+
+1. add a variant to `FeatureSet` in `rust/src/eval/linear.rs`, with its name in `FeatureSet::NAMES`,
+   its size in `size` and its `active` function, which must give the same indices and values, in the
+   same order, as the Python `active` (the training encodes with the Python one, so a difference
+   means training on one thing and playing with another);
+2. run `tests/test_feature_parity.py`, which compares the two on 300 positions for every registered
+   feature family (and, for the shipped ones, `tests/test_core_golden.py`);
+3. rebuild with `pip install -e .` and run `cargo test --manifest-path rust/Cargo.toml`.
 
 The search is written for chess (it uses `shakmaty` for the rules); another game would need
 its own core.

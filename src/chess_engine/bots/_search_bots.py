@@ -22,7 +22,7 @@ from chess_engine.search.statistics import SearchStatistics
 from chess_engine.search.time_management import TimeManager
 
 #: Techniques of selective search the bots use by default: the ones that won in the games against
-#: the reference search (docs/ALGORITHMS.md, sections 12 onwards). ``lmr`` is left out.
+#: the reference search (docs/algorithms/selective-techniques.md). ``lmr`` is left out.
 DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", "null_move")
 
 #: Defaults of the search, defined in the Rust core.

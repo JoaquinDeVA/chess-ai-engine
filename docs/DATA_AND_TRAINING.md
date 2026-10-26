@@ -178,7 +178,7 @@ request rate; on 12 entries both judges agreed on the one failing move.
 **The endgame tables** are the Syzygy tablebases for three, four and five pieces (290 files, 939 MB)
 in `data/knowledge/endgame`. They are not versioned and cannot be rebuilt by this project: they
 come from `tablebase.lichess.ovh` (or any Syzygy 3-4-5 set). The search bots use them when the folder exists
-(`python main.py --no-endgame-db` switches them off); see [Search algorithms](ALGORITHMS.md), section 9.
+(`python main.py --no-endgame-db` switches them off); see [Search basics](algorithms/search-basics.md#endgame-tablebases).
 
 ## Reproducing everything
 
@@ -222,4 +222,4 @@ DRY_RUN=1 bash scripts/run_full_pipeline.sh
 nohup setsid bash scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
 ```
 
-It trains five models at effort 30 by default (`EFFORT` and `MODELS` change that). Results and the commands that measure them are in [Results](RESULTS.md); the models themselves are in [Models](MODELS.md), and [Adding a model](ADDING_A_MODEL.md) shows how to plug a new one into this training.
+It trains five models at effort 30 by default (`EFFORT` and `MODELS` change that). Results and the commands that measure them are in [Results](RESULTS.md); the models themselves are in [Models](MODELS.md).

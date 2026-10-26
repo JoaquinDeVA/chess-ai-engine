@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to compare models, check a claim of the other pages, or repeat a measurement.
 >
-> **Next:** [Adding an evaluation model](ADDING_A_MODEL.md)
+> **Next:** [Index of the pages](README.md)
 
 All numbers are from this project, on a six-core CPU, with the five models trained at effort 30 (30
 million positions, 10 % of the mate positions kept; see [Data and training](DATA_AND_TRAINING.md)).
@@ -90,7 +90,7 @@ evaluations themselves, since speed plays no part.
 ## Engine speed
 
 The search, the evaluations and the knowledge moved from Python to Rust on 2026-10-25 (see
-[Algorithms](ALGORITHMS.md), section 10). **The tournaments of this page were played with the Python
+[Rust and threads](algorithms/rust-and-threads.md)). **The tournaments of this page were played with the Python
 engine**, which searched 3 to 5 plies deep in the times they use; the Rust core plays the same
 moves from the same positions but reaches 2 to 3 plies more, so a new tournament at the same time
 control is not comparable with them and the ranking could change. The core was checked against
@@ -111,11 +111,11 @@ scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 
 | `net4_pst` | 4.85 | 6.82 | 2.266 s → 0.286 s (8 times) |
 
 The table above is the reference search (no selective techniques). The bots add six techniques
-(section 12 of [Algorithms](ALGORITHMS.md)); in 100 games at 4 s + 0.05 s they scored 76.5 % against the
+([selective techniques](algorithms/selective-techniques.md)); in 100 games at 4 s + 0.05 s they scored 76.5 % against the
 reference with the same model (`python scripts/bench/compare_engine_versions.py --candidate
 incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`), and reached 5.54
 plies against 4.68. With the techniques on, four threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s
-(section 11). The model tournaments of this page were played without them.
+([Rust and threads](algorithms/rust-and-threads.md#several-threads-lazy-smp)). The model tournaments of this page were played without them.
 
 ## Does the time control matter?
 
@@ -143,9 +143,9 @@ strength by a search this shallow. For a game at 10 min + 5 s use `linear_pst_te
 |---|---|---|
 | Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). Those two models are not shipped any more; the all-mates one is recreated with `--mate-keep 1.0 --tag mates100`. | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_engine.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100`, then `play_tournament.py` between that model and the default one |
 | Does more training effort help? | Not for the Material logistic model: effort 90 gives Spearman 0.474, the same as effort 30; the validation loss stays flat (0.6722 to 0.6719). | `python -m chess_engine.training.train --model linear_material --effort 90` |
-| Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `python scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`; [Algorithms](ALGORITHMS.md), section 6 |
-| Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `python scripts/bench/compare_time_estimators.py`; [Algorithms](ALGORITHMS.md), section 2 |
-| Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`; [Algorithms](ALGORITHMS.md), section 9 |
+| Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `python scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`; [Search basics](algorithms/search-basics.md#quiescence-search) |
+| Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `python scripts/bench/compare_time_estimators.py`; [Search basics](algorithms/search-basics.md#iterative-deepening-with-a-clock) |
+| Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`; [Search basics](algorithms/search-basics.md#endgame-tablebases) |
 | Is the opening book good? | 98.7 % of 2,438 sampled moves are within 50 centipawns of Stockfish's best line, none illegal. | `python scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16` |
 
 The tournaments measure the evaluation alone: the endgame tables and the opening book are off in

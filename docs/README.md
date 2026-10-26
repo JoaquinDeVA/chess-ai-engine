@@ -15,11 +15,14 @@ where the training data comes from, what each model contains and what was measur
 | Page | What you learn | Read it when |
 |---|---|---|
 | [Architecture](ARCHITECTURE.md) | The packages, what depends on what, the path of one move | You are about to change the code |
-| [Search algorithms](ALGORITHMS.md) | The alpha-beta search and, one section each, every technique added on top of it, with what it saved | You want to know how the engine chooses a move |
+| [Search algorithms](ALGORITHMS.md) | The alpha-beta search and a table of every technique added on top of it, with its status and what it saved | You want to know how the engine chooses a move |
+| [Search basics](algorithms/search-basics.md) | The classic techniques of the reference search: transposition table, killers, quiescence, tablebases, opening book | You want the details of the base search |
+| [Rust and threads](algorithms/rust-and-threads.md) | The move of the search to Rust, its speed, and the Lazy SMP threads | You want speed numbers or `--threads` |
+| [Selective techniques](algorithms/selective-techniques.md) | The six techniques behind switches, how each is implemented and what it gained | You want to know why the engine searches deeper than before |
+| [Techniques not adopted](algorithms/not-adopted.md) | Late move reductions and the Prolog ordering, and why they are not in use | You wonder why an obvious technique is missing |
 | [Data and training](DATA_AND_TRAINING.md) | The Lichess evaluation database, the shards, the targets, the effort scale, how to retrain | You want to rebuild the data or train a model |
 | [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns | You want to understand a model before reading its numbers |
 | [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained | You want to compare models or repeat a measurement |
-| [Adding an evaluation model](ADDING_A_MODEL.md) | The few classes a new model needs, and the commands that train and measure it | You want to add a model of your own |
 
 The installation and the commands to play are in the [README of the repository](../README.md).
 The history of changes is in the [changelog](../CHANGELOG.md).

@@ -27,7 +27,9 @@ def evaluator_of(player):
     return h1_evaluator() if player == "h1" else model_evaluator(load_model(player))
 
 
-@pytest.mark.parametrize("name", MODELS)
+# The linear feature sets are checked against the live Python code by tests/test_feature_parity.py;
+# only the network's features keep a golden file.
+@pytest.mark.parametrize("name", ("net4_pst",))
 def test_features_match_golden(name, positions):
     expected = golden(f"features_{name}.json")
     evaluator = evaluator_of(name)

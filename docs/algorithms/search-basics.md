@@ -31,6 +31,8 @@ positions and flags in sharp ones, and a search interrupted at a random moment h
 iteration. The cheap shallow iterations also fill the transposition table and killer moves that
 speed up the deeper ones (the transposition table and killer moves, below). The clock logic:
 
+![Decision path of one move: opening book, then endgame tables, then iterative-deepening search; the first that applies chooses the move](../img/path-of-a-move.svg)
+
 * **Soft budget** (`TimeManager.turn_budget`): 15 % of the time left, between 1.5 s and 40 s and never
   more than half the clock (10 minutes left: the 40 s cap).
 * **Time estimate.** From the fourth iteration on, a rule predicts the duration of the next
@@ -163,6 +165,8 @@ lists them in arbitrary order.
 **What it does.** Captures go first, best Most Valuable Victim / Least Valuable Attacker first (a pawn
 taking a queen before a queen taking a pawn; en passant counts as a pawn capture). Quiet moves keep
 their order, so killers stay in front of them.
+
+![Order in which moves are tried: table move, captures by MVV-LVA, killers, then history; an early cut-off skips the later moves](../img/move-ordering.svg)
 
 **How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/tt.rs` (score
 `10 × victim − attacker`; a stable sort, so equal captures keep the order python-chess generates

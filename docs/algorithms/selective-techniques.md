@@ -103,6 +103,8 @@ cut-off by a quiet move. Part of `order`.
 **What it does.** Searches the first move with the full window and the others with a zero-width window around alpha;
 only a move that beats alpha is searched again with the full window.
 
+![PVS searches later moves with a zero-width window and repeats with the full window if one fails high; aspiration starts with a narrow window and widens it when the result falls outside](../img/pvs-aspiration.svg)
+
 **How it is implemented.** `child_value` in `rust/src/search/mod.rs`; the scout window uses
 `SCOUT_EPSILON = 1e-9` because values are continuous probabilities.
 
@@ -132,6 +134,8 @@ last complete result, and nothing reduced is stored as complete in the table.
 **What it does.** Passes the turn and searches 2 plies less (3 from depth 6) with a zero-width window; if even
 that cuts, the node is cut. Not in check, not at the root, not twice in a row, only if the mover has pieces
 besides king and pawns (zugzwang), and only if the static value already reaches beta.
+
+![Null move: pass the turn, search less deeply with a zero-width window, and prune the node if that still reaches beta; the cases where it is not tried are listed](../img/null-move.svg)
 
 **How it is implemented.** `apply_null` in `rust/src/board.rs` and the branch at the start of `Search::node`.
 Test: a pawn ending (Lasker position) where the null move would be wrong, in `rust/tests/techniques.rs`.

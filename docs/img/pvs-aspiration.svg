@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
+  <title id="t">Principal variation search and aspiration windows</title>
+  <desc id="d">Two value axes from 0 to 1 (illustrative values). Left, principal variation search: the first move is searched with the full window 0.30 to 0.70 and returns 0.45. The second move is searched with a zero-width scout window at 0.45 and returns 0.40, which is no better, so it is discarded. The third scout returns 0.62, above 0.45, so it is searched again with the full window 0.45 to 0.70, which gives 0.62. Right, aspiration windows: the window 0.58 to 0.62 around the previous value 0.60 is too narrow; the result 0.66 falls above it, so the high end widens to 0.68 and the search is repeated; 0.66 is inside and is accepted.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #0f172a; }
+    .title { font-size: 20px; font-weight: 700; }
+    .q { font-size: 15px; }
+    .label { font-size: 15px; }
+    .small { font-size: 13px; }
+    .bold { font-weight: 700; }
+    .on { fill: #dcfce7; stroke: #15803d; stroke-width: 2; }
+    .cut { fill: #fee2e2; stroke: #b91c1c; stroke-width: 2; }
+    .blue { fill: #dbeafe; stroke: #1d4ed8; stroke-width: 2; }
+    .gray { fill: #e5e7eb; stroke: #6b7280; stroke-width: 2; stroke-dasharray: 5 4; }
+    .edge { stroke: #15803d; stroke-width: 2.5; fill: none; }
+    .edge-cut { stroke: #b91c1c; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .t-green { fill: #14532d; }
+    .t-red { fill: #7f1d1d; }
+    .t-blue { fill: #1e3a8a; }
+    .t-gray { fill: #374151; }
+  </style>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="24" y="38" class="title">Two ways to spend less on each search: PVS and aspiration</text>
+
+  <!-- divider -->
+  <path d="M 400 60 L 400 362" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="4 4"/>
+
+  <!-- PVS: left half, value axis x = 170 + 200 v -->
+  <text x="24" y="66" class="label bold">PVS: first move full, the rest scouts</text>
+  <rect x="230" y="98" width="80" height="20" rx="4" class="blue"/>
+  <text x="24" y="116" class="label">1st move</text>
+  <text x="270" y="136" text-anchor="middle" class="small t-blue">full window (0.30, 0.70) → 0.45</text>
+
+  <rect x="256" y="150" width="8" height="20" rx="2" class="blue"/>
+  <text x="24" y="166" class="label">2nd move</text>
+  <text x="270" y="188" text-anchor="middle" class="small">scout → 0.40 ≤ 0.45: discarded</text>
+
+  <rect x="256" y="204" width="8" height="20" rx="2" class="blue"/>
+  <rect x="290" y="204" width="8" height="20" rx="2" class="cut"/>
+  <text x="24" y="220" class="label">3rd move</text>
+  <text x="270" y="242" text-anchor="middle" class="small t-red">scout → 0.62 > 0.45: repeat</text>
+
+  <rect x="260" y="258" width="50" height="20" rx="4" class="blue"/>
+  <text x="24" y="274" class="label">3rd, again</text>
+  <text x="270" y="296" text-anchor="middle" class="small t-green">full window (0.45, 0.70) → 0.62</text>
+
+  <!-- aspiration: right half, value axis x = 570 + 200 v -->
+  <text x="424" y="66" class="label bold">Aspiration: a narrow window</text>
+  <rect x="686" y="98" width="8" height="20" rx="2" class="blue"/>
+  <text x="424" y="116" class="label">iteration 4</text>
+  <text x="570" y="136" class="small t-blue">window 0.58–0.62 (±0.02)</text>
+
+  <rect x="698" y="150" width="8" height="20" rx="2" class="cut"/>
+  <text x="424" y="166" class="label">result 0.66</text>
+  <text x="570" y="188" class="small t-red">0.66 &gt; 0.62: widen</text>
+
+  <rect x="686" y="204" width="20" height="20" rx="2" class="blue"/>
+  <text x="424" y="220" class="label">again</text>
+  <text x="570" y="242" class="small t-blue">window widened to 0.58–0.68</text>
+
+  <rect x="698" y="258" width="8" height="20" rx="2" class="on"/>
+  <text x="424" y="274" class="label">result 0.66</text>
+  <text x="570" y="296" class="small t-green">0.66 is inside: accepted</text>
+
+  <!-- axes -->
+  <path d="M 170 340 L 370 340" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="170" y="356" text-anchor="middle" class="small">0</text>
+  <text x="270" y="356" text-anchor="middle" class="small">0.5</text>
+  <text x="370" y="356" text-anchor="middle" class="small">1</text>
+  <text x="24" y="356" class="small">value</text>
+  <path d="M 570 340 L 770 340" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="570" y="356" text-anchor="middle" class="small">0</text>
+  <text x="670" y="356" text-anchor="middle" class="small">0.5</text>
+  <text x="770" y="356" text-anchor="middle" class="small">1</text>
+
+  <!-- legend -->
+  <rect x="24" y="372" width="18" height="18" rx="4" class="on"/>
+  <text x="50" y="387" class="small">accepted</text>
+  <rect x="140" y="372" width="18" height="18" rx="4" class="cut"/>
+  <text x="166" y="387" class="small">fails, repeated</text>
+  <rect x="300" y="372" width="18" height="18" rx="4" class="blue"/>
+  <text x="326" y="387" class="small">search window</text>
+
+  <text x="24" y="418" class="q bold">When does a scout or a narrow window need a second search?</text>
+  <text x="24" y="438" class="q">Only if the result is above α (PVS) or outside the window (aspiration).</text>
+</svg>

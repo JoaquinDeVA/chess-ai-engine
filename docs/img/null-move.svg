@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
+  <title id="t">Null move: if passing the turn still cuts, the node is pruned</title>
+  <desc id="d">A node whose static value (0.78) already reaches the bound beta (0.75), illustrative values. The engine passes the turn and searches the resulting position 2 plies less (3 from depth 6) with a zero-width window at beta. If that search still gives a value at or above beta, the node is pruned and its moves are not searched. The null move is not tried in check, at the root, right after another null move, when only the king and pawns remain, below remaining depth 3, or when the static value does not reach the bound.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #0f172a; }
+    .title { font-size: 20px; font-weight: 700; }
+    .q { font-size: 15px; }
+    .label { font-size: 15px; }
+    .small { font-size: 13px; }
+    .bold { font-weight: 700; }
+    .on { fill: #dcfce7; stroke: #15803d; stroke-width: 2; }
+    .cut { fill: #fee2e2; stroke: #b91c1c; stroke-width: 2; }
+    .blue { fill: #dbeafe; stroke: #1d4ed8; stroke-width: 2; }
+    .gray { fill: #e5e7eb; stroke: #6b7280; stroke-width: 2; stroke-dasharray: 5 4; }
+    .edge { stroke: #15803d; stroke-width: 2.5; fill: none; }
+    .edge-cut { stroke: #b91c1c; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .t-green { fill: #14532d; }
+    .t-red { fill: #7f1d1d; }
+    .step { fill: #ffffff; stroke: #475569; stroke-width: 2; }
+    .t-step { fill: #0f172a; }
+    .t-blue { fill: #1e3a8a; }
+    .t-gray { fill: #374151; }
+  </style>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="24" y="38" class="title">Null move: if passing the turn still cuts, the node is pruned</text>
+
+  <!-- edges -->
+  <path class="edge" d="M 220 104 L 220 124"/>
+  <path class="edge" d="M 220 164 L 220 184"/>
+  <path class="edge" d="M 220 240 L 220 264"/>
+  <path class="edge-cut" d="M 220 304 L 220 326"/>
+
+  <!-- the node -->
+  <rect x="30" y="64" width="380" height="40" rx="8" class="step"/>
+  <text x="220" y="89" text-anchor="middle" class="label bold t-step">Node: static value 0.78 ≥ β = 0.75</text>
+  <!-- the null move -->
+  <rect x="30" y="124" width="380" height="40" rx="8" class="step"/>
+  <text x="220" y="149" text-anchor="middle" class="label bold t-step">Pass the turn: the null move</text>
+  <!-- the reduced search -->
+  <rect x="30" y="184" width="380" height="56" rx="8" class="step"/>
+  <text x="220" y="207" text-anchor="middle" class="label t-step">Search 2 plies less (3 from depth 6),</text>
+  <text x="220" y="228" text-anchor="middle" class="label t-step">zero-width window (β − ε, β)</text>
+  <!-- the cut -->
+  <rect x="30" y="264" width="380" height="40" rx="8" class="cut"/>
+  <text x="220" y="289" text-anchor="middle" class="label bold t-red">Still ≥ β after the pass: prune</text>
+  <!-- the moves not searched -->
+  <rect x="30" y="326" width="380" height="32" rx="8" class="gray"/>
+  <text x="220" y="347" text-anchor="middle" class="small t-gray">the other moves are not searched</text>
+
+  <!-- conditions -->
+  <text x="456" y="88" class="label bold">The null move is not tried when</text>
+  <rect x="456" y="100" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="119" class="small t-gray">the side to move is in check</text>
+  <rect x="456" y="136" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="155" class="small t-gray">at the root of the search</text>
+  <rect x="456" y="172" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="191" class="small t-gray">the previous move was a null move</text>
+  <rect x="456" y="208" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="227" class="small t-gray">remaining depth is below 3</text>
+  <rect x="456" y="244" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="263" class="small t-gray">only king and pawns are left (zugzwang)</text>
+  <rect x="456" y="280" width="304" height="28" rx="6" class="gray"/>
+  <text x="468" y="299" class="small t-gray">static value short of the bound</text>
+
+  <!-- legend -->
+  <rect x="24" y="372" width="18" height="18" rx="4" class="cut"/>
+  <text x="50" y="387" class="small">pruned</text>
+  <rect x="130" y="372" width="18" height="18" rx="4" class="step"/>
+  <text x="156" y="387" class="small">search step</text>
+  <rect x="330" y="372" width="18" height="18" rx="4" class="gray"/>
+  <text x="356" y="387" class="small">not tried</text>
+
+  <text x="24" y="418" class="q bold">Why can the other moves be skipped without searching them?</text>
+  <text x="24" y="438" class="q">A real move probably reaches β too; zugzwang breaks this guess, so it is excluded.</text>
+</svg>

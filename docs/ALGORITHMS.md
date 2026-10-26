@@ -26,10 +26,7 @@ best value MAX is already sure to get elsewhere, `beta` the best value MIN is al
 concede. When `alpha >= beta` the rest of a node's children cannot change the decision, so they are
 skipped (a cut-off). The result is exactly the minimax result with fewer nodes.
 
-![Alpha-beta pruning](https://upload.wikimedia.org/wikipedia/commons/9/91/AB_pruning.svg)
-
-*Alpha-beta pruning: branches that cannot change the decision are cut. Image by Jez9999, CC BY-SA 3.0,
-via Wikimedia Commons.*
+![An alpha-beta cut: the second leaf of the right branch is never searched because the MIN node already found a value below what the root can get](img/alpha-beta-cut.svg)
 
 **Heuristic evaluation and a depth cut-off.** Games are too deep to search to the end, so the search
 stops at a fixed depth and asks an evaluation function for a number. This is `Search::node` in

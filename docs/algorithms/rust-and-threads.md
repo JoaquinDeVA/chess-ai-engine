@@ -75,6 +75,8 @@ move is the main thread's. Dividing the root moves among the threads was not cho
 takes most of the work (the others are cut off by its value), so the threads would wait for each
 other and, ignoring what the others find, they would prune less.
 
+![Lazy SMP: a main thread and two helpers search the same root with different move orders and share one lock-free transposition table](../img/threads-shared-table.svg)
+
 **How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/mod.rs`; the
 table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
 XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of

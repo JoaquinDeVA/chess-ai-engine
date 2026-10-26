@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
+  <title id="t">Tournament format: every pair, every opening, both colours</title>
+  <desc id="d">The round-robin tournament of the bench scripts. Every pair of players meets. Each opening is played twice, once with each colour. Games run in a process pool with cores minus one workers, and each finished game is appended at once to a JSON-lines file, so an interrupted run resumes where it stopped. The scores are measured against an anchor player, h1 by default, fixed at 0 Elo. The equation shows 15 pairs times 10 openings times 2 colours, which gives the 300 games of the 60 s + 1 s run recorded in docs/RESULTS.md. The report and the model cards are written per time control.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #0f172a; }
+    .title { font-size: 20px; font-weight: 700; }
+    .q { font-size: 15px; }
+    .label { font-size: 15px; }
+    .small { font-size: 13px; }
+    .bold { font-weight: 700; }
+    .on { fill: #dcfce7; stroke: #15803d; stroke-width: 2; }
+    .cut { fill: #fee2e2; stroke: #b91c1c; stroke-width: 2; }
+    .blue { fill: #dbeafe; stroke: #1d4ed8; stroke-width: 2; }
+    .gray { fill: #e5e7eb; stroke: #6b7280; stroke-width: 2; stroke-dasharray: 5 4; }
+    .edge { stroke: #15803d; stroke-width: 2.5; fill: none; }
+    .edge-cut { stroke: #b91c1c; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .step { fill: #ffffff; stroke: #475569; stroke-width: 2; }
+    .t-step { fill: #0f172a; }
+    .t-red { fill: #7f1d1d; }
+    .t-blue { fill: #1e3a8a; }
+    .t-gray { fill: #374151; }
+  </style>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="24" y="38" class="title">Tournament format: every pair, every opening, both colours</text>
+  <text x="24" y="62" class="small t-gray">scripts/bench/play_tournament.py runs comparison/tournament.py; scores in standings.py.</text>
+
+  <!-- pipeline -->
+  <rect x="40" y="84" width="136" height="76" rx="8" class="step"/>
+  <text x="108" y="108" text-anchor="middle" class="label bold t-step">Every pair</text>
+  <text x="108" y="128" text-anchor="middle" class="small t-step">all pairs</text>
+  <text x="108" y="146" text-anchor="middle" class="small t-step">play each other</text>
+
+  <rect x="186" y="84" width="136" height="76" rx="8" class="step"/>
+  <text x="254" y="108" text-anchor="middle" class="label bold t-step">Openings</text>
+  <text x="254" y="128" text-anchor="middle" class="small t-step">each opening</text>
+  <text x="254" y="146" text-anchor="middle" class="small t-step">both colours</text>
+
+  <rect x="332" y="84" width="136" height="76" rx="8" class="step"/>
+  <text x="400" y="108" text-anchor="middle" class="label bold t-step">Process pool</text>
+  <text x="400" y="128" text-anchor="middle" class="small t-step">games in parallel</text>
+  <text x="400" y="146" text-anchor="middle" class="small t-step">cores − 1 workers</text>
+
+  <rect x="478" y="84" width="136" height="76" rx="8" class="step"/>
+  <text x="546" y="108" text-anchor="middle" class="label bold t-step">JSONL file</text>
+  <text x="546" y="128" text-anchor="middle" class="small t-step">one line a game</text>
+  <text x="546" y="146" text-anchor="middle" class="small t-step">resumable</text>
+
+  <rect x="624" y="84" width="136" height="76" rx="8" class="blue"/>
+  <text x="692" y="108" text-anchor="middle" class="label bold t-blue">Elo</text>
+  <text x="692" y="128" text-anchor="middle" class="small t-blue">anchor = 0 Elo</text>
+  <text x="692" y="146" text-anchor="middle" class="small t-blue">others vs anchor</text>
+
+  <path class="edge" d="M 176 122 L 186 122"/>
+  <path class="edge" d="M 322 122 L 332 122"/>
+  <path class="edge" d="M 468 122 L 478 122"/>
+  <path class="edge" d="M 614 122 L 624 122"/>
+
+  <!-- games per tournament -->
+  <text x="24" y="198" class="q bold">Games per tournament: pairs × openings × 2 colours</text>
+  <rect x="40" y="210" width="170" height="60" rx="8" class="step"/>
+  <text x="125" y="234" text-anchor="middle" class="label bold t-step">15 pairs</text>
+  <text x="125" y="254" text-anchor="middle" class="small t-step">pairs of 6 players</text>
+  <text x="228" y="244" text-anchor="middle" class="q bold">×</text>
+  <rect x="246" y="210" width="150" height="60" rx="8" class="step"/>
+  <text x="321" y="234" text-anchor="middle" class="label bold t-step">10 openings</text>
+  <text x="321" y="254" text-anchor="middle" class="small t-step">random, seeded</text>
+  <text x="414" y="244" text-anchor="middle" class="q bold">×</text>
+  <rect x="432" y="210" width="130" height="60" rx="8" class="step"/>
+  <text x="497" y="234" text-anchor="middle" class="label bold t-step">2 colours</text>
+  <text x="497" y="254" text-anchor="middle" class="small t-step">colours swapped</text>
+  <text x="580" y="244" text-anchor="middle" class="q bold">=</text>
+  <rect x="598" y="210" width="162" height="60" rx="8" class="step"/>
+  <text x="679" y="234" text-anchor="middle" class="label bold t-step">300 games</text>
+  <text x="679" y="254" text-anchor="middle" class="small t-step">the 60 s + 1 s run</text>
+
+  <text x="24" y="296" class="small t-gray">From docs/RESULTS.md: 60 s + 1 s had 10 openings (300 games); 10 min + 5 s had 5 (150 games).</text>
+  <text x="24" y="316" class="small t-gray">The anchor is h1 by default (--anchor); the fixed-depth run used linear_pst_terms.</text>
+  <text x="24" y="336" class="small t-gray">Re-running skips games already in the JSONL file; a file of another time control is refused.</text>
+  <text x="24" y="356" class="small t-gray">The report and the model cards are written per time control.</text>
+
+  <!-- legend -->
+  <rect x="24" y="372" width="18" height="18" rx="4" class="step"/>
+  <text x="50" y="387" class="small">step of the run</text>
+  <rect x="180" y="372" width="18" height="18" rx="4" class="blue"/>
+  <text x="206" y="387" class="small">anchor (Elo = 0)</text>
+
+  <text x="24" y="418" class="q bold">How are players compared when every pair meets on the same openings?</text>
+  <text x="24" y="438" class="q">Each pair plays the same openings in both colours; the anchor is fixed at 0 Elo.</text>
+</svg>

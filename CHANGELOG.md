@@ -25,6 +25,9 @@ results published for 1.1 were played with the Python engine and are not compara
   `tests/test_feature_parity.py`: each feature family matches its Rust version or falls back with a warning.
 - **`--threads N` / `--hash MB`**: Lazy SMP, the search on several threads sharing a lock-free table. One thread by
   default; the search is not deterministic with more.
+- **Seven drawings** in `docs/img/` (alpha-beta cut, path of a move, move ordering, PVS and aspiration windows, null move,
+  threads with a shared table, tournament format), linked from the pages that explain them; they replace the
+  Wikipedia figure of the algorithms page.
 - `scripts/bench/measure_search_speed.py`: depth reached in a time budget and cost of a fixed depth, per player.
 
 ### Changed

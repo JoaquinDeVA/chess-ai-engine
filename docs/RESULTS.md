@@ -40,6 +40,8 @@ any of them ended by forfeit, time or illegal move. The whole flow is `bash scri
 
 ## Tournaments
 
+![Tournament format: every pair plays every opening with both colours, games run in a process pool into a resumable JSONL file, and Elo is measured against the anchor](img/tournament-format.svg)
+
 Anchor `h1` (the hand-written heuristic), 10 openings (20 games per pair, 300 games), 60 s + 1 s:
 
 | Player | Score % |

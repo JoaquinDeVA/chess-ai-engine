@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
+  <title id="t">Lazy SMP: threads share one transposition table</title>
+  <desc id="d">Three threads search the same root position: a main thread and two helpers. The main thread runs iterative deepening with the root moves in their normal order and owns the clock. Each helper searches one or two plies deeper than the main thread and rotates the root moves by a different amount. All three read and write one transposition table with no locks. Each slot is three atomic words, checked by XOR, so a slot torn by two writers is ignored. When the main thread finishes it raises a stop flag, the helpers stop, and the main thread's move is played.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #0f172a; }
+    .title { font-size: 20px; font-weight: 700; }
+    .q { font-size: 15px; }
+    .label { font-size: 15px; }
+    .small { font-size: 13px; }
+    .bold { font-weight: 700; }
+    .on { fill: #dcfce7; stroke: #15803d; stroke-width: 2; }
+    .cut { fill: #fee2e2; stroke: #b91c1c; stroke-width: 2; }
+    .blue { fill: #dbeafe; stroke: #1d4ed8; stroke-width: 2; }
+    .gray { fill: #e5e7eb; stroke: #6b7280; stroke-width: 2; stroke-dasharray: 5 4; }
+    .edge { stroke: #15803d; stroke-width: 2.5; fill: none; }
+    .edge-cut { stroke: #b91c1c; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .t-green { fill: #14532d; }
+    .t-red { fill: #7f1d1d; }
+    .t-blue { fill: #1e3a8a; }
+    .t-gray { fill: #374151; }
+  </style>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="24" y="38" class="title">Lazy SMP: threads share one table and no locks</text>
+  <text x="24" y="62" class="small t-gray">Three threads search the same root. Helpers search 1 or 2 plies deeper than the main thread.</text>
+
+  <!-- threads -->
+  <rect x="40" y="84" width="220" height="92" rx="8" class="on"/>
+  <text x="150" y="108" text-anchor="middle" class="label bold t-green">Main thread</text>
+  <text x="150" y="128" text-anchor="middle" class="small t-green">depth 1, 2, 3, ...</text>
+  <text x="150" y="146" text-anchor="middle" class="small t-green">normal root order</text>
+  <text x="150" y="164" text-anchor="middle" class="small t-green">owns the clock and the move</text>
+
+  <rect x="290" y="84" width="220" height="92" rx="8" class="on"/>
+  <text x="400" y="108" text-anchor="middle" class="label bold t-green">Helper 1</text>
+  <text x="400" y="128" text-anchor="middle" class="small t-green">depth = main + 1</text>
+  <text x="400" y="146" text-anchor="middle" class="small t-green">root moves rotated by 1</text>
+  <text x="400" y="164" text-anchor="middle" class="small t-green">fills the table only</text>
+
+  <rect x="540" y="84" width="220" height="92" rx="8" class="on"/>
+  <text x="650" y="108" text-anchor="middle" class="label bold t-green">Helper 2</text>
+  <text x="650" y="128" text-anchor="middle" class="small t-green">depth = main + 2</text>
+  <text x="650" y="146" text-anchor="middle" class="small t-green">root moves rotated by 2</text>
+  <text x="650" y="164" text-anchor="middle" class="small t-green">fills the table only</text>
+
+  <!-- arrows: threads read and write the table -->
+  <path class="edge" d="M 150 176 L 200 250"/>
+  <path class="edge" d="M 400 176 L 400 250"/>
+  <path class="edge" d="M 650 176 L 600 250"/>
+
+  <!-- shared table -->
+  <rect x="100" y="250" width="600" height="80" rx="8" class="blue"/>
+  <text x="400" y="276" text-anchor="middle" class="label bold t-blue">Shared transposition table, no locks</text>
+  <text x="400" y="298" text-anchor="middle" class="small t-blue">3 atomic words per slot: check, value, packed data</text>
+  <text x="400" y="316" text-anchor="middle" class="small t-blue">a read is kept only if its XOR check matches</text>
+
+  <text x="400" y="352" text-anchor="middle" class="small t-gray">When the main thread finishes, it raises a stop flag and the helpers stop.</text>
+
+  <!-- legend -->
+  <rect x="24" y="372" width="18" height="18" rx="4" class="on"/>
+  <text x="50" y="387" class="small">thread</text>
+  <rect x="130" y="372" width="18" height="18" rx="4" class="blue"/>
+  <text x="156" y="387" class="small">shared table</text>
+
+  <text x="24" y="418" class="q bold">What happens when two threads write the same slot at the same time?</text>
+  <text x="24" y="438" class="q">A torn slot fails its XOR check and is ignored: the cost is a lost entry, not bad data.</text>
+</svg>

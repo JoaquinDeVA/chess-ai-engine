@@ -1,4 +1,4 @@
-//! Alpha-beta search with iterative deepening. Port of `search/game_algorithms.py`.
+//! Alpha-beta search with iterative deepening.
 //!
 //! The values are expected scores of the root player in `[0, 1]`; terminal values are 1, 0.5 and
 //! 0, nudged by `epsilon` per ply so that quicker wins and slower losses are preferred. The
@@ -119,7 +119,8 @@ pub struct Techniques {
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 6] = [
+    pub const NAMES: [&'static str; 7] = [
+        "incremental",
         "tt_move",
         "history",
         "pvs",

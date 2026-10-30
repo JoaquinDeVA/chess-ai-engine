@@ -1,4 +1,4 @@
-//! Transposition table, killer moves and move ordering. Port of `search/search_utils.py`.
+//! Transposition table, killer moves and move ordering.
 
 use std::collections::{HashMap, VecDeque};
 use std::hash::{BuildHasherDefault, Hash, Hasher};

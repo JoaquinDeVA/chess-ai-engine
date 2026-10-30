@@ -1,7 +1,7 @@
 //! Rules that predict the duration of the next iteration of an iterative deepening.
 //!
 //! Each estimator receives the finished iterations as `(seconds, nodes)`, oldest first, and
-//! returns the predicted seconds of the next one. Port of `search/time_estimators.py`.
+//! returns the predicted seconds of the next one.
 
 /// A finished iteration: seconds and nodes.
 pub type Iteration = (f64, u64);

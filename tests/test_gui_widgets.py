@@ -99,3 +99,47 @@ def test_game_page_resign(app):
         assert page.banner.isVisibleTo(page)
     finally:
         page.close_game()
+
+
+def test_setup_page_builds_the_match(app):
+    from chess_engine.gui.setup_dialog import AI, HUMAN, SetupPage
+
+    page = SetupPage()
+    setup = page.match_setup()
+    assert setup.white.is_human and not setup.black.is_human
+    assert (setup.base, setup.increment) == (600.0, 5.0)
+    page._kind[chess.WHITE].setCurrentText(AI)
+    page._kind[chess.BLACK].setCurrentText(HUMAN)
+    page.time_control.setCurrentText("No clock")
+    setup = page.match_setup()
+    assert not setup.white.is_human and setup.black.is_human and setup.base is None
+    page._kind[chess.WHITE].setCurrentText(HUMAN)
+    assert not page.play.isEnabled()
+
+
+def test_settings_dialog_round_trip(app):
+    from chess_engine.gui.settings_dialog import AISettingsDialog
+
+    original = AISettings(evaluation="h1", max_depth=5, move_time=None, tablebase=False)
+    dialog = AISettingsDialog(original)
+    assert dialog.settings() == original
+    dialog.depth.setValue(7)
+    dialog.techniques["lmr"].setChecked(True)
+    changed = dialog.settings()
+    assert changed.max_depth == 7 and "lmr" in changed.techniques
+
+
+def test_main_window_starts_and_drops_a_game(app):
+    from chess_engine.gui.app import MainWindow
+
+    window = MainWindow()
+    window.start_game(
+        MatchSetup(
+            white=PlayerSetup(),
+            black=PlayerSetup(AISettings(evaluation="h1", max_depth=1, move_time=0.1)),
+            base=None,
+        )
+    )
+    assert window.stack.currentWidget() is window.game
+    window.show_setup()
+    assert window.game is None and window.stack.currentWidget() is window.centred

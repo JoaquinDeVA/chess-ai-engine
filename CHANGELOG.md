@@ -2,6 +2,16 @@
 
 All notable changes. The newest are first.
 
+## Unreleased
+
+### Fixed
+- `_core.TECHNIQUES`, and with it `--techniques all` and the `+all` suffix of the tournament players, now include `incremental`; before, `all` left it out.
+- `get_info()` of the model bot works without an opening book (`book_positions` is 0).
+- The PGN `Event` header is "ChessAIEngine game".
+
+### Removed
+- `TimeManager.expired` and `game_manager.load_config`, which nothing used.
+
 ## 2.0.0 (2026-10-26)
 
 The search moves to Rust. The engine plays the same moves as 1.1 with the reference search, 8 to 35 times faster,

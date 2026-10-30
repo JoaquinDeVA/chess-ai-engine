@@ -24,7 +24,7 @@ def script():
 def test_specs_carry_the_techniques_of_a_player():
     assert split_techniques("linear_pst") == ("linear_pst", ())
     assert split_techniques("linear_pst+pvs,lmr") == ("linear_pst", ("pvs", "lmr"))
-    assert len(split_techniques("h1+all")[1]) == 6
+    assert len(split_techniques("h1+all")[1]) == 7
 
 
 def test_make_player_switches_the_techniques_on_and_keeps_the_label():

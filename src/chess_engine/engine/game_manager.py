@@ -8,7 +8,6 @@ Based on the AI course framework (Inteligencia Artificial e Ingeniería del Cono
 CEU San Pablo University).
 """
 
-import json
 import time
 from datetime import datetime
 from typing import List, Optional
@@ -18,8 +17,7 @@ import chess
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.bots.human_player import HumanPlayer
-from chess_engine.config.settings import BLITZ_CONFIG
-from chess_engine.engine.data_classes import GameResult, TournamentConfig
+from chess_engine.engine.data_classes import GameResult
 
 #: Terminations in which a player loses without the game ending on the board.
 FORFEIT_TERMINATIONS = ("time_forfeit", "illegal_move", "player_error")
@@ -275,25 +273,3 @@ class GameManager:
             if verbose:
                 print(f"Game error: {e}")
             raise
-
-
-def load_config(config_path: str) -> TournamentConfig:
-    """
-    Load simple tournament configuration.
-
-    :param config_path: Path to JSON config file
-    :type config_path: str
-    :return: TournamentConfig object
-    :rtype: TournamentConfig
-    """
-    try:
-        with open(config_path) as f:
-            data = json.load(f)
-        # FIXED: Pass all data as keyword arguments
-        return TournamentConfig(**data)
-    except FileNotFoundError:
-        print(f"Config file {config_path} not found, using defaults")
-        return TournamentConfig(**BLITZ_CONFIG)
-    except Exception as e:
-        print(f"Error loading config: {e}, using defaults")
-        return TournamentConfig(**BLITZ_CONFIG)

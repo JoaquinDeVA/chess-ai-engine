@@ -1,7 +1,6 @@
 """Game loop, results, standings, PGN export and configuration loading."""
 
 import io
-import json
 import time
 
 import chess
@@ -10,7 +9,7 @@ import pytest
 
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.engine.data_classes import GameResult
-from chess_engine.engine.game_manager import GameManager, load_config
+from chess_engine.engine.game_manager import GameManager
 
 SCHOLARS_MATE_WHITE = ["e2e4", "f1c4", "d1h5", "h5f7"]
 SCHOLARS_MATE_BLACK = ["e7e5", "b8c6", "g8f6"]
@@ -162,16 +161,3 @@ def finished_game(white, black, winner, round_number=None):
         0.0,
         round_number,
     )
-
-
-def test_configuration_is_loaded_from_json(tmp_path):
-    path = tmp_path / "tournament.json"
-    path.write_text(json.dumps({"total_game_time": 90, "time_increment": 1, "rounds": 3}))
-    config = load_config(str(path))
-    assert (config.total_game_time, config.time_increment, config.rounds) == (90, 1, 3)
-    assert config.scoring == {"win": 1.0, "draw": 0.5, "loss": 0.0}
-
-
-def test_missing_configuration_file_falls_back_to_the_default_preset(tmp_path):
-    config = load_config(str(tmp_path / "missing.json"))
-    assert (config.total_game_time, config.time_increment, config.rounds) == (180.0, 2.0, 1)

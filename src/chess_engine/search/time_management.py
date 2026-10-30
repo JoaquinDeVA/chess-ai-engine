@@ -43,12 +43,3 @@ class TimeManager:
         :return: Hard limit in seconds.
         """
         return budget * self.extension - self.safety_margin
-
-    def expired(self, budget: float, elapsed: float) -> bool:
-        """Whether ``elapsed`` seconds already exceed the hard limit of ``budget``.
-
-        :param budget: Soft budget returned by :meth:`turn_budget`.
-        :param elapsed: Seconds spent on the move so far.
-        :return: True if the search must stop.
-        """
-        return elapsed >= self.hard_limit(budget)

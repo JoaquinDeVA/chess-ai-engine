@@ -23,5 +23,3 @@ def test_no_clock_gives_the_maximum_budget():
 def test_hard_limit_extends_the_budget_minus_a_safety_margin():
     tm = TimeManager()
     assert math.isclose(tm.hard_limit(10.0), 14.7)
-    assert not tm.expired(10.0, 14.6)
-    assert tm.expired(10.0, 14.7)

@@ -52,7 +52,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--output", type=Path, help="where to save (default: src/chess_engine/models/artifacts)"
     )
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
-    parser.add_argument("--effort", type=int, help="linear models: effort level 0-100")
+    parser.add_argument("--effort", type=int, help="models: effort level 0-100")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
     parser.add_argument(
         "--representation",

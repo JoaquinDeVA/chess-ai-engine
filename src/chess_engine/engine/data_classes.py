@@ -119,7 +119,7 @@ class GameResult:
         game = chess.pgn.Game()
 
         # Set headers
-        game.headers["Event"] = "Student Chess Tournament"
+        game.headers["Event"] = "ChessAIEngine game"
         game.headers["Date"] = self.timestamp.split("T")[0].replace("-", ".")
         game.headers["White"] = self.white_name
         game.headers["Black"] = self.black_name

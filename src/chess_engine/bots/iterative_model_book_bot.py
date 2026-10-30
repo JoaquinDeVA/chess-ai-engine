@@ -75,7 +75,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
                 f"Opening book + iterative deepening evaluated by model '{self.ml_model.name}'"
             ),
             model=self.ml_model.name,
-            book_positions=len(self.opening_book),
+            book_positions=len(self.opening_book) if self.opening_book is not None else 0,
             max_depth=self.max_depth,
         )
         return info

@@ -210,6 +210,10 @@ class TestMLBots:
         bot.on_game_start(chess.WHITE, "opponent")
         assert bot.get_move(chess.Board(), 10.0) == chess.Move.from_uci("e2e4")
 
+    def test_info_without_an_opening_book(self, stub_model):
+        bot = IterativeModelBookBot(model=stub_model, opening_book=None, max_depth=1)
+        assert bot.get_info()["book_positions"] == 0
+
     def test_models_can_be_selected_by_name(self, tmp_path, monkeypatch):
         model_class = get_model_class("linear_material")
         saved = model_class().save(tmp_path / "linear_material.npz")

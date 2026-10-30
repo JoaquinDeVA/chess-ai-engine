@@ -123,17 +123,17 @@ step_tournaments() {
   without_h1="$(join $(present_models))"
   [ "$DRY_RUN" = 1 ] || mkdir -p data/tournament data/reports
   # A) short control
-  run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
+  run "$PYTHON" -m chess_engine.comparison.play_tournament --players "$with_h1" --anchor h1 \
     --base 60 --increment 1 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/short.jsonl --logs data/tournament/short \
     --report data/reports/TOURNAMENT_60+1.md
   # B) reference control
-  run "$PYTHON" scripts/bench/play_tournament.py --players "$with_h1" --anchor h1 \
+  run "$PYTHON" -m chess_engine.comparison.play_tournament --players "$with_h1" --anchor h1 \
     --base 600 --increment 5 --openings 5 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/reference.jsonl --logs data/tournament/reference \
     --report data/reports/TOURNAMENT_600+5.md
   # C) equal depth 3, no h1
-  run "$PYTHON" scripts/bench/play_tournament.py --players "$without_h1" --anchor linear_pst_terms \
+  run "$PYTHON" -m chess_engine.comparison.play_tournament --players "$without_h1" --anchor linear_pst_terms \
     --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/depth3.jsonl --logs data/tournament/depth3 \
     --report data/reports/TOURNAMENT_depth3.md

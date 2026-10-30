@@ -1,6 +1,5 @@
 """Tests for the parallel round-robin tournament."""
 
-import importlib.util
 import json
 import os
 import zlib
@@ -10,7 +9,7 @@ import chess
 import pytest
 
 from chess_engine import _core
-from chess_engine.comparison import tournament
+from chess_engine.comparison import play_tournament, tournament
 from chess_engine.comparison.standings import summarize
 from chess_engine.comparison.tournament import paired_openings, run_round_robin
 
@@ -137,11 +136,7 @@ def test_truncated_multibyte_character_is_a_truncated_line(tmp_path, caplog):
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "bench" / "play_tournament.py"
-    spec = importlib.util.spec_from_file_location("play_tournament", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return play_tournament
 
 
 def test_parse_args_rejects_fewer_than_two_distinct_players(script, capsys):

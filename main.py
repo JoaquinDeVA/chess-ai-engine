@@ -3,7 +3,7 @@
 Chess AI Engine - command-line interface.
 
 Play a game between any two players (humans or bots). With no arguments you play White against
-the default bot. Tournaments between bots run from ``scripts/bench/play_tournament.py``. The CLI
+the default bot. Tournaments between bots run with ``python -m chess_engine.comparison.play_tournament``. The CLI
 skeleton comes from the AI course framework (CEU San Pablo University); ``--model`` and ``--depth``
 are additions.
 """

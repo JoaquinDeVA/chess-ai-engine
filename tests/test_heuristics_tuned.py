@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
-from chess_engine.comparison import standings
+from chess_engine.comparison import play_tournament, standings
 from chess_engine.comparison.tradeoff import (
     HEURISTICS,
     fixed_time_manager,
@@ -149,8 +149,7 @@ def test_tradeoff_accepts_h1_spec():
 
 
 def test_play_tournament_defaults_use_h1_anchor():
-    script = load_script("scripts/bench/play_tournament.py", "play_tournament_h1")
     assert standings.ANCHOR == "h1"
-    args = script.parse_args([])
+    args = play_tournament.parse_args([])
     assert args.anchor == "h1"
     assert args.specs == ["linear_pst", "linear_pst_terms", "linear_king_bucket", "net4_pst", "h1"]

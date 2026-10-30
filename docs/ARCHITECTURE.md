@@ -54,9 +54,9 @@ Dependencies, as the imports stand:
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
 | `engine/`, `config/` | Game loop with clocks, tournaments, results and PGN export; tournament presets |
 
-Outside the packages, `scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
+Tournaments run with `python -m chess_engine.comparison.play_tournament`. Outside the packages, `scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
 `fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
-`scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`, `play_tournament.py`,
+`scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
 `measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,
 `compare_target_representations.py`) and `scripts/run_full_pipeline.sh`
 runs the whole flow. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and

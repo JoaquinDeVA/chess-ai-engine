@@ -69,7 +69,7 @@ python main.py --player1 human --player2 IterativeHeuristicBot
 python main.py --player1 IterativeHeuristicBot --player2 IterativeModelBookBot --model linear_pst_terms --depth 4
 ```
 
-Tournaments between bots run from `scripts/bench/play_tournament.py`
+Tournaments between bots run with `python -m chess_engine.comparison.play_tournament`
 (see [Results](docs/RESULTS.md)). `python main.py --list-bots` shows the bots. If you name one player,
 the other is completed so that a human faces a bot. Against a human the bot thinks `--move-time` seconds
 per move (default 3) with up to four threads unless `--threads` says otherwise. `--position` starts

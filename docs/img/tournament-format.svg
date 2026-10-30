@@ -22,7 +22,7 @@
   </style>
   <rect x="1" y="1" width="798" height="448" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
   <text x="24" y="38" class="title">Tournament format: every pair, every opening, both colours</text>
-  <text x="24" y="62" class="small t-gray">scripts/bench/play_tournament.py runs comparison/tournament.py; scores in standings.py.</text>
+  <text x="24" y="62" class="small t-gray">comparison/play_tournament.py runs comparison/tournament.py; scores in standings.py.</text>
 
   <!-- pipeline -->
   <rect x="40" y="84" width="136" height="76" rx="8" class="step"/>

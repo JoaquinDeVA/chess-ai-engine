@@ -4,6 +4,9 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
+### Changed
+- The tournament script moved from `scripts/bench/play_tournament.py` to `chess_engine.comparison.play_tournament`; it takes the same options and runs with `python -m chess_engine.comparison.play_tournament`.
+
 ### Fixed
 - `_core.TECHNIQUES`, and with it `--techniques all` and the `+all` suffix of the tournament players, now include `incremental`; before, `all` left it out.
 - `get_info()` of the model bot works without an opening book (`book_positions` is 0).

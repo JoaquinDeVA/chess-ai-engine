@@ -77,7 +77,7 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Make/unmake, terminal detection | reference, on | [search basics](algorithms/search-basics.md#makeunmake-on-one-state-with-fast-transposition-keys) |
 | Endgame tablebases, opening book | on | [search basics](algorithms/search-basics.md#endgame-tablebases) |
 | Search in Rust | since 2026-10-25; 8 to 35 times faster | [Rust and threads](algorithms/rust-and-threads.md#the-search-in-rust) |
-| Several threads (Lazy SMP) | option, off (`--threads`) | [Rust and threads](algorithms/rust-and-threads.md#several-threads-lazy-smp) |
+| Several threads (Lazy SMP) | option `threads`, off | [Rust and threads](algorithms/rust-and-threads.md#several-threads-lazy-smp) |
 | Incremental network accumulator (`incremental`) | on; +15 % nodes/s for `net4_pst` | [selective techniques](algorithms/selective-techniques.md#incremental-network-accumulator) |
 | Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | [selective techniques](algorithms/selective-techniques.md#table-move-first-tt_move) |
 | History heuristic (`history`) | on; nodes to 391,130 | [selective techniques](algorithms/selective-techniques.md#history-heuristic-history) |

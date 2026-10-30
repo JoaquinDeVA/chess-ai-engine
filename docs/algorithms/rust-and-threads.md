@@ -2,7 +2,7 @@
 
 > **What it is:** How the search moved to Rust with identical results, how much faster it is, and how it uses several threads.
 >
-> **Read it when:** You want the speed numbers or to use `--threads`.
+> **Read it when:** You want the speed numbers or to use several threads.
 >
 > **Next:** [Selective techniques](selective-techniques.md)
 
@@ -80,7 +80,7 @@ other and, ignoring what the others find, they would prune less.
 **How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/mod.rs`; the
 table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
 XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of
-`IterativeDeepeningBot` and `--threads`, `--hash` of `main.py`. The tournaments use one thread, so
+`IterativeDeepeningBot` and the thread setting of the window. The tournaments use one thread, so
 that games are reproducible and the clock is fair among processes. With more than one thread the
 search is not deterministic and the evaluation must run in the core.
 

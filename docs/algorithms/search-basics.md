@@ -281,8 +281,8 @@ losing it takes the one with the largest, to resist longest.
 `src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. The 3-4-5
 piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not versioned.
 `IterativeDeepeningBot` takes a `tablebase` argument and consults it at the root of `get_move`,
-recording `stop_reason = "tablebase"` in the search statistics; `python main.py --no-endgame-db`
-turns it off. It is on by default when the tables are present; the tournaments and measurement scripts
+recording `stop_reason = "tablebase"` in the search statistics; `tablebase=None`
+turns it off (the window has a switch for it). It is on by default when the tables are present; the tournaments and measurement scripts
 build their players without it (`make_player`), so that they compare evaluations and search, not tables.
 
 **Measured effect.** Measured with `python scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`

@@ -4,6 +4,9 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
+### Added
+- **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (evaluation, depth, time per move, opening book, tablebases, search techniques, quiescence, threads). See [The window](docs/GUI.md).
+
 ### Changed
 - The tournament script moved from `scripts/bench/play_tournament.py` to `chess_engine.comparison.play_tournament`; it takes the same options and runs with `python -m chess_engine.comparison.play_tournament`.
 
@@ -13,6 +16,7 @@ All notable changes. The newest are first.
 - The PGN `Event` header is "ChessAIEngine game".
 
 ### Removed
+- The console game: the ~17 options of `main.py`, `HumanPlayer`, the board printing of `GameManager` and `--mode`; `main.py` now only opens the window.
 - `TimeManager.expired` and `game_manager.load_config`, which nothing used.
 
 ## 2.0.0 (2026-10-26)

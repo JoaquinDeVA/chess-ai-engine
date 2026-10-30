@@ -10,7 +10,7 @@
 
 The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it, and `tests/golden/` pins
 its values, moves and node counts. Each technique is a field of `Techniques` (`rust/src/search/mod.rs`), a
-name in `_core.TECHNIQUES`, the option `techniques` of `IterativeDeepeningBot` and `--techniques` of `main.py`
+name in `_core.TECHNIQUES`, the option `techniques` of `IterativeDeepeningBot` and the Advanced panel of the AI settings of the window
 (`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`src/chess_engine/bots/_search_bots.py`): all but
 `lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
 so results of different engines are never mixed.

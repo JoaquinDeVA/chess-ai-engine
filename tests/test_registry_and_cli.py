@@ -12,7 +12,7 @@ def registry() -> BotRegistry:
 
 def test_registry_finds_every_playable_bot(registry):
     names = set(registry.list_available_bots())
-    assert names == {"HumanPlayer", "IterativeHeuristicBot", "IterativeModelBookBot"}
+    assert names == {"IterativeHeuristicBot", "IterativeModelBookBot"}
 
 
 def test_shared_base_classes_are_not_registered_as_bots(registry):

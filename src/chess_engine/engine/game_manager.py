@@ -16,7 +16,6 @@ import chess
 
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.chess_bot import ChessBot
-from chess_engine.bots.human_player import HumanPlayer
 from chess_engine.engine.data_classes import GameResult
 
 #: Terminations in which a player loses without the game ending on the board.
@@ -42,60 +41,6 @@ class GameManager:
         self.bot_registry = bot_registry
         self.completed_games: List[GameResult] = []
 
-    def _format_board_emoji(self, board: chess.Board) -> str:
-        """
-        Format chess board with emoji pieces.
-
-        :param board: Chess board to format
-        :type board: chess.Board
-        :return: Formatted board string with emoji pieces
-        :rtype: str
-        """
-        piece_symbols = {
-            "r": "♜",
-            "n": "♞",
-            "b": "♝",
-            "q": "♛",
-            "k": "♚",
-            "p": "♟",
-            "R": "♖",
-            "N": "♘",
-            "B": "♗",
-            "Q": "♕",
-            "K": "♔",
-            "P": "♙",
-        }
-
-        board_str = ""
-        for rank in range(8, 0, -1):
-            board_str += f"{rank} "
-            for file in range(8):
-                square = chess.square(file, rank - 1)
-                piece = board.piece_at(square)
-                if piece:
-                    board_str += piece_symbols.get(piece.symbol(), piece.symbol())
-                else:
-                    board_str += "."
-                board_str += "    "
-            board_str += "\n"
-
-        board_str += "  a    b    c    d    e    f    g    h\n"
-        return board_str
-
-    def _display_board(self, board: chess.Board, style: str = "ascii") -> None:
-        """
-        Display chess board in specified style.
-
-        :param board: Chess board to display
-        :type board: chess.Board
-        :param style: Display style ("ascii" or "emoji")
-        :type style: str
-        """
-        if style == "emoji":
-            print(self._format_board_emoji(board))
-        else:
-            print(board)
-
     def play_game(
         self,
         white_player: ChessBot,
@@ -104,13 +49,12 @@ class GameManager:
         time_increment: float = 0.0,
         starting_position: Optional[str] = None,
         verbose: bool = False,
-        board_style: str = "ascii",
         round_number: Optional[int] = None,
     ) -> GameResult:
         """
         Play a single game between any two players.
 
-        Supports any combination of players (human vs human, bot vs bot, human vs bot).
+        Supports any combination of players (bot vs bot).
         Handles time limits, tracks time for each player, and enforces game rules.
 
         :param white_player: Player to play as white
@@ -125,8 +69,6 @@ class GameManager:
         :type starting_position: Optional[str]
         :param verbose: Enable detailed output
         :type verbose: bool
-        :param board_style: Display style ("ascii" or "emoji")
-        :type board_style: str
         :param round_number: Round number for tournament games
         :type round_number: Optional[int]
         :return: GameResult with complete game information
@@ -167,9 +109,6 @@ class GameManager:
                     color_name = "White" if board.turn == chess.WHITE else "Black"
                     print(f"\n{color_name} ({current_player.name}) to move...")
                     print(f"Time left: {current_time_left:.1f}s")
-
-                if isinstance(current_player, HumanPlayer):
-                    self._display_board(board, board_style)
 
                 # Check if player has time left
                 if current_time_left <= 0:

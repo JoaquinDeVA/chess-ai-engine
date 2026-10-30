@@ -52,10 +52,3 @@ def test_quoted_script_paths_exist():
             if not (ROOT / path).exists():
                 missing.append(f"{doc.relative_to(ROOT)}: {path}")
     assert not missing, "\n".join(missing)
-
-
-def test_every_command_line_option_of_main_is_in_the_readme():
-    options = set(re.findall(r'"(--[a-z0-9-]+)"', (ROOT / "main.py").read_text(encoding="utf-8")))
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert options
-    assert [option for option in sorted(options) if option not in readme] == []

@@ -14,7 +14,8 @@ an evaluation to the Rust core once per move and gets a move and the statistics 
 
 ```mermaid
 flowchart TB
-    CLI["main.py<br/>command line"] --> GM["engine/<br/>GameManager, results, PGN"]
+    WIN["main.py → gui/<br/>window"] --> REG
+    TOURN["comparison/play_tournament<br/>no window"] --> GM["engine/<br/>GameManager, results, PGN"]
     GM --> REG["bots/bot_registry.py<br/>discovers bots"]
     REG --> BOTS["bots/<br/>playable bots"]
     BOTS --> BASES["bots/_search_bots.py<br/>IterativeDeepeningBot"]
@@ -34,6 +35,7 @@ Dependencies, as the imports stand:
 - `training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). So `models/` and `training/` depend on each other; the only edge from `models/` to `training/` is `training/representation.py`.
 - `bots/` imports `search/`, `evaluation/`, `models/` and `knowledge/`.
 - `engine/` imports `bots/` and `config/`; `config/` imports the data classes of `engine/`.
+- `gui/` imports `bots/`, `models/`, `search/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
 - `comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `training/`, `evaluation/`, `knowledge/` and `engine/`. Nothing else imports it.
 
 ## Packages
@@ -46,13 +48,14 @@ Dependencies, as the imports stand:
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
-| `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py`, `human_player.py` |
+| `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py` |
 | `evaluation/` | `features.py`: hand-crafted features (material, mobility, king safety...). `heuristics.py`: the heuristic `h1` and its fitted weights. `chess_game_state.py`: a thin wrapper of a board for the evaluation functions |
 | `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py` (which also lists `ACCURACY_RECORDS`, the models that are only measured). Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`). Course models: `architectures.py` and `keras_model.py` (`mlp_features`, `cnn_resnet`) with the dense encodings of `dense_features.py`. `evaluator.py` adapts a model to a search; `native.py` hands a model's weights to the Rust core; `cards.py` reads and writes the model cards in `models/cards/` |
 | `training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`, `targets.py` and `representation.py`: split, target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept). `effort.py`: training size per effort level. `train.py`: the training command |
-| `comparison/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
+| `comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
-| `engine/`, `config/` | Game loop with clocks, tournaments, results and PGN export; tournament presets |
+| `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings → bot options; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
+| `engine/`, `config/` | Game loop with clocks, results and PGN export for the tournaments; tournament presets |
 
 Tournaments run with `python -m chess_engine.comparison.play_tournament`. Outside the packages, `scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
 `fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
@@ -81,7 +84,6 @@ classDiagram
         native_evaluator()
     }
     ChessBot <|-- IterativeDeepeningBot
-    ChessBot <|-- HumanPlayer
     IterativeDeepeningBot <|-- IterativeHeuristicBot
     IterativeDeepeningBot <|-- IterativeModelBookBot
 
@@ -181,8 +183,8 @@ A bot is one file in `src/chess_engine/bots/`: subclass `IterativeDeepeningBot` 
 `bots/_search_bots.py`) and implement `evaluate(state, player)`, the expected score of `player` in
 `state`, strictly between 0 and 1. `BotRegistry` imports every public module in `bots/` and registers
 each `ChessBot` subclass under its class name; modules starting with `_` hold shared code and are
-skipped. `get_bot(name, **options)` forwards constructor arguments, which is how `--model` and
-`--depth` reach the bots, so the new bot appears in `python main.py --list-bots` and in tournaments.
+skipped. `get_bot(name, **options)` forwards constructor arguments, which is how the settings of the window
+reach the bots; the new bot can be named in tournaments.
 
 ```python
 # src/chess_engine/bots/material_bot.py

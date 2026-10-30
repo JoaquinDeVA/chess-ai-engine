@@ -114,12 +114,13 @@ class BoardWidget(QWidget):
         font.setBold(True)
         font.setPixelSize(max(9, int(size * 0.17)))
         painter.setFont(font)
+        highlight = QColor(*theme.HIGHLIGHT)
         for square in chess.SQUARES:
             rect = self._rect(square)
             is_light = (chess.square_file(square) + chess.square_rank(square)) % 2 == 1
             painter.fillRect(rect, light if is_light else dark)
             if square in highlighted:
-                painter.fillRect(rect, QColor(*theme.HIGHLIGHT))
+                painter.fillRect(rect, highlight)
             painter.setPen(dark if is_light else light)
             if rect.left() == 0:
                 painter.drawText(
@@ -167,26 +168,23 @@ class BoardWidget(QWidget):
     def _paint_targets(self, painter: QPainter, size: float) -> None:
         painter.setPen(Qt.NoPen)
         shade = QColor(0, 0, 0, 38)
-        for square in {move.to_square for move in self._targets}:
+        painter.setBrush(shade)
+        captures = {move.to_square: self._board.is_capture(move) for move in self._targets}
+        for square, capture in captures.items():
             rect = self._rect(square)
-            capture = self._board.piece_at(square) is not None or self._board.is_en_passant(
-                next(m for m in self._targets if m.to_square == square)
-            )
             if capture:
                 path = QPainterPath()
-                path.addEllipse(rect.adjusted(-0.0, -0.0, 0.0, 0.0))
+                path.addEllipse(rect)
                 path.addEllipse(rect.adjusted(size * 0.1, size * 0.1, -size * 0.1, -size * 0.1))
                 clip = QPainterPath()
                 clip.addRect(rect)
-                painter.setBrush(shade)
                 painter.drawPath(path.intersected(clip))
             else:
-                painter.setBrush(shade)
                 radius = size * 0.16
                 painter.drawEllipse(rect.center(), radius, radius)
         if self._drag_from is not None:
             hovered = self._square_at(self._drag_pos)
-            if hovered is not None and hovered in {m.to_square for m in self._targets}:
+            if hovered is not None and hovered in captures:
                 painter.setBrush(Qt.NoBrush)
                 painter.setPen(QPen(QColor(255, 255, 255, 190), max(2.0, size * 0.04)))
                 painter.drawRect(self._rect(hovered).adjusted(1, 1, -1, -1))

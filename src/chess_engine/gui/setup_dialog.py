@@ -67,7 +67,7 @@ class SetupPage(QWidget):
             button.clicked.connect(lambda _=False, c=color: self._edit(c))
             self._kind[color], self._summary[color], self._button[color] = kind, summary, button
             grid.addWidget(icon, row, 0)
-            grid.addWidget(QLabel("White" if color == chess.WHITE else "Black"), row, 1)
+            grid.addWidget(QLabel("White" if color else "Black"), row, 1)
             grid.addWidget(kind, row, 2)
             grid.addWidget(button, row, 3)
             grid.addWidget(summary, row + 1, 1, 1, 3)
@@ -107,7 +107,7 @@ class SetupPage(QWidget):
         self._update()
 
     def _edit(self, color: chess.Color) -> None:
-        name = "White" if color == chess.WHITE else "Black"
+        name = "White" if color else "Black"
         chosen = edit_settings(self._ai[color], f"{name} AI settings", self)
         if chosen is not None:
             self._ai[color] = chosen

@@ -82,13 +82,13 @@ class GamePage(QWidget):
             }
         for color, bot in self.bots.items():
             bot.on_game_start(color, self.names[not color])
+        self.humans = [c for c, p in self.players.items() if p.is_human]
         self._token = 0
         self._thread: Optional[MoveThread] = None
         self._view: Optional[int] = None  # ply being looked at; None = the live position
         self._ended = False
         self._build()
-        human = [c for c, p in self.players.items() if p.is_human]
-        self.board.set_orientation(human[0] if human else chess.WHITE)
+        self.board.set_orientation(self.humans[0] if self.humans else chess.WHITE)
         self._place_bars()
         self._refresh()
         self._timer = QTimer(self)
@@ -130,24 +130,19 @@ class GamePage(QWidget):
 
         nav = QHBoxLayout()
         for text, ply in (("⏮", "start"), ("◀", "back"), ("▶", "forward"), ("⏭", "end")):
-            button = QPushButton(text)
-            button.setFocusPolicy(Qt.NoFocus)
-            button.clicked.connect(lambda _=False, where=ply: self._navigate(where))
-            nav.addWidget(button)
+            nav.addWidget(self._button(text, lambda where=ply: self._navigate(where)))
 
         self.undo_button = self._button("Undo", self._undo)
         self.draw_button = self._button("Draw", self._offer_draw)
         self.resign_button = self._button("Resign", self._resign, "danger")
         self.flip_button = self._button("Flip", self._flip)
         self.pgn_button = self._button("Copy PGN", self._copy_pgn)
-        has_human = self.setup.has_humans()
         for button in (self.undo_button, self.draw_button, self.resign_button):
-            button.setVisible(has_human)
+            button.setVisible(bool(self.humans))
 
         self.again_button = self._button("Rematch", self.rematch.emit, "primary")
         self.new_button = self._button("New game", self.new_game.emit)
         self.again_button.setVisible(False)
-        self.new_button.setVisible(True)
 
         side = QVBoxLayout()
         side.addWidget(self.banner)
@@ -212,7 +207,7 @@ class GamePage(QWidget):
     def _fill_moves(self) -> None:
         sans = self.model.san_moves
         self.moves.setRowCount((len(sans) + 1) // 2)
-        shown = len(self._position().move_stack)
+        shown = len(sans) if self._view is None else self._view
         for ply, san in enumerate(sans):
             row, column = divmod(ply, 2)
             if column == 0:
@@ -231,8 +226,7 @@ class GamePage(QWidget):
         mine = self.players[turn].is_human and live and not over
         self.board.set_movable(turn if mine else None)
         busy = self._thread is not None
-        humans = [c for c, p in self.players.items() if p.is_human]
-        can_act = bool(humans) and not over
+        can_act = bool(self.humans) and not over
         self.undo_button.setEnabled(
             can_act
             and not busy
@@ -246,12 +240,13 @@ class GamePage(QWidget):
             self.status.setText(f"{who} is thinking…" if busy else f"{who} to move")
 
     def _tick(self) -> None:
+        over = self.model.outcome() is not None
         clock = self.model.clock
         if clock is not None:
-            running = self.model.turn if self.model.outcome() is None else None
+            running = None if over else self.model.turn
             for color, bar in self.bars.items():
                 bar.set_clock(clock.remaining(color), color == running)
-        if not self._ended and self.model.outcome() is not None:
+        if over and not self._ended:
             self._end()
 
     # -- playing --------------------------------------------------------------------------
@@ -339,8 +334,7 @@ class GamePage(QWidget):
             QMessageBox.information(self, "Draw", f"{self.names[opponents[0]]} declines the draw.")
 
     def _resign(self) -> None:
-        humans = [c for c, p in self.players.items() if p.is_human]
-        color = self.model.turn if self.model.turn in humans else humans[0]
+        color = self.model.turn if self.model.turn in self.humans else self.humans[0]
         self._finish_with(lambda: self.model.resign(color))
 
     def _finish_with(self, action) -> None:
@@ -401,7 +395,6 @@ class GamePage(QWidget):
         self.again_button.setVisible(True)
         self.status.setText("Game over")
         self._update_controls()
-        self.board.set_movable(None)
 
     def close_game(self) -> None:
         """Stop the clocks and wait for a running search; call before leaving the page."""

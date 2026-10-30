@@ -7,13 +7,7 @@ from typing import Callable, List, Optional, Tuple
 import chess
 import chess.pgn
 
-PIECE_VALUES = {
-    chess.PAWN: 1,
-    chess.KNIGHT: 3,
-    chess.BISHOP: 3,
-    chess.ROOK: 5,
-    chess.QUEEN: 9,
-}
+from chess_engine.evaluation.features import PIECE_VALUES
 
 
 @dataclass(frozen=True)
@@ -116,7 +110,7 @@ def material(board: chess.Board, color: chess.Color) -> int:
     :return: Sum of the values of its pieces.
     """
     return sum(
-        PIECE_VALUES.get(piece.piece_type, 0)
+        PIECE_VALUES[piece.piece_type]
         for piece in board.piece_map().values()
         if piece.color == color
     )
@@ -161,7 +155,7 @@ class GameModel:
         """
         if self.outcome() is not None:
             return []
-        return [move for move in self.board.legal_moves if move.from_square == square]
+        return list(self.board.generate_legal_moves(from_mask=chess.BB_SQUARES[square]))
 
     def make_move(self, move: chess.Move) -> str:
         """Play a move and switch the clocks.

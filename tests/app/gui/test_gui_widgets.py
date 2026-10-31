@@ -66,7 +66,7 @@ def test_board_ignores_other_colour_and_orientation(app):
 def test_game_page_human_move_and_undo(app):
     setup = MatchSetup(
         white=PlayerSetup(),
-        black=PlayerSetup(AISettings(evaluation="h1", max_depth=1, move_time=0.2)),
+        black=PlayerSetup(AISettings(max_depth=1, move_time=0.2)),
         base=None,
     )
     page = GamePage(setup)
@@ -89,7 +89,7 @@ def test_game_page_human_move_and_undo(app):
 def test_game_page_resign(app):
     setup = MatchSetup(
         white=PlayerSetup(),
-        black=PlayerSetup(AISettings(evaluation="h1", max_depth=1, move_time=0.1)),
+        black=PlayerSetup(AISettings(max_depth=1, move_time=0.1)),
         base=60.0,
     )
     page = GamePage(setup)
@@ -120,7 +120,7 @@ def test_setup_page_builds_the_match(app):
 def test_settings_dialog_round_trip(app):
     from chess_engine.gui.settings_dialog import AISettingsDialog
 
-    original = AISettings(evaluation="h1", max_depth=5, move_time=None, tablebase=False)
+    original = AISettings(max_depth=5, move_time=None, tablebase=False)
     dialog = AISettingsDialog(original)
     assert dialog.settings() == original
     dialog.depth.setValue(7)
@@ -136,7 +136,7 @@ def test_main_window_starts_and_drops_a_game(app):
     window.start_game(
         MatchSetup(
             white=PlayerSetup(),
-            black=PlayerSetup(AISettings(evaluation="h1", max_depth=1, move_time=0.1)),
+            black=PlayerSetup(AISettings(max_depth=1, move_time=0.1)),
             base=None,
         )
     )

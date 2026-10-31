@@ -16,7 +16,7 @@
 - **A card keeps measurements of the previous model after retraining.** `clear_measurements` empties them on training; before comparing, check the date and commit of each section.
 - **Two long processes write the same log.** Use absolute paths, launch once, check with `ps`, stop by PID.
 - **Stopping a tournament or training with `kill` of the parent leaves `multiprocessing` workers orphaned** (alive two days later at 2.3 GB each). Afterwards run `ps -eo pid,ppid,etime,rss,args` and kill by PID those with `ppid 1`.
-- **Measuring speed under load.** `src/chess_lab/scripts/bench/measure_search_speed.py` uses the clock: do not run the suite or compile meanwhile, and compare with the same `--workers`.
+- **Measuring speed under load.** `(removed) scripts/bench/measure_search_speed.py` uses the clock: do not run the suite or compile meanwhile, and compare with the same `--workers`.
 
 ## Search
 

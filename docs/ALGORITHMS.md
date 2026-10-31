@@ -9,7 +9,7 @@
 A chess engine tries moves, imagines the replies, and picks the move leading to the best position it
 can force. With about 30 moves per position the lines explode, so everything below is about looking at
 fewer or better positions within the clock. After the main algorithm, each technique gets a section
-with five parts (problem, what it does, how it is implemented, measured effect, status). Code: `rust/src/search/`, `rust/src/board.rs`, `src/chess_engine/bots/`; evaluations: [MODELS.md](MODELS.md).
+with five parts (problem, what it does, how it is implemented, measured effect, status). Code: `rust/src/search/`, `rust/src/board.rs`, `(removed) chess_engine/bots/`; evaluations: [MODELS.md](MODELS.md).
 
 The search was first written in Python and moved to Rust ([Rust and threads](algorithms/rust-and-threads.md)). The node counts, the pruning
 counts and the moves quoted in these pages were measured with the Python engine; the Rust core
@@ -58,7 +58,7 @@ flowchart TD
     L --> S
 ```
 
-The measured tables below come from `python src/chess_lab/scripts/bench/compare_search_features.py`: a fixed sample
+The measured tables below come from `python (removed) scripts/bench/compare_search_features.py`: a fixed sample
 of test positions searched with each technique switched off, one at a time, with `linear_material`
 as evaluation. Its report files are local (not versioned), so the numbers are copied here.
 

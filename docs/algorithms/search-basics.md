@@ -56,10 +56,10 @@ original rule ends 15 of 85 moves under depth 3 with a 40 s budget (19 with 10 s
 rule ends none. An earlier replay with a cold table, or with a table warmed by a deeper search of the
 same position, did not reproduce it; the recorded series, taken from consecutive moves of a game, did.
 
-**The estimators compared.** `python src/chess_lab/scripts/bench/record_iteration_times.py` replays the
+**The estimators compared.** `python (removed) scripts/bench/record_iteration_times.py` replays the
 positions of finished games with the stopping rules disabled and records the duration of every
 iteration (85 moves of three games, two of `linear_material` and one of `net4_pst`);
-`python src/chess_lab/scripts/bench/compare_time_estimators.py` replays the loop on those series with each rule.
+`python (removed) scripts/bench/compare_time_estimators.py` replays the loop on those series with each rule.
 With a 40 s budget (the cap used with 10 minutes on the clock):
 
 | rule | mean depth | budget used | stopped though the next iteration fitted | iteration cut by the hard limit | move over budget +15 % |
@@ -80,8 +80,8 @@ hundred games can resolve.
 
 **How it is implemented.** `iterative_deepening` in `rust/src/search/deepening.rs` (loop,
 `OVERSHOOT_FACTOR = 1.15`, discard of truncated iterations; `completed_depth` in the statistics).
-`TimeManager` in `src/chess_engine/bots/time_manager.py` holds the numbers;
-`SearchBot.get_move` in `src/chess_engine/bots/search_bot.py` computes the soft budget and
+`TimeManager` in `(removed) chess_engine/bots/time_manager.py` holds the numbers;
+`SearchBot.get_move` in `(removed) chess_engine/bots/search_bot.py` computes the soft budget and
 the hard limit and passes them to the core. `elapsed` runs from the start of the move, not of each
 iteration.
 
@@ -89,7 +89,7 @@ iteration.
 below depth 3 (126 of 1,051). With the floor of three iterations, 0 of the 2,900 moves of the first 34
 games at 10 min + 5 s did; at 1 min + 1 s, 0 to 0.1 % for the learned models and 5.7 % for `h1`, the
 slowest evaluation, whose depth-3 iteration is sometimes cut by the hard limit when the clock is low
-(`python src/chess_lab/scripts/bench/depth_in_game_logs.py data/tournament/reference`). The tournaments in this repository were played with the original
+(`python (removed) scripts/bench/depth_in_game_logs.py data/tournament/reference`). The tournaments in this repository were played with the original
 estimator and the floor; the estimator above was chosen afterwards and was not replayed in games. The logs are local files.
 
 **Status.** Iterative deepening and `TimeManager`: kept, since the first commit (2026-10-16).
@@ -112,7 +112,7 @@ nothing is stored once the clock has truncated a search. With several threads th
 lock-free one shared by all of them ([several threads](rust-and-threads.md#several-threads-lazy-smp)). It is shared by the iterations of a move and by the moves of a game, and cleared in
 `on_game_start` (values are from the point of view of the colour played). Quiescence does not use it.
 
-**Measured effect.** `python src/chess_lab/scripts/bench/compare_search_features.py --player linear_material
+**Measured effect.** `python (removed) scripts/bench/compare_search_features.py --player linear_material
 --positions 60 --depth 4` (60 positions; the table is empty at the start of every position):
 
 | variant | nodes/move | s/move | same as baseline | Stockfish |
@@ -177,7 +177,7 @@ rest of the quiet moves by their history score (`history`, if on).
 **How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/ordering.rs` (score
 `10 × victim − attacker`; a stable sort, so equal captures keep the order of generation (the one python-chess used)
 them in, `generation_order` in `rust/src/board.rs`). `fallback_move` in
-`src/chess_engine/bots/search_bot.py` picks the best capture when a search returns nothing.
+`(removed) chess_engine/bots/search_bot.py` picks the best capture when a search returns nothing.
 
 **Measured effect.** Depth 4, 60 positions: without ordering 64,003 nodes per move instead of 15,988
 (ordering saves 75.0 % of the nodes) and 5.408 s instead of 1.365 s (74.8 % less time); 11.7 % of the
@@ -204,7 +204,7 @@ is also the default of the search function itself.
 
 **Measured effect.**
 
-Measured with `python src/chess_lab/scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` on 1000
+Measured with `python (removed) scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` on 1000
 test positions (seed 42); agreement is the share of positions where the chosen move is Stockfish's
 move (report: `data/reports/QUIESCENCE.md`).
 
@@ -284,7 +284,7 @@ recording `stop_reason = "tablebase"` in the search statistics; `tablebase=None`
 turns it off (the window has a switch for it). It is on by default when the tables are present; the tournaments and measurement scripts
 build their players without it (`make_player`), so that they compare evaluations and search, not tables.
 
-**Measured effect.** Measured with `python src/chess_lab/scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`
+**Measured effect.** Measured with `python (removed) scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`
 (report: `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions with three to five pieces, the
 defender always plays the tablebase move, the winner has 0.5 s per move and 100 moves to mate. The search
 with the tables converts 52 of 60 (mean 14.2 moves to mate); the same search without them converts 8 of

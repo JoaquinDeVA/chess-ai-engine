@@ -3,19 +3,16 @@
 import chess
 import pytest
 
-from chess_engine.bots.search_bot import SearchBot
 from chess_engine.gui.game_model import (
     Clock,
     GameModel,
     ai_accepts_draw,
 )
 from chess_engine.gui.settings import (
-    HEURISTIC,
+    DEFAULT_TECHNIQUES,
     AISettings,
     MatchSetup,
     PlayerSetup,
-    available_evaluations,
-    evaluation_label,
 )
 
 
@@ -140,31 +137,8 @@ def test_pgn_has_the_names_and_the_result():
     assert '[White "You"]' in pgn and '[Result "0-1"]' in pgn and "Qh4#" in pgn
 
 
-def test_ai_settings_become_bot_options():
-    options = AISettings(
-        evaluation="linear_material", max_depth=5, move_time=2.0, opening_book=False
-    ).bot_options()
-    assert options["evaluation"] == "linear_material" and options["max_depth"] == 5
-    assert options["opening_book"] is None and "tablebase" not in options
-    assert options["time_manager"].max_turn_time == 2.0
-    heuristic = AISettings(evaluation=HEURISTIC, move_time=None, tablebase=False)
-    assert heuristic.bot_options()["evaluation"] == HEURISTIC
-    assert "time_manager" not in heuristic.bot_options()
-    assert heuristic.bot_options()["tablebase"] is None
-
-
-def test_bot_options_build_a_search_bot():
-    settings = AISettings(
-        evaluation="linear_material", max_depth=4, opening_book=False, tablebase=False, threads=1
-    )
-    bot = SearchBot(**settings.bot_options())
-    assert bot.max_depth == 4 and bot.opening_book is None and bot.tablebase is None
-
-
-def test_setup_names_and_evaluations():
-    assert evaluation_label("linear_material") == "Material logistic model (linear_material)"
-    evaluations = available_evaluations()
-    assert evaluations[-1] == HEURISTIC and "linear_pst_terms" in evaluations
+def test_setup_names_and_defaults():
+    assert AISettings().techniques == DEFAULT_TECHNIQUES and "lmr" not in AISettings().techniques
     setup = MatchSetup()
     assert setup.white.is_human and setup.has_humans() and setup.white.label == "You"
     assert not MatchSetup(PlayerSetup(AISettings()), PlayerSetup(AISettings())).has_humans()

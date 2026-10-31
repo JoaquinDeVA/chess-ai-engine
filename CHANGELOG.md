@@ -5,11 +5,12 @@ All notable changes. The newest are first.
 ## Unreleased
 
 ### Added
-- **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (evaluation, depth, time per move, opening book, tablebases, search techniques, quiescence, threads). See [The window](docs/GUI.md).
+- **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (depth, time per move, opening book, tablebases, search techniques, threads). See [The window](docs/GUI.md).
+- **A UCI engine**, `rust/target/release/uci` (`cargo build --release --bin uci`): the search of the Rust core behind the UCI protocol (`position`, `go depth|movetime|wtime … winc … binc|nodes|infinite`, `setoption` for `Threads`, `Hash`, `Techniques` and `Model`, `stop`, `bestmove`). The window plays through it with `chess_engine/uci.py`. See [Architecture](docs/ARCHITECTURE.md).
 
 ### Changed
-- One bot, `chess_engine.bots.SearchBot`, replaces the bot registry and the three bot classes; its evaluation is a spec (`name`, `name@tag` or `h1`, optionally `+tech1,tech2` or `+all`). `chess_engine.engine` is now `chess_engine.game` (`play_game`, `GameResult`) and `chess_engine.search` was folded into `chess_engine.bots`. `_core.ESTIMATOR_NAMES` is now `_core.ESTIMATORS`.
-- `chess_lab.comparison` was split: `python -m chess_lab.measure.{report,evaluate}` (model measures) and `python -m chess_lab.tournaments.play_tournament`; the players shared by the scripts live in `chess_lab.players`.
+- The window's AI is the UCI engine: the Python bot classes, the Python game loop and the Python search wrapper are gone. The window keeps the book and the tablebases in Python, before the engine. The engine has one evaluation (`linear_pst_terms`) and quiescence fixed at 4 plies, so the Settings dialog no longer offers them.
+- The laboratory measures models with `python -m chess_lab.measure.{report,evaluate}`. Games between engines are no longer played by this repository: fastchess plays them against the UCI binary. The pipeline `run_full_pipeline.sh` no longer runs tournaments.
 - Dependencies: `numpy` is a base dependency; `joblib` and `pytest-cov` were dropped.
 - Search depth is decided by the clock: the bots no longer default to `max_depth=3` and `min_depth` is 1 (was 3); `max_depth` is an optional explicit limit (`None` = no limit, technical cap `MAX_DEPTH` = 30). In the window, "Maximum depth" 0 means no limit.
 
@@ -17,11 +18,11 @@ All notable changes. The newest are first.
 - The reference files that pinned the core to the Python engine (their test and the Rust tests that read them); the rules are checked by perft and end-of-game tests in `rust/tests/rules.rs`, the book and tables by `rust/tests/knowledge.rs`, and the positions of the technique tests moved to `tests/data/positions.json`.
 - The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
 - `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
+- The Python game loop and bots (`chess_engine.bots`, `chess_engine.game`), the Python tournament (`chess_lab.tournaments`, `chess_lab.players`, `measure/tradeoff.py`) and the experiment scripts in `scripts/bench/`. The results they produced stay in [Results](docs/RESULTS.md); their code is in the git history before this version.
 
 ### Changed
 - Training moved out of the application: `chess_lab.models` now holds the feature extractors, `representation.py`, `spec.py`, `new_model`/`fit_stream` and `PythonEvaluator`. `chess_engine.models` only loads, saves and registers models (`LinearEvalModel(weights, bias, rep)` takes the weights instead of building zeros; `rep` is a plain dictionary and the `.npz` format is unchanged). `EvaluationModel` lost `predict_cp`, `predict_cp_batch` and `cp_to_expected_score`; only the laboratory evaluates in Python.
 - The laboratory is its own package, `chess_lab` (`src/chess_lab/`): `training/`, `comparison/` and the former top-level `scripts/` left `chess_engine`. Commands change from `python -m chess_engine.training.train` and `chess_engine.comparison.*` to `python -m chess_lab.training.train` and `chess_lab.comparison.*`, and scripts from `scripts/...` to `src/chess_lab/scripts/...`. The application no longer imports the laboratory.
-- The tournament script moved from `scripts/bench/play_tournament.py` to `chess_lab.comparison.play_tournament`; it takes the same options and runs with `python -m chess_lab.comparison.play_tournament`.
 
 ### Fixed
 - `_core.TECHNIQUES`, and with it `--techniques all` and the `+all` suffix of the tournament players, now include `incremental`; before, `all` left it out.

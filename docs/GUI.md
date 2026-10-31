@@ -10,8 +10,7 @@
 
 The engine had only a console game with a long list of options, and moves typed in UCI. A window
 lets a person play on a board and choose who plays whom, and keeps the options of the bots on one
-screen instead of on the command line. Tournaments between bots, which need no window, have their
-own entry point.
+screen instead of on the command line. Games between engines run without the window, with fastchess.
 
 ## What it does
 
@@ -45,23 +44,25 @@ mate, which is a draw.
 
 ## AI settings
 
-Every setting is an option of `SearchBot(**options)` (`gui/settings.py`:
-`AISettings.bot_options`). The defaults are those of the bots.
+Every setting is a field of `AISettings` (`gui/settings.py`). The engine is the UCI binary
+`rust/target/release/uci`, which has one evaluation (`linear_pst_terms`, compiled in) and a fixed
+quiescence depth of 4 plies, so neither is a setting.
 
-| Setting | Bot option | Default |
-|---|---|---|
-| Evaluation: the hand-written heuristic `h1` or a model whose file exists, shown as full name and id, e.g. "Piece-square-and-terms logistic model (`linear_pst_terms`)" | `evaluation` | `linear_pst_terms` |
-| Maximum depth (0 = no limit: the time decides) | `max_depth` | no limit |
-| Fixed time per move; unchecked, the bot spends a share of its clock | `time_manager` | 3 s |
-| Opening book | `opening_book` | on |
-| Endgame tablebases (up to five pieces) | `tablebase` | on |
-| Advanced: quiescence plies | `quiescence_plies` | 4 |
-| Advanced: search techniques | `techniques` | all but `lmr` |
-| Advanced: search threads | `threads` | up to 4 |
+| Setting | `AISettings` field | UCI option or `go` limit | Default |
+|---|---|---|---|
+| Maximum depth (0 = no limit: the time decides) | `max_depth` | `go depth N` | no limit |
+| Fixed time per move; unchecked, the engine spends a share of its clock | `move_time` | `go movetime ms` | 3 s |
+| Opening book | `opening_book` | none: read in Python before the engine | on |
+| Endgame tablebases (up to five pieces) | `tablebase` | none: read in Python before the engine | on |
+| Advanced: search techniques | `techniques` | `setoption name Techniques` | all but `lmr` |
+| Advanced: search threads | `threads` | `setoption name Threads` | up to 4 |
+
+With a clock and no fixed time, the window sends `wtime`, `btime`, `winc` and `binc`; the binary
+does not use the increment yet (see [Architecture](ARCHITECTURE.md)).
 
 **Implementation.** The bot searches on a `QThread` (`game_window.py: MoveThread`), so the window
-does not freeze: the Rust search releases the Python lock while it runs. Each game builds new
-bots; an answer to an old request (after an undo or a resignation) is ignored.
+does not freeze: the UCI binary is a separate process, and `UciBot` (`chess_engine/uci.py`) waits for its
+`bestmove`. Each game builds new bots; an answer to an old request (after an undo or a resignation) is ignored.
 `game_model.py` (position, SAN list, clocks, result, undo) and `settings.py` do not import Qt and are
 tested without a window (`tests/app/gui/test_gui_model.py`); the widgets are tested offscreen
 (`tests/app/gui/test_gui_widgets.py`, skipped if PySide6 is missing).

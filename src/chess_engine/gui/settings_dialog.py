@@ -4,7 +4,6 @@ from typing import Optional
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -16,12 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from chess_engine import _core
-from chess_engine.gui.settings import (
-    MAX_SETTABLE_DEPTH,
-    AISettings,
-    available_evaluations,
-    evaluation_label,
-)
+from chess_engine.gui.settings import MAX_SETTABLE_DEPTH, AISettings
 
 
 class AISettingsDialog(QDialog):
@@ -36,12 +30,6 @@ class AISettingsDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.evaluation = QComboBox()
-        for name in available_evaluations():
-            self.evaluation.addItem(evaluation_label(name), name)
-        index = self.evaluation.findData(current.evaluation)
-        self.evaluation.setCurrentIndex(max(0, index))
-
         self.depth = QSpinBox()
         self.depth.setRange(0, MAX_SETTABLE_DEPTH)
         self.depth.setSpecialValueText("No limit")
@@ -63,17 +51,12 @@ class AISettingsDialog(QDialog):
         self.tablebase = QCheckBox("Endgame tablebases (up to 5 pieces)")
         self.tablebase.setChecked(current.tablebase)
 
-        self.quiescence = QSpinBox()
-        self.quiescence.setRange(0, 12)
-        self.quiescence.setValue(current.quiescence_plies)
-        self.quiescence.setToolTip("Plies of capture search at the horizon (0 = off)")
         self.threads = QSpinBox()
         self.threads.setRange(1, 64)
         self.threads.setValue(current.threads)
         self.techniques = {}
         advanced = QGroupBox("Advanced")
         advanced_form = QFormLayout(advanced)
-        advanced_form.addRow("Quiescence plies", self.quiescence)
         advanced_form.addRow("Search threads", self.threads)
         for technique in _core.TECHNIQUES:
             box = QCheckBox(technique)
@@ -87,7 +70,6 @@ class AISettingsDialog(QDialog):
         toggle.toggled.connect(lambda _: self.adjustSize())
 
         form = QFormLayout()
-        form.addRow("Evaluation", self.evaluation)
         form.addRow("Maximum depth", self.depth)
         form.addRow(self.fixed_time, self.move_time)
         form.addRow(self.book)
@@ -104,12 +86,10 @@ class AISettingsDialog(QDialog):
     def settings(self) -> AISettings:
         """The settings the controls show."""
         return AISettings(
-            evaluation=self.evaluation.currentData(),
             max_depth=self.depth.value() or None,
             move_time=self.move_time.value() if self.fixed_time.isChecked() else None,
             opening_book=self.book.isChecked(),
             tablebase=self.tablebase.isChecked(),
-            quiescence_plies=self.quiescence.value(),
             techniques=tuple(name for name, box in self.techniques.items() if box.isChecked()),
             threads=self.threads.value(),
         )

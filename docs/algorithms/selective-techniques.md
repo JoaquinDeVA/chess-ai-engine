@@ -10,14 +10,14 @@
 
 The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it. Each technique is a field of `Techniques` (`rust/src/search/options.rs`), a
 name in `_core.TECHNIQUES`, the option `techniques` of `SearchBot` and the Advanced panel of the AI settings of the window
-(`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`src/chess_engine/bots/search_bot.py`): all but
+(`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`(removed) chess_engine/bots/search_bot.py`): all but
 `lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
 so results of different engines are never mixed.
 
 **How they were judged.** Two measurements, both repeatable.
 
 1. Nodes and time at depth 6 over 100 positions, and how often the move equals the reference's:
-   `python src/chess_lab/scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
+   `python (removed) scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
    Position-terms model:
 
 | variant | nodes per move | s per move | same move as reference |
@@ -32,7 +32,7 @@ so results of different engines are never mixed.
 | `lmr` (mild) | 146,356 | 0.395 | 82 % |
 
 2. Games against the reference at equal time (4 s + 0.05 s per move, 100 games, colours swapped, same model):
-   `python src/chess_lab/scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
+   `python (removed) scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
 
 | candidate | score | Elo | mean depth (reference 4.68) |
 |---|---|---|---|
@@ -61,7 +61,7 @@ beside `GameState`. Switch: `incremental`. Test: `incremental_equals_full` (same
 to rounding).
 
 **Measured effect.** About 15 % more nodes per second for `net4_pst`
-(`python src/chess_lab/scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts
+(`python (removed) scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts
 agree within 1 %, not exactly.
 
 **Status.** On by default; since 2026-10-25.

@@ -7,25 +7,23 @@
 > **Next:** [Algorithms](ALGORITHMS.md)
 
 The engine has two parts. The part that must be fast, the search, the evaluations it calls and the
-opening book and endgame tables, is written in Rust (`rust/`, built as the extension module
-`chess_engine._core`). Everything else is Python in two packages: `src/chess_engine/` is the application (game loop, bots,
-models, window), and `src/chess_lab/` is the laboratory that produces and measures it (training,
-measurements, tournaments and the scripts). The laboratory imports the application; the application never imports the
-laboratory. A bot hands the position and
-an evaluation to the Rust core once per move and gets a move and the statistics back.
+opening book and endgame tables, is written in Rust (`rust/`). It is built as two products: the
+extension module `chess_engine._core` (for the Python code and the tests) and the UCI binary
+`rust/target/release/uci`, which the window plays through. Everything else is Python in two
+packages: `src/chess_engine/` is the application (window, UCI client, models), and `src/chess_lab/` is the
+laboratory that produces and measures it (training and measurements). The laboratory imports the application;
+the application never imports the laboratory. The window talks to the UCI binary once per move.
 
 ```mermaid
 flowchart TB
-    WIN["main.py → gui/<br/>window"] --> BOTS
-    TOURN["chess_lab/tournaments/play_tournament<br/>no window"] --> GM["game/play.py<br/>play_game, results"]
-    GM --> BOTS
-    BOTS["bots/search_bot.py<br/>SearchBot"] -->|"one call per move"| CORE["rust/ (chess_engine._core)<br/>search · evaluations ·<br/>opening book · endgame tables"]
-    BOTS --> EVAL["models/<br/>h1 and the learned models"]
-    EVAL -->|"weights, once"| CORE
-    TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL
-    COMP["chess_lab/measure/ · tournaments/<br/>judge · evaluate · tradeoff · report · tournament · standings"] --> TRAIN
-    COMP --> EVAL
-    COMP --> BOTS
+    WIN["main.py → gui/<br/>window"] --> UCIB["uci.py: UciBot<br/>book and tablebase first"]
+    UCIB -->|"UCI: position, go, bestmove"| BIN["rust/ uci binary<br/>search · evaluations · table"]
+    UCIB --> BOOK["knowledge/<br/>opening book · endgame tables"]
+    BIN --> CORE["rust/ (chess_engine._core)<br/>same crate, for Python"]
+    TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL["models/<br/>h1 and the learned models"]
+    MEAS["chess_lab/measure/<br/>judge · evaluate · report"] --> TRAIN
+    MEAS --> EVAL
+    MEAS --> CORE
 ```
 
 Dependencies, as the imports stand:
@@ -33,10 +31,9 @@ Dependencies, as the imports stand:
 - `rust/` imports nothing from Python except the weights it is given (`models/loader.py` builds the evaluators).
 - `models/` imports nothing from the rest of the package: it only loads, saves and registers models.
 - `chess_lab/models/` imports `models/` (the classes it trains) and holds everything that builds a model: feature extractors, the target representation, fitting and the Python evaluation. `chess_lab/training/` imports both. `models/` imports nothing from `chess_lab`.
-- `bots/` imports `models/` and `knowledge/`.
-- `game/` imports `bots/`.
-- `gui/` imports `bots/`, `models/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
-- `chess_lab/measure/` and `chess_lab/tournaments/` are the top layer: they import `chess_lab/players.py`, `bots/`, `models/`, `chess_lab/training/`, `knowledge/` and `game/`. Nothing else imports them.
+- `chess_engine/uci.py` imports `knowledge/`; it talks to the UCI binary through pipes and imports nothing from the Rust core.
+- `gui/` imports `uci.py`, `models/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
+- `chess_lab/measure/` is the top layer: it imports `models/`, `chess_lab/training/` and the Rust core. Nothing else imports it.
 
 ## Packages
 
@@ -47,34 +44,34 @@ Dependencies, as the imports stand:
 | `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
-| `bots/` | `search_bot.py`: `SearchBot`, the one bot (options `techniques`, `threads`, `hash_mb`; the evaluation is `h1` or a model spec). `search_statistics.py`: `SearchStatistics`. `time_manager.py`: per-move time budget |
+| `uci.py` | `UciEngine` (one process of the UCI binary: `position fen … moves …`, `go`, `bestmove`), `UciBot` (the AI player of the window: the opening book and the tablebases first, then the engine; the clock or the fixed time become the `go` limits) |
 | `models/` | `loader.py`: turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) or `h1` (`h1_weights.json`) into the Rust `Evaluator`, which computes the features and the score. The models are defined, trained and saved in the lab: `chess_lab/models/definitions.py` (`SparseModel`, `LinearEvalModel`, `NeuralEvalModel` and the table `MODELS`) and `cards.py` (model cards in `chess_lab/models/cards/`) |
 | `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
 | `chess_lab/training/` | `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards, and the detection of its perspective. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
-| `chess_lab/players.py` | `make_player` (a `SearchBot` from a spec such as `linear_pst+pvs`, no book or tables, for measurements), `fixed_time_manager`, `single_threaded_env`, `validate_specs` |
-| `chess_lab/measure/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `report.py` (model cards into the models table of `RESULTS.md`) |
-| `chess_lab/tournaments/` | `play_tournament.py` (entry point), `tournament.py` (round-robin at equal time, resumable records), `standings.py` (Elo, summaries and model cards of a tournament) |
+| `chess_lab/measure/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
-| `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings → bot options; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
-| `game/` | `play.py`: `play_game`, the game loop with clocks, and `GameResult`, for the tournaments |
+| `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
 
-Tournaments run with `python -m chess_lab.tournaments.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
-`build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
-`src/chess_lab/scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
-`measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,
-`compare_target_representations.py`) and `src/chess_lab/scripts/run_full_pipeline.sh`
-runs the whole flow. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and
+Data scripts live in `src/chess_lab/scripts/data/` (`build_raw_shards.py`, `build_sidecars.py`,
+`build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`), and `src/chess_lab/scripts/run_full_pipeline.sh`
+runs the data, training and measurement flow. Games between engines are played by fastchess against the UCI binary, not by
+Python code in this repository. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and
 [MODELS.md](MODELS.md) for the models themselves.
 
 ## Main classes
 
 ```mermaid
 classDiagram
-    class SearchBot {
-        evaluation
-        time_manager
-        searcher
-        get_move(board, time_limit)
+    class UciEngine {
+        new_game()
+        bestmove(board, limits)
+        close()
+    }
+    class UciBot {
+        engine
+        book
+        tablebase
+        get_move(board, clocks, increment)
         on_game_start()
     }
 
@@ -86,14 +83,12 @@ classDiagram
     SparseModel <|-- LinearEvalModel
     SparseModel <|-- NeuralEvalModel
     LinearEvalModel o-- LinearFeatures
-    SearchBot ..> Evaluator : load_evaluator(spec)
-    SearchBot o-- Searcher : Rust
-    Searcher o-- Evaluator : Rust
+    UciBot o-- UciEngine
+    UciEngine ..> Binary : pipes (UCI)
 ```
 
-`SearchBot` takes the evaluation as a spec (`h1`, a model name or `name@tag`). `models/loader.py`
-builds it from the saved weights of a model (linear and sparse-network models) or of `h1`; the core runs it,
-with no call back into Python. The bot provides the book, the tables, the time budget and the bookkeeping.
+`UciBot` decides the move source; `UciEngine` only speaks UCI. The binary has one evaluation, `linear_pst_terms`,
+compiled in (`rust/models/`), and its search options (threads, techniques) are set with `setoption`.
 
 The core identifies a position by `(zobrist hash, halfmove clock, fullmove number)`: it names the
 same positions as the FEN without building the string, and it is what the transposition table is
@@ -104,50 +99,34 @@ indexed by. The repetition history is rebuilt on every call from the root FEN an
 
 ```mermaid
 sequenceDiagram
-    participant G as play_game
-    participant B as SearchBot
-    participant S as Rust: iterative deepening
-    participant A as Rust: alpha-beta
-    participant E as Rust: evaluation
-    G->>B: get_move(board, time left)
-    B->>B: book? tablebase? budget = TimeManager.turn_budget(time left)
-    B->>S: search(root FEN, moves, evaluator, budget, hard limit, options)
-    loop depth 1 .. max_depth
-        S->>S: depth > min_depth and next depth does not fit? stop
-        S->>A: alpha-beta(depth)
-        A->>E: evaluate(leaf, player)
-        E-->>A: expected score in [0.01, 0.99]
-        A-->>S: best move + counters
-        S->>S: depth >= min_depth and budget used up? stop
+    participant W as Window
+    participant B as UciBot
+    participant K as Book and tables (Python)
+    participant U as uci binary (Rust)
+    W->>B: get_move(board, clocks, increment)
+    B->>K: book move? tablebase move?
+    alt known position
+        K-->>B: move
+    else
+        B->>U: position fen <root> moves …
+        B->>U: go wtime … btime … winc … binc …
+        U-->>B: bestmove
     end
-    S-->>B: move of the deepest finished iteration + statistics
-    B-->>G: legal move
+    B-->>W: legal move
 ```
 
-There is no depth to aim for: the clock decides. Depths 1 to `min_depth` (default 1,
-`DEFAULT_MIN_DEPTH` in `rust/src/search/options.rs`) are always completed, so there is always an
-answer. After that, the search stops when the time the next iteration
-would take (estimated from the previous ones) does not fit in the budget. Only the hard limit
-(`TimeManager.hard_limit`, checked inside the tree) interrupts an iteration, and an interrupted
-iteration is discarded unless it is the first one. If the search returns no legal move, the bot
-falls back to the best capture or the first legal move. The algorithms themselves are in
-[Algorithms](ALGORITHMS.md).
+Under a clock the binary spends a share of the time left and the increment; with `depth N` it searches
+to that depth; with `movetime` it spends that time. Without a clock or a fixed time the window sends
+`movetime 3000`. The search is iterative deepening with a hard limit inside the tree: an interrupted
+iteration is discarded unless it is the first one, so there is always a move. The algorithms themselves
+are in [Algorithms](ALGORITHMS.md).
 
-`SearchBot` takes these options (`bots/search_bot.py`):
+The binary takes its options by `setoption`: `Threads`, `Hash`, `Techniques` (a list of names, as in
+`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. Known gap: the binary reads
+the clock fields but ignores `winc`/`binc`, so the increment has no effect on the search until the
+selective-search work of the plan fixes it.
 
-| Option | Default | Meaning |
-|---|---|---|
-| `evaluation` | `linear_pst_terms` | `h1`, a model name or `name@tag`; the bot is named after it unless `name` is given |
-| `max_depth` | none (the clock decides; cap `MAX_DEPTH` = 30) | deepest iteration; a fixed depth is for benchmarks and tests |
-| `min_depth` | 1 | iterations always completed |
-| `quiescence_plies` | 4 | plies of capture and promotion search at the horizon; 0 turns it off |
-| `max_tt_entries` | 500,000 | size cap of the transposition table |
-| `estimator` | `geometric_growth` | rule that predicts the next iteration |
-| `time_manager` | `TimeManager()` | per-move time budgeting policy |
-| `tablebase`, `opening_book` | the shipped ones | endgame tables and opening book; `None` switches them off |
-
-
-## Building and testing
+## Building and testing## Building and testing
 
 The Rust crate is built by `maturin`, which `pip install -e ".[dev]"` runs (it needs a Rust
 toolchain, `rustup`). After a change in `rust/` run the same command again, or `maturin develop`,

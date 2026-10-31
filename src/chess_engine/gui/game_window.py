@@ -1,6 +1,6 @@
 """The game page: board, clocks, move list, game buttons and the bots that play."""
 
-from typing import Optional
+from typing import Dict, Optional
 
 import chess
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
@@ -18,10 +18,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from chess_engine.bots.search_bot import SearchBot
 from chess_engine.gui.board_widget import BoardPanel, BoardWidget, PlayerBar
 from chess_engine.gui.game_model import Clock, GameModel, ai_accepts_draw
 from chess_engine.gui.settings import MatchSetup
+from chess_engine.uci import UciBot
 
 #: Pause between moves when two AIs play, by the name shown in the speed menu.
 SPEEDS = {"Fast": 0.0, "Normal": 0.8, "Slow": 2.0}
@@ -32,21 +32,30 @@ class MoveThread(QThread):
 
     found = Signal(int, object)  # token, chess.Move or None
 
-    def __init__(self, token: int, bot: SearchBot, board: chess.Board, time_left: float):
+    def __init__(
+        self,
+        token: int,
+        bot: UciBot,
+        board: chess.Board,
+        clocks: Optional[Dict[chess.Color, float]],
+        increment: float,
+    ):
         """Prepare the search.
 
         :param token: Number of the request; the page ignores answers to old ones.
         :param bot: Bot that moves.
         :param board: Position (a copy; the page keeps playing on its own).
-        :param time_left: Seconds on the bot's clock (infinity without a clock).
+        :param clocks: Seconds left for each colour, or None without a clock.
+        :param increment: Seconds added after each move.
         """
         super().__init__()
-        self.token, self.bot, self.board, self.time_left = token, bot, board, time_left
+        self.token, self.bot, self.board = token, bot, board
+        self.clocks, self.increment = clocks, increment
 
     def run(self) -> None:
         """Search and report; an error is reported as no move."""
         try:
-            move = self.bot.get_move(self.board, self.time_left)
+            move = self.bot.get_move(self.board, self.clocks, self.increment)
         except Exception:  # the page shows a message; the thread must not die silently
             move = None
         self.found.emit(self.token, move)
@@ -73,17 +82,15 @@ class GamePage(QWidget):
         clock = Clock(setup.base, setup.increment) if setup.base is not None else None
         self.model = GameModel(setup.fen, clock)
         self.players = {chess.WHITE: setup.white, chess.BLACK: setup.black}
-        self.bots = {
-            c: SearchBot(**p.ai.bot_options()) for c, p in self.players.items() if p.ai is not None
-        }
+        self.bots = {c: UciBot(p.ai) for c, p in self.players.items() if p.ai is not None}
         self.names = {c: p.label for c, p in self.players.items()}
         if setup.white.label == setup.black.label:
             self.names = {
                 chess.WHITE: f"{self.names[chess.WHITE]} (White)",
                 chess.BLACK: f"{self.names[chess.BLACK]} (Black)",
             }
-        for color, bot in self.bots.items():
-            bot.on_game_start(color, self.names[not color])
+        for bot in self.bots.values():
+            bot.on_game_start()
         self.humans = [c for c, p in self.players.items() if p.is_human]
         self._token = 0
         self._thread: Optional[MoveThread] = None
@@ -289,10 +296,17 @@ class GamePage(QWidget):
         if turn not in self.bots:
             return
         clock = self.model.clock
+        clocks = None
         if clock is not None:
             clock.start(turn)
-        left = clock.remaining(turn) if clock is not None else float("inf")
-        self._thread = MoveThread(self._token, self.bots[turn], self.model.board.copy(), left)
+            clocks = {color: clock.remaining(color) for color in (chess.WHITE, chess.BLACK)}
+        self._thread = MoveThread(
+            self._token,
+            self.bots[turn],
+            self.model.board.copy(),
+            clocks,
+            self.setup.increment,
+        )
         self._thread.found.connect(self._bot_moved)
         self._thread.start()
         self._update_controls()
@@ -406,3 +420,5 @@ class GamePage(QWidget):
         if self._thread is not None:
             self._thread.wait()
             self._thread = None
+        for bot in self.bots.values():
+            bot.close()

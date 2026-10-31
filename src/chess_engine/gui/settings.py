@@ -2,93 +2,39 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
-from chess_engine import _core
-from chess_engine.bots.search_bot import DEFAULT_MODEL, DEFAULT_TECHNIQUES, HEURISTIC
-from chess_engine.bots.time_manager import TimeManager
-from chess_engine.models import installed_models
+#: Techniques of selective search the AI players use by default: the ones that won in the games
+#: against the reference search (docs/algorithms/selective-techniques.md). ``lmr`` is left out.
+DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", "null_move")
 
-#: Name shown for each evaluation next to its short id (docs/MODELS.md).
-EVALUATION_NAMES: Dict[str, str] = {
-    HEURISTIC: "Hand-written heuristic",
-    "linear_material": "Material logistic model",
-    "linear_pst": "Piece-square logistic model",
-    "linear_pst_terms": "Piece-square-and-terms logistic model",
-    "linear_king_bucket": "King-bucket logistic model",
-    "net4_pst": "Four-layer piece-square network",
-}
-
-#: Threads a bot gets by default against a person, at most.
+#: Threads an AI gets by default against a person, at most.
 DEFAULT_THREADS = max(1, min(4, os.cpu_count() or 1))
 #: Deepest iteration the window lets a person set; the default is no limit (the clock decides).
 MAX_SETTABLE_DEPTH = 30
 
-
-def evaluation_label(evaluation: str) -> str:
-    """Name and id of an evaluation, e.g. ``Material logistic model (linear_material)``.
-
-    :param evaluation: Short id.
-    :return: Text for a menu.
-    """
-    name = EVALUATION_NAMES.get(evaluation)
-    return f"{name} ({evaluation})" if name else evaluation
-
-
-def available_evaluations() -> List[str]:
-    """Evaluations that can be played now: the heuristic and the models whose file exists.
-
-    :return: Short ids, the default model first and the heuristic last.
-    """
-    models = installed_models()
-    models.sort(key=lambda name: (name != DEFAULT_MODEL, name))
-    return models + [HEURISTIC]
+#: Name shown on the board for an AI.
+AI_NAME = "AI"
 
 
 @dataclass(frozen=True)
 class AISettings:
     """How an AI player thinks (the options of the settings dialog).
 
-    :param evaluation: ``"h1"`` or the id of a model.
     :param max_depth: Deepest iteration of the search; ``None`` lets the time decide.
     :param move_time: Seconds per move, or None to spend a share of the clock.
     :param opening_book: Play the book while the game follows it.
     :param tablebase: Play endings of up to five pieces from the tables.
-    :param quiescence_plies: Plies of capture search at the horizon (0 = off).
     :param techniques: Selective-search techniques to switch on.
     :param threads: Threads that search.
     """
 
-    evaluation: str = DEFAULT_MODEL
     max_depth: Optional[int] = None
     move_time: Optional[float] = 3.0
     opening_book: bool = True
     tablebase: bool = True
-    quiescence_plies: int = _core.DEFAULT_QUIESCENCE_PLIES
-    techniques: Tuple[str, ...] = tuple(DEFAULT_TECHNIQUES)
+    techniques: Tuple[str, ...] = DEFAULT_TECHNIQUES
     threads: int = DEFAULT_THREADS
-
-    def bot_options(self) -> Dict[str, Any]:
-        """Constructor options for :class:`~chess_engine.bots.search_bot.SearchBot`.
-
-        :return: Keyword arguments of the bot.
-        """
-        options: Dict[str, Any] = {
-            "evaluation": self.evaluation,
-            "max_depth": self.max_depth,
-            "quiescence_plies": self.quiescence_plies,
-            "techniques": tuple(self.techniques),
-            "threads": self.threads,
-        }
-        if not self.opening_book:
-            options["opening_book"] = None
-        if not self.tablebase:
-            options["tablebase"] = None
-        if self.move_time is not None:
-            options["time_manager"] = TimeManager(
-                min_turn_time=self.move_time, max_turn_time=self.move_time
-            )
-        return options
 
 
 @dataclass(frozen=True)
@@ -105,7 +51,7 @@ class PlayerSetup:
     @property
     def label(self) -> str:
         """Name shown on the board."""
-        return "You" if self.ai is None else EVALUATION_NAMES.get(self.ai.evaluation, "AI")
+        return "You" if self.ai is None else AI_NAME
 
 
 @dataclass(frozen=True)

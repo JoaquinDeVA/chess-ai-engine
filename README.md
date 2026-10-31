@@ -64,33 +64,33 @@ Two entries:
 pip install -e ".[gui]"
 python main.py
 
-# no window: tournaments between bots
-python -m chess_lab.tournaments.play_tournament --help
+# the UCI engine the window plays with (the window looks for it in rust/target/release/)
+cargo build --release --manifest-path rust/Cargo.toml --bin uci
 ```
 
 In the window you choose who plays White and Black (a person or an AI), the time control and, with the
-**Settings** button of every AI, how it thinks (see [The window](docs/GUI.md)). The tournaments are
-described in [Results](docs/RESULTS.md).
+**Settings** button of every AI, how it thinks (see [The window](docs/GUI.md)). Tournaments are
+no longer in this repository: they are played with fastchess against the UCI binary, and the results
+are in [Results](docs/RESULTS.md).
 
 ### Extras of the bots
 
 The search bots come with everything that helps them play, and every extra can be switched off, for
-example to compare evaluations alone (the tournaments of the results page do that).
+example to compare evaluations alone.
 
 | Extra | What it does | Switch | Default | Details |
 |---|---|---|---|---|
-| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it | Settings → Opening book; option `opening_book` | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
-| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists) | Settings → Endgame tablebases; option `tablebase` | on | [Algorithms](docs/algorithms/search-basics.md#endgame-tablebases) |
-| Quiescence, time estimator, minimum depth | Search settings: quiescence 4 plies, estimator `geometric_growth`, minimum depth 1 | Settings → Advanced (quiescence); options `quiescence_plies`, `estimator`, `min_depth` | on | [Algorithms](docs/algorithms/search-basics.md) |
-| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | Settings → Advanced; option `techniques` | on (all but `lmr`) | [Algorithms](docs/algorithms/selective-techniques.md) |
-| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | Settings → Advanced (threads); options `threads`, `hash_mb` | 1 thread | [Algorithms](docs/algorithms/rust-and-threads.md#several-threads-lazy-smp) |
+| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it; the Python side consults it before the engine | Settings → Opening book; `AISettings.opening_book` | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
+| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists); consulted before the engine | Settings → Endgame tablebases; `AISettings.tablebase` | on | [Algorithms](docs/algorithms/search-basics.md#endgame-tablebases) |
+| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | Settings → Advanced; UCI option `Techniques` | on (all but `lmr`) | [Algorithms](docs/algorithms/selective-techniques.md) |
+| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | Settings → Advanced (threads); UCI option `Threads` | up to 4 | [Algorithms](docs/algorithms/rust-and-threads.md#several-threads-lazy-smp) |
 
 ## Reproduce the experiments
 
 The data (about 24 GB) and the training are described in
 [Data and training](docs/DATA_AND_TRAINING.md). Once the shards are in `data/lichess/raw`, the
-whole flow, from the sidecars to the training of the models, the measurements, the tournaments and
-the results table, is one script. It takes roughly a day on a six-core machine, most of it the 10-minute tournament (about 13 hours):
+flow, from the sidecars to the training of the models, the measurements and the models table, is one
+script. Tournaments are not part of it; they are run with fastchess (see [Results](docs/RESULTS.md)):
 
 ```bash
 DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh      # print every command without running anything
@@ -102,16 +102,14 @@ nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/pipeline.log
 ```text
 rust/           the core: rules, search, evaluations, opening book and endgame tables (Rust)
 src/chess_engine/
-  search/       search statistics and the per-move time budget
-  bots/         the playable bots (they call the core)
+  uci.py        the UCI client the window plays through (book and tables first, then the binary)
   models/       h1, the learned evaluators and their cards
+  knowledge/    the opening book and the endgame tables (Python faces of the Rust core)
   gui/          the window: board, game page, player selection and AI settings
 src/chess_lab/  the laboratory (not needed to play)
   training/     sampling, targets and the training command
-  measure/      judge, model evaluation, trade-off profile and the results table
-  tournaments/  round-robin games, standings and the tournament entry point
-  players.py    the players (from a spec) shared by both
-  scripts/      data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
+  measure/      judge, model evaluation and the results table
+  scripts/      data pipeline and run_full_pipeline.sh
 docs/           the documentation
 tests/          the test suite
 ```
@@ -129,7 +127,7 @@ cargo clippy --manifest-path rust/Cargo.toml --all-targets --features python -- 
 
 Joaquín De Vicente Abad. The base framework (game loop, bot interface)
 and the first test suite come from the course *Inteligencia Artificial e Ingeniería del
-Conocimiento* (Universidad CEU San Pablo). The search, the bots, the models and the tools are
+Conocimiento* (Universidad CEU San Pablo). The search, the UCI engine, the models and the tools are
 original work. The project uses [python-chess](https://python-chess.readthedocs.io),
 [shakmaty](https://github.com/niklasf/shakmaty) and
 [shakmaty-syzygy](https://github.com/niklasf/shakmaty-syzygy) (Rust), [PyO3](https://pyo3.rs),

@@ -21,6 +21,11 @@ DEFAULT_OUT = REPO / "rust" / "models"
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Command-line options.
+
+    :param argv: Arguments; None reads ``sys.argv``.
+    :return: The parsed options.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", default="linear_pst_terms", help="saved model name")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output folder")
@@ -28,6 +33,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    """Write the JSON file of the model.
+
+    :param argv: Arguments; None reads ``sys.argv``.
+    :return: Exit code.
+    """
     args = parse_args(argv)
     with np.load(artifact_path(args.model)) as data:
         if "W0" in data:

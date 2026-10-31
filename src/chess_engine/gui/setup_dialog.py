@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from chess_engine.gui.pieces import piece_icon
-from chess_engine.gui.settings import AISettings, MatchSetup, PlayerSetup, evaluation_label
+from chess_engine.gui.settings import AISettings, MatchSetup, PlayerSetup
 from chess_engine.gui.settings_dialog import edit_settings
 
 HUMAN, AI = "Human", "AI"
@@ -125,9 +125,7 @@ class SetupPage(QWidget):
                 "no depth limit" if settings.max_depth is None else f"depth ≤ {settings.max_depth}"
             )
             self._summary[color].setText(
-                f"{evaluation_label(settings.evaluation)} · {depth} · {time}"
-                if is_ai
-                else "You play with the mouse"
+                f"{depth} · {time}" if is_ai else "You play with the mouse"
             )
         both_human = all(k.currentText() == HUMAN for k in self._kind.values())
         self.play.setEnabled(not both_human)

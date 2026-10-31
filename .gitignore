@@ -61,11 +61,8 @@ CLAUDE.local.md
 Thumbs.db
 desktop.ini
 
-# Trabajo interno de agentes: planes, briefs, informes, notas de ejecución (no se versiona)
-.superpowers/
-
-# Vault de agentes: conocimiento local, no se versiona
-vault/
+# Trabajo interno de agentes: planes, informes, vault, runs (no se versiona)
+.planes/
 
 # Instrucciones de agente y diseño interno: local, no se versiona
 CLAUDE.md

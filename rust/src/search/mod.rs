@@ -20,8 +20,11 @@ use crate::eval::{EvalState, Evaluator};
 use shared::SharedTable;
 use tt::{move_to_front, order, Flag, History, Killers, Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
-/// Iterations that are always completed before the time estimate may stop the deepening.
-pub const DEFAULT_MIN_DEPTH: usize = 3;
+/// Iterations that are always completed before the time estimate may stop the deepening: the first,
+/// so that there is always an answer; after it the clock decides.
+pub const DEFAULT_MIN_DEPTH: usize = 1;
+/// Technical cap of the iterations; the clock stops the deepening long before in a real game.
+pub const MAX_DEPTH: usize = 30;
 /// Rule that predicts the duration of the next iteration.
 pub const DEFAULT_ESTIMATOR: &str = "geometric_growth";
 /// Weight of the "win faster / lose slower" preference, in utility units per ply.
@@ -1200,7 +1203,7 @@ mod tests {
         let (_, stats, _) = run(START, &options, 8, 0.0, 1e12, 1e-3);
         assert_eq!(
             (stats.completed_depth, stats.stop_reason),
-            (3, StopReason::Budget)
+            (options.min_depth, StopReason::Budget)
         );
     }
 

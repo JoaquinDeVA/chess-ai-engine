@@ -10,7 +10,7 @@ from chess_engine.search.time_management import TimeManager
 class IterativeHeuristicBot(IterativeDeepeningBot):
     """Clock-aware alpha-beta using the hand-crafted heuristic ``h1``.
 
-    :param max_depth: Deepest iteration to run.
+    :param max_depth: Deepest iteration to run; ``None`` (default) lets the time decide.
     :param time_manager: Time budgeting policy.
     :param search_options: Other options of :class:`IterativeDeepeningBot` (``quiescence_plies``,
         ``min_depth``, ``estimator``, ``max_tt_entries``, ``tablebase``).
@@ -18,7 +18,7 @@ class IterativeHeuristicBot(IterativeDeepeningBot):
 
     def __init__(
         self,
-        max_depth: int = 3,
+        max_depth: Optional[int] = None,
         time_manager: Optional[TimeManager] = None,
         **search_options: Any,
     ) -> None:

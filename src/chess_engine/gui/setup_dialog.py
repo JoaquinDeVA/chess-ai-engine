@@ -121,8 +121,11 @@ class SetupPage(QWidget):
             time = (
                 "share of the clock" if settings.move_time is None else f"{settings.move_time:g} s"
             )
+            depth = (
+                "no depth limit" if settings.max_depth is None else f"depth ≤ {settings.max_depth}"
+            )
             self._summary[color].setText(
-                f"{evaluation_label(settings.evaluation)} · depth ≤ {settings.max_depth} · {time}"
+                f"{evaluation_label(settings.evaluation)} · {depth} · {time}"
                 if is_ai
                 else "You play with the mouse"
             )

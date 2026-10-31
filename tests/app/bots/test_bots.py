@@ -5,7 +5,7 @@ import time
 import chess
 import pytest
 
-from chess_engine.bots._search_bots import IterativeDeepeningBot, fallback_move
+from chess_engine.bots._search_bots import MAX_DEPTH, IterativeDeepeningBot, fallback_move
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.knowledge.opening_book import OpeningBook
@@ -113,6 +113,13 @@ class TestIterativeDeepening:
         bot = IterativeHeuristicBot(max_depth=6, opening_book=None, tablebase=None)
         bot.get_move(chess.Board(MATE_IN_ONE.replace("R3K3", "4K3")), 20.0)
         assert bot.last_search_stats.max_depth_reached >= 3
+
+    def test_without_a_depth_limit_the_clock_decides(self):
+        """Regression: bots used to stop at depth 3 by default."""
+        bot = IterativeHeuristicBot(opening_book=None, tablebase=None)
+        bot.get_move(chess.Board(), 20.0)
+        assert bot.last_search_stats.completed_depth > 3
+        assert bot.max_depth == MAX_DEPTH
 
     def test_several_threads_play_a_legal_move_within_the_budget(self):
         bot = IterativeHeuristicBot(

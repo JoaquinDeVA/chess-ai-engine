@@ -18,7 +18,7 @@ fn read(path: PathBuf) -> Value {
 }
 
 fn weights() -> [f64; 6] {
-    let file = read(root().join("src/chess_engine/evaluation/h1_weights.json"));
+    let file = read(root().join("src/chess_engine/models/h1_weights.json"));
     let names = _core::eval::h1::FEATURE_NAMES;
     let mut out = [0.0; 6];
     for (slot, name) in names.iter().enumerate() {

@@ -26,6 +26,7 @@ DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", 
 #: Defaults of the search, defined in the Rust core.
 DEFAULT_ESTIMATOR = _core.DEFAULT_ESTIMATOR
 DEFAULT_MIN_DEPTH = _core.DEFAULT_MIN_DEPTH
+MAX_DEPTH = _core.MAX_DEPTH
 DEFAULT_MAX_TT_ENTRIES = _core.DEFAULT_MAX_TT_ENTRIES
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     """Clock-aware iterative deepening alpha-beta, run by the Rust core.
 
     Every move gets a time budget from the :class:`TimeManager`; the search deepens until the
-    budget is used up or ``max_depth`` is reached. A transposition table (bounded) and the
+    budget is used up or ``max_depth`` is reached; without ``max_depth`` only the clock (and
+    a technical cap of the core) stops it. A transposition table (bounded) and the
     killer moves persist during a game and are cleared when a new game starts: their values are
     from the point of view of the colour the bot played.
 
@@ -123,11 +125,12 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
 
     :param name: Bot name shown in games and tournaments.
     :param author: Author shown in bot listings.
-    :param max_depth: Deepest iteration to run.
+    :param max_depth: Deepest iteration to run; ``None`` (default) lets the time decide. A fixed
+        depth is for benchmarks and tests.
     :param time_manager: Time budgeting policy.
     :param max_tt_entries: Size cap of the transposition table.
     :param quiescence_plies: Plies of capture/promotion search at the horizon (0 = off; default 4).
-    :param min_depth: Iterations always completed whatever the clock estimate says (default 3).
+    :param min_depth: Iterations always completed whatever the clock estimate says (default 1).
     :param estimator: Rule that predicts the duration of the next iteration (see
         ``rust/src/search/estimators.rs``).
     :param tablebase: Endgame tablebases; positions with up to five pieces are played from them
@@ -150,7 +153,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self,
         name: str,
         author: str = AUTHOR,
-        max_depth: int = 3,
+        max_depth: Optional[int] = None,
         time_manager: Optional[TimeManager] = None,
         max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
         quiescence_plies: int = DEFAULT_QUIESCENCE_PLIES,
@@ -163,7 +166,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         techniques: Sequence[str] = DEFAULT_TECHNIQUES,
     ):
         super().__init__(name, author)
-        self.max_depth = max_depth
+        self.max_depth = MAX_DEPTH if max_depth is None else max_depth
         self.time_manager = time_manager or TimeManager()
         self.max_tt_entries = max_tt_entries
         self.quiescence_plies = quiescence_plies

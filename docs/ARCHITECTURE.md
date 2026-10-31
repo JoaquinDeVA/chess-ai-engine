@@ -134,9 +134,9 @@ sequenceDiagram
     B-->>G: legal move
 ```
 
-The clock only decides how deep to go after the first `min_depth` iterations: depths 1 to
-`min_depth` (default 3, `DEFAULT_MIN_DEPTH` in `rust/src/search/mod.rs`) are always completed,
-whatever the time estimate says. Beyond that, the search stops when the time the next iteration
+There is no depth to aim for: the clock decides. Depths 1 to `min_depth` (default 1,
+`DEFAULT_MIN_DEPTH` in `rust/src/search/mod.rs`) are always completed, so there is always an
+answer. After that, the search stops when the time the next iteration
 would take (estimated from the previous ones) does not fit in the budget. Only the hard limit
 (`TimeManager.hard_limit`, checked inside the tree) interrupts an iteration, and an interrupted
 iteration is discarded unless it is the first one. If the search returns no legal move, the bot
@@ -147,8 +147,8 @@ falls back to the best capture or the first legal move. The algorithms themselve
 
 | Option | Default | Meaning |
 |---|---|---|
-| `max_depth` | 3 | deepest iteration |
-| `min_depth` | 3 | iterations always completed |
+| `max_depth` | none (the clock decides; cap `MAX_DEPTH` = 30) | deepest iteration; a fixed depth is for benchmarks and tests |
+| `min_depth` | 1 | iterations always completed |
 | `quiescence_plies` | 4 | plies of capture and promotion search at the horizon; 0 turns it off |
 | `max_tt_entries` | 500,000 | size cap of the transposition table |
 | `estimator` | `geometric_growth` | rule that predicts the next iteration |

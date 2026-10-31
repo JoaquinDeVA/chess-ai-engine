@@ -51,7 +51,7 @@ Every setting is an option of `BotRegistry.get_bot(name, **options)` (`gui/setti
 | Setting | Bot option | Default |
 |---|---|---|
 | Evaluation: the hand-written heuristic `h1` or a model whose file exists, shown as full name and id, e.g. "Piece-square-and-terms logistic model (`linear_pst_terms`)" | the bot (`IterativeHeuristicBot` or `IterativeModelBookBot`) and `model` | `linear_pst_terms` |
-| Maximum depth (30 = no limit) | `max_depth` | 30 |
+| Maximum depth (0 = no limit: the time decides) | `max_depth` | no limit |
 | Fixed time per move; unchecked, the bot spends a share of its clock | `time_manager` | 3 s |
 | Opening book | `opening_book` | on |
 | Endgame tablebases (up to five pieces) | `tablebase` | on |

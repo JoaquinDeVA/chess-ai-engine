@@ -494,6 +494,7 @@ mod _core {
     fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module.add("DEFAULT_ESTIMATOR", crate::search::DEFAULT_ESTIMATOR)?;
         module.add("DEFAULT_MIN_DEPTH", crate::search::DEFAULT_MIN_DEPTH)?;
+        module.add("MAX_DEPTH", crate::search::MAX_DEPTH)?;
         module.add(
             "DEFAULT_QUIESCENCE_PLIES",
             crate::search::DEFAULT_QUIESCENCE_PLIES,

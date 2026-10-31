@@ -41,8 +41,9 @@ speed up the deeper ones (the transposition table and killer moves, below). The 
 * **Hard limit** (`TimeManager.hard_limit`): `1.5 × budget − 0.3 s` (59.7 s for a 40 s budget). The
   running iteration is then interrupted, flagged as truncated and *discarded*, unless it is the very
   first (some move is always needed).
-* **Minimum depth 3** (`min_depth`, `DEFAULT_MIN_DEPTH`): iterations 1 to 3 are always completed.
-  Only the hard limit can interrupt them. This is the fix described next.
+* **Minimum depth 1** (`min_depth`, `DEFAULT_MIN_DEPTH`): the first iteration is always completed, so
+  there is always an answer. Until 2026-10-31 the floor was 3 iterations, the fix described next for
+  the original estimator; with `geometric_growth` it makes no difference (see Status).
 
 **The defect and its cause.** In the per-move logs of a 10 min + 5 s tournament (partial, 1,051
 moves of three models), 126 moves (12.0 %) finished below depth 3, every one of them in under 2 s
@@ -92,7 +93,7 @@ slowest evaluation, whose depth-3 iteration is sometimes cut by the hard limit w
 estimator and the floor; the estimator above was chosen afterwards and was not replayed in games. The logs are local files.
 
 **Status.** Iterative deepening and `TimeManager`: kept, since the first commit (2026-10-16).
-Minimum depth 3: kept as a guard, since 2026-10-21 (commit `0cdf404`). Estimator `geometric_growth`: default since 2026-10-21 (commit `d3e848c`); the original rule stays available as `ratio_squared`.
+Minimum depth: 3 from 2026-10-21 (commit `0cdf404`), 1 from 2026-10-31 and no default depth cap (the bots used to stop at depth 3; now only the clock does). Measured with `geometric_growth` on 60 random positions (seeded; ad-hoc script, not versioned): with a floor of 1 or 3 the completed depths are identical (all at least 6 with `linear_pst_terms` at a 1.8 s budget, at least 4 with `h1` at 1 s). Repeating the iterations 4 to 7 pays: on a middlegame position the iterations to depth 7 take 730,876 nodes in total against 1,083,355 for searching depth 7 directly (`_core.Searcher.search_fixed`), because each iteration seeds the move ordering of the next. Estimator `geometric_growth`: default since 2026-10-21 (commit `d3e848c`); the original rule stays available as `ratio_squared`.
 
 ## Transposition table
 

@@ -28,8 +28,8 @@ EVALUATION_NAMES: Dict[str, str] = {
 
 #: Threads a bot gets by default against a person, at most.
 DEFAULT_THREADS = max(1, min(4, os.cpu_count() or 1))
-#: Deepest iteration of the search; the clock stops it long before in a real game.
-UNLIMITED_DEPTH = 30
+#: Deepest iteration the window lets a person set; the default is no limit (the clock decides).
+MAX_SETTABLE_DEPTH = 30
 
 
 def evaluation_label(evaluation: str) -> str:
@@ -57,7 +57,7 @@ class AISettings:
     """How an AI player thinks (the options of the settings dialog).
 
     :param evaluation: ``"h1"`` or the id of a model.
-    :param max_depth: Deepest iteration of the search.
+    :param max_depth: Deepest iteration of the search; ``None`` lets the time decide.
     :param move_time: Seconds per move, or None to spend a share of the clock.
     :param opening_book: Play the book while the game follows it.
     :param tablebase: Play endings of up to five pieces from the tables.
@@ -67,7 +67,7 @@ class AISettings:
     """
 
     evaluation: str = DEFAULT_MODEL
-    max_depth: int = UNLIMITED_DEPTH
+    max_depth: Optional[int] = None
     move_time: Optional[float] = 3.0
     opening_book: bool = True
     tablebase: bool = True

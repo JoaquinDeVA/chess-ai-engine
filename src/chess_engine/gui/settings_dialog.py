@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from chess_engine import _core
 from chess_engine.gui.settings import (
-    UNLIMITED_DEPTH,
+    MAX_SETTABLE_DEPTH,
     AISettings,
     available_evaluations,
     evaluation_label,
@@ -43,9 +43,10 @@ class AISettingsDialog(QDialog):
         self.evaluation.setCurrentIndex(max(0, index))
 
         self.depth = QSpinBox()
-        self.depth.setRange(1, UNLIMITED_DEPTH)
-        self.depth.setValue(current.max_depth)
-        self.depth.setToolTip(f"{UNLIMITED_DEPTH} = no limit: the time decides")
+        self.depth.setRange(0, MAX_SETTABLE_DEPTH)
+        self.depth.setSpecialValueText("No limit")
+        self.depth.setValue(current.max_depth or 0)
+        self.depth.setToolTip("No limit: the time decides")
 
         self.fixed_time = QCheckBox("Fixed time per move")
         self.fixed_time.setChecked(current.move_time is not None)
@@ -104,7 +105,7 @@ class AISettingsDialog(QDialog):
         """The settings the controls show."""
         return AISettings(
             evaluation=self.evaluation.currentData(),
-            max_depth=self.depth.value(),
+            max_depth=self.depth.value() or None,
             move_time=self.move_time.value() if self.fixed_time.isChecked() else None,
             opening_book=self.book.isChecked(),
             tablebase=self.tablebase.isChecked(),

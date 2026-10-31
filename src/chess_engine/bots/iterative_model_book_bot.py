@@ -21,7 +21,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
     :param model: Registered model name, or an already loaded :class:`EvaluationModel`.
     :param opening_book: Book to use; the one shipped in ``data/`` by default (an empty book
         if that file is missing); ``None`` switches it off.
-    :param max_depth: Deepest iteration to run.
+    :param max_depth: Deepest iteration to run; ``None`` (default) lets the time decide.
     :param name: Bot name shown in games and tournaments.
     :param time_manager: Time budgeting policy.
     :param search_options: Other options of :class:`IterativeDeepeningBot` (``quiescence_plies``,
@@ -33,7 +33,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         self,
         model: Union[str, EvaluationModel] = DEFAULT_MODEL,
         opening_book: Union[OpeningBook, None, str] = SHIPPED,
-        max_depth: int = 3,
+        max_depth: Optional[int] = None,
         name: str = "IterativeModelBookBot",
         time_manager: Optional[TimeManager] = None,
         **search_options: Any,

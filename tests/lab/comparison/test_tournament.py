@@ -6,6 +6,7 @@ import zlib
 from pathlib import Path
 
 import chess
+import numpy as np
 import pytest
 
 from chess_engine import _core
@@ -170,7 +171,7 @@ def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, m
 
     monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
     monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
-    PstTaperedModel().save(tmp_path / "linear_pst@x.npz")
+    PstTaperedModel(weights=np.zeros(768)).save(tmp_path / "linear_pst@x.npz")
     tournament.check_specs(["h1", "linear_pst@x"])
     with pytest.raises(ValueError, match="linear_pst@missing"):
         tournament.check_specs(["linear_pst@missing"])

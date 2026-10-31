@@ -12,8 +12,8 @@ import chess
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.base import EvaluationModel
-from chess_engine.models.representation import Representation, white_score
+from chess_lab.models.python_eval import PythonEvaluator
+from chess_lab.models.representation import Representation, white_score
 
 #: Positions per call of ``predict_cp_batch`` when judging a whole sample.
 CHUNK_SIZE = 4096
@@ -58,7 +58,7 @@ def static_metrics(pred_white: np.ndarray, true_white: np.ndarray) -> dict:
     return {"spearman": _spearman(pred, truth), "mae": mae, "n": int(pred.size)}
 
 
-def one_ply_choice(model: EvaluationModel, board: chess.Board) -> chess.Move:
+def one_ply_choice(model: PythonEvaluator, board: chess.Board) -> chess.Move:
     """Best move of the mover after one ply, judged by the model.
 
     All the non-terminal children are evaluated with a single ``predict_cp_batch`` call. A
@@ -91,7 +91,7 @@ def one_ply_choice(model: EvaluationModel, board: chess.Board) -> chess.Move:
     return moves[max(range(len(moves)), key=lambda i: scores[i])]
 
 
-def _predict_white(model: EvaluationModel, fens: list[str]) -> np.ndarray:
+def _predict_white(model: PythonEvaluator, fens: list[str]) -> np.ndarray:
     """Predicted expected scores for White, computed in chunks of :data:`CHUNK_SIZE`."""
     rep = Representation()
     parts = []
@@ -101,7 +101,7 @@ def _predict_white(model: EvaluationModel, fens: list[str]) -> np.ndarray:
     return np.concatenate(parts) if parts else np.empty(0)
 
 
-def judge(model: EvaluationModel, test: pd.DataFrame, agreement_n: int = 20_000) -> dict:
+def judge(model: PythonEvaluator, test: pd.DataFrame, agreement_n: int = 20_000) -> dict:
     """Judge a model on a test sample, on all positions and on each quiet slice.
 
     Static metrics use every row; the Stockfish truth is always on the Lichess win-probability

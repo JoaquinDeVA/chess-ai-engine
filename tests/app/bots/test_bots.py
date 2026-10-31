@@ -3,6 +3,7 @@
 import time
 
 import chess
+import numpy as np
 import pytest
 
 from chess_engine.bots._search_bots import MAX_DEPTH, IterativeDeepeningBot, fallback_move
@@ -198,7 +199,7 @@ class TestMLBots:
 
     def test_models_can_be_selected_by_name(self, tmp_path, monkeypatch):
         model_class = get_model_class("linear_material")
-        saved = model_class().save(tmp_path / "linear_material.npz")
+        saved = model_class(weights=np.zeros(5)).save(tmp_path / "linear_material.npz")
         monkeypatch.setattr(model_class, "default_path", classmethod(lambda cls: saved))
         bot = IterativeModelBookBot(model="linear_material", max_depth=1)
         assert bot.get_info()["model"] == "linear_material"

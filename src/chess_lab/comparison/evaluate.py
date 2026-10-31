@@ -18,12 +18,12 @@ import chess
 import numpy as np
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
-from chess_engine.models.base import EvaluationModel
 from chess_engine.models.cards import current_commit, load_card, today, update_card
 from chess_engine.models.native import h1_evaluator, load_h1_weights
 from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
-from chess_engine.models.representation import Representation, score_to_cp
-from chess_engine.models.spec import SAMPLE_SEED
+from chess_lab.models.python_eval import PythonEvaluator
+from chess_lab.models.representation import Representation, score_to_cp
+from chess_lab.models.spec import SAMPLE_SEED
 from chess_lab.training.dataset import TEST
 from chess_lab.training.sidecar import load_sample
 
@@ -83,7 +83,7 @@ def _median_ms(call: Callable[[chess.Board], float], fens: List[str], warmup: in
 
 
 def sample_benchmark(
-    model: Union[EvaluationModel, HeuristicModel],
+    model: Union[PythonEvaluator, HeuristicModel],
     raw: Path,
     sidecar: Path,
     agreement_n: int = AGREEMENT_ROWS,
@@ -109,7 +109,7 @@ def sample_benchmark(
     return {"accuracy": accuracy, "cost": cost}
 
 
-def features_name(model: Union[EvaluationModel, HeuristicModel]) -> str:
+def features_name(model: Union[PythonEvaluator, HeuristicModel]) -> str:
     """Name of the feature set of a model, for the card.
 
     :param model: Model instance.
@@ -173,7 +173,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     """
     args = parse_args(argv)
     heuristic = args.model in HEURISTICS
-    model = HeuristicModel(args.model) if heuristic else load_model(args.model, args.path)
+    model = (
+        HeuristicModel(args.model)
+        if heuristic
+        else PythonEvaluator(load_model(args.model, args.path))
+    )
     print(f"Evaluating {args.model} ...")
 
     sections: Dict[str, Any] = {

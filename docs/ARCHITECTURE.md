@@ -33,8 +33,8 @@ flowchart TB
 Dependencies, as the imports stand:
 
 - `rust/` imports nothing from Python except the weights it is given (`models/native.py` builds the evaluators).
-- `models/` imports nothing from the rest of the package. It holds `representation.py` and `spec.py` (target scale and shared defaults), which both the models and the training need.
-- `chess_lab/training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). `models/` imports nothing from `chess_lab`.
+- `models/` imports nothing from the rest of the package: it only loads, saves and registers models.
+- `chess_lab/models/` imports `models/` (the classes it trains) and holds everything that builds a model: feature extractors, the target representation, fitting and the Python evaluation. `chess_lab/training/` imports both. `models/` imports nothing from `chess_lab`.
 - `bots/` imports `search/`, `models/` and `knowledge/`.
 - `engine/` imports `bots/`.
 - `gui/` imports `bots/`, `models/`, `search/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
@@ -51,7 +51,8 @@ Dependencies, as the imports stand:
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
 | `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py` |
-| `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py`. Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`).  `native.py` hands a model's weights (and those of `h1`, `h1_weights.json`) to the Rust core; `cards.py` reads and writes the model cards in `models/cards/`. `representation.py`: target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept) |
+| `models/` | Saved position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py`. A model is its weights and the name of its feature set: `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models) and `neural_eval.py` (`net4_pst`) only load and save them. `native.py` hands a model's weights (and those of `h1`, `h1_weights.json`) to the Rust core, which computes the features and the score; `cards.py` reads and writes the model cards in `models/cards/` |
+| `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py` and `spec.py`: target scale and point of view, and the defaults shared by the training (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
 | `chess_lab/training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
 | `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
@@ -89,7 +90,6 @@ classDiagram
 
     class EvaluationModel {
         <<abstract>>
-        predict_cp(board)
         save()
         load()
     }
@@ -213,7 +213,7 @@ several positions, mate in one (`tests.conftest.MATE_IN_ONE`) and the board left
 | To add... | Implement | Guide |
 |---|---|---|
 | a bot | `evaluate()` in a subclass of `IterativeDeepeningBot` | the section above |
-| an evaluation model | a `LinearFeatures` and a `LinearEvalModel` (`models/linear_features.py`, `models/linear_eval.py`), or any `EvaluationModel`; register it by name in `models/registry.py`; train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
+| an evaluation model | a `LinearFeatures` (`chess_lab/models/linear_features.py`, plus its Rust version) and a `LinearEvalModel` (`models/linear_eval.py`), or any `EvaluationModel`; register it by name in `models/registry.py`; train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
 | a search technique | a change in `rust/src/search/`, measured and documented like the others | [Algorithms](ALGORITHMS.md) |
 
 ### Running a model in Rust

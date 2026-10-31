@@ -53,7 +53,7 @@ def model_evaluator(model: EvaluationModel) -> "_core.Evaluator":
     :return: Evaluator that runs inside the core.
     :raises ValueError: If the model's feature set has no Rust version.
     """
-    if not isinstance(model, LinearEvalModel) or model.features.name not in _core.FEATURE_SETS:
+    if not isinstance(model, LinearEvalModel) or model.feature_set not in _core.FEATURE_SETS:
         raise ValueError(f"{model.name} has no Rust evaluation: only the core evaluates models")
     if isinstance(model, NeuralEvalModel):
         layers = [
@@ -63,6 +63,6 @@ def model_evaluator(model: EvaluationModel) -> "_core.Evaluator":
             )
             for weights, bias in model.layers
         ]
-        return _core.Evaluator.network(model.features.name, model.rep.perspective, layers)
+        return _core.Evaluator.network(model.feature_set, model.perspective, layers)
     weights = np.ascontiguousarray(model.weights, dtype=np.float64)
-    return _core.Evaluator.linear(model.features.name, model.rep.perspective, weights, model.bias)
+    return _core.Evaluator.linear(model.feature_set, model.perspective, weights, model.bias)

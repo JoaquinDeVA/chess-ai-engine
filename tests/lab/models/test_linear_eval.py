@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models import linear_eval
 from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.linear_features import (
+from chess_engine.models.native import model_evaluator
+from chess_engine.models.registry import available_models, get_model_class
+from chess_lab.models import fit_stream, linear_eval, new_model
+from chess_lab.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
     TERM_NAMES,
@@ -20,10 +22,11 @@ from chess_engine.models.linear_features import (
     PstTermsFeatures,
     SlottedPstFeatures,
     _pawn_terms,
+    features_of,
     phase,
 )
-from chess_engine.models.registry import available_models, get_model_class
-from chess_engine.models.representation import Representation
+from chess_lab.models.python_eval import PythonEvaluator
+from chess_lab.models.representation import Representation
 from tests.conftest import material_cp, random_positions
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -46,7 +49,7 @@ def frame(boards: list[chess.Board]) -> pd.DataFrame:
 
 def random_model(seed: int = 0, rep: Representation | None = None) -> LinearEvalModel:
     """Pst model with random weights, so that scores are not trivially 0.5."""
-    model = get_model_class("linear_pst")(rep=rep)
+    model = new_model(get_model_class("linear_pst"), rep)
     rng = np.random.default_rng(seed)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
@@ -70,22 +73,22 @@ def test_pst_features_are_antisymmetric():
 def test_mirrored_position_gets_complementary_white_score():
     model = random_model(seed=3)
     for board in random_positions(20, seed=11):
-        assert model.expected_score(board) == pytest.approx(
-            1.0 - model.expected_score(board.mirror())
+        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
+            1.0 - PythonEvaluator(model).expected_score(board.mirror())
         )
 
 
 @pytest.mark.slow
 def test_fit_learns_material():
-    model = get_model_class("linear_pst")()
+    model = new_model(get_model_class("linear_pst"), Representation())
     boards = random_positions(3000, seed=5)
     batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
     config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
-    summary = model.fit_stream(batches, frame(random_positions(300, seed=9)), config)
+    summary = fit_stream(model, batches, frame(random_positions(300, seed=9)), config)
 
     assert summary["epochs"] >= 1
-    assert model.expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.9
-    assert model.expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.1
+    assert PythonEvaluator(model).expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.9
+    assert PythonEvaluator(model).expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.1
 
 
 def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
@@ -95,39 +98,45 @@ def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
 
     loaded = get_model_class("linear_pst").load(path)
 
-    assert loaded.rep == rep
+    assert Representation.from_dict(loaded.rep) == rep
     assert loaded.count_parameters() == model.count_parameters() == 769 + 1
     for board in random_positions(10, seed=2):
-        assert loaded.expected_score(board) == pytest.approx(model.expected_score(board))
-        assert loaded.predict_cp(board) == pytest.approx(model.predict_cp(board))
+        assert PythonEvaluator(loaded).expected_score(board) == pytest.approx(
+            PythonEvaluator(model).expected_score(board)
+        )
+        assert PythonEvaluator(loaded).predict_cp(board) == pytest.approx(
+            PythonEvaluator(model).predict_cp(board)
+        )
 
 
 def test_logit_matches_dense_computation():
     model = random_model(seed=6)
     for board in random_positions(10, seed=8):
-        indices, values = model.features.active(board, model.rep.perspective)
+        indices, values = features_of(model).active(board, model.perspective)
         dense = np.zeros(model.weights.shape)
         for index, value in zip(indices, values, strict=True):
             dense[index] += value
-        assert model.logit(board) == pytest.approx(float(model.weights @ dense + model.bias))
+        assert PythonEvaluator(model).logit(board) == pytest.approx(
+            float(model.weights @ dense + model.bias)
+        )
 
 
 def test_count_parameters_matches_size_plus_bias():
-    assert get_model_class("linear_pst")().count_parameters() == 768 + 1
+    assert new_model(get_model_class("linear_pst"), Representation()).count_parameters() == 768 + 1
 
 
 def test_fit_rejects_empty_validation():
-    model = get_model_class("linear_pst")()
+    model = new_model(get_model_class("linear_pst"), Representation())
     with pytest.raises(ValueError, match="validation set is empty"):
-        model.fit_stream([frame(random_positions(10, seed=1))], frame([]), {})
+        fit_stream(model, [frame(random_positions(10, seed=1))], frame([]), {})
 
 
 def test_fit_rejects_non_finite_validation_loss():
-    model = get_model_class("linear_pst")()
+    model = new_model(get_model_class("linear_pst"), Representation())
     boards = random_positions(40, seed=12)
     config = {"lr": float("nan"), "max_epochs": 2}
     with pytest.raises(ValueError, match="not finite"):
-        model.fit_stream([frame(boards)], frame(random_positions(10, seed=13)), config)
+        fit_stream(model, [frame(boards)], frame(random_positions(10, seed=13)), config)
 
 
 def test_workers_give_the_same_weights_as_one_worker():
@@ -137,10 +146,10 @@ def test_workers_give_the_same_weights_as_one_worker():
     config = {"batch_size": 16, "max_epochs": 3, "patience": 3, "lr": 0.05}
     env_before = {name: os.environ.get(name) for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS")}
 
-    serial = get_model_class("linear_pst")()
-    parallel = get_model_class("linear_pst")()
-    serial_summary = serial.fit_stream(batches, validation, {**config, "workers": 1})
-    parallel_summary = parallel.fit_stream(batches, validation, {**config, "workers": 2})
+    serial = new_model(get_model_class("linear_pst"), Representation())
+    parallel = new_model(get_model_class("linear_pst"), Representation())
+    serial_summary = fit_stream(serial, batches, validation, {**config, "workers": 1})
+    parallel_summary = fit_stream(parallel, batches, validation, {**config, "workers": 2})
 
     assert np.array_equal(serial.weights, parallel.weights)
     assert serial.bias == parallel.bias
@@ -151,13 +160,13 @@ def test_workers_give_the_same_weights_as_one_worker():
 
 
 def test_base_class_refuses_save_and_load(tmp_path):
-    with pytest.raises(TypeError, match="defines no features"):
-        LinearEvalModel()
-    with pytest.raises(TypeError, match="defines no features"):
+    with pytest.raises(TypeError, match="defines no feature set"):
+        LinearEvalModel(weights=np.zeros(1)).save(tmp_path / "base.npz")
+    with pytest.raises(TypeError, match="defines no feature set"):
         LinearEvalModel.load(tmp_path / "missing.npz")
 
 
-def test_load_rejects_weights_of_the_wrong_size(tmp_path):
+def test_core_rejects_weights_of_the_wrong_size(tmp_path):
     path = tmp_path / "wrong.npz"
     meta = {"features": "linear_pst", "rep": Representation().to_dict()}
     with open(path, "wb") as handle:
@@ -167,8 +176,9 @@ def test_load_rejects_weights_of_the_wrong_size(tmp_path):
             bias=np.float64(0.0),
             meta=np.array(json.dumps(meta)),
         )
-    with pytest.raises(ValueError, match="expected 768 weights.*found 10"):
-        get_model_class("linear_pst").load(path)
+    model = get_model_class("linear_pst").load(path)
+    with pytest.raises(ValueError, match="768"):
+        model_evaluator(model)
 
 
 MATERIAL_BOARD = "4k3/8/8/8/8/8/PPB5/R3K3 w - - 0 1"  # white: 2 pawns, 1 bishop, 1 rook
@@ -194,8 +204,8 @@ def test_material_model_mirror_complement():
     model = get_model_class("linear_material")(weights=np.array([0.3, 0.1, 0.2, 0.5, 0.9]))
     model.bias = 0.05
     for board in random_positions(20, seed=11):
-        assert model.expected_score(board) == pytest.approx(
-            1.0 - model.expected_score(board.mirror())
+        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
+            1.0 - PythonEvaluator(model).expected_score(board.mirror())
         )
 
 
@@ -262,19 +272,22 @@ def test_mobility_counts_attacks_not_legal_moves():
 
 
 def test_pst_terms_mirror_complement():
-    model = get_model_class("linear_pst_terms")()
+    model = new_model(get_model_class("linear_pst_terms"), Representation())
     rng = np.random.default_rng(3)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
     for board in random_positions(20, seed=17):
-        assert model.expected_score(board) == pytest.approx(
-            1.0 - model.expected_score(board.mirror())
+        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
+            1.0 - PythonEvaluator(model).expected_score(board.mirror())
         )
 
 
 def test_pst_terms_parameter_count():
     # 768 PST weights, two per term (middlegame and endgame), plus the bias.
-    assert get_model_class("linear_pst_terms")().count_parameters() == 768 + 2 * 11 + 1
+    assert (
+        new_model(get_model_class("linear_pst_terms"), Representation()).count_parameters()
+        == 768 + 2 * 11 + 1
+    )
 
 
 def test_pawn_cache_hit_returns_same_features():
@@ -362,31 +375,31 @@ def test_king_bucket_rejects_white_perspective():
 
 
 def test_pst_kb_mirror_complement():
-    model = get_model_class("linear_king_bucket")()
+    model = new_model(get_model_class("linear_king_bucket"), Representation())
     rng = np.random.default_rng(5)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
     for board in random_positions(20, seed=24):
-        assert model.expected_score(board) == pytest.approx(
-            1.0 - model.expected_score(board.mirror())
+        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
+            1.0 - PythonEvaluator(model).expected_score(board.mirror())
         )
 
 
 @pytest.mark.slow
 def test_pst_kb_fit_learns_material():
-    model = get_model_class("linear_king_bucket")()
+    model = new_model(get_model_class("linear_king_bucket"), Representation())
     boards = random_positions(3000, seed=25)
     batches = [frame(boards[i : i + 500]) for i in range(0, len(boards), 500)]
     config = {"l2": 0.0, "lr": 0.05, "batch_size": 256, "max_epochs": 60, "patience": 60}
-    model.fit_stream(batches, frame(random_positions(300, seed=26)), config)
+    fit_stream(model, batches, frame(random_positions(300, seed=26)), config)
 
     # Looser than the PST test: each king-bucket weight sees fewer examples, so it fits slower.
-    assert model.expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.8
-    assert model.expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.2
+    assert PythonEvaluator(model).expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.8
+    assert PythonEvaluator(model).expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.2
 
 
 def test_pst_kb_save_load_round_trip(tmp_path):
-    model = get_model_class("linear_king_bucket")()
+    model = new_model(get_model_class("linear_king_bucket"), Representation())
     rng = np.random.default_rng(8)
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = -0.2
@@ -396,13 +409,15 @@ def test_pst_kb_save_load_round_trip(tmp_path):
 
     assert loaded.count_parameters() == model.count_parameters() == 10368 + 1
     for board in random_positions(10, seed=27):
-        assert loaded.expected_score(board) == pytest.approx(model.expected_score(board))
+        assert PythonEvaluator(loaded).expected_score(board) == pytest.approx(
+            PythonEvaluator(model).expected_score(board)
+        )
 
 
 def test_pst_kb_is_registered():
     assert "linear_king_bucket" in available_models()
     model = get_model_class("linear_king_bucket")
-    assert isinstance(model.features, KingBucketFeatures)
+    assert isinstance(features_of(model), KingBucketFeatures)
     assert model.architecture == "King-bucketed piece-square features (10,368 weights), logistic"
 
 
@@ -411,8 +426,8 @@ def _cache_fit(cache_dir):
     batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
     validation = frame(random_positions(30, seed=22))
     config = {"batch_size": 16, "max_epochs": 3, "patience": 3, "lr": 0.05}
-    model = get_model_class("linear_pst")()
-    model.fit_stream(batches, validation, config, cache_dir=cache_dir)
+    model = new_model(get_model_class("linear_pst"), Representation())
+    fit_stream(model, batches, validation, config, cache_dir=cache_dir)
     return model
 
 
@@ -455,8 +470,8 @@ def _decay_fit(config):
     boards = random_positions(120, seed=31)
     batches = [frame(boards[i : i + 40]) for i in range(0, len(boards), 40)]
     validation = _flipped(random_positions(60, seed=32))
-    model = get_model_class("linear_pst")()
-    summary = model.fit_stream(batches, validation, {"batch_size": 16, "lr": 0.1, **config})
+    model = new_model(get_model_class("linear_pst"), Representation())
+    summary = fit_stream(model, batches, validation, {"batch_size": 16, "lr": 0.1, **config})
     return model, validation, summary
 
 
@@ -500,7 +515,9 @@ def test_lr_decay_restores_the_weights_of_the_best_epoch():
 
     best = summary["best_epoch"]
     assert summary["val_losses"][best - 1] == min(summary["val_losses"])
-    rows, cols, vals, targets = model._encode(validation)
+    rows, cols, vals, targets = linear_eval.encode_frame(
+        features_of(model), Representation.from_dict(model.rep), validation
+    )
     theta = np.append(model.weights, model.bias)
     z = linear_eval._scores(rows, cols, vals, len(targets), theta)
     restored = float(np.mean(linear_eval._losses(z, targets)))

@@ -1,586 +1,122 @@
-"""Logistic models over sparse board features: fast, non-neural evaluators.
+"""Linear models as the app sees them: weights read from a file and evaluated by the core.
 
-The model predicts a score in ``[0, 1]`` as ``sigmoid(w . x + b)``, where ``x`` are the sparse
-features of :mod:`linear_features`. Its target is the :class:`Representation` of the training
-data: the score of the side to move (or of White), converted back to centipawns when the model
-answers :meth:`predict_cp`.
+A model here is its weights, its bias and the name of the feature set; the core computes the
+features and the score (:mod:`chess_engine.models.native`). Building, training and evaluating a
+model in Python is the job of the laboratory.
 """
 
-import functools
 import json
-import math
-import multiprocessing
-import os
-import time
-from collections import deque
-from collections.abc import Iterable, Iterator
-from concurrent.futures import Executor, ProcessPoolExecutor
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, Optional
 
-import chess
 import numpy as np
-import pandas as pd
 
-from chess_engine.models.representation import Representation, score_to_cp, target
-
-from .base import CP_SCALE, EvaluationModel
-from .linear_features import (
-    KingBucketFeatures,
-    LinearFeatures,
-    MaterialCountFeatures,
-    PstFeatures,
-    PstTermsFeatures,
-)
+from .base import EvaluationModel
 from .registry import register_model
 
-#: Hyper-parameters used when the training configuration leaves a key out.
-DEFAULT_FIT_CONFIG: Dict[str, Any] = {
-    "l2": 1e-6,
-    "lr": 0.01,
-    "batch_size": 4096,
-    "max_epochs": 20,
-    "patience": 3,
-    "workers": 1,
-}
-_ADAM_BETA1 = 0.9
-_ADAM_BETA2 = 0.999
-_ADAM_EPS = 1e-8
-#: Thread-count variables pinned to 1 in the featurization workers (the BLAS threads of
-#: numpy would otherwise oversubscribe the cores).
-_THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
-
-EncodedFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+#: Point of view of the score when the saved representation does not say.
+DEFAULT_PERSPECTIVE = "side_to_move"
 
 
-def _sigmoid(z: float) -> float:
-    """Logistic function, stable for large magnitudes.
-
-    :param z: Logit.
-    :return: ``1 / (1 + exp(-z))``.
-    """
-    return 0.5 * (1.0 + math.tanh(0.5 * z))
-
-
-def _features_of(cls: type) -> LinearFeatures:
-    """Feature set of a concrete linear model class.
+def _feature_set_of(cls: type) -> str:
+    """Name of the feature set of a concrete model class.
 
     :param cls: A class derived from :class:`LinearEvalModel`.
-    :return: Its ``features`` attribute.
-    :raises TypeError: If the class is the abstract base, which defines no features.
+    :return: Its ``feature_set`` attribute.
+    :raises TypeError: If the class is the abstract base, which defines no feature set.
     """
-    features = getattr(cls, "features", None)
-    if features is None:
-        raise TypeError(
-            f"{cls.__name__} defines no features; use a concrete model such as PstTaperedModel"
-        )
-    return features
+    feature_set = getattr(cls, "feature_set", None)
+    if feature_set is None:
+        raise TypeError(f"{cls.__name__} defines no feature set; use a concrete model")
+    return feature_set
 
 
 class LinearEvalModel(EvaluationModel):
-    """Logistic regression over the sparse features of ``features``.
+    """Logistic regression over the sparse features of ``feature_set``.
 
-    :param weights: Coefficients, shape ``(features.size(rep.perspective),)``; zeros if omitted.
+    :param weights: Coefficients, one per feature of the set under the model's perspective.
     :param bias: Intercept.
-    :param rep: Representation of the target; defaults to :class:`Representation`.
-    :cvar features: Sparse encoding of positions.
+    :param rep: Representation of the training target as a plain dictionary; the app only reads
+        its ``perspective`` and saves the rest untouched.
+    :cvar feature_set: Name of the feature set, one of ``_core.FEATURE_SETS``.
     :cvar artifact_suffix: ``.npz``.
     """
 
-    features: ClassVar[LinearFeatures]
+    feature_set: ClassVar[str]
     artifact_suffix = ".npz"
 
     def __init__(
         self,
-        weights: Optional[np.ndarray] = None,
+        weights: np.ndarray,
         bias: float = 0.0,
-        rep: Optional[Representation] = None,
+        rep: Optional[Dict[str, Any]] = None,
     ):
-        self.rep = rep if rep is not None else Representation()
-        size = _features_of(type(self)).size(self.rep.perspective)
-        self.weights = np.zeros(size) if weights is None else weights
+        self.rep: Dict[str, Any] = dict(rep) if rep else {}
+        self.weights = np.asarray(weights, dtype=np.float64)
         self.bias = float(bias)
 
     @property
-    def weights(self) -> np.ndarray:
-        """Coefficients as a numpy array, shape ``(size,)``."""
-        return self._weights
-
-    @weights.setter
-    def weights(self, value: np.ndarray) -> None:
-        self._weights = np.asarray(value, dtype=np.float64)
-        # Plain Python floats make the per-position sum in :meth:`logit` fast.
-        self._weights_list: List[float] = self._weights.tolist()
-
-    def logit(self, board: chess.Board) -> float:
-        """Linear score of a position, before the logistic function.
-
-        It is the logit of the side to move under ``"side_to_move"``, of White under ``"white"``.
-
-        :param board: The position.
-        :return: ``w . x + b``, computed in pure Python.
-        """
-        indices, values = self.features.active(board, self.rep.perspective)
-        weights = self._weights_list
-        total = self.bias
-        for index, value in zip(indices, values, strict=True):
-            total += weights[index] * value
-        return total
-
-    def expected_score(self, board: chess.Board) -> float:
-        """Expected score of White in ``[0, 1]``.
-
-        :param board: The position.
-        :return: The logistic score, flipped to White's point of view when Black is to move
-            under ``"side_to_move"``.
-        """
-        score = _sigmoid(self.logit(board))
-        if self.rep.perspective == "side_to_move" and board.turn == chess.BLACK:
-            return 1.0 - score
-        return score
-
-    def predict_cp(self, board: chess.Board) -> float:
-        """Evaluate one position.
-
-        :param board: Position to evaluate.
-        :return: Centipawns from White's point of view, clipped to ``[-CP_SCALE, CP_SCALE]``.
-        """
-        cp = float(score_to_cp(self.expected_score(board), self.rep))
-        return min(CP_SCALE, max(-CP_SCALE, cp))
-
-    def predict_cp_batch(self, boards: Iterable[chess.Board]) -> np.ndarray:
-        """Evaluate many positions.
-
-        :param boards: Positions to evaluate.
-        :return: Centipawns from White's point of view, shape ``(n,)``.
-        """
-        return np.array([self.predict_cp(board) for board in boards], dtype=np.float64)
+    def perspective(self) -> str:
+        """``"white"`` or ``"side_to_move"``: whose point of view the score has."""
+        return self.rep.get("perspective", DEFAULT_PERSPECTIVE)
 
     def count_parameters(self) -> int:
         """Coefficients plus the intercept.
 
         :return: ``size + 1``.
         """
-        return int(self._weights.size) + 1
+        return int(self.weights.size) + 1
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "LinearEvalModel":
         """Load a saved model.
 
+        The number of weights is not checked here: the core rejects a mismatch with its feature
+        set when it builds the evaluation.
+
         :param path: File to load; defaults to :meth:`default_path`.
         :return: The model, with the representation it was trained with.
-        :raises TypeError: If called on the abstract base, which has no features.
+        :raises TypeError: If called on the abstract base, which has no feature set.
         :raises FileNotFoundError: If the file does not exist.
-        :raises ValueError: If the file was saved with other features or its weights do not
-            match the feature set.
+        :raises ValueError: If the file was saved with another feature set.
         """
-        features = _features_of(cls)
+        feature_set = _feature_set_of(cls)
         path = Path(path) if path else cls.default_path()
         if not path.exists():
             raise FileNotFoundError(f"model file not found: {path}")
         with np.load(path) as data:
             meta = json.loads(str(data["meta"]))
             weights, bias = data["weights"], float(data["bias"])
-        if meta["features"] != features.name:
+        if meta["features"] != feature_set:
             raise ValueError(f"{path} was saved with features {meta['features']!r}")
-        rep = Representation.from_dict(meta["rep"])
-        expected = features.size(rep.perspective)
-        if weights.size != expected:
-            raise ValueError(
-                f"{path}: expected {expected} weights for features {features.name!r} under "
-                f"perspective {rep.perspective!r}, found {weights.size}"
-            )
-        return cls(weights=weights, bias=bias, rep=rep)
+        return cls(weights=weights, bias=bias, rep=meta["rep"])
 
     def save(self, path: Optional[Path] = None) -> Path:
-        """Save weights, bias, features name and representation in one ``.npz`` file.
+        """Save weights, bias, feature set and representation in one ``.npz`` file.
 
         :param path: Destination; defaults to :meth:`default_path`.
         :return: The path that was written.
-        :raises TypeError: If the model has no features (the abstract base class).
+        :raises TypeError: If the model has no feature set (the abstract base class).
         """
-        features = _features_of(type(self))
+        meta = {"features": _feature_set_of(type(self)), "rep": self.rep}
         path = Path(path) if path else self.default_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        meta = {"features": features.name, "rep": self.rep.to_dict()}
         # A file object keeps numpy from appending ".npz" to the requested name.
         with open(path, "wb") as handle:
             np.savez(
                 handle,
-                weights=self._weights,
+                weights=self.weights,
                 bias=np.float64(self.bias),
                 meta=np.array(json.dumps(meta)),
             )
         return path
-
-    def fit_stream(
-        self,
-        batches: Iterable[pd.DataFrame],
-        validation: pd.DataFrame,
-        config: Dict[str, Any],
-        cache_dir: Optional[Path] = None,
-    ) -> Dict[str, Any]:
-        """Train with Adam on the binary cross-entropy against soft targets.
-
-        ``batches`` is read once per epoch, so it must be re-iterable (a list, or an object whose
-        ``__iter__`` restarts), not a one-shot generator. Minibatches never span two frames: each
-        frame is cut into chunks of at most ``batch_size`` rows, so the effective batch size
-        depends on how the caller chunks the data. The weights of the epoch with the lowest
-        validation loss are kept.
-
-        With ``workers > 1`` the frames are featurized in a process pool, in order, while the
-        main process runs the updates; the result is the same as with one worker.
-
-        :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.
-        :param validation: Same columns, used for early stopping; must not be empty.
-        :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
-            ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`. Optional ``lr_decay`` in
-            (0, 1) and ``min_lr`` (default 1e-5): an epoch without validation improvement
-            multiplies the learning rate by ``lr_decay`` and the run goes on (``patience`` is not
-            used) until the rate falls below ``min_lr`` or ``max_epochs`` is reached.
-        :param cache_dir: If set, the encoded frames are stored there (``<index>.npz``) and read
-            back instead of being encoded again; the caller must key the directory by everything
-            that determines the frames. None encodes every epoch.
-        :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
-            ``lr_history`` (rate of each epoch),
-            ``train_rows``, ``seconds`` and the ``config`` used.
-        :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
-            validation loss is not finite.
-        """
-        cfg = {**DEFAULT_FIT_CONFIG, **config}
-        started = time.perf_counter()
-        if len(validation) == 0:
-            raise ValueError("validation set is empty; early stopping needs validation rows")
-        size = self._weights.size
-        theta = np.append(self._weights, self.bias)  # coefficients, then the intercept
-        moment, velocity = np.zeros_like(theta), np.zeros_like(theta)
-        step = 0
-        validation_data = self._encode(validation)
-        batch_size = int(cfg["batch_size"])
-        lr = float(cfg["lr"])
-
-        def train_batch(encoded: EncodedFrame) -> Tuple[float, int]:
-            nonlocal moment, velocity, step
-            loss_sum, rows_seen = 0.0, 0
-            for local in _minibatches(*encoded, batch_size):
-                local_rows, local_cols, local_vals, local_y = local
-                count = len(local_y)
-                z = _scores(local_rows, local_cols, local_vals, count, theta)
-                loss_sum += float(np.sum(_losses(z, local_y)))
-                rows_seen += count
-                grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
-                grad_w = (
-                    np.bincount(
-                        local_cols,
-                        weights=local_vals * grad_z[local_rows],
-                        minlength=size,
-                    )
-                    / count
-                    + float(cfg["l2"]) * theta[:size]
-                )
-                grad = np.append(grad_w, grad_z.mean())
-                step += 1
-                moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
-                velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
-                m_hat = moment / (1 - _ADAM_BETA1**step)
-                v_hat = velocity / (1 - _ADAM_BETA2**step)
-                theta[:] -= lr * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
-            return loss_sum, rows_seen
-
-        def validation_loss() -> float:
-            val_rows, val_cols, val_vals, val_y = validation_data
-            val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
-            return float(np.mean(_losses(val_z, val_y)))
-
-        def set_lr(value: float) -> None:
-            nonlocal lr
-            lr = value
-
-        summary, best_theta = run_epochs(
-            cfg=cfg,
-            started=started,
-            frames=lambda executor: self._encoded_frames(
-                batches, int(cfg["workers"]), executor, cache_dir
-            ),
-            train_batch=train_batch,
-            validation_loss=validation_loss,
-            get_lr=lambda: lr,
-            set_lr=set_lr,
-            snapshot=theta.copy,
-            initial_best=theta.copy(),
-        )
-        self.weights = best_theta[:size]
-        self.bias = float(best_theta[size])
-        return summary
-
-    def _encode(self, frame: pd.DataFrame) -> EncodedFrame:
-        """Sparse features of the rows of a frame, with their soft targets.
-
-        :param frame: Rows with ``fen, cp, mate, white_to_move``.
-        :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
-        """
-        return encode_frame(self.features, self.rep, frame)
-
-    def _encoded_frames(
-        self,
-        batches: Iterable[pd.DataFrame],
-        workers: int,
-        executor: Optional[Executor],
-        cache_dir: Optional[Path] = None,
-    ) -> Iterator[EncodedFrame]:
-        """Encoded frames in order, featurized by the pool when there is one.
-
-        At most ``2 * workers`` frames are in flight, so memory stays bounded. With a cache, a
-        frame already stored is read instead of encoded, and a new one is stored once encoded.
-
-        :param batches: The frames of one epoch.
-        :param workers: Number of workers (``1`` means no pool).
-        :param executor: The pool, or None.
-        :param cache_dir: Directory of the encoded frames, or None for no cache.
-        :return: Iterator of :data:`EncodedFrame`, in the order of ``batches``.
-        """
-        if cache_dir is not None:
-            cache_dir.mkdir(parents=True, exist_ok=True)
-        encode = functools.partial(encode_frame, self.features, self.rep)
-        window = 2 * workers
-        pending: deque = deque()  # (index, future)
-        for index, frame in enumerate(batches):
-            cached = _load_encoded(cache_dir, index)
-            if cached is not None:
-                pending.append((index, cached))
-            elif executor is None:
-                encoded = self._encode(frame)
-                if cache_dir is not None:
-                    _save_encoded(cache_dir, index, encoded)
-                pending.append((index, encoded))
-            else:
-                pending.append((index, executor.submit(encode, frame)))
-            if len(pending) > window:
-                yield _resolve(pending.popleft(), cache_dir)
-        while pending:
-            yield _resolve(pending.popleft(), cache_dir)
-
-
-def run_epochs(
-    *,
-    cfg: Dict[str, Any],
-    started: float,
-    frames: Callable[[Optional[Executor]], Iterable[EncodedFrame]],
-    train_batch: Callable[[EncodedFrame], Tuple[float, int]],
-    validation_loss: Callable[[], float],
-    get_lr: Callable[[], float],
-    set_lr: Callable[[float], None],
-    snapshot: Callable[[], Any],
-    initial_best: Any,
-) -> Tuple[Dict[str, Any], Any]:
-    """Epoch loop shared by the models: encoded frames, decay or patience, best-epoch state.
-
-    Each model supplies how an encoded frame is trained and how the validation loss is computed.
-    With ``lr_decay`` in ``cfg`` an epoch without improvement multiplies the learning rate and the
-    run stops when it falls below ``min_lr``; otherwise it stops after more than ``patience``
-    epochs without improvement.
-
-    :param cfg: Fit configuration (``max_epochs``, ``workers``, ``patience``, ``lr_decay``...).
-    :param started: ``time.perf_counter()`` at the start of the fit, for ``seconds``.
-    :param frames: Given the pool (or None), the encoded frames of one epoch.
-    :param train_batch: Trains on one encoded frame; returns ``(loss_sum, rows)``.
-    :param validation_loss: Mean validation loss with the current weights.
-    :param get_lr: Current learning rate.
-    :param set_lr: Sets the learning rate.
-    :param snapshot: State to keep when an epoch is the best so far.
-    :param initial_best: State to return if no epoch improves on infinity.
-    :return: ``(summary, best_state)``; the summary has ``epochs``, ``best_epoch``,
-        ``train_losses``, ``val_losses``, ``lr_history``, ``train_rows``, ``seconds``, ``config``.
-    :raises ValueError: If an epoch yields no rows or a validation loss is not finite.
-    """
-    best_state, best_loss, best_epoch = initial_best, math.inf, 0
-    train_losses: List[float] = []
-    val_losses: List[float] = []
-    lr_history: List[float] = []
-    bad_epochs = 0
-    train_rows = 0
-    lr_decay = cfg.get("lr_decay")
-    min_lr = float(cfg.get("min_lr", 1e-5))
-
-    with _featurization_pool(int(cfg["workers"])) as executor:
-        for epoch in range(1, int(cfg["max_epochs"]) + 1):
-            loss_sum, rows_seen = 0.0, 0
-            lr_history.append(get_lr())
-            for encoded in frames(executor):
-                frame_loss, frame_rows = train_batch(encoded)
-                loss_sum += frame_loss
-                rows_seen += frame_rows
-            if rows_seen == 0:
-                raise ValueError("batches yielded no rows; pass a re-iterable collection")
-            train_rows = rows_seen
-            train_losses.append(loss_sum / rows_seen)
-
-            val_loss = validation_loss()
-            if not math.isfinite(val_loss):
-                raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
-            val_losses.append(val_loss)
-            if val_loss < best_loss:
-                best_loss, best_epoch, best_state = val_loss, epoch, snapshot()
-                bad_epochs = 0
-            elif lr_decay is not None:
-                lr = get_lr() * float(lr_decay)
-                if lr < min_lr:
-                    break
-                set_lr(lr)
-            else:
-                bad_epochs += 1
-                if bad_epochs > int(cfg["patience"]):
-                    break
-
-    summary = {
-        "epochs": len(train_losses),
-        "best_epoch": best_epoch,
-        "train_losses": train_losses,
-        "val_losses": val_losses,
-        "lr_history": lr_history,
-        "train_rows": train_rows,
-        "seconds": round(time.perf_counter() - started, 3),
-        "config": cfg,
-    }
-    return summary, best_state
-
-
-def _resolve(item: Tuple[int, Any], cache_dir: Optional[Path]) -> EncodedFrame:
-    """The encoded frame of a pending item; a future is awaited and its result cached."""
-    index, value = item
-    if isinstance(value, tuple):
-        return value
-    encoded = value.result()
-    if cache_dir is not None:
-        _save_encoded(cache_dir, index, encoded)
-    return encoded
-
-
-def _load_encoded(cache_dir: Optional[Path], index: int) -> Optional[EncodedFrame]:
-    """Encoded frame ``index`` read from the cache, or None if it is not there."""
-    if cache_dir is None:
-        return None
-    path = cache_dir / f"{index:07d}.npz"
-    if not path.exists():
-        return None
-    with np.load(path) as data:
-        return data["rows"], data["cols"], data["values"], data["targets"]
-
-
-def _save_encoded(cache_dir: Path, index: int, encoded: EncodedFrame) -> None:
-    """Write an encoded frame to the cache, atomically (temporary name, then rename)."""
-    path = cache_dir / f"{index:07d}.npz"
-    tmp = cache_dir / f"{index:07d}.tmp"
-    rows, cols, values, targets = encoded
-    with open(tmp, "wb") as handle:
-        np.savez(handle, rows=rows, cols=cols, values=values, targets=targets)
-    os.replace(tmp, path)
-
-
-def encode_frame(
-    features: LinearFeatures, rep: Representation, frame: pd.DataFrame
-) -> EncodedFrame:
-    """Sparse features of the rows of a frame, with their soft targets.
-
-    Module-level so that featurization workers can run it.
-
-    :param features: Feature set.
-    :param rep: Representation; its perspective selects the features, its scale the targets.
-    :param frame: Rows with ``fen, cp, mate, white_to_move``.
-    :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
-    """
-    rows: List[int] = []
-    cols: List[int] = []
-    vals: List[float] = []
-    for row, fen in enumerate(frame["fen"]):
-        indices, values = features.active(chess.Board(fen), rep.perspective)
-        rows.extend([row] * len(indices))
-        cols.extend(indices)
-        vals.extend(values)
-    y = target(
-        np.asarray(frame["cp"], dtype=np.float64),
-        np.asarray(frame["mate"], dtype=np.float64),
-        np.asarray(frame["white_to_move"], dtype=bool),
-        rep,
-    )
-    return (
-        np.asarray(rows, dtype=np.intp),
-        np.asarray(cols, dtype=np.intp),
-        np.asarray(vals, dtype=np.float64),
-        np.asarray(y, dtype=np.float64),
-    )
-
-
-@contextmanager
-def _featurization_pool(workers: int) -> Iterator[Optional[ProcessPoolExecutor]]:
-    """Process pool for featurization, with single-threaded children.
-
-    The thread-count variables are set while the pool starts its (spawned) workers and restored
-    on exit, so the parent environment is left as it was.
-
-    :param workers: Number of processes; ``1`` yields None (no pool).
-    :return: The pool, or None.
-    :raises ValueError: If ``workers`` is below 1.
-    """
-    if workers < 1:
-        raise ValueError(f"workers must be at least 1, got {workers}")
-    if workers == 1:
-        yield None
-        return
-    saved = {name: os.environ.get(name) for name in _THREAD_ENV}
-    os.environ.update({name: "1" for name in _THREAD_ENV})
-    try:
-        with ProcessPoolExecutor(
-            max_workers=workers, mp_context=multiprocessing.get_context("spawn")
-        ) as executor:
-            yield executor
-    finally:
-        for name, value in saved.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
-
-
-def _minibatches(rows, cols, vals, y, batch_size: int):
-    """Split encoded rows into consecutive minibatches.
-
-    :param rows: Sorted row indices of the sparse entries.
-    :param cols: Feature index of each entry.
-    :param vals: Value of each entry.
-    :param y: Targets, one per row.
-    :param batch_size: Rows per minibatch.
-    :return: Generator of ``(local_rows, cols, vals, targets)`` with rows renumbered from 0.
-    """
-    for start in range(0, len(y), batch_size):
-        stop = min(len(y), start + batch_size)
-        first, last = np.searchsorted(rows, [start, stop])
-        yield rows[first:last] - start, cols[first:last], vals[first:last], y[start:stop]
-
-
-def _scores(rows, cols, vals, count: int, theta: np.ndarray) -> np.ndarray:
-    """Logits of ``count`` rows, from the sparse entries and ``theta = (weights, bias)``.
-
-    :return: Array of shape ``(count,)``.
-    """
-    weights = theta[:-1]
-    return np.bincount(rows, weights=vals * weights[cols], minlength=count) + theta[-1]
-
-
-def _losses(z: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """Binary cross-entropy with soft targets, from logits.
-
-    :return: ``log(1 + exp(z)) - y * z`` per row.
-    """
-    return np.logaddexp(0.0, z) - y * z
 
 
 @register_model("linear_pst")
 class PstTaperedModel(LinearEvalModel):
     """Tapered piece-square tables (768 weights) with a logistic output."""
 
-    features = PstFeatures()
+    feature_set = "linear_pst"
     architecture = "Tapered piece-square tables (768 weights), logistic"
 
 
@@ -588,7 +124,7 @@ class PstTaperedModel(LinearEvalModel):
 class PstTermsModel(LinearEvalModel):
     """Tapered piece-square tables plus eleven classical terms (790 weights), logistic."""
 
-    features = PstTermsFeatures()
+    feature_set = "linear_pst_terms"
     architecture = "Tapered piece-square tables plus 11 classical terms (790 weights), logistic"
 
 
@@ -596,7 +132,7 @@ class PstTermsModel(LinearEvalModel):
 class MaterialLinearModel(LinearEvalModel):
     """Logistic regression on five piece-count differences (and the turn under ``"white"``)."""
 
-    features = MaterialCountFeatures()
+    feature_set = "material5"
     architecture = "Logistic regression on 5 material counts (own minus opponent)"
 
 
@@ -604,5 +140,5 @@ class MaterialLinearModel(LinearEvalModel):
 class KingBucketModel(LinearEvalModel):
     """King-bucketed piece-square features (10,368 weights), logistic."""
 
-    features = KingBucketFeatures()
+    feature_set = "king_bucket"
     architecture = "King-bucketed piece-square features (10,368 weights), logistic"

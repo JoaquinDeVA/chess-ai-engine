@@ -9,9 +9,9 @@ import pytest
 
 from chess_engine.models import base as models_base
 from chess_engine.models import cards, registry
-from chess_engine.models.representation import Representation, white_score
 from chess_lab.comparison import evaluate as evaluate_cli
 from chess_lab.comparison import report
+from chess_lab.models.representation import Representation, white_score
 from chess_lab.training import train as train_cli
 from chess_lab.training.dataset import (
     TEST,
@@ -381,6 +381,7 @@ class TestCommandLineWithDoubles:
         }
         monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
         monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
+        monkeypatch.setattr(evaluate_cli, "PythonEvaluator", lambda model: model)
         monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
         assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
         assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912

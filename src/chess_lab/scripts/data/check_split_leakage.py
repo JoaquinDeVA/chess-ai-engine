@@ -164,10 +164,11 @@ def stratified_accuracy(
     """
     from chess_engine.models import load_model
     from chess_lab.comparison.judge import judge
+    from chess_lab.models.python_eval import PythonEvaluator
 
     result = {}
     for name in model_names:
-        model = load_model(name)
+        model = PythonEvaluator(load_model(name))
         groups = {}
         for label, mask in (("with neighbour", flags), ("without neighbour", ~flags)):
             part = sample[mask].reset_index(drop=True)

@@ -15,7 +15,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from chess_engine.models.representation import is_quiet, keep_mate_rows, validate_mate_keep
+from chess_lab.models.representation import is_quiet, keep_mate_rows, validate_mate_keep
 
 from .dataset import assign_split
 

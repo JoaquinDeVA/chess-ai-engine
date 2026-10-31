@@ -32,13 +32,15 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.models.cards import card_path, current_commit, today, update_card
-from chess_engine.models.linear_eval import DEFAULT_FIT_CONFIG, LinearEvalModel
+from chess_engine.models.linear_eval import LinearEvalModel
 from chess_engine.models.registry import artifact_path, get_model_class
-from chess_engine.models.representation import Representation
-from chess_engine.models.spec import SAMPLE_SEED
 from chess_lab.comparison.judge import judge
 from chess_lab.comparison.standings import record_cards, summarize
 from chess_lab.comparison.tournament import paired_openings, read_games, run_round_robin
+from chess_lab.models import fit_stream, new_model
+from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG
+from chess_lab.models.representation import Representation
+from chess_lab.models.spec import SAMPLE_SEED
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 from chess_lab.training.effort import effort_config, fit_config
 from chess_lab.training.sidecar import iter_batches, load_sample
@@ -288,8 +290,8 @@ def train_variant(
             mate_keep=variant.rep.mate_keep,
         )
     )
-    model = get_model_class(MODEL)(rep=variant.rep)
-    return model, model.fit_stream(batches, validation, config)
+    model = new_model(get_model_class(MODEL), variant.rep)
+    return model, fit_stream(model, batches, validation, config)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -339,7 +341,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 spec,
                 status="bake-off",
                 architecture=model_class.architecture,
-                features=model_class.features.name,
+                features=model_class.feature_set,
                 parameters=model.count_parameters(),
                 size_kb=round(artifact_path(spec).stat().st_size / 1024, 1),
                 training={

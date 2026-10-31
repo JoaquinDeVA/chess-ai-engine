@@ -506,3 +506,30 @@ class KingBucketFeatures(LinearFeatures):
                 indices.append(mover_base + (kind + 5) * 64 + mover_map[square])
                 indices.append(opponent_base + kind * 64 + opponent_map[square])
         return indices, [1.0] * len(indices)
+
+
+#: Every feature set by its name, the one the saved models and the core refer to.
+FEATURE_SETS: Dict[str, LinearFeatures] = {
+    features.name: features
+    for features in (
+        PstFeatures(),
+        MaterialCountFeatures(),
+        PstTermsFeatures(),
+        SlottedPstFeatures(),
+        KingBucketFeatures(),
+    )
+}
+
+
+def features_of(model: object) -> LinearFeatures:
+    """Python feature set of a saved model, or of its class.
+
+    :param model: A :class:`~chess_engine.models.linear_eval.LinearEvalModel` or its class.
+    :return: The feature set named by its ``feature_set``.
+    :raises TypeError: If it is the abstract base, which defines no feature set.
+    :raises KeyError: If the name has no Python version.
+    """
+    name = getattr(model, "feature_set", None)
+    if name is None:
+        raise TypeError(f"{model!r} defines no feature set; use a concrete model")
+    return FEATURE_SETS[name]

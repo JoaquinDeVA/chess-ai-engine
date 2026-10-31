@@ -19,8 +19,8 @@ from chess_engine.models.registry import (
     available_models,
     get_model_class,
 )
-from chess_engine.models.representation import Representation
-from chess_engine.models.spec import DEFAULT_MATE_KEEP, SAMPLE_SEED
+from chess_lab.models.representation import Representation
+from chess_lab.models.spec import DEFAULT_MATE_KEEP, SAMPLE_SEED
 
 from .dataset import VALIDATION
 from .effort import (
@@ -216,7 +216,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         model_spec(args),
         status="current",
         architecture=model_class.architecture,
-        features=model_class.features.name,
+        features=model_class.feature_set,
         parameters=model.count_parameters(),
         size_kb=round(path.stat().st_size / 1024, 1),
         training={

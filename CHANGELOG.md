@@ -16,7 +16,8 @@ All notable changes. The newest are first.
 - `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
 
 ### Changed
-- The laboratory is its own package, `chess_lab` (`src/chess_lab/`): `training/`, `comparison/` and the former top-level `scripts/` left `chess_engine`. Commands change from `python -m chess_engine.training.train` and `chess_engine.comparison.*` to `python -m chess_lab.training.train` and `chess_lab.comparison.*`, and scripts from `scripts/...` to `src/chess_lab/scripts/...`. `representation.py` and `spec.py` moved to `chess_engine.models`, so the application no longer imports the laboratory.
+- Training moved out of the application: `chess_lab.models` now holds the feature extractors, `representation.py`, `spec.py`, `new_model`/`fit_stream` and `PythonEvaluator`. `chess_engine.models` only loads, saves and registers models (`LinearEvalModel(weights, bias, rep)` takes the weights instead of building zeros; `rep` is a plain dictionary and the `.npz` format is unchanged). `EvaluationModel` lost `predict_cp`, `predict_cp_batch` and `cp_to_expected_score`; only the laboratory evaluates in Python.
+- The laboratory is its own package, `chess_lab` (`src/chess_lab/`): `training/`, `comparison/` and the former top-level `scripts/` left `chess_engine`. Commands change from `python -m chess_engine.training.train` and `chess_engine.comparison.*` to `python -m chess_lab.training.train` and `chess_lab.comparison.*`, and scripts from `scripts/...` to `src/chess_lab/scripts/...`. The application no longer imports the laboratory.
 - The tournament script moved from `scripts/bench/play_tournament.py` to `chess_lab.comparison.play_tournament`; it takes the same options and runs with `python -m chess_lab.comparison.play_tournament`.
 
 ### Fixed

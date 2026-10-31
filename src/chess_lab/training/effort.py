@@ -2,7 +2,7 @@
 
 :func:`effort_config` maps the effort to a configuration; :func:`calibrate` times a short fit to
 estimate the duration; :func:`search` runs the random hyper-parameter trials; :func:`fit` streams
-the TRAIN split of the raw shards through :meth:`LinearEvalModel.fit_stream`.
+the TRAIN split of the raw shards through :func:`chess_lab.models.fit_stream`.
 """
 
 import hashlib
@@ -18,20 +18,17 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from chess_engine.models.linear_eval import (
-    DEFAULT_FIT_CONFIG,
-    LinearEvalModel,
-    _losses,
-    _scores,
-    encode_frame,
-)
+from chess_engine.models.linear_eval import LinearEvalModel
 from chess_engine.models.neural_eval import NeuralEvalModel
-from chess_engine.models.representation import (
+from chess_lab.models import PythonEvaluator, fit_stream, new_model
+from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, _losses, _scores, encode_frame
+from chess_lab.models.linear_features import features_of
+from chess_lab.models.representation import (
     Representation,
     keep_mate_rows,
     validate_mate_keep,
 )
-from chess_engine.models.spec import SAMPLE_SEED
+from chess_lab.models.spec import SAMPLE_SEED
 
 from .dataset import TRAIN
 from .sidecar import iter_batches
@@ -233,7 +230,7 @@ def fit(
     :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
-    model = model_class(rep=rep)
+    model = new_model(model_class, rep)
     batches = _Epochs(
         lambda: iter_batches(
             raw_dir,
@@ -249,7 +246,7 @@ def fit(
     cache = None
     if use_cache:
         cache = cache_path(model_class, rep, positions, seed, quiet_only, config["batch_size"])
-    summary = model.fit_stream(batches, validation, config, cache_dir=cache)
+    summary = fit_stream(model, batches, validation, config, cache_dir=cache)
     return model, summary
 
 
@@ -285,12 +282,12 @@ def calibrate(
     )
 
     started = time.perf_counter()
-    rows, cols, vals, targets = encode_frame(model_class.features, rep, validation)
+    rows, cols, vals, targets = encode_frame(features_of(model_class), rep, validation)
     encode_seconds = time.perf_counter() - started
     if isinstance(model, NeuralEvalModel):
         boards = [chess.Board(fen) for fen in validation["fen"]]
         started = time.perf_counter()
-        model.predict_cp_batch(boards)
+        PythonEvaluator(model).predict_cp_batch(boards)
     else:
         theta = np.append(model.weights, model.bias)
         started = time.perf_counter()

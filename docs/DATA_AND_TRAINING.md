@@ -38,7 +38,7 @@ It prints `126000000 1076973`; the difference is the 124,923,027 kept rows (`doc
 | `best_move` | string | First move of the best line, in UCI notation |
 | `n_evals`, `n_pvs` | uint8 | Evaluations of the line, and variations of the chosen one |
 
-The sign convention matters. In the shards, `cp` and `mate` are always from White's point of view: positive is good for White, and `mate > 0` means White delivers mate, whoever is to move. The code measures this instead of assuming it (`detect_perspective` in `src/chess_lab/training/lichess.py`) and writes it in each shard's metadata under the `perspective` key. Training converts the target to the side to move: the score of a position is `1 - s` when Black is to move (`target` in `src/chess_engine/models/representation.py`). One model therefore serves both colours.
+The sign convention matters. In the shards, `cp` and `mate` are always from White's point of view: positive is good for White, and `mate > 0` means White delivers mate, whoever is to move. The code measures this instead of assuming it (`detect_perspective` in `src/chess_lab/training/lichess.py`) and writes it in each shard's metadata under the `perspective` key. Training converts the target to the side to move: the score of a position is `1 - s` when Black is to move (`target` in `src/chess_lab/models/representation.py`). One model therefore serves both colours.
 
 ## Sidecars
 
@@ -48,7 +48,7 @@ Next to each shard sits a small file, `data/lichess/sidecar/part-NNNNN.sidecar.p
 - `quiet`: true when the side to move is not in check and the best move is neither a capture nor a promotion (`is_quiet`). Quiet positions are the ones where a static evaluation is least distorted by an exchange in progress.
 - `white_to_move`: whose turn it is, so the sampler does not need to parse the FEN again.
 
-The sampler draws positions with a seeded random generator, `numpy.random.default_rng(seed)` with seed 42 (`SAMPLE_SEED` in `src/chess_engine/models/spec.py`), shuffling the shard order and the order inside each row group. The same seed gives the same positions. Pairing a shard with its sidecar means only the columns and row groups needed are read.
+The sampler draws positions with a seeded random generator, `numpy.random.default_rng(seed)` with seed 42 (`SAMPLE_SEED` in `src/chess_lab/models/spec.py`), shuffling the shard order and the order inside each row group. The same seed gives the same positions. Pairing a shard with its sidecar means only the columns and row groups needed are read.
 
 | Measure | Value |
 |---|---|
@@ -98,11 +98,11 @@ Stockfish speaks in centipawns, but a model that learns to predict centipawns di
 
     target = 1 / (1 + exp(-k * cp)),   k = 0.00368208
 
-With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the scale is bounded and saturates. Forced mates become exactly 1 (White mates) or 0 (Black mates). Both come from `white_score` in `src/chess_engine/models/representation.py`, with `LICHESS_K = 0.00368208`; the two values quoted above come from evaluating that formula.
+With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the scale is bounded and saturates. Forced mates become exactly 1 (White mates) or 0 (Black mates). Both come from `white_score` in `src/chess_lab/models/representation.py`, with `LICHESS_K = 0.00368208`; the two values quoted above come from evaluating that formula.
 
 ### Why only 10 % of the mates
 
-Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_engine/models/spec.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
+Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_lab/models/spec.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
 
 The evidence is one match, played once. `linear_pst_terms` trained with 10 % of the mates played 100 games against the same model trained with all of them: effort 15, 50 openings with colours swapped, 60 s + 1 s per move. The 10 % model scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1), which is +156 Elo (`docs/RESULTS.md`, section "Mates al 10 %"). It is a single pair of players at a single effort level, not a general law.
 
@@ -134,9 +134,9 @@ Before training, the command prints the configuration and an estimated duration,
 
 ## What training does
 
-The linear models score a position as a weighted sum of features (material, piece-square tables and so on), pass the sum through the logistic function, and compare the result with the soft target. The loss is binary cross-entropy against targets that may be any number from 0 to 1, not just 0 or 1 (`_losses` in `src/chess_engine/models/linear_eval.py`). Adam, a standard gradient-descent variant, updates the weights, with an L2 penalty that keeps them small.
+The linear models score a position as a weighted sum of features (material, piece-square tables and so on), pass the sum through the logistic function, and compare the result with the soft target. The loss is binary cross-entropy against targets that may be any number from 0 to 1, not just 0 or 1 (`_losses` in `src/chess_lab/models/linear_eval.py`). Adam, a standard gradient-descent variant, updates the weights, with an L2 penalty that keeps them small.
 
-After each epoch the model is scored on a validation sample of up to 50,000 positions (`MAX_VALIDATION_ROWS` in `src/chess_lab/training/train.py`). The weights of the epoch with the lowest validation loss are the ones saved. Two ways of stopping are available (`run_epochs` in `src/chess_engine/models/linear_eval.py`):
+After each epoch the model is scored on a validation sample of up to 50,000 positions (`MAX_VALIDATION_ROWS` in `src/chess_lab/training/train.py`). The weights of the epoch with the lowest validation loss are the ones saved. Two ways of stopping are available (`run_epochs` in `src/chess_lab/models/linear_eval.py`):
 
 - Default: stop after more than `patience` (2) epochs without improvement.
 - With `--lr-decay F` (a factor between 0 and 1, for example 0.5): each epoch without improvement multiplies the learning rate by F and training continues, until the rate falls below 1e-5 or the epochs run out.

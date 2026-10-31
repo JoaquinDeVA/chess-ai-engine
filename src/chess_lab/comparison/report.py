@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (loads models first: avoids an import cycle)
 from chess_engine.models.cards import PROJECT_ROOT, load_all_cards
-from chess_engine.models.representation import Representation
+from chess_lab.models.representation import Representation
 
 HISTORY_FILE = PROJECT_ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"

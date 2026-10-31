@@ -5,7 +5,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from chess_engine.models.representation import is_quiet
+from chess_lab.models.representation import is_quiet
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION, assign_split
 from chess_lab.training.lichess_raw import read_metadata, shard_path, write_shard
 from chess_lab.training.sidecar import build_sidecar, iter_batches, load_sample

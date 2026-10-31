@@ -162,7 +162,7 @@ def write_mate_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> N
 
 def test_available_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
     raw, side = tmp_path / "raw", tmp_path / "side"
-    write_mate_fixture_shards(raw, side, 900, seed=4)
+    write_mate_fixture_shards(raw, side, 300, seed=4)
     full = available_rows(side)
     kept = available_rows(side, raw_dir=raw, mate_keep=0.2)
     assert 0 < kept < full

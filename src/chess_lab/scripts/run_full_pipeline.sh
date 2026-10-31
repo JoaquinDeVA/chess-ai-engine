@@ -20,7 +20,7 @@
 #   Dry run:   DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh
 #   Real run:  nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 RAW="${RAW:-data/lichess/raw}"
 SIDECAR="${SIDECAR:-data/lichess/sidecar}"
@@ -97,6 +97,7 @@ step_report() {
   run "$PYTHON" -m chess_lab.measure.report
 }
 
+log "repository $(pwd)"
 [ "$DRY_RUN" = 1 ] || mkdir -p "$STATE_DIR"
 for step in $STEPS; do
   done_file="$STATE_DIR/$step.done"

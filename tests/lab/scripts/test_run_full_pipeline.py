@@ -19,6 +19,7 @@ def test_run_full_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_pa
     result = subprocess.run(
         ["bash", str(SCRIPT)], env=env, capture_output=True, text=True, check=True
     )
+    assert f"=== repository {ROOT}" in result.stdout
     lines = [line for line in result.stdout.splitlines() if line.startswith("+ ")]
     for model in PIPELINE_MODELS.split():
         assert any(

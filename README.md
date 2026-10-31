@@ -21,7 +21,7 @@ its command are in [Results](docs/RESULTS.md#the-short-answer).
 - The neural network judges positions best (Spearman 0.700 against Stockfish) but does not win more games.
 - Counting material alone is clearly the worst (21 % at 10 min + 5 s).
 - The move of the search to Rust made it 8 to 35 times faster to a given depth
-  ([the search in Rust](docs/techniques/rust-core.md)); five pruning and ordering techniques on top of it scored 76.5 %
+  ([the search in Rust](docs/techniques/rust-core.md)); six pruning and ordering techniques on top of it scored 76.5 %
   against the plain search ([search techniques](docs/techniques/README.md)).
 
 ## Where to read

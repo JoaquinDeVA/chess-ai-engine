@@ -23,6 +23,8 @@ where the training data comes from, what each model contains and what was measur
 | [Data and training](DATA_AND_TRAINING.md) | The Lichess evaluation database, the shards, the targets, the effort scale, how to retrain | You want to rebuild the data or train a model |
 | [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns | You want to understand a model before reading its numbers |
 | [The window](GUI.md) | The board, the game page, the players and the AI settings of the window | You want to play, or to change the window |
+| [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence | You wonder why something is the way it is |
+| [Pitfalls](PITFALLS.md) | What already cost time: symptom, cause, what to do | You are about to launch a long script or touch `rust/` |
 | [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained | You want to compare models or repeat a measurement |
 
 The installation and the commands to play are in the [README of the repository](../README.md).

@@ -135,6 +135,8 @@ pub fn iterative_deepening(
         return deepen(state, eval, memory, options, max_depth, time_limit, control);
     };
     table.new_search();
+    // Helpers only fill the shared table; the main thread alone decides the move, so the result
+    // does not depend on how the threads interleave. They stop when the main thread is done.
     let stop = AtomicBool::new(false);
     let helper_nodes = std::sync::atomic::AtomicU64::new(0);
     let progress = AtomicUsize::new(0);
@@ -220,6 +222,9 @@ fn deepen(
     let mut last_value: Option<f64> = None;
 
     for depth in 1..=max_depth {
+        // Clock policy: before an iteration, skip it if the estimate says it will not finish in
+        // what is left (the overshoot factor forgives a near miss); never skip before `min_depth`,
+        // so the move always comes from a minimum of real search.
         let remaining = time_limit - (clock() - start);
         if depth > options.min_depth && !history.is_empty() {
             let predicted = estimate(&history);
@@ -254,6 +259,7 @@ fn deepen(
         last_truncated = result.truncated;
         deepest_ply = deepest_ply.max(result.max_ply);
 
+        // A cut iteration is discarded: its value comes from a search that stopped half way.
         if result.truncated {
             if best_move.is_none() && result.best.is_some() {
                 best_move = result.best; // better a partial answer than none at all
@@ -265,6 +271,7 @@ fn deepen(
         last_value = Some(result.value);
         best_move = result.best;
         completed_depth = depth;
+        // The soft budget is also checked after the iteration, since the estimate can be low.
         if depth >= options.min_depth && clock() - start >= time_limit {
             stop_reason = StopReason::Budget;
             break;

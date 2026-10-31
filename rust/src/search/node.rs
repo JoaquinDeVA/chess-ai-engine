@@ -138,10 +138,14 @@ impl Search<'_> {
         ply: i32,
         allow_null: bool,
     ) -> Outcome {
+        // The window as it came in: the table flag is decided against it, not against the one
+        // narrowed below by the table and by the moves.
         let (alpha_orig, beta_orig) = (alpha, beta);
         self.nodes += 1;
         self.max_ply = self.max_ply.max(ply);
 
+        // Order of the checks: the table first (it can end the node for free), then game end and
+        // horizon, then the clock, and only then the techniques that cost a search.
         let key = self.state.key();
         let entry = if self.options.use_table {
             self.memory.table.get(&key)
@@ -173,6 +177,8 @@ impl Search<'_> {
             }
             return (self.static_value(), None);
         }
+        // Checked after the horizon test so a cut never hides a quiescence value, and before any
+        // move is searched so a cut node stores nothing in the table.
         let stopped = self.control.stop.is_some_and(|flag| flag.load(Relaxed));
         if stopped || (self.control.clock)() - self.control.start >= self.control.hard_limit {
             self.truncated = true;
@@ -192,6 +198,8 @@ impl Search<'_> {
             None
         };
         let mut ordered = order(moves, &killers, self.options.use_capture_order, history);
+        // Helper threads rotate the root moves so they do not all search the same subtree; the
+        // table move is not put first there for the same reason.
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
         if helper_root {
             let shift = self.control.rotation % ordered.len();
@@ -200,6 +208,9 @@ impl Search<'_> {
         if self.options.techniques.tt_move && !helper_root {
             move_to_front(&mut ordered, table_move);
         }
+        // Null move: it needs a pass to be safe (not in check, not at the root, not twice in a
+        // row) and pieces on the board, or zugzwang makes passing the best move. Only tried when
+        // the static value already beats the bound, so the reduced search rarely wastes time.
         let in_check = self.state.pos().is_check();
         if self.options.techniques.null_move
             && allow_null
@@ -240,6 +251,8 @@ impl Search<'_> {
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
             self.play(action);
+            // LMR only reduces moves unlikely to matter: not captures, promotions, killers or
+            // moves in or giving check, whose value can change a lot with depth.
             let late_quiet = self.options.techniques.lmr
                 && index >= LMR_FROM_MOVE
                 && depth_remaining >= LMR_FROM_DEPTH
@@ -268,6 +281,8 @@ impl Search<'_> {
                 best_move = Some(move_id(&action));
                 beta = beta.min(best_value);
             }
+            // Cutoff: quiet moves that cut are remembered (killers, history) to be tried earlier
+            // in sibling nodes; captures are already ordered first.
             if alpha >= beta {
                 self.prunings += 1;
                 if self.options.use_killers {
@@ -280,6 +295,7 @@ impl Search<'_> {
                 break;
             }
         }
+        // A cut search has partial values, so it must not be stored as if it were exact.
         if !self.truncated && self.options.use_table {
             self.memory.table.store(
                 key,

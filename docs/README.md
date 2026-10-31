@@ -33,6 +33,7 @@ laboratory that trains and measures the models are in Python.
 | [Architecture](ARCHITECTURE.md) | The packages, what depends on what, the path of one move through the code |
 | [Training data](DATA.md) | The Lichess evaluation database, the shards, the sidecars, the targets |
 | [Training](TRAINING.md) | The effort scale, what training does, how to reproduce everything |
+| [Measurement](MEASUREMENT.md) | How a change is judged: fastchess matches, paired openings, SPRT, the A/A check |
 | [Openings](OPENINGS.md) | The suite of balanced starting positions for engine matches |
 | [Remote worker](WORKER.md) | How matches run on the desktop machine over SSH |
 | [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence |

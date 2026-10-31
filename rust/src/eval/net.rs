@@ -2,7 +2,7 @@
 
 use shakmaty::{Chess, Color, Move, Piece, Position, Role, Square};
 
-use super::linear::{FeatureSet, Perspective};
+use super::features::{FeatureSet, Perspective};
 use super::{for_player, sigmoid, EvalState, Evaluator};
 
 /// One dense layer: `weights` is row-major `(fan_in, fan_out)`.

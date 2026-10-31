@@ -8,14 +8,19 @@
 
 mod deepening;
 pub mod estimators;
+mod memory;
 mod node;
 mod options;
+pub mod ordering;
 pub mod shared;
+mod stats;
 pub mod tt;
 
 pub use deepening::iterative_deepening;
+pub use memory::*;
 pub use node::{alpha_beta, alpha_beta_window, SearchResult};
 pub use options::*;
+pub use stats::*;
 
 #[cfg(test)]
 mod tests;

@@ -93,7 +93,7 @@ slowest evaluation, whose depth-3 iteration is sometimes cut by the hard limit w
 estimator and the floor; the estimator above was chosen afterwards and was not replayed in games. The logs are local files.
 
 **Status.** Iterative deepening and `TimeManager`: kept, since the first commit (2026-10-16).
-Minimum depth: 3 from 2026-10-21 (commit `0cdf404`), 1 from 2026-10-31 and no default depth cap (the bots used to stop at depth 3; now only the clock does). Measured with `geometric_growth` on 60 random positions (seeded; ad-hoc script, not versioned): with a floor of 1 or 3 the completed depths are identical (all at least 6 with `linear_pst_terms` at a 1.8 s budget, at least 4 with `h1` at 1 s). Repeating the iterations 4 to 7 pays: on a middlegame position the iterations to depth 7 take 730,876 nodes in total against 1,083,355 for searching depth 7 directly (`_core.Searcher.search_fixed`), because each iteration seeds the move ordering of the next. Estimator `geometric_growth`: default since 2026-10-21 (commit `d3e848c`); the original rule stays available as `ratio_squared`.
+Minimum depth: 3 from 2026-10-21 (commit `0cdf404`), 1 from 2026-10-31 and no default depth cap (the bots used to stop at depth 3; now only the clock does). Measured with `geometric_growth` on 60 random positions (seeded; ad-hoc script, not versioned): with a floor of 1 or 3 the completed depths are identical (all at least 6 with `linear_pst_terms` at a 1.8 s budget, at least 4 with `h1` at 1 s). Repeating the iterations 4 to 7 pays: on a middlegame position the iterations to depth 7 take 730,876 nodes in total against 1,083,355 for searching depth 7 directly (one alpha-beta of depth 7 through `search::alpha_beta`; ad-hoc, not versioned), because each iteration seeds the move ordering of the next. Estimator `geometric_growth`: default since 2026-10-21 (commit `d3e848c`); the original rule stays available as `ratio_squared`.
 
 ## Transposition table
 
@@ -144,7 +144,7 @@ is often good in a sibling branch.
 before the other moves in later nodes at that depth.
 
 **How it is implemented.** `Killers::record` and the first step of `order` in
-`rust/src/search/tt.rs`, called from `Search::node`. Up to three killers are kept per depth
+`rust/src/search/ordering.rs`, called from `Search::node`. Up to three killers are kept per depth
 (`MAX_KILLERS_PER_DEPTH`), shared across iterations and moves, cleared at the start of each game. A
 killer is identified by its squares and promotion, not by what it captures, as `chess.Move` does.
 
@@ -174,7 +174,7 @@ rest of the quiet moves by their history score (`history`, if on).
 
 ![Order in which moves are tried: table move, captures by MVV-LVA, killers, then history; an early cut-off skips the later moves](../img/move-ordering.svg)
 
-**How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/tt.rs` (score
+**How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/ordering.rs` (score
 `10 × victim − attacker`; a stable sort, so equal captures keep the order python-chess generates
 them in, `generation_order` in `rust/src/board.rs`). `fallback_move` in
 `src/chess_engine/bots/_search_bots.py` picks the best capture when a search returns nothing.

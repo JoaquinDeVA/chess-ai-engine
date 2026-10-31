@@ -11,11 +11,12 @@ use numpy::{PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use shakmaty::{Chess, Color};
+use shakmaty::Color;
 
-use crate::board::{fen_of, position_from_fen, uci_string, GameState};
-use crate::eval::h1::{self, H1};
-use crate::eval::linear::{FeatureSet, LinearModel, Perspective};
+use crate::board::{position_from_fen, uci_string, GameState};
+use crate::eval::features::{FeatureSet, Perspective};
+use crate::eval::h1::H1;
+use crate::eval::linear::LinearModel;
 use crate::eval::net::{Layer, Net};
 use crate::eval::{Eval, Evaluator};
 use crate::knowledge::book::OpeningBook;
@@ -38,47 +39,10 @@ fn parse_features(name: &str) -> PyResult<FeatureSet> {
     FeatureSet::from_name(name).ok_or_else(|| value_error(format!("unknown feature set {name:?}")))
 }
 
-/// Evaluation done by a Python function `(fen: str, white_to_evaluate: bool) -> float`.
-struct Callback {
-    function: Py<PyAny>,
-}
-
-impl Evaluator for Callback {
-    fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        Python::attach(|py| {
-            self.function
-                .call1(py, (fen_of(pos), player == Color::White))
-                .and_then(|value| value.extract::<f64>(py))
-                .expect("the evaluation callback must return a float")
-        })
-    }
-}
-
-enum Kind {
-    Native(Eval),
-    Callback(Callback),
-}
-
-impl Evaluator for Kind {
-    fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        match self {
-            Kind::Native(e) => e.evaluate(pos, player),
-            Kind::Callback(c) => c.evaluate(pos, player),
-        }
-    }
-
-    fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn crate::eval::EvalState + 'a>> {
-        match self {
-            Kind::Native(e) => e.new_state(pos),
-            Kind::Callback(_) => None,
-        }
-    }
-}
-
 /// An evaluation of positions.
 #[pyclass(name = "Evaluator", frozen)]
 struct PyEvaluator {
-    kind: Arc<Kind>,
+    eval: Arc<Eval>,
     features: Option<(FeatureSet, Perspective)>,
 }
 
@@ -91,7 +55,7 @@ impl PyEvaluator {
             .try_into()
             .map_err(|_| value_error("h1 needs exactly six weights"))?;
         Ok(PyEvaluator {
-            kind: Arc::new(Kind::Native(Eval::H1(H1::new(weights)))),
+            eval: Arc::new(Eval::H1(H1::new(weights))),
             features: None,
         })
     }
@@ -108,7 +72,7 @@ impl PyEvaluator {
         let model =
             LinearModel::new(set, view, weights.as_array().to_vec(), bias).map_err(value_error)?;
         Ok(PyEvaluator {
-            kind: Arc::new(Kind::Native(Eval::Linear(model))),
+            eval: Arc::new(Eval::Linear(model)),
             features: Some((set, view)),
         })
     }
@@ -135,31 +99,16 @@ impl PyEvaluator {
             .collect();
         let net = Net::new(set, view, layers).map_err(value_error)?;
         Ok(PyEvaluator {
-            kind: Arc::new(Kind::Native(Eval::Net(net))),
+            eval: Arc::new(Eval::Net(net)),
             features: Some((set, view)),
         })
-    }
-
-    /// An evaluation computed by a Python function `(fen, evaluate_for_white) -> float` (slow).
-    #[staticmethod]
-    fn callback(function: Py<PyAny>) -> PyEvaluator {
-        PyEvaluator {
-            kind: Arc::new(Kind::Callback(Callback { function })),
-            features: None,
-        }
-    }
-
-    /// Whether the evaluation runs without Python.
-    #[getter]
-    fn native(&self) -> bool {
-        matches!(*self.kind, Kind::Native(_))
     }
 
     /// Value of the position for White (`white=True`) or Black, in `[0.01, 0.99]`.
     fn evaluate(&self, fen: &str, white: bool) -> PyResult<f64> {
         let pos = position_from_fen(fen).map_err(value_error)?;
         Ok(self
-            .kind
+            .eval
             .evaluate(&pos, if white { Color::White } else { Color::Black }))
     }
 
@@ -173,25 +122,6 @@ impl PyEvaluator {
         set.active(&pos, view, &mut indices, &mut values);
         Ok((indices, values))
     }
-}
-
-/// The six normalised features of `h1` for a position.
-#[pyfunction]
-fn h1_features(fen: &str) -> PyResult<Vec<f64>> {
-    Ok(h1::features(&position_from_fen(fen).map_err(value_error)?).to_vec())
-}
-
-/// Whether the game is over for the search, and who won (`"white"`, `"black"` or `None`).
-#[pyfunction]
-fn terminal(root_fen: &str, moves: Vec<String>) -> PyResult<(bool, Option<&'static str>)> {
-    let state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
-    let legal = crate::board::ordered_moves(state.pos());
-    Ok(match state.outcome(&legal) {
-        None => (false, None),
-        Some(None) => (true, None),
-        Some(Some(Color::White)) => (true, Some("white")),
-        Some(Some(Color::Black)) => (true, Some("black")),
-    })
 }
 
 /// An opening book.
@@ -327,11 +257,6 @@ impl PySearcher {
         self.memory.table.len()
     }
 
-    /// Change the size cap of the table.
-    fn set_max_tt_entries(&mut self, max_tt_entries: usize) {
-        self.memory.table.set_capacity(max_tt_entries);
-    }
-
     /// Iterative deepening. Returns `(move, statistics)`; `move` is a UCI string or `None`.
     #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator, disabled=Vec::new(), techniques=Vec::new()))]
     #[allow(clippy::too_many_arguments)]
@@ -350,11 +275,6 @@ impl PySearcher {
         disabled: Vec<String>,
         techniques: Vec<String>,
     ) -> PyResult<(Option<String>, Bound<'py, PyDict>)> {
-        if self.memory.threads > 1 && !evaluator.native() {
-            return Err(value_error(
-                "several threads need an evaluation that runs without Python",
-            ));
-        }
         let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
         let options = options(
             quiescence_plies,
@@ -363,9 +283,9 @@ impl PySearcher {
             &disabled,
             &techniques,
         )?;
-        let kind = evaluator.kind.clone();
+        let eval = evaluator.eval.clone();
         let memory = &mut self.memory;
-        let mut run = move || {
+        let run = move || {
             let origin = Instant::now();
             let clock = || origin.elapsed().as_secs_f64();
             let control = Control {
@@ -377,68 +297,12 @@ impl PySearcher {
                 rotation: 0,
             };
             search::iterative_deepening(
-                &mut state, &*kind, memory, &options, max_depth, time_limit, &control,
+                &mut state, &*eval, memory, &options, max_depth, time_limit, &control,
             )
         };
-        // A Python callback needs the interpreter: keep it attached in that case.
-        let result = if evaluator.native() {
-            py.detach(run)
-        } else {
-            run()
-        };
+        let result = py.detach(run);
         let (best, stats) = result.map_err(value_error)?;
         Ok((best.as_ref().map(uci_string), stats_dict(py, &stats)?))
-    }
-
-    /// One alpha-beta search of exactly `depth` plies with no clock. Returns
-    /// `(value, move, nodes, prunings, deepest ply)`.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (root_fen, moves, evaluator, depth, quiescence_plies, disabled=Vec::new(), techniques=Vec::new()))]
-    fn search_fixed(
-        &mut self,
-        py: Python<'_>,
-        root_fen: &str,
-        moves: Vec<String>,
-        evaluator: &PyEvaluator,
-        depth: i32,
-        quiescence_plies: u32,
-        disabled: Vec<String>,
-        techniques: Vec<String>,
-    ) -> PyResult<(f64, Option<String>, u64, u64, i32)> {
-        let mut state = GameState::from_moves(root_fen, &moves).map_err(value_error)?;
-        let options = options(
-            quiescence_plies,
-            search::DEFAULT_MIN_DEPTH,
-            search::DEFAULT_ESTIMATOR,
-            &disabled,
-            &techniques,
-        )?;
-        let kind = evaluator.kind.clone();
-        let memory = &mut self.memory;
-        let mut run = move || {
-            let clock = || 0.0;
-            let control = Control {
-                start: 0.0,
-                hard_limit: f64::INFINITY,
-                clock: &clock,
-                stop: None,
-                progress: None,
-                rotation: 0,
-            };
-            search::alpha_beta(&mut state, &*kind, memory, &options, depth, &control)
-        };
-        let found = if evaluator.native() {
-            py.detach(run)
-        } else {
-            run()
-        };
-        Ok((
-            found.value,
-            found.best.as_ref().map(uci_string),
-            found.nodes,
-            found.prunings,
-            found.max_ply,
-        ))
     }
 }
 
@@ -486,9 +350,7 @@ mod _core {
     use pyo3::prelude::*;
 
     #[pymodule_export]
-    use super::{
-        estimate, h1_features, terminal, version, PyBook, PyEvaluator, PySearcher, PyTablebase,
-    };
+    use super::{estimate, version, PyBook, PyEvaluator, PySearcher, PyTablebase};
 
     #[pymodule_init]
     fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -506,7 +368,7 @@ mod _core {
         module.add("TECHNIQUES", crate::search::Techniques::NAMES.to_vec())?;
         module.add(
             "FEATURE_SETS",
-            crate::eval::linear::FeatureSet::NAMES.to_vec(),
+            crate::eval::features::FeatureSet::NAMES.to_vec(),
         )?;
         module.add("ESTIMATOR_NAMES", crate::search::estimators::NAMES.to_vec())?;
         Ok(())

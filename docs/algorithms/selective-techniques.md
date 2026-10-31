@@ -73,7 +73,7 @@ ignores it and orders by MVV-LVA and killers.
 
 **What it does.** Tries the stored best move before every other move.
 
-**How it is implemented.** `move_to_front` in `rust/src/search/tt.rs`, called in `Search::node`. The value does
+**How it is implemented.** `move_to_front` in `rust/src/search/ordering.rs`, called in `Search::node`. The value does
 not change (same tree, other order), only how soon a cut-off comes.
 
 **Measured effect.** Nodes at depth 6 fall from 672,800 to 256,693 (2.6 times); same move as the reference in 98 %
@@ -88,7 +88,7 @@ not change (same tree, other order), only how soon a cut-off comes.
 **What it does.** Counts, for each (colour, move), how often it produced a cut-off, weighted by depth, and orders
 quiet moves by that count.
 
-**How it is implemented.** `History` in `rust/src/search/tt.rs`, indexed by `move_id`; `reward` is called at a
+**How it is implemented.** `History` in `rust/src/search/ordering.rs`, indexed by `move_id`; `reward` is called at a
 cut-off by a quiet move. Part of `order`.
 
 **Measured effect.** Nodes 672,800 -> 391,130; same move as the reference 100 %.

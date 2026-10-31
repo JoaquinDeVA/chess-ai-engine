@@ -353,7 +353,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
 
 mod incremental {
     use crate::board::{position_from_fen, GameState};
-    use crate::eval::linear::{FeatureSet, Perspective};
+    use crate::eval::features::{FeatureSet, Perspective};
     use crate::eval::net::{Layer, Net};
     use crate::search::*;
 

@@ -6,10 +6,13 @@ use std::sync::Arc;
 use shakmaty::Move;
 
 use super::estimators;
+use super::memory::*;
 use super::node::{alpha_beta, alpha_beta_window, SearchResult};
 use super::options::*;
+use super::ordering::{History, Killers};
 use super::shared::SharedTable;
-use super::tt::{History, Killers, Tt};
+use super::stats::*;
+use super::tt::Tt;
 use crate::board::GameState;
 use crate::eval::Evaluator;
 

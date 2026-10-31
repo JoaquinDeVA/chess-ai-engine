@@ -27,5 +27,5 @@
 
 - **`bots/_search_bots.py` starts with an underscore on purpose:** the bot registry skips such files. Renaming it makes the registry try to load it as a bot.
 - **After touching `rust/`, `pip install -e ".[dev]"` again.** Otherwise `pytest` tests the old binary. `cargo test` does not build the bindings (feature `python` off).
-- **Two implementations of the features.** Training encodes with `chess_lab/models/linear_features.py`, the core plays with `rust/src/eval/linear.rs`; if they differ, one thing is trained and another played, with no error. `tests/core/test_feature_parity.py` compares them on 300 positions per feature family.
+- **Two implementations of the features.** Training encodes with `chess_lab/models/linear_features.py`, the core plays with `rust/src/eval/features.rs`; if they differ, one thing is trained and another played, with no error. `tests/core/test_feature_parity.py` compares them on 300 positions per feature family.
 - **The models table of `docs/RESULTS.md` is generated** (`python -m chess_lab.comparison.report`); editing it by hand is lost. After a rename or a command change, grep the whole repository before saying the docs are in sync.

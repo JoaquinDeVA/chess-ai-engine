@@ -4,8 +4,10 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use shakmaty::{Color, Move, Position};
 
+use super::memory::*;
 use super::options::*;
-use super::tt::{move_to_front, order, Flag};
+use super::ordering::{move_to_front, order};
+use super::tt::Flag;
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
 

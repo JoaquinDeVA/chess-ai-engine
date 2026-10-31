@@ -45,8 +45,8 @@ Dependencies, as the imports stand:
 | Package (`src/chess_engine/` unless noted) | Responsibility |
 |---|---|
 | `rust/src/board.rs` | The rules for the search: a position with the keys needed for repetitions, the terminal test of `board.outcome(claim_draw=True)`, legal moves in the order python-chess generates them, a key for the transposition table |
-| `rust/src/eval/` | The evaluations the search runs without Python: `h1.rs` (the heuristic), `linear.rs` (sparse features and the logistic models), `net.rs` (the sparse network `net4_pst`) |
-| `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches, `Memory` and the counters. `mod.rs` re-exports them. `tt.rs`: transposition table, killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
+| `rust/src/eval/` | The evaluations the search runs without Python: `h1.rs` (the heuristic), `features.rs` (sparse board features), `linear.rs` (the logistic models), `net.rs` (the sparse network `net4_pst`) |
+| `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
@@ -225,7 +225,7 @@ The search runs in Rust, so a model plays at full speed only if its features are
 from Python for every leaf (a warning says so), which is much slower and cannot use
 several threads. To give a feature set its Rust version:
 
-1. add a variant to `FeatureSet` in `rust/src/eval/linear.rs`, with its name in `FeatureSet::NAMES`,
+1. add a variant to `FeatureSet` in `rust/src/eval/features.rs`, with its name in `FeatureSet::NAMES`,
    its size in `size` and its `active` function, which must give the same indices and values, in the
    same order, as the Python `active` (the training encodes with the Python one, so a difference
    means training on one thing and playing with another);

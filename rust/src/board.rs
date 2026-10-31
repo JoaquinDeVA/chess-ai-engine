@@ -15,7 +15,7 @@ use shakmaty::uci::UciMove;
 use shakmaty::zobrist::Zobrist64;
 use shakmaty::{
     Bitboard, CastlingMode, CastlingSide, Chess, Color, EnPassantMode, File, FromSetup, Move,
-    MoveList, Position, Rank, Role, Square,
+    Position, Rank, Role, Square,
 };
 
 /// Key of a position in the transposition table: the position (placement, side to move, castling
@@ -33,15 +33,6 @@ pub type Winner = Option<Color>;
 /// Zobrist hash of the position (no counters), counting an en passant square only if it is legal.
 pub fn zobrist(pos: &Chess) -> u64 {
     pos.zobrist_hash::<Zobrist64>(EnPassantMode::Legal).0
-}
-
-/// Transposition key of a position.
-pub fn key_of(pos: &Chess) -> Key {
-    Key {
-        zobrist: zobrist(pos),
-        halfmoves: pos.halfmoves(),
-        fullmoves: pos.fullmoves().get(),
-    }
 }
 
 /// Identity of a move by its squares and promotion (as `chess.Move` compares moves), a number
@@ -477,11 +468,6 @@ fn count_moves(pos: &Chess, color: Color) -> usize {
         }
     }
     count
-}
-
-/// Legal moves as a plain list (for callers that do not need the ordering).
-pub fn legal_list(pos: &Chess) -> MoveList {
-    pos.legal_moves()
 }
 
 #[cfg(test)]

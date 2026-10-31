@@ -2,6 +2,7 @@
 //! network. All return the expected score of a player in `[0.01, 0.99]`, like the Python
 //! `ModelEvaluator`.
 
+pub mod features;
 pub mod h1;
 pub mod linear;
 pub mod net;

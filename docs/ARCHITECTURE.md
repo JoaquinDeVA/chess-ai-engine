@@ -4,7 +4,7 @@
 >
 > **Read it when:** You are about to change the code or add a bot or a model.
 >
-> **Next:** [Algorithms](ALGORITHMS.md)
+> **Next:** [How the engine chooses a move](SEARCH.md)
 
 The engine has two parts. The part that must be fast, the search, the evaluations it calls and the
 opening book and endgame tables, is written in Rust (`rust/`). It is built as two products: the
@@ -55,7 +55,7 @@ Dependencies, as the imports stand:
 Data scripts live in `src/chess_lab/scripts/data/` (`build_raw_shards.py`, `build_sidecars.py`,
 `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`), and `src/chess_lab/scripts/run_full_pipeline.sh`
 runs the data, training and measurement flow. Games between engines are played by fastchess against the UCI binary, not by
-Python code in this repository. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and
+Python code in this repository. See [Training data](DATA.md) for the data and
 [MODELS.md](MODELS.md) for the models themselves.
 
 ## Main classes
@@ -119,14 +119,14 @@ Under a clock the binary spends a share of the time left and the increment; with
 to that depth; with `movetime` it spends that time. Without a clock or a fixed time the window sends
 `movetime 3000`. The search is iterative deepening with a hard limit inside the tree: an interrupted
 iteration is discarded unless it is the first one, so there is always a move. The algorithms themselves
-are in [Algorithms](ALGORITHMS.md).
+are in [How the engine chooses a move](SEARCH.md) and the [catalogue of techniques](techniques/README.md).
 
 The binary takes its options by `setoption`: `Threads`, `Hash`, `Techniques` (a list of names, as in
 `_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. Known gap: the binary reads
 the clock fields but ignores `winc`/`binc`, so the increment has no effect on the search until the
 selective-search work of the plan fixes it.
 
-## Building and testing## Building and testing
+## Building and testing
 
 The Rust crate is built by `maturin`, which `pip install -e ".[dev]"` runs (it needs a Rust
 toolchain, `rustup`). After a change in `rust/` run the same command again, or `maturin develop`,
@@ -141,8 +141,8 @@ Python extractors by `tests/core/test_feature_parity.py`.
 
 | To add... | Implement | Guide |
 |---|---|---|
-| an evaluation model | a `LinearFeatures` (`chess_lab/models/linear_features.py`, plus its Rust version) and a model class in `chess_lab/models/definitions.py` (added to `MODELS`); train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
-| a search technique | a change in `rust/src/search/`, measured and documented like the others | [Algorithms](ALGORITHMS.md) |
+| an evaluation model | a `LinearFeatures` (`chess_lab/models/linear_features.py`, plus its Rust version) and a model class in `chess_lab/models/definitions.py` (added to `MODELS`); train and measure it with the commands of [Training](TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
+| a search technique | a change in `rust/src/search/`, measured and documented like the others | [Search techniques](techniques/README.md#how-to-add-a-technique) |
 
 ### Running a model in Rust
 

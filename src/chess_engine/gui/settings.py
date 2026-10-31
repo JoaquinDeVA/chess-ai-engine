@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
 #: Techniques of selective search the AI players use by default: the ones that won in the games
-#: against the reference search (docs/algorithms/selective-techniques.md). ``lmr`` is left out.
+#: against the reference search (docs/techniques/README.md). ``lmr`` is left out.
 DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", "null_move")
 
 #: Threads an AI gets by default against a person, at most.

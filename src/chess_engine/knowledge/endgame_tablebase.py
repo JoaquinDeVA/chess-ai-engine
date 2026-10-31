@@ -6,7 +6,7 @@ move (DTZ). With the 3-4-5 piece tables (about 940 MB) the engine never needs to
 position: :meth:`EndgameTablebase.best_move` returns a move that keeps the best result and, among
 the winning moves, the one that finishes the quickest.
 
-The tables are not versioned (they are large); see ``docs/DATA_AND_TRAINING.md`` for where they go.
+The tables are not versioned (they are large); see ``docs/techniques/endgame-tablebases.md`` for where they go.
 They are probed by the Rust core (``rust/src/knowledge/tablebase.rs``); this class is its Python
 face.
 """

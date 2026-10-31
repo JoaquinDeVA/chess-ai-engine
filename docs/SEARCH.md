@@ -1,17 +1,17 @@
 # Search algorithms
 
-> **What it is:** How the engine chooses a move: one main algorithm (alpha-beta search) and the techniques added on it, one section each in the pages linked below.
+> **What it is:** How the engine chooses a move: one main algorithm (alpha-beta search) and the techniques added on it, one page each in the [catalogue](techniques/README.md).
 >
 > **Read it when:** You want to know why the engine thinks the way it does, what each technique costs or saves, or where it lives in the code.
 >
-> **Next:** [Data and training](DATA_AND_TRAINING.md)
+> **Next:** [Search techniques](techniques/README.md)
 
 A chess engine tries moves, imagines the replies, and picks the move leading to the best position it
 can force. With about 30 moves per position the lines explode, so everything below is about looking at
 fewer or better positions within the clock. After the main algorithm, each technique gets a section
 with five parts (problem, what it does, how it is implemented, measured effect, status). Code: `rust/src/search/`, `rust/src/board.rs`, `(removed) chess_engine/bots/`; evaluations: [MODELS.md](MODELS.md).
 
-The search was first written in Python and moved to Rust ([Rust and threads](algorithms/rust-and-threads.md)). The node counts, the pruning
+The search was first written in Python and moved to Rust ([the search in Rust](techniques/rust-core.md)). The node counts, the pruning
 counts and the moves quoted in these pages were measured with the Python engine; the Rust core
 reproduced them exactly when it replaced the Python engine, so they hold
 for both. Only the time per node changed, and that page gives the speed.
@@ -62,29 +62,31 @@ The measured tables below come from `python (removed) scripts/bench/compare_sear
 of test positions searched with each technique switched off, one at a time, with `linear_material`
 as evaluation. Its report files are local (not versioned), so the numbers are copied here.
 
+## Preference for faster wins
+
+**Problem.** A forced mate in 2 and a forced mate in 9 are both worth `1`, so the engine can see a
+win and keep postponing it. The same happens in reverse for losses.
+
+**What it does.** A terminal value is nudged by `0.003` per ply from the root: a quicker win is worth
+slightly more than a slower one, a slower loss more than a quicker one. Draws are untouched.
+
+**How it is implemented.** `DEPTH_PREFERENCE_EPSILON = 0.003` and `Search::terminal_utility` in
+`rust/src/search/node.rs`: `1 - ply * epsilon` for a win, `ply * epsilon` for a loss, with `ply`
+computed from `depth_remaining`. The quiescence search uses it too.
+
+**Measured effect.** Not measured in this repository.
+
+**Status.** Kept; since the first commit (2026-10-16, imported from the coursework version).
+
+## The path of one move
+
+The whole decision of a move, around that search: the opening book answers first while the game follows
+it, then the endgame tables (five pieces or fewer), and only otherwise the search above runs.
+
+![Decision path of one move: opening book, then endgame tables, then iterative-deepening search; the first that applies chooses the move](img/path-of-a-move.svg)
+
 ## The techniques
 
-Node counts are per move at depth 6 over 100 positions (reference: 672,800); the measurements are in the pages linked.
-
-| Technique | Status and effect | Page |
-|---|---|---|
-| Preference for faster wins | reference | [search basics](algorithms/search-basics.md#preference-for-faster-wins) |
-| Iterative deepening with a clock | reference, on | [search basics](algorithms/search-basics.md#iterative-deepening-with-a-clock) |
-| Transposition table | reference, on | [search basics](algorithms/search-basics.md#transposition-table) |
-| Killer moves | reference, on | [search basics](algorithms/search-basics.md#killer-moves) |
-| MVV-LVA move ordering | reference, on | [search basics](algorithms/search-basics.md#move-ordering-by-mvv-lva) |
-| Quiescence search | on (4 plies) | [search basics](algorithms/search-basics.md#quiescence-search) |
-| Make/unmake, terminal detection | reference, on | [search basics](algorithms/search-basics.md#makeunmake-on-one-state-with-fast-transposition-keys) |
-| Endgame tablebases, opening book | on | [search basics](algorithms/search-basics.md#endgame-tablebases) |
-| Search in Rust | since 2026-10-25; 8 to 35 times faster | [Rust and threads](algorithms/rust-and-threads.md#the-search-in-rust) |
-| Several threads (Lazy SMP) | option `threads`, off | [Rust and threads](algorithms/rust-and-threads.md#several-threads-lazy-smp) |
-| Incremental network accumulator (`incremental`) | on; +15 % nodes/s for `net4_pst` | [selective techniques](algorithms/selective-techniques.md#incremental-network-accumulator) |
-| Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | [selective techniques](algorithms/selective-techniques.md#table-move-first-tt_move) |
-| History heuristic (`history`) | on; nodes to 391,130 | [selective techniques](algorithms/selective-techniques.md#history-heuristic-history) |
-| Principal variation search (`pvs`) | on; nodes to 487,244 | [selective techniques](algorithms/selective-techniques.md#principal-variation-search-pvs) |
-| Aspiration windows (`aspiration`) | on; nodes to 440,213 | [selective techniques](algorithms/selective-techniques.md#aspiration-windows-aspiration) |
-| Null move (`null_move`) | on; nodes to 446,129; +205 Elo with the set | [selective techniques](algorithms/selective-techniques.md#null-move-null_move) |
-| Late move reductions (`lmr`) | implemented, off: lost games | [not adopted](algorithms/not-adopted.md#late-move-reductions-lmr---tried-not-adopted) |
-| Tactical ordering with Prolog | removed | [not adopted](algorithms/not-adopted.md#tried-and-removed-tactical-move-ordering-with-prolog) |
+Every technique added to this search, with its status and measured effect, is in the [catalogue of search techniques](techniques/README.md).
 
 See also [RESULTS.md](RESULTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md).

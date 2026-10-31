@@ -6,7 +6,7 @@
 >
 > **Next:** [Results](RESULTS.md)
 
-An evaluation model answers one question: given a chess position, how likely is the player whose turn it is to win? The search engine (see [ARCHITECTURE.md](ARCHITECTURE.md) and [ALGORITHMS.md](ALGORITHMS.md)) calls this answer at the leaves of its tree and uses it to compare moves. The models differ only in how they produce that probability. Each one is trained to imitate Stockfish evaluations from the Lichess database (see [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md)), so what a model "learns" is always the same thing: a cheap approximation of what a very strong engine thinks of a position.
+An evaluation model answers one question: given a chess position, how likely is the player whose turn it is to win? The search engine (see [ARCHITECTURE.md](ARCHITECTURE.md) and [SEARCH.md](SEARCH.md)) calls this answer at the leaves of its tree and uses it to compare moves. The models differ only in how they produce that probability. Each one is trained to imitate Stockfish evaluations from the Lichess database (see [DATA.md](DATA.md)), so what a model "learns" is always the same thing: a cheap approximation of what a very strong engine thinks of a position.
 
 ## The idea behind the linear models
 

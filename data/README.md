@@ -11,7 +11,7 @@ What lives here and what can be deleted. Only this file and `opening_book.json` 
   the `.rtbw` win/draw/loss tables and the `.rtbz` distance-to-zeroing tables). **Not versioned**
   (too large) but not regenerable either: copy them back from `tablebase.lichess.ovh` or from
   any other Syzygy 3-4-5 set. Bots use them with `python main.py --endgame-db`; see
-  `docs/ALGORITHMS.md`.
+  `docs/techniques/endgame-tablebases.md`.
 
 ## Training data (can be rebuilt, can be deleted)
 
@@ -27,7 +27,7 @@ What lives here and what can be deleted. Only this file and `opening_book.json` 
   ```bash
   python scripts/data/build_sidecars.py --raw data/lichess/raw --out data/lichess/sidecar --jobs 4
   ```
-* `cache/linear/` – encoded training batches (`docs/DATA_AND_TRAINING.md`, "The cache of encoded
+* `cache/linear/` – encoded training batches (`docs/TRAINING.md`, "The cache of encoded
   batches"). Safe to delete; the next training rebuilds what it needs.
 
 ## Results of the runs (can be deleted)
@@ -36,4 +36,4 @@ What lives here and what can be deleted. Only this file and `opening_book.json` 
 * `tournament/` – the games of the tournaments and their per-move logs.
 * `reports/` – the generated reports (tournaments, trade-off, search measurements).
 
-Schema, sign convention and commands: `docs/DATA_AND_TRAINING.md`.
+Schema, sign convention and commands: `docs/DATA.md`.

@@ -1,33 +1,42 @@
 # Documentation
 
-> **What it is:** The index of every page, in the order a newcomer should read them.
+> **What it is:** The index of every page, grouped by what you came to do.
 >
 > **Read it when:** You do not know where to start, or you look for one specific page.
 >
 > **Next:** [Architecture](ARCHITECTURE.md)
 
-The project is a chess engine written in Python: an alpha-beta search that asks an evaluation
-function how good a position is. The functions it can ask range from a hand-written heuristic
-to logistic models and a small neural network trained to imitate Stockfish on 125 million
-positions. The pages below tell, in this order, how the engine is put together, how it searches,
-where the training data comes from, what each model contains and what was measured.
+The project is a chess engine with an alpha-beta search written in Rust, played through UCI, that asks an
+evaluation function how good a position is. The functions range from a hand-written heuristic to logistic
+models and a small neural network trained to imitate Stockfish on 125 million positions. The window and the
+laboratory that trains and measures the models are in Python.
 
-| Page | What you learn | Read it when |
-|---|---|---|
-| [Architecture](ARCHITECTURE.md) | The packages, what depends on what, the path of one move | You are about to change the code |
-| [Search algorithms](ALGORITHMS.md) | The alpha-beta search and a table of every technique added on top of it, with its status and what it saved | You want to know how the engine chooses a move |
-| [Search basics](algorithms/search-basics.md) | The classic techniques of the reference search: transposition table, killers, quiescence, tablebases, opening book | You want the details of the base search |
-| [Rust and threads](algorithms/rust-and-threads.md) | The move of the search to Rust, its speed, and the Lazy SMP threads | You want speed numbers or to use several threads |
-| [Selective techniques](algorithms/selective-techniques.md) | The six techniques behind switches, how each is implemented and what it gained | You want to know why the engine searches deeper than before |
-| [Techniques not adopted](algorithms/not-adopted.md) | Late move reductions and the Prolog ordering, and why they are not in use | You wonder why an obvious technique is missing |
-| [Data and training](DATA_AND_TRAINING.md) | The Lichess evaluation database, the shards, the targets, the effort scale, how to retrain | You want to rebuild the data or train a model |
-| [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns | You want to understand a model before reading its numbers |
-| [The window](GUI.md) | The board, the game page, the players and the AI settings of the window | You want to play, or to change the window |
-| [Openings](OPENINGS.md) | The suite of balanced starting positions for engine matches and how it is built | You run a match or rebuild the suite |
-| [Remote worker](WORKER.md) | How matches run on the desktop machine over SSH | You launch a match |
-| [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence | You wonder why something is the way it is |
-| [Pitfalls](PITFALLS.md) | What already cost time: symptom, cause, what to do | You are about to launch a long script or touch `rust/` |
-| [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained | You want to compare models or repeat a measurement |
+## To play
+
+| Page | What you learn |
+|---|---|
+| [The window](GUI.md) | The board, the game page, the players and the AI settings |
+| [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained |
+
+## To understand how it plays
+
+| Page | What you learn |
+|---|---|
+| [How the engine chooses a move](SEARCH.md) | Minimax, alpha-beta, the values, the path of one move |
+| [Search techniques](techniques/README.md) | Every technique added to the search, its status and what it gained, one page each |
+| [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns |
+
+## To change or measure it
+
+| Page | What you learn |
+|---|---|
+| [Architecture](ARCHITECTURE.md) | The packages, what depends on what, the path of one move through the code |
+| [Training data](DATA.md) | The Lichess evaluation database, the shards, the sidecars, the targets |
+| [Training](TRAINING.md) | The effort scale, what training does, how to reproduce everything |
+| [Openings](OPENINGS.md) | The suite of balanced starting positions for engine matches |
+| [Remote worker](WORKER.md) | How matches run on the desktop machine over SSH |
+| [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence |
+| [Pitfalls](PITFALLS.md) | What already cost time: symptom, cause, what to do |
 
 The installation and the commands to play are in the [README of the repository](../README.md).
 The history of changes is in the [changelog](../CHANGELOG.md).

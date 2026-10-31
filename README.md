@@ -35,8 +35,8 @@ All the numbers, with the command behind each, are in [Results](docs/RESULTS.md)
 | You want to | Read |
 |---|---|
 | See how the engine is organised | [Architecture](docs/ARCHITECTURE.md) |
-| Understand how it chooses a move, and what each technique saves | [Search algorithms](docs/ALGORITHMS.md) |
-| Know where the training data comes from and how to retrain | [Data and training](docs/DATA_AND_TRAINING.md) |
+| Understand how it chooses a move, and what each technique saves | [How the engine chooses a move](docs/SEARCH.md) and [Search techniques](docs/techniques/README.md) |
+| Know where the training data comes from and how to retrain | [Training data](docs/DATA.md), [Training](docs/TRAINING.md) |
 | Know what each evaluation model contains | [Models](docs/MODELS.md) |
 | Read the measurements | [Results](docs/RESULTS.md) |
 | Use the window | [The window](docs/GUI.md) |
@@ -80,15 +80,15 @@ example to compare evaluations alone.
 
 | Extra | What it does | Switch | Default | Details |
 |---|---|---|---|---|
-| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it; the Python side consults it before the engine | Settings → Opening book; `AISettings.opening_book` | on | [Data and training](docs/DATA_AND_TRAINING.md#the-opening-book-and-the-endgame-tables) |
-| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists); consulted before the engine | Settings → Endgame tablebases; `AISettings.tablebase` | on | [Algorithms](docs/algorithms/search-basics.md#endgame-tablebases) |
-| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | Settings → Advanced; UCI option `Techniques` | on (all but `lmr`) | [Algorithms](docs/algorithms/selective-techniques.md) |
-| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | Settings → Advanced (threads); UCI option `Threads` | up to 4 | [Algorithms](docs/algorithms/rust-and-threads.md#several-threads-lazy-smp) |
+| Opening book (`knowledge/opening_book.py`) | Plays the moves of `data/opening_book.json` (121,868 positions checked against Stockfish) while the game follows it; the Python side consults it before the engine | Settings → Opening book; `AISettings.opening_book` | on | [Opening book](docs/techniques/opening-book.md) |
+| Endgame tables (`knowledge/endgame_tablebase.py`) | Plays positions of up to five pieces from the Syzygy tables in `data/knowledge/endgame`, without searching (used only if the folder exists); consulted before the engine | Settings → Endgame tablebases; `AISettings.tablebase` | on | [Endgame tablebases](docs/techniques/endgame-tablebases.md) |
+| Search techniques | Table move first, history, principal variation search, aspiration windows, null move and an incremental network (`lmr`, which lost, is off) | Settings → Advanced; UCI option `Techniques` | on (all but `lmr`) | [Search techniques](docs/techniques/README.md) |
+| Several threads | The search runs on N threads that share one table (Lazy SMP); the search stops being deterministic | Settings → Advanced (threads); UCI option `Threads` | up to 4 | [Lazy SMP](docs/techniques/lazy-smp.md) |
 
 ## Reproduce the experiments
 
 The data (about 24 GB) and the training are described in
-[Data and training](docs/DATA_AND_TRAINING.md). Once the shards are in `data/lichess/raw`, the
+[Training data](docs/DATA.md) and [Training](docs/TRAINING.md). Once the shards are in `data/lichess/raw`, the
 flow, from the sidecars to the training of the models, the measurements and the models table, is one
 script. Tournaments are not part of it; they are run with fastchess (see [Results](docs/RESULTS.md)):
 

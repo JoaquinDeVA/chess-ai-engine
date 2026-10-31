@@ -11,15 +11,21 @@ SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/scripts/[\w./-]+\.(?:py|sh)\b")
 
 
 def checked_docs():
-    """README and every doc except the internal planning records in ``docs/superpowers/``.
+    """README and every page under ``docs/``.
 
     :return: Paths of the Markdown files to check.
     """
-    docs = ROOT / "docs"
-    others = sorted(
-        path for path in docs.rglob("*.md") if path.relative_to(docs).parts[0] != "superpowers"
-    )
-    return [ROOT / "README.md", *others]
+    return [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
+
+
+def linked_from(index):
+    """Files that an index page links to.
+
+    :param index: Path of the index page.
+    :return: Resolved paths of its relative links.
+    """
+    targets = LINK.findall(index.read_text(encoding="utf-8"))
+    return {(index.parent / t.split("#", 1)[0]).resolve() for t in targets if "://" not in t}
 
 
 def test_relative_links_resolve():
@@ -52,3 +58,15 @@ def test_quoted_script_paths_exist():
             if not (ROOT / path).exists():
                 missing.append(f"{doc.relative_to(ROOT)}: {path}")
     assert not missing, "\n".join(missing)
+
+
+def test_every_page_is_in_an_index():
+    docs = ROOT / "docs"
+    listed = linked_from(docs / "README.md") | linked_from(docs / "techniques" / "README.md")
+    indexes = {docs / "README.md", docs / "techniques" / "README.md"}
+    orphans = [
+        str(page.relative_to(ROOT))
+        for page in docs.rglob("*.md")
+        if page not in indexes and page.resolve() not in listed
+    ]
+    assert not orphans, "\n".join(orphans)

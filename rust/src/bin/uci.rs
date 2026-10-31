@@ -142,16 +142,21 @@ fn think(mut memory: Memory, eval: Arc<Eval>, job: Job) -> Memory {
     memory
 }
 
-fn run_search(memory: &mut Memory, eval: &Eval, job: Job) -> Result<String, String> {
-    let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
-    let options = Options {
+/// The options every search of the binary uses (the defaults of the Python search).
+fn search_options(techniques: Techniques, node_limit: Option<u64>) -> Options {
+    Options {
         quiescence_plies: search::DEFAULT_QUIESCENCE_PLIES,
         min_depth: search::DEFAULT_MIN_DEPTH,
         estimator: search::DEFAULT_ESTIMATOR.to_string(),
-        techniques: job.techniques,
-        node_limit: job.limits.nodes,
+        techniques,
+        node_limit,
         ..Options::default()
-    };
+    }
+}
+
+fn run_search(memory: &mut Memory, eval: &Eval, job: Job) -> Result<String, String> {
+    let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
+    let options = search_options(job.techniques, job.limits.nodes);
     let origin = Instant::now();
     let clock = || origin.elapsed().as_secs_f64();
     let control = Control {
@@ -227,8 +232,67 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
     Ok(name == "Hash" || name == "Threads")
 }
 
+/// Positions of `bench`: a fixed set, so that the node counts are a fingerprint of the search.
+const BENCH_FENS: [&str; 6] = [
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+    "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+    "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+];
+const BENCH_DEPTH: usize = 6;
+
+/// Searches the fixed positions one by one with fresh memory and a fixed depth. The node counts go
+/// to stdout (the same on every run); the time to stderr.
+fn bench(eval: &Eval) {
+    let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
+    let started = Instant::now();
+    let mut total_nodes = 0;
+    let mut nodes_by_depth = [0u64; BENCH_DEPTH + 1];
+    for fen in BENCH_FENS {
+        let mut memory = Memory::new(DEFAULT_MAX_TT_ENTRIES);
+        let mut state = GameState::from_moves(fen, &[]).expect("bench position is valid");
+        let options = search_options(techniques, None);
+        let clock = || 0.0;
+        let control = Control {
+            start: 0.0,
+            hard_limit: f64::INFINITY,
+            clock: &clock,
+            stop: None,
+            progress: None,
+            rotation: 0,
+        };
+        let (best, stats) = search::iterative_deepening(
+            &mut state,
+            eval,
+            &mut memory,
+            &options,
+            BENCH_DEPTH,
+            f64::INFINITY,
+            &control,
+        )
+        .expect("bench search");
+        let best = best.as_ref().map_or("0000".to_string(), uci_string);
+        println!("{fen} nodes {} bestmove {best}", stats.nodes_visited);
+        total_nodes += stats.nodes_visited;
+        for iteration in &stats.iterations {
+            nodes_by_depth[iteration.depth] += iteration.nodes;
+        }
+    }
+    println!("total nodes {total_nodes}");
+    for (depth, nodes) in nodes_by_depth.iter().enumerate().skip(1) {
+        println!("depth {depth} nodes {nodes}");
+    }
+    eprintln!("time {:.3} s", started.elapsed().as_secs_f64());
+}
+
 fn main() {
     let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
+    if std::env::args().nth(1).as_deref() == Some("bench") {
+        bench(&eval);
+        return;
+    }
     let mut settings = Settings {
         threads: 1,
         hash_mb: DEFAULT_HASH_MB,

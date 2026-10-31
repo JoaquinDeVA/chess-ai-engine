@@ -25,6 +25,9 @@ pub struct Options {
     pub use_capture_order: bool,
     /// Techniques of selective search; all off reproduces the reference engine.
     pub techniques: Techniques,
+    /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
+    /// its own nodes, so a fixed-node search is deterministic whatever the machine.
+    pub node_limit: Option<u64>,
 }
 
 /// The techniques added to the reference search, each with its own switch (all off by default).
@@ -107,6 +110,7 @@ impl Default for Options {
             use_killers: true,
             use_capture_order: true,
             techniques: Techniques::default(),
+            node_limit: None,
         }
     }
 }

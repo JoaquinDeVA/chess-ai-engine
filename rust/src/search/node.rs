@@ -182,7 +182,14 @@ impl Search<'_> {
         // Checked after the horizon test so a cut never hides a quiescence value, and before any
         // move is searched so a cut node stores nothing in the table.
         let stopped = self.control.stop.is_some_and(|flag| flag.load(Relaxed));
-        if stopped || (self.control.clock)() - self.control.start >= self.control.hard_limit {
+        let out_of_nodes = self
+            .options
+            .node_limit
+            .is_some_and(|limit| self.nodes >= limit);
+        if stopped
+            || out_of_nodes
+            || (self.control.clock)() - self.control.start >= self.control.hard_limit
+        {
             self.truncated = true;
             return (self.static_value(), None);
         }

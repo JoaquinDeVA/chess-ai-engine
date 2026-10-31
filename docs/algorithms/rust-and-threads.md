@@ -75,7 +75,7 @@ other and, ignoring what the others find, they would prune less.
 
 ![Lazy SMP: a main thread and two helpers search the same root with different move orders and share one lock-free transposition table](../img/threads-shared-table.svg)
 
-**How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/mod.rs`; the
+**How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; the
 table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
 XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of
 `IterativeDeepeningBot` and the thread setting of the window. The tournaments use one thread, so

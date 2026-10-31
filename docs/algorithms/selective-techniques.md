@@ -8,7 +8,7 @@
 
 ## Search techniques: the switches and how they were judged
 
-The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it. Each technique is a field of `Techniques` (`rust/src/search/mod.rs`), a
+The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it. Each technique is a field of `Techniques` (`rust/src/search/options.rs`), a
 name in `_core.TECHNIQUES`, the option `techniques` of `IterativeDeepeningBot` and the Advanced panel of the AI settings of the window
 (`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`src/chess_engine/bots/_search_bots.py`): all but
 `lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
@@ -104,7 +104,7 @@ only a move that beats alpha is searched again with the full window.
 
 ![PVS searches later moves with a zero-width window and repeats with the full window if one fails high; aspiration starts with a narrow window and widens it when the result falls outside](../img/pvs-aspiration.svg)
 
-**How it is implemented.** `child_value` in `rust/src/search/mod.rs`; the scout window uses
+**How it is implemented.** `child_value` in `rust/src/search/node.rs`; the scout window uses
 `SCOUT_EPSILON = 1e-9` because values are continuous probabilities.
 
 **Measured effect.** Nodes 672,800 -> 487,244; same move 100 %.
@@ -119,7 +119,7 @@ is almost always close.
 **What it does.** From depth 4, searches with a window of +-0.02 around the last value; if the result falls
 outside, widens it by 4 times and searches again.
 
-**How it is implemented.** `iteration` in `rust/src/search/mod.rs`. A repeat cut short by the clock keeps the
+**How it is implemented.** `iteration` in `rust/src/search/deepening.rs`. A repeat cut short by the clock keeps the
 last complete result, and nothing reduced is stored as complete in the table.
 
 **Measured effect.** Nodes 672,800 -> 440,213; same move 100 %. With `pvs`: +104 Elo (with `tt_move`, `history`).

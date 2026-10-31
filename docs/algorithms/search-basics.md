@@ -15,7 +15,7 @@ win and keep postponing it. The same happens in reverse for losses.
 slightly more than a slower one, a slower loss more than a quicker one. Draws are untouched.
 
 **How it is implemented.** `DEPTH_PREFERENCE_EPSILON = 0.003` and `Search::terminal_utility` in
-`rust/src/search/mod.rs`: `1 - ply * epsilon` for a win, `ply * epsilon` for a loss, with `ply`
+`rust/src/search/node.rs`: `1 - ply * epsilon` for a win, `ply * epsilon` for a loss, with `ply`
 computed from `depth_remaining`. The quiescence search uses it too.
 
 **Measured effect.** Not measured in this repository.
@@ -78,7 +78,7 @@ iterations at 40 s. The replay assumes each iteration lasts what it lasted in th
 change was not tested in games, where a difference of 0.2 plies (a few Elo) is far below what a
 hundred games can resolve.
 
-**How it is implemented.** `iterative_deepening` in `rust/src/search/mod.rs` (loop,
+**How it is implemented.** `iterative_deepening` in `rust/src/search/deepening.rs` (loop,
 `OVERSHOOT_FACTOR = 1.15`, discard of truncated iterations; `completed_depth` in the statistics).
 `TimeManager` in `src/chess_engine/search/time_management.py` holds the numbers;
 `IterativeDeepeningBot.search` in `src/chess_engine/bots/_search_bots.py` computes the soft budget and
@@ -196,7 +196,7 @@ the recapture and scores a free pawn (the horizon effect).
 evaluation ("stand-pat": nobody is forced to capture) or follow a *noisy* move (capture or promotion)
 for a few more plies, with alpha-beta pruning, and the best option is returned.
 
-**How it is implemented.** `Search::quiescence` in `rust/src/search/mod.rs`, called from
+**How it is implemented.** `Search::quiescence` in `rust/src/search/node.rs`, called from
 `Search::node` at `depth_remaining <= 0`, and `is_noisy` in `rust/src/board.rs` (legal captures and
 promotions). It uses neither the table nor killers; its nodes count in `nodes_visited`. The bots
 (`IterativeDeepeningBot`) use `DEFAULT_QUIESCENCE_PLIES = 4`; `quiescence_plies=0` switches it off, which

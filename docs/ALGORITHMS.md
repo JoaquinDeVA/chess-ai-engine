@@ -30,7 +30,7 @@ skipped (a cut-off). The result is exactly the minimax result with fewer nodes.
 
 **Heuristic evaluation and a depth cut-off.** Games are too deep to search to the end, so the search
 stops at a fixed depth and asks an evaluation function for a number. This is `Search::node` in
-`rust/src/search/mod.rs` (one function for MAX and MIN nodes; `alpha_beta` runs it for a depth and
+`rust/src/search/node.rs` (one function for MAX and MIN nodes; `alpha_beta` runs it for a depth and
 returns the value, the best move and the counters). Every modification below was added to it.
 
 **Values.** Every value is the expected score for the player the search runs for: `1` win, `0.5` draw,

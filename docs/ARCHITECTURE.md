@@ -46,7 +46,7 @@ Dependencies, as the imports stand:
 |---|---|
 | `rust/src/board.rs` | The rules for the search: a position with the keys needed for repetitions, the terminal test of `board.outcome(claim_draw=True)`, legal moves in the order python-chess generates them, a key for the transposition table |
 | `rust/src/eval/` | The evaluations the search runs without Python: `h1.rs` (the heuristic), `linear.rs` (sparse features and the logistic models), `net.rs` (the sparse network `net4_pst`) |
-| `rust/src/search/` | `mod.rs`: alpha-beta, quiescence, iterative deepening, the `Techniques` switches and the threads. `tt.rs`: transposition table, killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
+| `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches, `Memory` and the counters. `mod.rs` re-exports them. `tt.rs`: transposition table, killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
@@ -135,7 +135,7 @@ sequenceDiagram
 ```
 
 There is no depth to aim for: the clock decides. Depths 1 to `min_depth` (default 1,
-`DEFAULT_MIN_DEPTH` in `rust/src/search/mod.rs`) are always completed, so there is always an
+`DEFAULT_MIN_DEPTH` in `rust/src/search/options.rs`) are always completed, so there is always an
 answer. After that, the search stops when the time the next iteration
 would take (estimated from the previous ones) does not fit in the budget. Only the hard limit
 (`TimeManager.hard_limit`, checked inside the tree) interrupts an iteration, and an interrupted

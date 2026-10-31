@@ -22,6 +22,14 @@ src/chess_lab/scripts/worker/match.sh stop check     # SIGINT: fastchess saves i
 
 To pause, run `stop NAME`; to continue, run `start NAME` again: if `results/NAME/config.json` exists, fastchess resumes from it (games played and SPRT state are kept, the PGN is appended). fastchess writes that file only on a clean exit or SIGINT, so a power cut or a `kill -9` of the worker loses the match: in that case the games in the PGN are still valid but the SPRT state is not.
 
+**Keeping the connection alive.** For unattended runs, `keepalive.sh` runs on the laptop: every `CHECK` seconds (default 1800) it tests the SSH connection; if it fails, every `RETRY` seconds (default 300) it switches wifi off and on and reselects the connection `WIFI` with `nmcli` until SSH answers. It logs to `data/matches/keepalive.log`. `HOST`, `PORT`, `WIFI`, `CHECK` and `RETRY` can be overridden.
+
+```bash
+systemd-inhibit --what=sleep src/chess_lab/scripts/worker/keepalive.sh   # stops the laptop from suspending
+```
+
+It only restores the laptop's link: the match itself runs detached on the worker and does not depend on it.
+
 **Implementation.** The binary and fastchess are built on the laptop (glibc 2.39) and copied: the worker has glibc 2.43 and no Rust toolchain, so they run unchanged. The worker holds Stockfish and python-chess too, so `build_openings.py` can also run there.
 
 **Measured effect.** The command above ran 2 games at 10 s + 0.1 s in 56 s on the worker, result in `data/matches/check/match.log` (1 win, 1 loss for the same binary). fastchess warns "No info line available to extract score" because the binary prints no score in its `info` lines; it affects only adjudication, which is not used.

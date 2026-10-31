@@ -48,7 +48,7 @@ Next to each shard sits a small file, `data/lichess/sidecar/part-NNNNN.sidecar.p
 - `quiet`: true when the side to move is not in check and the best move is neither a capture nor a promotion (`is_quiet`). Quiet positions are the ones where a static evaluation is least distorted by an exchange in progress.
 - `white_to_move`: whose turn it is, so the sampler does not need to parse the FEN again.
 
-The sampler draws positions with a seeded random generator, `numpy.random.default_rng(seed)` with seed 42 (`SAMPLE_SEED` in `src/chess_lab/models/spec.py`), shuffling the shard order and the order inside each row group. The same seed gives the same positions. Pairing a shard with its sidecar means only the columns and row groups needed are read.
+The sampler draws positions with a seeded random generator, `numpy.random.default_rng(seed)` with seed 42 (`SAMPLE_SEED` in `src/chess_lab/models/defaults.py`), shuffling the shard order and the order inside each row group. The same seed gives the same positions. Pairing a shard with its sidecar means only the columns and row groups needed are read.
 
 | Measure | Value |
 |---|---|
@@ -102,7 +102,7 @@ With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the 
 
 ### Why only 10 % of the mates
 
-Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_lab/models/spec.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
+Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_lab/models/defaults.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
 
 The evidence is one match, played once. `linear_pst_terms` trained with 10 % of the mates played 100 games against the same model trained with all of them: effort 15, 50 openings with colours swapped, 60 s + 1 s per move. The 10 % model scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1), which is +156 Elo (`docs/RESULTS.md`, section "Mates al 10 %"). It is a single pair of players at a single effort level, not a general law.
 

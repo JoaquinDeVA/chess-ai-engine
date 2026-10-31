@@ -1,6 +1,6 @@
 """Scores of a round-robin tournament: Elo, W-D-L and intervals, report section and model cards.
 
-Everything here works on the game records written by :mod:`chess_lab.comparison.tournament`;
+Everything here works on the game records written by :mod:`chess_lab.tournaments.tournament`;
 nothing plays a game.
 """
 
@@ -10,8 +10,8 @@ import statistics
 from typing import Any, Dict, List, Sequence, Tuple
 
 from chess_engine.game.play import FORFEIT_TERMINATIONS
-from chess_lab.comparison.tradeoff import HEURISTICS
 from chess_lab.models.cards import card_path, load_card, save_card
+from chess_lab.players import HEURISTICS
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ def record_cards(
     The section holds one entry per control (see :func:`control_label`); the other controls
     are kept. An old flat section (one tournament, with ``base``) is migrated first. A player
     whose card does not exist yet is skipped (cards are written by training and by
-    ``comparison.evaluate``, not created here), and so is one that played no game.
+    ``measure.evaluate``, not created here), and so is one that played no game.
 
     :param summary: Output of :func:`summarize`.
     :param specs: Players of the tournament.

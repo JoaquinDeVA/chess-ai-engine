@@ -1,9 +1,9 @@
 """Render the model cards into the table of ``RESULTS.md``.
 
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
-this module regenerates: ``python -m chess_lab.comparison.report``.
+this module regenerates: ``python -m chess_lab.measure.report``.
 
-Each row reads the card sections ``accuracy`` and ``cost`` (written by ``comparison.evaluate``),
+Each row reads the card sections ``accuracy`` and ``cost`` (written by ``measure.evaluate``),
 ``tradeoff`` (depth and search agreement per time per move, from the profiler) and ``tournament``
 (one entry per time control, from the round-robin). Each control that appears in any card gets
 two columns, score and Elo against the anchor: ``600+5`` (10 min + 5 s), ``60+1`` (1 min + 1 s),

@@ -10,7 +10,7 @@ The folders mirror the source: a test sits where the code it checks sits.
 | `app/knowledge/`, `app/gui/` | opening book, endgame tables, the window (the widgets are skipped without PySide6) | `src/chess_engine/{knowledge,gui}/` |
 | `core/` | the Rust core against the Python feature extractors of `chess_lab/models/` | `rust/` |
 | `lab/training/` | sampling, split, effort, cards, the raw Lichess export | `src/chess_lab/training/` |
-| `lab/comparison/` | judge, trade-off profile, tournament, standings | `src/chess_lab/comparison/` |
+| `lab/measure/`, `lab/tournaments/` | judge, trade-off profile; tournament, standings | `src/chess_lab/{measure,tournaments}/` |
 | `lab/scripts/` | one file per script, named `test_<script>.py` | `src/chess_lab/scripts/` |
 | `test_docs.py` | links, commands and script paths quoted in the docs exist | `README.md`, `docs/` |
 

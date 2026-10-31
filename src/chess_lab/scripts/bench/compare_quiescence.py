@@ -20,8 +20,8 @@ from typing import List, Sequence, Tuple
 import chess
 
 from chess_engine.bots.time_manager import TimeManager
-from chess_lab.comparison.evaluate import SAMPLE_SEED, TEST, TEST_SAMPLE_ROWS
-from chess_lab.comparison.tradeoff import make_player, validate_specs
+from chess_lab.measure.evaluate import SAMPLE_SEED, TEST, TEST_SAMPLE_ROWS
+from chess_lab.players import make_player, validate_specs
 from chess_lab.training.sidecar import load_sample
 
 #: (maximum depth, quiescence plies) pairs that are measured.

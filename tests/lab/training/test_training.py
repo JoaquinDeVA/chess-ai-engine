@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 
 from chess_engine.models import loader
-from chess_lab.comparison import evaluate as evaluate_cli
-from chess_lab.comparison import report
+from chess_lab.measure import evaluate as evaluate_cli
+from chess_lab.measure import report
 from chess_lab.models import cards, definitions
 from chess_lab.models.representation import Representation, white_score
 from chess_lab.training import train as train_cli

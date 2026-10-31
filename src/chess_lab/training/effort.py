@@ -19,6 +19,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from chess_lab.models import PythonEvaluator, fit_stream, new_model
+from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import NeuralEvalModel, SparseModel
 from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, _losses, _scores, encode_frame
 from chess_lab.models.linear_features import features_of
@@ -27,7 +28,6 @@ from chess_lab.models.representation import (
     keep_mate_rows,
     validate_mate_keep,
 )
-from chess_lab.models.spec import SAMPLE_SEED
 
 from .dataset import TRAIN
 from .sidecar import iter_batches

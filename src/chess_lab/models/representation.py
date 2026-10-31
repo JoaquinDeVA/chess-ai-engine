@@ -13,8 +13,8 @@ import chess
 import numpy as np
 import pandas as pd
 
+from .defaults import DEFAULT_MATE_KEEP, mates_suffix
 from .definitions import CP_SCALE
-from .spec import DEFAULT_MATE_KEEP, mates_suffix
 
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
 LICHESS_K = 0.00368208

@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Sequence
 import chess
 
 from chess_engine.bots.time_manager import TimeManager
-from chess_lab.comparison.tradeoff import make_player
+from chess_lab.players import make_player
 
 #: Clock handed to the bot at every move: the budget is then the 40 s cap of the time manager.
 CLOCK_SECONDS = 600.0

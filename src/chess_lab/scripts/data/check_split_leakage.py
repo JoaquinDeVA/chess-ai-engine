@@ -15,7 +15,7 @@ Neighbours are counted through the moves of the test position (its children); th
 to it are not searched, so the shares are lower bounds.
 
 With ``--models`` the script also measures whether the neighbours flatter the models: it judges each
-model on the fixed test sample of ``comparison.evaluate`` twice, on the positions that have a child in
+model on the fixed test sample of ``measure.evaluate`` twice, on the positions that have a child in
 train and on those that have none, and prints the Spearman correlation and the error of both groups. If
 neighbours inflated the accuracy, the first group would score clearly higher.
 
@@ -158,7 +158,7 @@ def stratified_accuracy(
     :param flags: Which rows of the sample have a child in train.
     :return: ``{model: {"with neighbour": metrics, "without neighbour": metrics}}``.
     """
-    from chess_lab.comparison.judge import judge
+    from chess_lab.measure.judge import judge
     from chess_lab.models.definitions import load_model
     from chess_lab.models.python_eval import PythonEvaluator
 
@@ -246,7 +246,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"| a position one move away | {near['child_in_data']:.1%} | {near['child_in_train']:.1%} |",
     ]
     if args.models:
-        from chess_lab.comparison.evaluate import SAMPLE_SEED
+        from chess_lab.measure.evaluate import SAMPLE_SEED
         from chess_lab.training.sidecar import load_sample
 
         sample = load_sample(args.raw, args.sidecar, TEST, args.sample_rows, seed=SAMPLE_SEED)

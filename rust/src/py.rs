@@ -359,7 +359,7 @@ mod _core {
             "FEATURE_SETS",
             crate::eval::features::FeatureSet::NAMES.to_vec(),
         )?;
-        module.add("ESTIMATOR_NAMES", crate::search::estimators::NAMES.to_vec())?;
+        module.add("ESTIMATORS", crate::search::estimators::NAMES.to_vec())?;
         Ok(())
     }
 }

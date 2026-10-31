@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round-robin at equal time per move: calibrate, play, and write the report.
 
-python -m chess_lab.comparison.play_tournament --players linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1 \
+python -m chess_lab.tournaments.play_tournament --players linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1 \
     --base 10 --increment 0.1 --workers 5 --hours 10 --out data/tournament/games.jsonl
 
 A short calibration (one opening, every pair) measures the worker-seconds per game; that sizes
@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from chess_lab.comparison.standings import (
+from chess_lab.tournaments.standings import (
     ANCHOR,
     DEFAULT_MAX_DEPTH,
     record_cards,
@@ -25,7 +25,7 @@ from chess_lab.comparison.standings import (
     summarize,
     termination_section,
 )
-from chess_lab.comparison.tournament import paired_openings, read_games, run_round_robin
+from chess_lab.tournaments.tournament import paired_openings, read_games, run_round_robin
 
 DEFAULT_PLAYERS = "linear_pst,linear_pst_terms,linear_king_bucket,net4_pst,h1"
 

@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from chess_lab.comparison import standings
+from chess_lab.tournaments import standings
 
 
 def game(white, black, winner, **extra):
@@ -85,7 +85,7 @@ def test_size_for_budget():
 
 
 def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, monkeypatch):
-    from chess_lab.comparison import report
+    from chess_lab.measure import report
     from chess_lab.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")

@@ -31,9 +31,9 @@ Commands are run from the repository root.
 
 | Judge | What it measures | Command |
 |---|---|---|
-| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42) | `python -m chess_lab.comparison.evaluate --model linear_pst_terms` |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42) | `python -m chess_lab.measure.evaluate --model linear_pst_terms` |
 | Profile | Depth reached in 1, 3 and 10 s and agreement of the searched move with Stockfish | `python src/chess_lab/scripts/bench/profile_depth_vs_accuracy.py` |
-| Tournament | Round robin at equal time per move, paired openings (each opening is played with both colours), Elo against an anchor | `python -m chess_lab.comparison.play_tournament` |
+| Tournament | Round robin at equal time per move, paired openings (each opening is played with both colours), Elo against an anchor | `python -m chess_lab.tournaments.play_tournament` |
 
 The tournaments report the score (wins plus half the draws) with a 95 % interval; no game in
 any of them ended by forfeit, time or illegal move. The whole flow is `bash src/chess_lab/scripts/run_full_pipeline.sh`.
@@ -76,11 +76,11 @@ Fixed depth of 3 for everybody (no player can reach more depth than another), an
 | `linear_material` | 27.5 |
 
 ```bash
-python -m chess_lab.comparison.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
+python -m chess_lab.tournaments.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
     --anchor h1 --base 60 --increment 1 --openings 10 --out data/tournament/short.jsonl
-python -m chess_lab.comparison.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
+python -m chess_lab.tournaments.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
     --anchor h1 --base 600 --increment 5 --openings 5 --out data/tournament/reference.jsonl
-python -m chess_lab.comparison.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst \
+python -m chess_lab.tournaments.play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst \
     --anchor linear_pst_terms --max-depth 3 --base 600 --increment 0 --openings 10 --out data/tournament/depth3.jsonl
 ```
 
@@ -143,7 +143,7 @@ strength by a search this shallow. For a game at 10 min + 5 s use `linear_pst_te
 
 | Question | Answer | Where it comes from |
 |---|---|---|
-| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). Those two models are not shipped any more; the all-mates one is recreated with `--mate-keep 1.0 --tag mates100`. | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100`, then `python -m chess_lab.comparison.play_tournament` between that model and the default one |
+| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). Those two models are not shipped any more; the all-mates one is recreated with `--mate-keep 1.0 --tag mates100`. | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100`, then `python -m chess_lab.tournaments.play_tournament` between that model and the default one |
 | Does more training effort help? | Not for the Material logistic model: effort 90 gives Spearman 0.474, the same as effort 30; the validation loss stays flat (0.6722 to 0.6719). | `python -m chess_lab.training.train --model linear_material --effort 90` |
 | Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `python src/chess_lab/scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`; [Search basics](algorithms/search-basics.md#quiescence-search) |
 | Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `python src/chess_lab/scripts/bench/compare_time_estimators.py`; [Search basics](algorithms/search-basics.md#iterative-deepening-with-a-clock) |
@@ -155,7 +155,7 @@ them, and the time estimator is pinned to the original rule (`ratio_squared`, wi
 so that a stopped tournament can be resumed with identical conditions. Quiescence is on, as in the
 bots by default. Each game record also carries the version of the Rust core that played it (`core`,
 `chess_engine._core.version()`); a file is never resumed with another version, and records without the
-field count as `python`, the engine before 2.0 (`tests/lab/comparison/test_tournament.py::test_a_file_played_by_another_core_is_refused`).
+field count as `python`, the engine before 2.0 (`tests/lab/tournaments/test_tournament.py::test_a_file_played_by_another_core_is_refused`).
 The published tournaments below were played by that Python engine.
 
 ## Limits and leakage
@@ -175,7 +175,7 @@ The published tournaments below were played by that Python engine.
 
 ## Model table
 
-Generated by `python -m chess_lab.comparison.report` from the model cards; do not edit by hand.
+Generated by `python -m chess_lab.measure.report` from the model cards; do not edit by hand.
 
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | 10 min + 5 s, score % | 10 min + 5 s, Elo vs anchor | 1 min + 1 s, score % | 1 min + 1 s, Elo vs anchor | Depth 3, score % | Depth 3, Elo vs anchor |

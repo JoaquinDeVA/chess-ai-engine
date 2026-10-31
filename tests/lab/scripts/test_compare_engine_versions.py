@@ -5,8 +5,6 @@ import json
 
 import pytest
 
-from chess_engine.bots.time_manager import TimeManager
-from chess_lab.comparison.tradeoff import make_player, split_techniques
 from tests.paths import ROOT
 
 
@@ -17,18 +15,6 @@ def script():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def test_specs_carry_the_techniques_of_a_player():
-    assert split_techniques("linear_pst") == ("linear_pst", ())
-    assert split_techniques("linear_pst+pvs,lmr") == ("linear_pst", ("pvs", "lmr"))
-    assert len(split_techniques("h1+all")[1]) == 7
-
-
-def test_make_player_switches_the_techniques_on_and_keeps_the_label():
-    player = make_player("linear_material+pvs,lmr", TimeManager())
-    assert player.techniques == ("pvs", "lmr") and player.name == "linear_material+pvs,lmr"
-    assert make_player("linear_material", TimeManager()).techniques == ()
 
 
 def test_spec_of(script):

@@ -25,7 +25,7 @@ def test_run_full_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_pa
             "training.train" in line and f"--model {model} " in line and "--effort 30" in line
             for line in lines
         ), model
-    assert any("comparison.evaluate --model h1 " in line for line in lines)
+    assert any("measure.evaluate --model h1 " in line for line in lines)
     assert any("--base 60 " in line and "--increment 1" in line for line in lines)
     assert any("--base 600 --increment 5" in line for line in lines)
     assert any("--max-depth 3" in line for line in lines)

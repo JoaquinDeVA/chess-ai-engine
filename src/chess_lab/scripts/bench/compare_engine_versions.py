@@ -19,8 +19,8 @@ import statistics
 from pathlib import Path
 from typing import Dict, List, Sequence
 
-from chess_lab.comparison.standings import DEFAULT_MAX_DEPTH, summarize
-from chess_lab.comparison.tournament import paired_openings, read_games, run_round_robin
+from chess_lab.tournaments.standings import DEFAULT_MAX_DEPTH, summarize
+from chess_lab.tournaments.tournament import paired_openings, read_games, run_round_robin
 
 
 def spec_of(model: str, techniques: str) -> str:

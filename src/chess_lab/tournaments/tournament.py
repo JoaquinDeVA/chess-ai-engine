@@ -10,24 +10,22 @@ import itertools
 import json
 import logging
 import multiprocessing
-import os
 import random
 import re
 import time
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Sequence, Tuple
 
 import chess
 
 from chess_engine import _core
 from chess_engine.bots.time_manager import TimeManager
 from chess_engine.game.play import play_game
-from chess_lab.comparison.standings import DEFAULT_MAX_DEPTH
-from chess_lab.comparison.tradeoff import make_player
+from chess_lab.players import make_player, single_threaded_env
+from chess_lab.tournaments.standings import DEFAULT_MAX_DEPTH
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +39,6 @@ MAX_DEATHS_PER_GAME = 2
 #: by the log directory (``Path`` or ``None``: no per-move log) and the game index, which names
 #: the log file ``<index>_<white>_vs_<black>.json``.
 Job = Tuple[Any, ...]
-
-#: Thread-pool variables pinned to 1 in the workers, so that timed games do not compete for cores.
-THREAD_VARIABLES = (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "TF_NUM_INTRAOP_THREADS",
-    "TF_NUM_INTEROP_THREADS",
-)
 
 
 def paired_openings(n_pairs: int, plies: int = 6, seed: int = 0) -> List[str]:
@@ -198,24 +187,6 @@ def check_specs(specs: Sequence[str]) -> None:
             make_player(spec, TimeManager())
         except Exception as exc:
             raise ValueError(f"cannot build player '{spec}': {exc}") from exc
-
-
-@contextmanager
-def single_threaded_env() -> Iterator[None]:
-    """Set :data:`THREAD_VARIABLES` to 1 and restore the previous environment on exit.
-
-    Workers spawned inside the block inherit the variables.
-    """
-    saved = {name: os.environ.get(name) for name in THREAD_VARIABLES}
-    os.environ.update({name: "1" for name in THREAD_VARIABLES})
-    try:
-        yield
-    finally:
-        for name, value in saved.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
 
 
 class RecordingPlayer:

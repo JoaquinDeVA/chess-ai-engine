@@ -22,7 +22,6 @@ model cards.
 import argparse
 import json
 import multiprocessing
-import os
 import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -31,10 +30,11 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 import chess
 
+from chess_lab.players import single_threaded_env
+
 DEFAULT_PLAYERS = "h1,linear_material,linear_pst,linear_pst_terms,linear_king_bucket,net4_pst"
 #: Clock that never limits a fixed-depth search.
 GENEROUS_CLOCK = 1e6
-SINGLE_THREAD = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "TF_NUM_THREADS")
 
 
 def load_fens(raw: Path, sidecar: Path, count: int) -> List[str]:
@@ -45,7 +45,7 @@ def load_fens(raw: Path, sidecar: Path, count: int) -> List[str]:
     :param count: Number of positions.
     :return: FEN strings.
     """
-    from chess_lab.comparison.evaluate import SAMPLE_SEED, TEST
+    from chess_lab.measure.evaluate import SAMPLE_SEED, TEST
     from chess_lab.training.sidecar import load_sample
 
     return load_sample(raw, sidecar, TEST, count, seed=SAMPLE_SEED)["fen"].tolist()
@@ -58,7 +58,7 @@ def run_job(job: Tuple[str, str, float, List[str], int, Tuple[str, ...]]) -> Dic
     :return: The player, the setting and the summary of the searches.
     """
     from chess_engine.bots.time_manager import TimeManager
-    from chess_lab.comparison.tradeoff import fixed_time_manager, make_player
+    from chess_lab.players import fixed_time_manager, make_player
 
     player_name, kind, value, fens, threads, techniques = job
     options = {} if threads == 1 else {"threads": threads, "hash_mb": 256}
@@ -179,10 +179,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         for d in args.depths.split(",")
         if d
     ]
-    for name in SINGLE_THREAD:
-        os.environ[name] = "1"
     context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=args.workers, mp_context=context) as pool:
+    with (
+        single_threaded_env(),
+        ProcessPoolExecutor(max_workers=args.workers, mp_context=context) as pool,
+    ):
         results = list(pool.map(run_job, jobs))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({"label": args.label, "results": results}, indent=1) + "\n")

@@ -21,8 +21,8 @@ from typing import Callable, Dict, Iterator, List, Sequence, Tuple
 import chess
 
 from chess_engine.bots.time_manager import TimeManager
-from chess_lab.comparison.evaluate import SAMPLE_SEED, TEST, TEST_SAMPLE_ROWS
-from chess_lab.comparison.tradeoff import make_player, validate_specs
+from chess_lab.measure.evaluate import SAMPLE_SEED, TEST, TEST_SAMPLE_ROWS
+from chess_lab.players import make_player, validate_specs
 from chess_lab.training.sidecar import load_sample
 
 #: Clock given to the bot, in seconds: large enough for the depth limit to end every search.

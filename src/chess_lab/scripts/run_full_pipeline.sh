@@ -100,7 +100,7 @@ step_evaluate() {
   local model
   for model in $(present_models) h1; do
     log "evaluate $model"
-    run "$PYTHON" -m chess_lab.comparison.evaluate --model "$model" \
+    run "$PYTHON" -m chess_lab.measure.evaluate --model "$model" \
       --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"
   done
 }
@@ -123,33 +123,29 @@ step_tournaments() {
   without_h1="$(join $(present_models))"
   [ "$DRY_RUN" = 1 ] || mkdir -p data/tournament data/reports
   # A) short control
-  run "$PYTHON" -m chess_lab.comparison.play_tournament --players "$with_h1" --anchor h1 \
+  run "$PYTHON" -m chess_lab.tournaments.play_tournament --players "$with_h1" --anchor h1 \
     --base 60 --increment 1 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/short.jsonl --logs data/tournament/short \
     --report data/reports/TOURNAMENT_60+1.md
   # B) reference control
-  run "$PYTHON" -m chess_lab.comparison.play_tournament --players "$with_h1" --anchor h1 \
+  run "$PYTHON" -m chess_lab.tournaments.play_tournament --players "$with_h1" --anchor h1 \
     --base 600 --increment 5 --openings 5 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/reference.jsonl --logs data/tournament/reference \
     --report data/reports/TOURNAMENT_600+5.md
   # C) equal depth 3, no h1
-  run "$PYTHON" -m chess_lab.comparison.play_tournament --players "$without_h1" --anchor linear_pst_terms \
+  run "$PYTHON" -m chess_lab.tournaments.play_tournament --players "$without_h1" --anchor linear_pst_terms \
     --max-depth 3 --base 600 --increment 0 --openings 10 --workers "$WORKERS" $(estimator_args) \
     --out data/tournament/depth3.jsonl --logs data/tournament/depth3 \
     --report data/reports/TOURNAMENT_depth3.md
 }
 
 step_quiescence() {
-  if [ -f src/chess_lab/scripts/bench/compare_quiescence.py ]; then
-    run "$PYTHON" src/chess_lab/scripts/bench/compare_quiescence.py --players h1,linear_pst_terms \
-      --raw "$RAW" --sidecar "$SIDECAR"
-  else
-    echo "quiescence step: script added by the supervisor"
-  fi
+  run "$PYTHON" src/chess_lab/scripts/bench/compare_quiescence.py --players h1,linear_pst_terms \
+    --raw "$RAW" --sidecar "$SIDECAR"
 }
 
 step_report() {
-  run "$PYTHON" -m chess_lab.comparison.report
+  run "$PYTHON" -m chess_lab.measure.report
 }
 
 [ "$DRY_RUN" = 1 ] || mkdir -p "$STATE_DIR"

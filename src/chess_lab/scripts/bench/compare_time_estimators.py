@@ -32,7 +32,7 @@ Estimator = Callable[[Sequence[Tuple[float, int]]], float]
 #: The rules of the core, by name.
 ESTIMATORS: Dict[str, Estimator] = {
     name: (lambda history, name=name: _core.estimate(name, [tuple(h) for h in history]))
-    for name in _core.ESTIMATOR_NAMES
+    for name in _core.ESTIMATORS
 }
 
 #: The numbers of ``TimeManager`` and of the iterative deepening loop.

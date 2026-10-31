@@ -1,6 +1,6 @@
 """Defaults of the tournament command line."""
 
-from chess_lab.comparison import play_tournament, standings
+from chess_lab.tournaments import play_tournament, standings
 
 
 def test_play_tournament_defaults_use_h1_anchor():

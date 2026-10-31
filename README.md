@@ -65,7 +65,7 @@ pip install -e ".[gui]"
 python main.py
 
 # no window: tournaments between bots
-python -m chess_lab.comparison.play_tournament --help
+python -m chess_lab.tournaments.play_tournament --help
 ```
 
 In the window you choose who plays White and Black (a person or an AI), the time control and, with the
@@ -108,7 +108,9 @@ src/chess_engine/
   gui/          the window: board, game page, player selection and AI settings
 src/chess_lab/  the laboratory (not needed to play)
   training/     sampling, targets and the training command
-  comparison/   judge, trade-off profile, tournament (and its entry point) and the results table
+  measure/      judge, model evaluation, trade-off profile and the results table
+  tournaments/  round-robin games, standings and the tournament entry point
+  players.py    the players (from a spec) shared by both
   scripts/      data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
 docs/           the documentation
 tests/          the test suite

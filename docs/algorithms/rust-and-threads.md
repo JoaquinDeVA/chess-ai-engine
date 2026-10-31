@@ -16,7 +16,7 @@ algorithm.
 **What it does.** The same search, in Rust: the rules of the game, the evaluations the search calls
 (`h1`, the four logistic models and the sparse network), the alpha-beta with all the techniques
 above, the opening book and the endgame tables. Python keeps the game loop, the bots' interface, the
-training and the comparison tools, and calls the core once per move with the position, the
+training and the measurement tools, and calls the core once per move with the position, the
 evaluation and the time limits.
 
 **How it is implemented.** The crate in `rust/` is built as the Python module `chess_engine._core`
@@ -26,7 +26,8 @@ produced; they were removed afterwards and live in git history). Today `rust/tes
 `rust/tests/knowledge.rs` check the rules, the book and the tables. The legal moves are listed in the order python-chess generates them
 (`generation_order`), so that moves of equal value are chosen as before. Replaying the 21,203 moves
 of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with
-the same number of nodes; the 11 others differ in the last decimal of a value.
+the same number of nodes; the 11 others differ in the last decimal of a value. This was checked once, when the core replaced
+the Python engine, against game records that no longer exist (no command reproduces the figure today).
 
 **Measured effect.** Measured with `python src/chess_lab/scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
 (200 test positions, seed 42, a fresh table per position, five processes of one thread each, books

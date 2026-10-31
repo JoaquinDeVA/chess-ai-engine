@@ -1,1 +1,1 @@
-"""Laboratory: training, model comparison and the scripts that produce the data and the results."""
+"""Laboratory: training, model measurements, tournaments and the scripts that produce the data and the results."""

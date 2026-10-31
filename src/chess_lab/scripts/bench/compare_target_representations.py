@@ -7,7 +7,7 @@ python src/chess_lab/scripts/bench/compare_target_representations.py --train-pos
 Every variant changes one axis of the default representation and is trained as a tagged model
 ``linear_pst@<prefix>-<index>`` (artifact and card; the prefix is ``bake`` unless
 ``--tag-prefix`` says otherwise). The variants are judged on the same test sample
-with :func:`~chess_lab.comparison.judge.judge`. The two best by ``all`` best-move agreement then
+with :func:`~chess_lab.measure.judge.judge`. The two best by ``all`` best-move agreement then
 play a round-robin at equal time per move. The script stops there: it writes the report, which
 ends with ``Decision: pending``, and deletes the tagged models it created unless ``--keep-models`` is given. The script refuses
 to start if one of its tagged models or cards already exists, so it never overwrites or deletes
@@ -32,15 +32,15 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.models import artifact_path
-from chess_lab.comparison.judge import judge
-from chess_lab.comparison.standings import record_cards, summarize
-from chess_lab.comparison.tournament import paired_openings, read_games, run_round_robin
+from chess_lab.measure.judge import judge
 from chess_lab.models import fit_stream, new_model
 from chess_lab.models.cards import card_path, current_commit, today, update_card
+from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import LinearEvalModel, get_model_class
 from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG
 from chess_lab.models.representation import Representation
-from chess_lab.models.spec import SAMPLE_SEED
+from chess_lab.tournaments.standings import record_cards, summarize
+from chess_lab.tournaments.tournament import paired_openings, read_games, run_round_robin
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 from chess_lab.training.effort import effort_config, fit_config
 from chess_lab.training.sidecar import iter_batches, load_sample

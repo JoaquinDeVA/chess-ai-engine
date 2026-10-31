@@ -3,7 +3,7 @@
 import chess
 import pytest
 
-from chess_lab.training.lichess import SIDE_TO_MOVE, WHITE, detect_perspective
+from chess_lab.training.lichess_raw import SIDE_TO_MOVE, WHITE, detect_perspective
 from tests.conftest import material_cp, random_positions
 
 

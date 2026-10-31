@@ -20,7 +20,7 @@ import chess
 
 from chess_engine.bots.search_bot import HEURISTIC, SearchBot
 from chess_engine.knowledge.endgame_tablebase import DEFAULT_TABLEBASE_DIR, EndgameTablebase
-from chess_lab.comparison.tradeoff import fixed_time_manager
+from chess_lab.players import fixed_time_manager
 
 #: Material of the generated positions, as White's extra pieces and Black's.
 MATERIALS: Tuple[Tuple[str, str], ...] = (

@@ -21,7 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from chess_lab.comparison.tradeoff import record_cards, run_profiles  # noqa: E402
+from chess_lab.measure.tradeoff import record_cards, run_profiles  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 

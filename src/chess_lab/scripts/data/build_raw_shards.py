@@ -26,10 +26,11 @@ from pathlib import Path
 import pyarrow as pa
 import zstandard
 
-from chess_lab.training.lichess import DETECTION_SAMPLE, detect_perspective
 from chess_lab.training.lichess_raw import (
+    DETECTION_SAMPLE,
     ROW_GROUP_SIZE,
     ShardWriter,
+    detect_perspective,
     parse_chunk,
     read_metadata,
     shard_path,

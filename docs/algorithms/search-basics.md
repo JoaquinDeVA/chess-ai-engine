@@ -163,8 +163,8 @@ it, then the endgame tables (five pieces or fewer), and only otherwise the searc
 
 ## Move ordering by MVV-LVA
 
-**Problem.** The order in which moves are tried decides how much alpha-beta can skip, and python-chess
-lists them in arbitrary order.
+**Problem.** The order in which moves are tried decides how much alpha-beta can skip, and the move list of a
+position comes in generation order, which says nothing about how good a move is.
 
 **What it does.** Captures go first, best Most Valuable Victim / Least Valuable Attacker first (a pawn
 taking a queen before a queen taking a pawn; en passant counts as a pawn capture). Quiet moves keep
@@ -175,7 +175,7 @@ rest of the quiet moves by their history score (`history`, if on).
 ![Order in which moves are tried: table move, captures by MVV-LVA, killers, then history; an early cut-off skips the later moves](../img/move-ordering.svg)
 
 **How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/ordering.rs` (score
-`10 × victim − attacker`; a stable sort, so equal captures keep the order python-chess generates
+`10 × victim − attacker`; a stable sort, so equal captures keep the order of generation (the one python-chess used)
 them in, `generation_order` in `rust/src/board.rs`). `fallback_move` in
 `src/chess_engine/bots/search_bot.py` picks the best capture when a search returns nothing.
 
@@ -242,8 +242,8 @@ engine, identical moves and node counts and a total time from 10.8 s to 3.7 s (2
 
 ## Fast terminal detection with the same draw rules
 
-**Problem.** "Is the game over here?" is asked at every node, and python-chess's
-`board.outcome(claim_draw=True)` replays the game to claim a threefold repetition.
+**Problem.** "Is the game over here?" is asked at every node, and the reference rule,
+`board.outcome(claim_draw=True)` of python-chess, replays the game to claim a threefold repetition.
 
 **What it does.** Same answer as `board.outcome(claim_draw=True)`, but the repetition is read from the
 keys of the positions since the last irreversible move, which the state extends in constant time per

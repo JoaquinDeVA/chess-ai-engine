@@ -10,20 +10,20 @@ The engine has two parts. The part that must be fast, the search, the evaluation
 opening book and endgame tables, is written in Rust (`rust/`, built as the extension module
 `chess_engine._core`). Everything else is Python in two packages: `src/chess_engine/` is the application (game loop, bots,
 models, window), and `src/chess_lab/` is the laboratory that produces and measures it (training,
-comparison and the scripts). The laboratory imports the application; the application never imports the
+measurements, tournaments and the scripts). The laboratory imports the application; the application never imports the
 laboratory. A bot hands the position and
 an evaluation to the Rust core once per move and gets a move and the statistics back.
 
 ```mermaid
 flowchart TB
     WIN["main.py → gui/<br/>window"] --> BOTS
-    TOURN["chess_lab/comparison/play_tournament<br/>no window"] --> GM["game/play.py<br/>play_game, results"]
+    TOURN["chess_lab/tournaments/play_tournament<br/>no window"] --> GM["game/play.py<br/>play_game, results"]
     GM --> BOTS
     BOTS["bots/search_bot.py<br/>SearchBot"] -->|"one call per move"| CORE["rust/ (chess_engine._core)<br/>search · evaluations ·<br/>opening book · endgame tables"]
     BOTS --> EVAL["models/<br/>h1 and the learned models"]
     EVAL -->|"weights, once"| CORE
     TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL
-    COMP["chess_lab/comparison/<br/>judge · evaluate · tradeoff · tournament · report"] --> TRAIN
+    COMP["chess_lab/measure/ · tournaments/<br/>judge · evaluate · tradeoff · report · tournament · standings"] --> TRAIN
     COMP --> EVAL
     COMP --> BOTS
 ```
@@ -36,7 +36,7 @@ Dependencies, as the imports stand:
 - `bots/` imports `models/` and `knowledge/`.
 - `game/` imports `bots/`.
 - `gui/` imports `bots/`, `models/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
-- `chess_lab/comparison/` is the top layer: it imports `bots/`, `models/`, `chess_lab/training/`, `knowledge/` and `game/`. Nothing else imports it.
+- `chess_lab/measure/` and `chess_lab/tournaments/` are the top layer: they import `chess_lab/players.py`, `bots/`, `models/`, `chess_lab/training/`, `knowledge/` and `game/`. Nothing else imports them.
 
 ## Packages
 
@@ -49,14 +49,16 @@ Dependencies, as the imports stand:
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `bots/` | `search_bot.py`: `SearchBot`, the one bot (options `techniques`, `threads`, `hash_mb`; the evaluation is `h1` or a model spec). `search_statistics.py`: `SearchStatistics`. `time_manager.py`: per-move time budget |
 | `models/` | `loader.py`: turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) or `h1` (`h1_weights.json`) into the Rust `Evaluator`, which computes the features and the score. The models are defined, trained and saved in the lab: `chess_lab/models/definitions.py` (`SparseModel`, `LinearEvalModel`, `NeuralEvalModel` and the table `MODELS`) and `cards.py` (model cards in `chess_lab/models/cards/`) |
-| `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py` and `spec.py`: target scale and point of view, and the defaults shared by the training (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
-| `chess_lab/training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
-| `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
+| `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
+| `chess_lab/training/` | `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards, and the detection of its perspective. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
+| `chess_lab/players.py` | `make_player` (a `SearchBot` from a spec such as `linear_pst+pvs`, no book or tables, for measurements), `fixed_time_manager`, `single_threaded_env`, `validate_specs` |
+| `chess_lab/measure/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `report.py` (model cards into the models table of `RESULTS.md`) |
+| `chess_lab/tournaments/` | `play_tournament.py` (entry point), `tournament.py` (round-robin at equal time, resumable records), `standings.py` (Elo, summaries and model cards of a tournament) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
 | `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings → bot options; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
 | `game/` | `play.py`: `play_game`, the game loop with clocks, and `GameResult`, for the tournaments |
 
-Tournaments run with `python -m chess_lab.comparison.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
+Tournaments run with `python -m chess_lab.tournaments.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
 `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
 `src/chess_lab/scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
 `measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,

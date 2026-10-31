@@ -9,7 +9,6 @@ depth in the same time per move. :func:`profile` measures both sides for one pla
 import logging
 import math
 import multiprocessing
-import os
 import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -18,83 +17,16 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import chess
 import pandas as pd
 
-from chess_engine import _core
-from chess_engine.bots.search_bot import SearchBot
-from chess_engine.bots.time_manager import TimeManager
-from chess_engine.models import split_spec
 from chess_lab.models.cards import card_path, update_card
-from chess_lab.models.definitions import get_model_class
+from chess_lab.players import (
+    HEURISTICS,
+    fixed_time_manager,
+    make_player,
+    single_threaded_env,
+    validate_specs,
+)
 
 logger = logging.getLogger(__name__)
-
-SINGLE_THREAD_VARIABLES = (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "TF_NUM_INTRAOP_THREADS",
-    "TF_NUM_INTEROP_THREADS",
-)
-HEURISTICS = ("h1",)
-
-
-def fixed_time_manager(seconds: float) -> TimeManager:
-    """Time manager whose per-move budget is exactly ``seconds`` (no extension, no margin).
-
-    :param seconds: Seconds allowed for each move.
-    :return: The time manager.
-    """
-    return TimeManager(
-        move_fraction=1.0,
-        min_turn_time=seconds,
-        max_turn_time=seconds,
-        max_clock_share=1.0,
-        extension=1.0,
-        safety_margin=0.0,
-    )
-
-
-def split_techniques(spec: str) -> Tuple[str, Tuple[str, ...]]:
-    """Split ``name+tech1,tech2`` into the player and the techniques of selective search.
-
-    ``name+all`` switches every technique on. A spec without ``+`` has no techniques.
-
-    :param spec: Player specification, possibly with a ``+`` suffix.
-    :return: ``(player specification, techniques)``.
-    """
-    base, _, rest = spec.partition("+")
-    if not rest:
-        return base, ()
-    names = list(_core.TECHNIQUES) if rest == "all" else [n for n in rest.split(",") if n]
-    return base, tuple(names)
-
-
-def make_player(
-    spec: str,
-    time_manager: TimeManager,
-    max_depth: int = 30,
-    **search_options: Any,
-) -> SearchBot:
-    """Build an iterative-deepening player for measurements: no opening book and no tablebases.
-
-    :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
-        name or ``name@tag`` (its player is named after the spec). A ``+`` suffix switches techniques of selective search on (``linear_pst+pvs,lmr``
-        or ``linear_pst+all``); without it the player uses the reference search, so that measurements
-        compare evaluations alone.
-    :param time_manager: Time budgeting policy.
-    :param max_depth: Deepest iteration to run.
-    :param search_options: Other options of the bot (``estimator``, ``min_depth``...); they may
-        switch the book (``opening_book``) or the tables (``tablebase``) on.
-    :return: The player.
-    """
-    search_options = {"opening_book": None, "tablebase": None, **search_options}
-    label = spec
-    techniques: Tuple[str, ...] = ()  # the reference search, unless the spec asks for techniques
-    if "+" in spec:
-        spec, techniques = split_techniques(spec)
-    search_options.setdefault("techniques", techniques)
-    return SearchBot(
-        spec, name=label, max_depth=max_depth, time_manager=time_manager, **search_options
-    )
 
 
 def _summary(rows: List[Tuple[int, int, float, Optional[bool]]]) -> Dict[str, float]:
@@ -155,22 +87,6 @@ def _profile_job(job: Tuple[str, float, pd.DataFrame]) -> Optional[Dict[str, obj
     return {"player": spec, "seconds": seconds, **result}
 
 
-def validate_specs(specs: Sequence[str]) -> None:
-    """Fail fast on a player that is neither a heuristic nor a registered model.
-
-    :param specs: Player specifications (``name`` or ``name@tag``).
-    :raises ValueError: If a spec is unknown.
-    """
-    for spec in specs:
-        spec = split_techniques(spec)[0]
-        if spec in HEURISTICS:
-            continue
-        try:
-            get_model_class(split_spec(spec)[0])
-        except (KeyError, ValueError) as error:
-            raise ValueError(f"unknown player {spec!r}: {error.args[0]}") from error
-
-
 def run_profiles(
     specs: Sequence[str], seconds: Sequence[float], positions: pd.DataFrame, parallel: int = 1
 ) -> Dict[str, List]:
@@ -189,18 +105,12 @@ def run_profiles(
     validate_specs(specs)
     jobs = [(spec, secs, positions) for spec in specs for secs in seconds]
     if parallel > 1:
-        saved = {name: os.environ.get(name) for name in SINGLE_THREAD_VARIABLES}
-        os.environ.update(dict.fromkeys(SINGLE_THREAD_VARIABLES, "1"))
-        try:
-            context = multiprocessing.get_context("spawn")
-            with ProcessPoolExecutor(max_workers=parallel, mp_context=context) as pool:
-                outcomes = list(pool.map(_profile_job, jobs))
-        finally:
-            for name, value in saved.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
+        context = multiprocessing.get_context("spawn")
+        with (
+            single_threaded_env(),
+            ProcessPoolExecutor(max_workers=parallel, mp_context=context) as pool,
+        ):
+            outcomes = list(pool.map(_profile_job, jobs))
     else:
         outcomes = [_profile_job(job) for job in jobs]
     skipped = []

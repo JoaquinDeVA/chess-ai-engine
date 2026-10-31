@@ -1,7 +1,7 @@
 """Model cards: small JSON files with everything known about a model.
 
-Cards live in ``chess_lab/models/cards/<name>.json``. ``chess_lab.training.train`` and ``comparison.evaluate`` fill
-them in; ``comparison.report`` renders them into ``RESULTS.md``.
+Cards live in ``chess_lab/models/cards/<name>.json``. ``chess_lab.training.train`` and ``measure.evaluate`` fill
+them in; ``measure.report`` renders them into ``RESULTS.md``.
 """
 
 import json

@@ -14,9 +14,9 @@ from typing import List, Optional
 
 from chess_engine.models import artifact_path
 from chess_lab.models.cards import clear_measurements, current_commit, today, update_card
+from chess_lab.models.defaults import DEFAULT_MATE_KEEP, SAMPLE_SEED
 from chess_lab.models.definitions import available_models, get_model_class
 from chess_lab.models.representation import Representation
-from chess_lab.models.spec import DEFAULT_MATE_KEEP, SAMPLE_SEED
 
 from .dataset import VALIDATION
 from .effort import (

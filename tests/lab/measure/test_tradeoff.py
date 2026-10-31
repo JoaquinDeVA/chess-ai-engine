@@ -4,35 +4,11 @@ import chess
 import pandas as pd
 import pytest
 
-from chess_engine.bots.search_bot import SearchBot
-from chess_lab.comparison import tradeoff
-from chess_lab.comparison.tradeoff import (
-    HEURISTICS,
-    fixed_time_manager,
-    make_player,
+from chess_lab.measure import tradeoff
+from chess_lab.measure.tradeoff import (
     profile,
-    validate_specs,
 )
 from chess_lab.models import cards
-
-
-def test_fixed_time_manager_budget_is_exact():
-    manager = fixed_time_manager(2.5)
-    budget = manager.turn_budget(2.5)
-    assert budget == 2.5
-    assert manager.hard_limit(budget) == 2.5
-
-
-def test_make_player_builds_model_and_heuristic_players(material_model):
-    manager = fixed_time_manager(0.2)
-    model_player = make_player(material_model, manager, max_depth=4)
-    assert isinstance(model_player, SearchBot)
-    assert model_player.max_depth == 4
-    assert model_player.opening_book is None and model_player.tablebase is None
-    assert model_player.time_manager is manager
-    player = make_player("h1", manager)
-    assert isinstance(player, SearchBot) and player.evaluation == "h1"
-    assert player.time_manager is manager
 
 
 def test_profile_reports_depth_and_agreement(material_model):
@@ -68,10 +44,3 @@ def cards_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
     return tmp_path
-
-
-def test_tradeoff_accepts_h1_spec():
-    assert "h1" in HEURISTICS
-    validate_specs(["h1"])
-    player = make_player("h1", fixed_time_manager(0.2))
-    assert isinstance(player, SearchBot)

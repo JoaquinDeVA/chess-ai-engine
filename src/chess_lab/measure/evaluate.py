@@ -1,11 +1,11 @@
-"""Evaluate a model: ``python -m chess_lab.comparison.evaluate --model <name>``.
+"""Evaluate a model: ``python -m chess_lab.measure.evaluate --model <name>``.
 
 By default the model is judged on the fixed test sample of the raw shards (``--raw``,
 ``--sidecar``): the ``accuracy`` section (:func:`~.judge.judge`) and the ``cost`` section (median
 microseconds per single-position evaluation, as the search calls it). Every model can be
 evaluated this way, including the older ones that are not retrained.
 
-Playing strength is measured by :mod:`comparison.tournament` instead.
+Playing strength is measured by :mod:`chess_lab.tournaments.tournament` instead.
 """
 
 import argparse
@@ -18,17 +18,16 @@ import chess
 import numpy as np
 
 from chess_engine.models import artifact_path, h1_evaluator, load_h1_weights, split_spec
+from chess_lab.measure.judge import judge
+from chess_lab.measure.report import update_history_file
+from chess_lab.measure.tradeoff import HEURISTICS
 from chess_lab.models.cards import current_commit, load_card, today, update_card
+from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation, score_to_cp
-from chess_lab.models.spec import SAMPLE_SEED
 from chess_lab.training.dataset import TEST
 from chess_lab.training.sidecar import load_sample
-
-from .judge import judge
-from .report import update_history_file
-from .tradeoff import HEURISTICS
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000

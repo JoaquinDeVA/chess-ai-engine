@@ -44,4 +44,4 @@ def test_fixed_factor_and_never_stop():
 def test_unknown_estimator_lists_the_valid_names():
     with pytest.raises(ValueError, match="available:.*clamped_growth"):
         estimate("nope", [(1.0, 1)])
-    assert _core.DEFAULT_ESTIMATOR in _core.ESTIMATOR_NAMES
+    assert _core.DEFAULT_ESTIMATOR in _core.ESTIMATORS

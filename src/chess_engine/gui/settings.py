@@ -24,12 +24,8 @@ EVALUATION_NAMES: Dict[str, str] = {
     "linear_pst_terms": "Piece-square-and-terms logistic model",
     "linear_king_bucket": "King-bucket logistic model",
     "net4_pst": "Four-layer piece-square network",
-    "mlp_features": "Dense network on hand-crafted features",
-    "cnn_resnet": "Residual convolutional network",
 }
 
-#: Models the Rust core cannot evaluate by itself (Keras): they run through Python, so one search thread.
-SINGLE_THREAD_MODELS = frozenset({"mlp_features", "cnn_resnet"})
 #: Threads a bot gets by default against a person, at most.
 DEFAULT_THREADS = max(1, min(4, os.cpu_count() or 1))
 #: Deepest iteration of the search; the clock stops it long before in a real game.
@@ -93,7 +89,7 @@ class AISettings:
             "max_depth": self.max_depth,
             "quiescence_plies": self.quiescence_plies,
             "techniques": tuple(self.techniques),
-            "threads": 1 if self.evaluation in SINGLE_THREAD_MODELS else self.threads,
+            "threads": self.threads,
         }
         if self.evaluation != HEURISTIC:
             options["model"] = self.evaluation

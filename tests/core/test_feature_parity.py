@@ -1,7 +1,5 @@
 """Every training feature family has a Rust version that matches it, or is declared slow."""
 
-import logging
-
 import chess
 import numpy as np
 import pytest
@@ -49,7 +47,7 @@ def test_rust_features_equal_python_features(cls, perspective):
         assert got[1] == pytest.approx(expected[1], abs=1e-12), fen
 
 
-def test_a_family_without_rust_version_falls_back_with_a_warning(caplog):
+def test_a_family_without_rust_version_is_rejected():
     class Unported(linear_features.PstFeatures):
         name = "unported_test_features"
 
@@ -57,7 +55,5 @@ def test_a_family_without_rust_version_falls_back_with_a_warning(caplog):
         features = Unported()
         name = "unported_test"
 
-    with caplog.at_level(logging.WARNING):
-        evaluator = model_evaluator(UnportedModel())
-    assert not evaluator.native
-    assert "no Rust version" in caplog.text
+    with pytest.raises(ValueError, match="no Rust evaluation"):
+        model_evaluator(UnportedModel())

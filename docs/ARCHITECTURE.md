@@ -22,7 +22,7 @@ flowchart TB
     REG --> BOTS["bots/<br/>playable bots"]
     BOTS --> BASES["bots/_search_bots.py<br/>IterativeDeepeningBot"]
     BASES -->|"one call per move"| CORE["rust/ (chess_engine._core)<br/>search · evaluations ·<br/>opening book · endgame tables"]
-    BOTS --> EVAL["evaluation/ + models/<br/>features, heuristic, learned models"]
+    BOTS --> EVAL["models/<br/>h1 and the learned models"]
     EVAL -->|"weights, once"| CORE
     TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL
     COMP["chess_lab/comparison/<br/>judge · evaluate · tradeoff · tournament · report"] --> TRAIN
@@ -33,12 +33,12 @@ flowchart TB
 Dependencies, as the imports stand:
 
 - `rust/` imports nothing from Python except the weights it is given (`models/native.py` builds the evaluators).
-- `models/` imports `evaluation/` (`evaluator.py`, `native.py`, for `ChessGameState`). It holds `representation.py` and `spec.py` (target scale and shared defaults), which both the models and the training need.
+- `models/` imports nothing from the rest of the package. It holds `representation.py` and `spec.py` (target scale and shared defaults), which both the models and the training need.
 - `chess_lab/training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). `models/` imports nothing from `chess_lab`.
-- `bots/` imports `search/`, `evaluation/`, `models/` and `knowledge/`.
+- `bots/` imports `search/`, `models/` and `knowledge/`.
 - `engine/` imports `bots/`.
 - `gui/` imports `bots/`, `models/`, `search/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
-- `chess_lab/comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `chess_lab/training/`, `evaluation/`, `knowledge/` and `engine/`. Nothing else imports it.
+- `chess_lab/comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `chess_lab/training/`, `knowledge/` and `engine/`. Nothing else imports it.
 
 ## Packages
 
@@ -51,8 +51,7 @@ Dependencies, as the imports stand:
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
 | `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py` |
-| `evaluation/` | `features.py`: hand-crafted features (material, mobility, king safety...). `heuristics.py`: the heuristic `h1` and its fitted weights. `chess_game_state.py`: a thin wrapper of a board for the evaluation functions |
-| `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py` (which also lists `ACCURACY_RECORDS`, the models that are only measured). Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`). Course models: `architectures.py` and `keras_model.py` (`mlp_features`, `cnn_resnet`) with the dense encodings of `dense_features.py`. `evaluator.py` adapts a model to a search; `native.py` hands a model's weights to the Rust core; `cards.py` reads and writes the model cards in `models/cards/`. `representation.py`: target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept) |
+| `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py`. Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`).  `native.py` hands a model's weights (and those of `h1`, `h1_weights.json`) to the Rust core; `cards.py` reads and writes the model cards in `models/cards/`. `representation.py`: target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept) |
 | `chess_lab/training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
 | `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
@@ -60,7 +59,7 @@ Dependencies, as the imports stand:
 | `engine/` | Game loop with clocks, results and PGN export for the tournaments |
 
 Tournaments run with `python -m chess_lab.comparison.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
-`fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
+`build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
 `src/chess_lab/scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
 `measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,
 `compare_target_representations.py`) and `src/chess_lab/scripts/run_full_pipeline.sh`
@@ -82,8 +81,7 @@ classDiagram
         <<abstract>>
         time_manager
         searcher
-        evaluate(state, player)*
-        native_evaluator()
+        native_evaluator()*
     }
     ChessBot <|-- IterativeDeepeningBot
     IterativeDeepeningBot <|-- IterativeHeuristicBot
@@ -91,14 +89,10 @@ classDiagram
 
     class EvaluationModel {
         <<abstract>>
-        extractor
         predict_cp(board)
-        predict_target(inputs)
-        fit()
         save()
         load()
     }
-    EvaluationModel <|-- KerasModel
     EvaluationModel <|-- LinearEvalModel
     LinearEvalModel <|-- NeuralEvalModel
     LinearEvalModel o-- LinearFeatures
@@ -107,11 +101,9 @@ classDiagram
     Searcher o-- Evaluator : Rust
 ```
 
-A bot's whole job is to say which evaluation the search uses: `evaluate(state, player)` in
-Python and, to run it inside the core, `native_evaluator()`. `models/native.py` builds the native
-evaluator of a model from its weights (linear and sparse-network models), and of `h1`; any other
-evaluation is called back from Python for every leaf, which works but is slow (the Keras
-networks of the course). The base class provides the search, the time budget and the bookkeeping.
+A bot's whole job is to say which evaluation the search uses: `native_evaluator()`. `models/native.py`
+builds it from the weights of a model (linear and sparse-network models) or of `h1`; the core runs it,
+with no call back into Python. The base class provides the search, the time budget and the bookkeeping.
 
 The core identifies a position by `(zobrist hash, halfmove clock, fullmove number)`: it names the
 same positions as the FEN without building the string, and it is what the transposition table is

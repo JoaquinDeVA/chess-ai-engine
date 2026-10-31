@@ -14,10 +14,8 @@ import chess
 
 from chess_engine import _core
 from chess_engine.bots.chess_bot import ChessBot
-from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.models.native import callback_evaluator
 from chess_engine.search.statistics import SearchStatistics
 from chess_engine.search.time_management import TimeManager
 
@@ -183,23 +181,11 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.reset_statistics()
 
     @abstractmethod
-    def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
-        """Heuristic value of a non-terminal position.
-
-        :param state: Position to evaluate.
-        :param player: Player the value is for.
-        :return: Expected score for ``player`` in ``[0, 1]``.
-        """
-
     def native_evaluator(self) -> "_core.Evaluator":
         """The evaluation the Rust core runs.
 
-        Subclasses return a native evaluator; this default calls :meth:`evaluate` from the core,
-        which works for any bot but is slow.
-
         :return: Evaluator.
         """
-        return callback_evaluator(self.evaluate)
 
     def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
         """Clear everything learned in the previous game.

@@ -101,22 +101,16 @@ A position activates at most 32 inputs (one per piece). The first layer, the acc
 
 ## The hand-written heuristic (`h1`)
 
-`h1` is not a trained model with a model file, and it is not in the model registry. It is a classical evaluation function written by hand: six readable features, each normalised to the range 0 to 1 where 0.5 means "equal", combined with a weighted sum. Its code is in `src/chess_engine/evaluation/heuristics.py`.
+`h1` is not a trained model with a model file, and it is not in the model registry. It is a classical evaluation function written by hand: six readable features, each normalised to the range 0 to 1 where 0.5 means "equal", combined with a weighted sum. Its code is in `rust/src/eval/h1.rs`.
 
 | | |
 |---|---|
 | Type | Hand-designed linear combination (no sigmoid, no bias) |
 | Input features | Six differences between White and Black: material, positional (hand-written piece-square tables), mobility, centre control, king safety and development |
-| Parameters | 6 weights, stored in `src/chess_engine/evaluation/h1_weights.json` |
+| Parameters | 6 weights, stored in `src/chess_engine/models/h1_weights.json` |
 | Meaning of each weight | How strongly that feature pulls the evaluation away from 0.5 |
 | Output | `0.5 + sum(weight * (feature - 0.5))`, clipped to 0.01 to 0.99 |
 
 The features are designed by a person, but the six weights were fitted to Stockfish evaluations by a small script, so the heuristic also "learns", just very little: it can only choose how much to trust each of the six ideas. Weights may be negative, and a feature can end up with almost no weight at all if it does not help predict Stockfish. The clipping keeps a heuristic value strictly between 0.01 and 0.99, so it can never be mistaken for a real win or loss, which are scored exactly 1 and 0. It serves as the classical baseline that the learned models are compared with.
-
-## The two course models
-
-`mlp_features` and `cnn_resnet` come from a university course and are different in kind: they are Keras networks, and their weight files are not versioned in the repository, so a fresh clone does not have them. They are never retrained here, only measured, to show where the home-made models stand against them.
-
-`mlp_features` is a small dense network, 29 inputs, then layers of 32 and 16 units with ReLU, then one output (1,505 parameters, counting weights and biases of that layout). Its 29 inputs are hand-crafted numbers: turn, game phase, material, piece counts, pawn advancement, centre occupation, king distance to the centre, check flags, castling rights and mobility. `cnn_resnet` is a residual convolutional network that reads the board as an 8x8 grid with 12 piece planes plus 9 extra numbers, and whose code documents 572,353 parameters. Both learn to predict the same Stockfish-derived target as the rest.
 
 For accuracy, speed and tournament numbers of every model above, see [Results](RESULTS.md).

@@ -2,13 +2,9 @@
 
 from typing import Any, Optional, Union
 
-import chess
-
 from chess_engine.bots._search_bots import AUTHOR, SHIPPED, IterativeDeepeningBot
-from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.models import EvaluationModel, load_model
-from chess_engine.models.evaluator import ModelEvaluator
 from chess_engine.models.native import model_evaluator
 from chess_engine.search.time_management import TimeManager
 
@@ -46,23 +42,13 @@ class IterativeModelBookBot(IterativeDeepeningBot):
             name, AUTHOR, max_depth, time_manager, opening_book=opening_book, **search_options
         )
         self.ml_model = load_model(model) if isinstance(model, str) else model
-        self.evaluator = ModelEvaluator(self.ml_model)
 
     def native_evaluator(self):
-        """The evaluation the core runs: the model itself, natively when it can be.
+        """The evaluation the core runs: the model itself.
 
         :return: Evaluator for the model.
         """
         return model_evaluator(self.ml_model)
-
-    def evaluate(self, state: ChessGameState, player: chess.Color) -> float:
-        """Expected score of ``player`` according to the model.
-
-        :param state: Position to evaluate.
-        :param player: Player the value is for.
-        :return: Value in ``[0.01, 0.99]``.
-        """
-        return self.evaluator(state, player)
 
     def get_info(self):
         """Describe the bot.

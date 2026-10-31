@@ -7,7 +7,15 @@ from typing import Callable, List, Optional, Tuple
 import chess
 import chess.pgn
 
-from chess_engine.evaluation.features import PIECE_VALUES
+#: Pawn units of each piece, for the material count shown beside the board.
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0,
+}
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,6 @@ import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.evaluation.heuristics import h1
 from chess_engine.models import cards
 from chess_lab.comparison import tradeoff
 from chess_lab.comparison.tradeoff import (
@@ -25,23 +24,22 @@ def test_fixed_time_manager_budget_is_exact():
     assert manager.hard_limit(budget) == 2.5
 
 
-def test_make_player_builds_model_and_heuristic_players(stub_model):
+def test_make_player_builds_model_and_heuristic_players(material_model):
     manager = fixed_time_manager(0.2)
-    model_player = make_player(stub_model, manager, max_depth=4)
+    model_player = make_player(material_model, manager, max_depth=4)
     assert isinstance(model_player, IterativeModelBookBot)
     assert model_player.max_depth == 4
     assert model_player.opening_book is None and model_player.tablebase is None
     assert model_player.time_manager is manager
     player = make_player("h1", manager)
     assert isinstance(player, IterativeHeuristicBot)
-    assert player.eval_function is h1
     assert player.time_manager is manager
 
 
-def test_profile_reports_depth_and_agreement(stub_model):
+def test_profile_reports_depth_and_agreement(material_model):
     fens = [chess.Board().fen(), chess.Board("4k3/8/8/8/8/8/4P3/4K2R w K - 0 1").fen()]
     positions = pd.DataFrame({"fen": fens, "best_move": ["e2e4", None], "quiet": [True, False]})
-    result = profile(stub_model, positions, 0.2)
+    result = profile(material_model, positions, 0.2)
     assert result["positions"] == 2
     for key in ("overall", "quiet", "non_quiet"):
         assert key in result
@@ -76,8 +74,7 @@ def cards_dir(tmp_path, monkeypatch):
 
 
 def test_tradeoff_accepts_h1_spec():
-    assert HEURISTICS["h1"] is h1
+    assert "h1" in HEURISTICS
     validate_specs(["h1"])
     player = make_player("h1", fixed_time_manager(0.2))
     assert isinstance(player, IterativeHeuristicBot)
-    assert player.eval_function is h1

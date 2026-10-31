@@ -1,21 +1,40 @@
-"""Evaluations for the Rust core: the native version of a model, or a callback to Python."""
+"""Evaluations for the Rust core: the heuristic ``h1`` and the native version of a model."""
 
-import logging
-from typing import Callable
+import json
+from pathlib import Path
 
-import chess
 import numpy as np
 
 from chess_engine import _core
-from chess_engine.evaluation.chess_game_state import ChessGameState
-from chess_engine.evaluation.heuristics import FEATURE_NAMES, h1, load_h1_weights
 
 from .base import EvaluationModel
-from .evaluator import ModelEvaluator
 from .linear_eval import LinearEvalModel
 from .neural_eval import NeuralEvalModel
 
-logger = logging.getLogger(__name__)
+#: Names of the features of ``h1``, in the order the core takes their weights.
+FEATURE_NAMES = (
+    "material_diff_normalized",
+    "positional_diff_normalized",
+    "mobility_diff_normalized",
+    "center_diff_normalized",
+    "king_safety_diff_normalized",
+    "development_diff_normalized",
+)
+
+#: Versioned JSON file with the fitted weights of ``h1``.
+H1_WEIGHTS_PATH = Path(__file__).with_name("h1_weights.json")
+
+
+def load_h1_weights() -> dict:
+    """The fitted weights of ``h1``.
+
+    :return: Weight per feature name in :data:`FEATURE_NAMES`.
+    :raises ValueError: If the file is not keyed by exactly those names.
+    """
+    weights = json.loads(H1_WEIGHTS_PATH.read_text())["weights"]
+    if set(weights) != set(FEATURE_NAMES):
+        raise ValueError(f"{H1_WEIGHTS_PATH}: weights must be keyed by {list(FEATURE_NAMES)}")
+    return {name: float(weights[name]) for name in FEATURE_NAMES}
 
 
 def h1_evaluator() -> "_core.Evaluator":
@@ -27,39 +46,15 @@ def h1_evaluator() -> "_core.Evaluator":
     return _core.Evaluator.h1([weights[name] for name in FEATURE_NAMES])
 
 
-def callback_evaluator(
-    function: Callable[[ChessGameState, chess.Color], float],
-) -> "_core.Evaluator":
-    """An evaluation computed in Python (slow: the core calls back for every leaf).
-
-    :param function: ``(state, player) -> float``, like ``h1`` or a ``ModelEvaluator``.
-    :return: Evaluator that calls ``function``.
-    """
-
-    def evaluate(fen: str, white: bool) -> float:
-        return function(ChessGameState(chess.Board(fen)), chess.WHITE if white else chess.BLACK)
-
-    return _core.Evaluator.callback(evaluate)
-
-
 def model_evaluator(model: EvaluationModel) -> "_core.Evaluator":
     """The native evaluation of a model.
 
-    Linear and sparse-network models whose feature set is implemented in the core run inside it;
-    any other model (the Keras networks of the course, or a new feature set that has no Rust
-    version yet) is evaluated through a callback to Python, which works but is slow.
-
-    :param model: A loaded model.
-    :return: Evaluator that gives the same values as ``ModelEvaluator(model)``.
+    :param model: A linear or sparse-network model.
+    :return: Evaluator that runs inside the core.
+    :raises ValueError: If the model's feature set has no Rust version.
     """
-    sparse = isinstance(model, LinearEvalModel)
-    if sparse and model.features.name not in _core.FEATURE_SETS:
-        logger.warning(
-            "the feature set %r has no Rust version: %s is evaluated through Python (slow)",
-            model.features.name,
-            model.name,
-        )
-        return callback_evaluator(ModelEvaluator(model))
+    if not isinstance(model, LinearEvalModel) or model.features.name not in _core.FEATURE_SETS:
+        raise ValueError(f"{model.name} has no Rust evaluation: only the core evaluates models")
     if isinstance(model, NeuralEvalModel):
         layers = [
             (
@@ -69,20 +64,5 @@ def model_evaluator(model: EvaluationModel) -> "_core.Evaluator":
             for weights, bias in model.layers
         ]
         return _core.Evaluator.network(model.features.name, model.rep.perspective, layers)
-    if isinstance(model, LinearEvalModel):
-        weights = np.ascontiguousarray(model.weights, dtype=np.float64)
-        return _core.Evaluator.linear(
-            model.features.name, model.rep.perspective, weights, model.bias
-        )
-    return callback_evaluator(ModelEvaluator(model))
-
-
-def heuristic_evaluator(
-    function: Callable[[ChessGameState, chess.Color], float],
-) -> "_core.Evaluator":
-    """The native evaluation of a heuristic function (``h1`` runs natively, others by callback).
-
-    :param function: ``(state, player) -> float``.
-    :return: Evaluator.
-    """
-    return h1_evaluator() if function is h1 else callback_evaluator(function)
+    weights = np.ascontiguousarray(model.weights, dtype=np.float64)
+    return _core.Evaluator.linear(model.features.name, model.rep.perspective, weights, model.bias)

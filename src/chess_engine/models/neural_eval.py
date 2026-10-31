@@ -18,7 +18,6 @@ import pandas as pd
 
 from chess_engine.models.representation import Representation
 
-from .keras_model import _import_keras
 from .linear_eval import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,
@@ -76,6 +75,15 @@ def _padded(encoded: EncodedFrame, width: int) -> Tuple[np.ndarray, np.ndarray, 
     index[rows, position] = cols + 1
     value[rows, position] = vals
     return index, value, targets
+
+
+def _import_keras() -> Any:
+    """Import Keras lazily: only training needs it."""
+    try:
+        import keras
+    except ImportError as error:  # pragma: no cover - depends on the environment
+        raise ImportError("training needs the 'ml' extra: pip install -e '.[ml]'") from error
+    return keras
 
 
 def _training_keras() -> Any:

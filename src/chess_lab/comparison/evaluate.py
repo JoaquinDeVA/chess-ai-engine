@@ -18,10 +18,9 @@ import chess
 import numpy as np
 
 import chess_engine.models  # noqa: F401  (registers the built-in models)
-from chess_engine.evaluation.chess_game_state import ChessGameState
-from chess_engine.evaluation.heuristics import load_h1_weights
 from chess_engine.models.base import EvaluationModel
 from chess_engine.models.cards import current_commit, load_card, today, update_card
+from chess_engine.models.native import h1_evaluator, load_h1_weights
 from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
 from chess_engine.models.representation import Representation, score_to_cp
 from chess_engine.models.spec import SAMPLE_SEED
@@ -43,7 +42,7 @@ DEFAULT_SIDECAR_DIR = Path("data/lichess/sidecar")
 
 
 class HeuristicModel:
-    """Adapter that lets a heuristic (``(state, player) -> score``) go through the judge.
+    """Adapter that lets the heuristic ``h1`` go through the judge.
 
     It offers what :func:`~.judge.judge` and :func:`sample_benchmark` use of a model:
     ``expected_score`` and ``predict_cp_batch``. The batch method returns the centipawns whose
@@ -54,11 +53,11 @@ class HeuristicModel:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.function = HEURISTICS[name]
+        self.evaluator = h1_evaluator()
 
     def expected_score(self, board: chess.Board) -> float:
         """Expected score of White in ``[0.01, 0.99]``."""
-        return self.function(ChessGameState(board), chess.WHITE)
+        return self.evaluator.evaluate(board.fen(), True)
 
     def predict_cp_batch(self, boards) -> np.ndarray:
         """Centipawns (White's point of view) equivalent to the heuristic scores."""
@@ -114,11 +113,11 @@ def features_name(model: Union[EvaluationModel, HeuristicModel]) -> str:
     """Name of the feature set of a model, for the card.
 
     :param model: Model instance.
-    :return: ``model.extractor.name`` for the older models, else the class's ``features.name``.
+    :return: The class's ``features.name``.
     """
     if isinstance(model, HeuristicModel):
         return model.name
-    features = getattr(model, "extractor", None) or getattr(model, "features", None)
+    features = getattr(model, "features", None)
     return features.name if features is not None else "—"
 
 

@@ -2,12 +2,10 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterable, Optional, Tuple
+from typing import ClassVar, Iterable, Optional
 
 import chess
 import numpy as np
-
-from .dense_features import FeatureExtractor
 
 #: Centipawns that correspond to a normalized target of ``1.0``. It is the 0.5% quantile of the
 #: course dataset: evaluations beyond it are clipped, so the target covers ~99% of the data.
@@ -42,17 +40,13 @@ class EvaluationModel(ABC):
     White's point of view); :meth:`predict_cp` converts it back to centipawns.
 
     :cvar name: Registry key, set by :func:`models.registry.register_model`.
-    :cvar extractor: Board encoding the model consumes.
     :cvar artifact_suffix: File extension of the saved model.
     :cvar architecture: One-line description of the architecture, for the model card.
-    :cvar trainable: Whether :meth:`fit` is implemented (legacy artifacts are load-only).
     """
 
     name: ClassVar[str]
-    extractor: ClassVar[FeatureExtractor]
     artifact_suffix: ClassVar[str]
     architecture: ClassVar[str] = ""
-    trainable: ClassVar[bool] = True
 
     @classmethod
     def default_path(cls) -> Path:
@@ -81,46 +75,19 @@ class EvaluationModel(ABC):
         """
 
     @abstractmethod
-    def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
-        """Predict normalized targets (White's point of view) for encoded positions.
-
-        :param inputs: Arrays produced by ``extractor.encode_batch``.
-        :return: Array of shape ``(n,)`` with values nominally in ``[-1, 1]``.
-        """
-
-    @abstractmethod
-    def fit(
-        self,
-        inputs: Tuple[np.ndarray, ...],
-        targets: np.ndarray,
-        validation: Optional[Tuple[Tuple[np.ndarray, ...], np.ndarray]] = None,
-        config: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """Train the model in place.
-
-        :param inputs: Encoded training positions.
-        :param targets: Normalized targets, shape ``(n,)``.
-        :param validation: Optional ``(inputs, targets)`` used for monitoring.
-        :param config: Hyper-parameters (see ``training/configs``).
-        :return: Free-form training summary stored in the model card (epochs, losses...).
-        """
-
-    @abstractmethod
     def count_parameters(self) -> int:
         """Number of trainable parameters (coefficients for linear models).
 
         :return: Parameter count.
         """
 
+    @abstractmethod
     def predict_cp(self, board: chess.Board) -> float:
         """Evaluate one position.
 
         :param board: Position to evaluate.
         :return: Centipawns from White's point of view, within ``[-CP_SCALE, CP_SCALE]``.
         """
-        batch = tuple(array[np.newaxis] for array in self.extractor.encode(board))
-        target = float(self.predict_target(batch)[0])
-        return float(np.clip(target, -1.0, 1.0) * CP_SCALE)
 
     def expected_score(self, board: chess.Board) -> float:
         """Expected score of White in ``[0, 1]``.
@@ -131,11 +98,10 @@ class EvaluationModel(ABC):
         """
         return cp_to_expected_score(self.predict_cp(board))
 
+    @abstractmethod
     def predict_cp_batch(self, boards: Iterable[chess.Board]) -> np.ndarray:
         """Evaluate many positions at once.
 
         :param boards: Positions to evaluate.
         :return: Centipawns from White's point of view, shape ``(n,)``.
         """
-        targets = self.predict_target(self.extractor.encode_batch(boards))
-        return np.clip(targets, -1.0, 1.0) * CP_SCALE

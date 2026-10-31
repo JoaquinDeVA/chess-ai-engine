@@ -12,8 +12,4 @@ Typical flow::
     python -m chess_lab.training.train --model linear_pst --effort 40
     python -m chess_lab.comparison.evaluate --model linear_pst
 
-The older CSV-family models (``mlp_features``, ``cnn_resnet``) are accuracy records: measure
-them from the raw shards with ``evaluate``. They are not retrained::
-
-    python -m chess_lab.comparison.evaluate --model mlp_features
 """

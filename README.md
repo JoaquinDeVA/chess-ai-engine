@@ -54,7 +54,7 @@ git clone https://github.com/JoaquinDeVA/chess-ai-engine.git
 cd chess-ai-engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"          # the engine and its tests
-pip install -e ".[ml,data]"      # optional: Keras and the data tools (training and the neural network)
+pip install -e ".[ml,data]"      # optional: Keras (trains the neural network) and the data tools
 ```
 
 Two entries:
@@ -104,8 +104,7 @@ rust/           the core: rules, search, evaluations, opening book and endgame t
 src/chess_engine/
   search/       search statistics and the per-move time budget
   bots/         the playable bots (they call the core)
-  evaluation/   hand-crafted features and the heuristic h1
-  models/       the learned evaluators and their cards
+  models/       h1, the learned evaluators and their cards
   gui/          the window: board, game page, player selection and AI settings
 src/chess_lab/  the laboratory (not needed to play)
   training/     sampling, targets and the training command

@@ -15,7 +15,6 @@ from typing import Any, Dict, List, Optional
 
 import chess_engine.models  # noqa: F401  (loads models first: avoids an import cycle)
 from chess_engine.models.cards import PROJECT_ROOT, load_all_cards
-from chess_engine.models.registry import ACCURACY_RECORDS
 from chess_engine.models.representation import Representation
 
 HISTORY_FILE = PROJECT_ROOT / "docs" / "RESULTS.md"
@@ -31,11 +30,11 @@ AGREEMENT_SECONDS = "10"
 _STATUS_ORDER = {"current": 0, "reference": 1}
 _DASH = "—"
 _HEADER = (
-    "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
+    "| Model | Params | Representation | Effort | Spearman | MAE | "
     "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
     "Search agreement, 10 s |"
 )
-_ALIGNMENT = "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+_ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
 _CONTROL_TITLES = {"600+5": "10 min + 5 s", "60+1": "1 min + 1 s"}
 
 
@@ -146,7 +145,6 @@ def _row(card: Dict[str, Any], labels: List[str]) -> str:
     effort = _dig(card, "training", "effort")
     cells = [
         f"`{name}`",
-        "accuracy record" if name in ACCURACY_RECORDS else "plays",
         _number(card.get("parameters"), 0),
         _representation(card),
         _DASH if effort is None else str(effort),
@@ -178,7 +176,7 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
         for card in (load_all_cards() if cards is None else cards)
         if card.get("status") in _STATUS_ORDER
     ]
-    rows.sort(key=lambda card: (card["name"] in ACCURACY_RECORDS, card["name"]))
+    rows.sort(key=lambda card: card["name"])
     labels = _control_labels(rows)
     alignment = _ALIGNMENT + "---:|---:|" * len(labels)
     return "\n".join([_header(labels), alignment, *(_row(card, labels) for card in rows)])

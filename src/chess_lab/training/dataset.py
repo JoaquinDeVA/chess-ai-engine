@@ -6,8 +6,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.dense_features import FeatureExtractor
-
 TRAIN, VALIDATION, TEST = 0, 1, 2
 
 #: Default benchmark split: 10% test, 10% validation, 80% train.
@@ -64,25 +62,3 @@ def split_dataset(
     """
     split = assign_split(frame["fen"], test_fraction, validation_fraction, seed)
     return frame[split == TRAIN], frame[split == VALIDATION], frame[split == TEST]
-
-
-def encode_positions(
-    extractor: FeatureExtractor, fens: pd.Series, n_jobs: int = 1, chunk_size: int = 20_000
-) -> Tuple[np.ndarray, ...]:
-    """Encode FEN strings with ``extractor``, optionally in parallel.
-
-    :param extractor: Board encoding to apply.
-    :param fens: FEN strings.
-    :param n_jobs: Worker processes (``-1`` = all cores, ``1`` = no parallelism).
-    :param chunk_size: Positions per work item when running in parallel.
-    :return: One stacked array per model input.
-    """
-    fens = list(fens)
-    if n_jobs == 1 or len(fens) <= chunk_size:
-        return extractor.encode_fens(fens)
-
-    from joblib import Parallel, delayed
-
-    chunks = [fens[start : start + chunk_size] for start in range(0, len(fens), chunk_size)]
-    parts = Parallel(n_jobs=n_jobs)(delayed(extractor.encode_fens)(chunk) for chunk in chunks)
-    return tuple(np.concatenate(column) for column in zip(*parts, strict=True))

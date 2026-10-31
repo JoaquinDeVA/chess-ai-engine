@@ -142,7 +142,7 @@ class BotRegistry:
         Get a bot instance, loading it if necessary.
 
         Without ``options`` the instance is cached and shared. With ``options`` (constructor
-        keyword arguments such as ``model="cnn_resnet"`` or ``max_depth=4``) a fresh, uncached
+        keyword arguments such as ``model="linear_pst"`` or ``max_depth=4``) a fresh, uncached
         instance is built.
 
         :param bot_name: Name of the bot to get

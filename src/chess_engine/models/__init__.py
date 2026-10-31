@@ -4,16 +4,14 @@ A model estimates the evaluation of a position in centipawns, from White's point
 way Stockfish would. Models are looked up by name through the registry::
 
     from chess_engine.models import load_model
-    model = load_model("mlp_features")
+    model = load_model("linear_pst_terms")
     model.predict_cp(chess.Board())
 
-Importing this package registers the built-in models; heavy dependencies (Keras)
-are only imported when a model is actually loaded or trained.
+Importing this package registers the built-in models; Keras is only imported to train one.
 """
 
 # Importing the modules below registers the built-in models.
 from . import (
-    architectures,  # noqa: F401,E402
     linear_eval,  # noqa: F401,E402
     neural_eval,  # noqa: F401,E402
 )

@@ -4,10 +4,11 @@ import random
 from typing import List
 
 import chess
+import numpy as np
 import pytest
 
+from chess_engine.models import load_model
 from chess_engine.models.base import EvaluationModel
-from chess_engine.models.dense_features import VectorFeatures
 
 PIECE_CP = {
     chess.PAWN: 100,
@@ -31,11 +32,10 @@ def material_cp(board: chess.Board) -> float:
 class MaterialStubModel(EvaluationModel):
     """Deterministic stand-in for a trained model: evaluates by counting material.
 
-    Lets the ML bots be tested without any trained artifact.
+    Python only, so it does not play (the core cannot run it): it serves the judge and the cards.
     """
 
     name = "stub"
-    extractor = VectorFeatures()
     artifact_suffix = ".stub"
     architecture = "material count"
 
@@ -46,22 +46,25 @@ class MaterialStubModel(EvaluationModel):
     def save(self, path=None):
         raise NotImplementedError
 
-    def predict_target(self, inputs):
-        raise NotImplementedError
-
-    def fit(self, inputs, targets, validation=None, config=None):
-        return {}
-
     def count_parameters(self) -> int:
         return 0
 
     def predict_cp(self, board: chess.Board) -> float:
         return max(-1267.0, min(1267.0, material_cp(board)))
 
+    def predict_cp_batch(self, boards):
+        return np.array([self.predict_cp(board) for board in boards], dtype=np.float64)
+
 
 @pytest.fixture
 def stub_model() -> MaterialStubModel:
     return MaterialStubModel()
+
+
+@pytest.fixture(scope="session")
+def material_model():
+    """A model the core can play: the shipped material logistic model."""
+    return load_model("linear_material")
 
 
 def random_positions(count: int, seed: int = 0, max_plies: int = 70) -> List[chess.Board]:
@@ -88,8 +91,8 @@ def sample_boards() -> List[chess.Board]:
 MATE_IN_ONE = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"  # 1.Ra8#
 
 
-#: Shipped model artifacts that no test may overwrite (the course weights and the MLP).
-PROTECTED_ARTIFACTS = ("cnn_resnet.keras", "mlp_features.keras")
+#: Shipped model artifacts that no test may overwrite.
+PROTECTED_ARTIFACTS = ("linear_pst_terms.npz", "net4_pst.npz")
 _PROTECTED_HASHES: dict = {}
 
 

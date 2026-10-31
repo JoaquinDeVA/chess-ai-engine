@@ -15,7 +15,6 @@ from typing import List, Optional
 import chess_engine.models  # noqa: F401  (registers the built-in models)
 from chess_engine.models.cards import clear_measurements, current_commit, today, update_card
 from chess_engine.models.registry import (
-    ACCURACY_RECORDS,
     artifact_path,
     available_models,
     get_model_class,
@@ -243,16 +242,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     :return: Process exit code.
     """
     args = parse_args(argv)
-    if args.model in ACCURACY_RECORDS:
-        print(
-            f"{args.model} is an accuracy record: its training CSV was retired; "
-            "measure it with evaluate"
-        )
-        return 2
     model_class = get_model_class(args.model)
-    if not model_class.trainable:
-        print(f"{args.model} is a frozen artifact and cannot be retrained")
-        return 2
 
     if args.effort is None:
         print("--effort is required")

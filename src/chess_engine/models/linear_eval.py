@@ -157,20 +157,6 @@ class LinearEvalModel(EvaluationModel):
         """
         return np.array([self.predict_cp(board) for board in boards], dtype=np.float64)
 
-    def predict_target(self, inputs: Tuple[np.ndarray, ...]) -> np.ndarray:
-        """Not available: linear models work on boards, see :meth:`expected_score`.
-
-        :raises NotImplementedError: Always.
-        """
-        raise NotImplementedError("linear models evaluate boards: use expected_score()")
-
-    def fit(self, inputs, targets, validation=None, config=None) -> Dict[str, Any]:
-        """Not available: use :meth:`fit_stream` with DataFrames of raw shard rows.
-
-        :raises NotImplementedError: Always.
-        """
-        raise NotImplementedError("linear models are trained with fit_stream()")
-
     def count_parameters(self) -> int:
         """Coefficients plus the intercept.
 

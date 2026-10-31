@@ -170,11 +170,3 @@ def test_setup_names_and_evaluations():
     setup = MatchSetup()
     assert setup.white.is_human and setup.has_humans() and setup.white.label == "You"
     assert not MatchSetup(PlayerSetup(AISettings()), PlayerSetup(AISettings())).has_humans()
-
-
-def test_keras_models_search_with_one_thread():
-    """Their evaluation runs in Python, which the core only allows with a single search thread."""
-    from chess_engine.gui.settings import AISettings
-
-    assert AISettings(evaluation="cnn_resnet", threads=4).bot_options()["threads"] == 1
-    assert AISettings(evaluation="linear_pst", threads=4).bot_options()["threads"] == 4

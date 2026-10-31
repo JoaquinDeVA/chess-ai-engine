@@ -12,8 +12,8 @@
 # Tournaments: A) 60+1 anchored at h1; B) 600+5 (the reference) anchored at h1; C) depth 3
 # with no clock, without h1, anchored at linear_pst_terms.
 #
-# Not here: refitting h1 (src/chess_lab/scripts/data/fit_h1_weights.py). Run it by hand; refitting changes the anchor,
-# so every result measured against the old h1 would stop being comparable.
+# h1 is fixed (src/chess_engine/models/h1_weights.json): changing it would change the anchor, so every result
+# measured against the old h1 would stop being comparable.
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
 # AGREEMENT_N (20000), PROFILE_SECONDS (1,3,10), PROFILE_POSITIONS (100), WORKERS (5),

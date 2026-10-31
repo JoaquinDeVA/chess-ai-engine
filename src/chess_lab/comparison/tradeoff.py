@@ -22,7 +22,6 @@ from chess_engine import _core
 from chess_engine.bots._search_bots import IterativeDeepeningBot
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.evaluation.heuristics import h1
 from chess_engine.models import EvaluationModel, get_model_class
 from chess_engine.models.cards import card_path, update_card
 from chess_engine.models.registry import split_spec
@@ -37,7 +36,7 @@ SINGLE_THREAD_VARIABLES = (
     "TF_NUM_INTRAOP_THREADS",
     "TF_NUM_INTEROP_THREADS",
 )
-HEURISTICS = {"h1": h1}
+HEURISTICS = ("h1",)
 
 
 def fixed_time_manager(seconds: float) -> TimeManager:
@@ -98,7 +97,6 @@ def make_player(
     search_options.setdefault("techniques", techniques)
     if isinstance(spec, str) and spec in HEURISTICS:
         return IterativeHeuristicBot(
-            eval_function=HEURISTICS[spec],
             max_depth=max_depth,
             time_manager=time_manager,
             **search_options,

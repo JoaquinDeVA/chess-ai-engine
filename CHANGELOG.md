@@ -8,6 +8,7 @@ All notable changes. The newest are first.
 - **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (evaluation, depth, time per move, opening book, tablebases, search techniques, quiescence, threads). See [The window](docs/GUI.md).
 
 ### Removed
+- The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
 - `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
 
 ### Changed

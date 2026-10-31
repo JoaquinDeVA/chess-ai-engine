@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine import models
 from chess_engine.models import base as models_base
 from chess_engine.models import cards, registry
 from chess_engine.models.representation import Representation, white_score
@@ -19,13 +18,31 @@ from chess_lab.training.dataset import (
     TRAIN,
     VALIDATION,
     assign_split,
-    encode_positions,
     split_dataset,
 )
 from chess_lab.training.lichess_raw import shard_path, write_shard
 from chess_lab.training.sidecar import build_sidecar
 from chess_lab.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
+
+
+@pytest.fixture
+def isolated_cards(tmp_path, monkeypatch):
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "RESULTS.md")
+    return tmp_path
+
+
+ACCURACY = {
+    "all": {"spearman": 0.912, "mae": 0.083, "best_move_agreement": 0.345, "n": 100},
+    "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
+    "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
+}
+TRADEOFF = {
+    "1": {"mean_depth": 1.0, "search_agreement": 0.2},
+    "3": {"mean_depth": 3.2, "search_agreement": 0.3},
+    "10": {"mean_depth": 6.0, "search_agreement": 0.4},
+}
 
 
 class TestTargets:
@@ -91,34 +108,6 @@ class TestDatasetSplit:
         assert not (set(train.fen) & set(test.fen))
 
 
-class TestEncoding:
-    def test_parallel_encoding_equals_serial_encoding(self):
-        extractor = models.dense_features.VectorFeatures()
-        fens = pd.Series([" ".join(b.fen().split()[:4]) for b in random_positions(50, seed=3)])
-        (serial,) = encode_positions(extractor, fens)
-        (parallel,) = encode_positions(extractor, fens, n_jobs=2, chunk_size=10)
-        np.testing.assert_array_equal(serial, parallel)
-
-
-@pytest.fixture
-def isolated_cards(tmp_path, monkeypatch):
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "RESULTS.md")
-    return tmp_path
-
-
-ACCURACY = {
-    "all": {"spearman": 0.912, "mae": 0.083, "best_move_agreement": 0.345, "n": 100},
-    "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
-    "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
-}
-TRADEOFF = {
-    "1": {"mean_depth": 1.0, "search_agreement": 0.2},
-    "3": {"mean_depth": 3.2, "search_agreement": 0.3},
-    "10": {"mean_depth": 6.0, "search_agreement": 0.4},
-}
-
-
 class TestCardsAndReport:
     def test_update_merges_dictionaries_and_replaces_scalars(self, isolated_cards):
         cards.update_card("m", architecture="a", training={"epochs": 3, "dataset": "x"})
@@ -170,12 +159,12 @@ class TestCardsAndReport:
         )
         text = report.render_tables()
         header = (
-            "| Model | Kind | Params | Representation | Effort | Spearman | MAE | "
+            "| Model | Params | Representation | Effort | Spearman | MAE | "
             "Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | "
             "Search agreement, 10 s | 10 min + 5 s, score % | 10 min + 5 s, Elo vs anchor |"
         )
         row = (
-            f"| `linear_pst` | plays | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
+            f"| `linear_pst` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
             "34.5% / 28.0% | 12.5 | 1.0 | 3.2 | 6.0 | 40.0% | 56.2% | +43 ± 24 |"
         )
         assert header in text and row in text
@@ -206,7 +195,7 @@ class TestCardsAndReport:
             },
         )
         lines = report.render_tables().splitlines()
-        titles = [t.strip() for t in lines[0].strip("|").split("|")][13:]
+        titles = [t.strip() for t in lines[0].strip("|").split("|")][12:]
         assert titles == [
             "10 min + 5 s, score %", "10 min + 5 s, Elo vs anchor",
             "1 min + 1 s, score %", "1 min + 1 s, Elo vs anchor",
@@ -214,7 +203,7 @@ class TestCardsAndReport:
             "5+0, score %", "5+0, Elo vs anchor",
         ]  # fmt: skip
         cells = {
-            line.split("|")[1].strip(): [c.strip() for c in line.strip("|").split("|")][13:]
+            line.split("|")[1].strip(): [c.strip() for c in line.strip("|").split("|")][12:]
             for line in lines[2:]
         }
         assert cells["`a`"] == [
@@ -230,23 +219,9 @@ class TestCardsAndReport:
         assert cells["`b`"] == ["55.0%", "+20 ± 10", *["—"] * 6]
         assert cells["`c`"] == ["—", "—", "30.0%", "-60 ± 8", *["—"] * 4]  # old flat layout
 
-    def test_accuracy_record_models_marked(self, isolated_cards):
-        cards.update_card(
-            "mlp_features",
-            status="current",
-            parameters=1505,
-            accuracy=ACCURACY,
-            cost={"us_per_eval": 12.5},
-        )
-        text = report.render_tables()
-        assert (
-            "| `mlp_features` | accuracy record | 1,505 | — | — | 0.912 | 0.083 | 34.5% / 28.0% "
-            "| 12.5 | — | — | — | — |"
-        ) in text
-
     def test_models_without_sections_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
-        assert f"| `fresh` | plays |{' — |' * 11}" in report.render_tables()
+        assert f"| `fresh` |{' — |' * 11}" in report.render_tables()
 
     def test_history_file_is_updated_between_markers_only(self, isolated_cards):
         path = report.HISTORY_FILE
@@ -266,13 +241,6 @@ class TestCardsAndReport:
         assert not report.update_history_file()
         assert report.HISTORY_FILE.read_text() == "no markers here"
         assert not report.update_history_file(isolated_cards / "does-not-exist.md")
-
-
-class TestAccuracyRecords:
-    def test_csv_family_models_are_not_trained(self, capsys):
-        for name in ("mlp_features", "cnn_resnet"):
-            assert train_cli.main(["--model", name, "--effort", "0"]) == 2
-            assert f"{name} is an accuracy record" in capsys.readouterr().out
 
 
 class TestEffortCommandLine:
@@ -468,7 +436,7 @@ class TestHeuristicEvaluation:
         assert card["architecture"] == "Hand-crafted heuristic (weights fitted to Stockfish)"
         assert card["parameters"] == 6 and "training" not in card and "size_kb" not in card
         assert card["accuracy"]["all"]["n"] == 30 and card["cost"]["us_per_eval"] > 0
-        assert "| `h1` | plays | 6 |" in report.render_tables()
+        assert "| `h1` | 6 |" in report.render_tables()
 
 
 @pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])

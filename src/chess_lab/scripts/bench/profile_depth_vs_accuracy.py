@@ -25,7 +25,7 @@ from chess_lab.comparison.tradeoff import record_cards, run_profiles  # noqa: E4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
-DEFAULT_PLAYERS = "linear_pst,linear_pst_terms,linear_material,h1,mlp_features"
+DEFAULT_PLAYERS = "linear_pst,linear_pst_terms,linear_material,h1"
 
 
 def render_markdown(results, path: Path) -> None:

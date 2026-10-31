@@ -63,8 +63,8 @@ Every setting is an option of `BotRegistry.get_bot(name, **options)` (`gui/setti
 does not freeze: the Rust search releases the Python lock while it runs. Each game builds new
 bots; an answer to an old request (after an undo or a resignation) is ignored.
 `game_model.py` (position, SAN list, clocks, result, undo) and `settings.py` do not import Qt and are
-tested without a window (`tests/test_gui_model.py`); the widgets are tested offscreen
-(`tests/test_gui_widgets.py`, skipped if PySide6 is missing).
+tested without a window (`tests/app/gui/test_gui_model.py`); the widgets are tested offscreen
+(`tests/app/gui/test_gui_widgets.py`, skipped if PySide6 is missing).
 
 **Measured effect.** Not measured: the window does not change the engine.
 

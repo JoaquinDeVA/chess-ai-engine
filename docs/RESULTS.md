@@ -155,7 +155,7 @@ them, and the time estimator is pinned to the original rule (`ratio_squared`, wi
 so that a stopped tournament can be resumed with identical conditions. Quiescence is on, as in the
 bots by default. Each game record also carries the version of the Rust core that played it (`core`,
 `chess_engine._core.version()`); a file is never resumed with another version, and records without the
-field count as `python`, the engine before 2.0 (`tests/test_tournament.py::test_a_file_played_by_another_core_is_refused`).
+field count as `python`, the engine before 2.0 (`tests/lab/comparison/test_tournament.py::test_a_file_played_by_another_core_is_refused`).
 The published tournaments below were played by that Python engine.
 
 ## Limits and leakage

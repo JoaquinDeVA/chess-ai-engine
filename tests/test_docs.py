@@ -2,9 +2,9 @@
 
 import importlib.util
 import re
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.paths import ROOT
+
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 MODULE_COMMAND = re.compile(r"python -m ((?:chess_engine|chess_lab)(?:\.\w+)+)")
 SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/scripts/[\w./-]+\.(?:py|sh)\b")

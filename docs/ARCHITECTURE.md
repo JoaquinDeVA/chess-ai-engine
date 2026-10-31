@@ -177,7 +177,7 @@ and then the tests. `cargo test --manifest-path rust/Cargo.toml` runs the Rust t
 The Rust core was checked against the Python engine it replaced through golden files
 (`tests/golden/`): positions, terminal tests, features, evaluations, fixed-depth searches (value,
 move and node counts), opening-book lookups and tablebase moves. The tests that read them are
-`tests/test_core_golden.py` and `rust/tests/golden_*.rs`.
+`tests/core/test_core_golden.py` and `rust/tests/golden_*.rs`.
 
 ## Adding a bot
 
@@ -214,7 +214,7 @@ is slow. To run an evaluation at full speed it must be written in Rust and retur
 
 Rules: the constructor must work without arguments; override `on_game_start` to reset per-game
 state and `get_info()` to describe the bot. Use `ChessBot` directly only if you do not want a tree
-search (just `get_move(board, time_limit)`). Test it like `tests/test_bots.py`: legal moves from
+search (just `get_move(board, time_limit)`). Test it like `tests/app/bots/test_bots.py`: legal moves from
 several positions, mate in one (`tests.conftest.MATE_IN_ONE`) and the board left untouched.
 
 ## Extension points
@@ -238,8 +238,8 @@ several threads. To give a feature set its Rust version:
    its size in `size` and its `active` function, which must give the same indices and values, in the
    same order, as the Python `active` (the training encodes with the Python one, so a difference
    means training on one thing and playing with another);
-2. run `tests/test_feature_parity.py`, which compares the two on 300 positions for every registered
-   feature family (and, for the shipped ones, `tests/test_core_golden.py`);
+2. run `tests/core/test_feature_parity.py`, which compares the two on 300 positions for every registered
+   feature family (and, for the shipped ones, `tests/core/test_core_golden.py`);
 3. rebuild with `pip install -e .` and run `cargo test --manifest-path rust/Cargo.toml`.
 
 The search is written for chess (it uses `shakmaty` for the rules); another game would need

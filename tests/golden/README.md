@@ -9,9 +9,9 @@ and read it with `git show <commit>^:scripts/golden/generate_golden.py`.
 |---|---|
 | `positions.json` | 2,000 positions of random games, each with the moves that lead to it |
 | `terminal.json` | whether the game is over and who won, for those positions and 66 hand-made cases (mates, stalemates, insufficient material, repetitions, fifty moves) |
-| `features_h1.json`, `features_net4_pst.json`, `eval_*.json` | the features of `h1` and `net4_pst`, and the expected score of `h1` and the five models, for the positions. The features of the four linear models are not stored: `tests/test_feature_parity.py` compares them with the Python code that is still in the repo |
+| `features_h1.json`, `features_net4_pst.json`, `eval_*.json` | the features of `h1` and `net4_pst`, and the expected score of `h1` and the five models, for the positions. The features of the four linear models are not stored: `tests/core/test_feature_parity.py` compares them with the Python code that is still in the repo |
 | `search_*.json` | fixed-depth searches of each player: value, move, nodes, prunings and deepest ply |
 | `book.json`, `tablebase.json` | opening-book lookups and endgame-table moves |
 
-They are read by `tests/test_core_golden.py` and by `rust/tests/golden_*.rs`. Do not edit them by
+They are read by `tests/core/test_core_golden.py` and by `rust/tests/golden_*.rs`. Do not edit them by
 hand: a difference between the core and these files is a bug in one of the two.

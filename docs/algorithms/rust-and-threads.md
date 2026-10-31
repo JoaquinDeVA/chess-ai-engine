@@ -24,7 +24,7 @@ evaluation and the time limits.
 core reproduces the Python engine node for node. `tests/golden/` holds what the Python engine
 produced (2,000 positions with their histories, the features and values of every evaluation,
 fixed-depth searches of `h1` and the five models with value, move, nodes and prunings, book
-lookups and tablebase moves) and `rust/tests/golden_*.rs` and `tests/test_core_golden.py` compare
+lookups and tablebase moves) and `rust/tests/golden_*.rs` and `tests/core/test_core_golden.py` compare
 the core with it. The legal moves are listed in the order python-chess generates them
 (`generation_order`), so that moves of equal value are chosen as before. Replaying the 21,203 moves
 of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with

@@ -59,7 +59,7 @@ Black as the reference) and the one of the player to move is read.
 **How it is implemented.** `NetState` in `rust/src/eval/net.rs` behind the `EvalState` trait (`apply`,
 `apply_null`, `undo`, `evaluate`), with a stack of snapshots so `undo` is a pop. The search holds the state
 beside `GameState`. Switch: `incremental`. Test: `incremental_equals_full` (same values as the full evaluation up
-to rounding) and `tests/test_core_golden.py::test_the_incremental_network_gives_the_same_search`.
+to rounding) and `tests/core/test_core_golden.py::test_the_incremental_network_gives_the_same_search`.
 
 **Measured effect.** About 15 % more nodes per second for `net4_pst`
 (`python src/chess_lab/scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts

@@ -232,9 +232,7 @@ a hash of the position plus the two move counters, which identifies the same pos
 without building the string.
 
 **How it is implemented.** `GameState::apply`, `undo` and `key` in `rust/src/board.rs`; the
-`apply` / `undo` pairs in `Search::node` and `Search::quiescence`. (The Python version was
-`ChessGameState.apply_move`, `undo_move` and `key`, which survive only as a thin wrapper of a board
-for the evaluation functions.)
+`apply` / `undo` pairs in `Search::node` and `Search::quiescence`.
 
 **Measured effect.** Commit `ea86b20` reports, on the fixed benchmark at depth 3 of the Python
 engine, identical moves and node counts and a total time from 10.8 s to 3.7 s (2.9 times faster),

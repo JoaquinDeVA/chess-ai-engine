@@ -8,22 +8,24 @@
 
 The engine has two parts. The part that must be fast, the search, the evaluations it calls and the
 opening book and endgame tables, is written in Rust (`rust/`, built as the extension module
-`chess_engine._core`). Everything else, the game loop, the bots' interface, the training, the
-comparison tools and the command line, is Python (`src/chess_engine/`). A bot hands the position and
+`chess_engine._core`). Everything else is Python in two packages: `src/chess_engine/` is the application (game loop, bots,
+models, window), and `src/chess_lab/` is the laboratory that produces and measures it (training,
+comparison and the scripts). The laboratory imports the application; the application never imports the
+laboratory. A bot hands the position and
 an evaluation to the Rust core once per move and gets a move and the statistics back.
 
 ```mermaid
 flowchart TB
     WIN["main.py → gui/<br/>window"] --> REG
-    TOURN["comparison/play_tournament<br/>no window"] --> GM["engine/<br/>GameManager, results, PGN"]
+    TOURN["chess_lab/comparison/play_tournament<br/>no window"] --> GM["engine/<br/>GameManager, results, PGN"]
     GM --> REG["bots/bot_registry.py<br/>discovers bots"]
     REG --> BOTS["bots/<br/>playable bots"]
     BOTS --> BASES["bots/_search_bots.py<br/>IterativeDeepeningBot"]
     BASES -->|"one call per move"| CORE["rust/ (chess_engine._core)<br/>search · evaluations ·<br/>opening book · endgame tables"]
     BOTS --> EVAL["evaluation/ + models/<br/>features, heuristic, learned models"]
     EVAL -->|"weights, once"| CORE
-    TRAIN["training/<br/>targets, sampling, fitting"] <--> EVAL
-    COMP["comparison/<br/>judge · evaluate · tradeoff · tournament · report"] --> TRAIN
+    TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL
+    COMP["chess_lab/comparison/<br/>judge · evaluate · tradeoff · tournament · report"] --> TRAIN
     COMP --> EVAL
     COMP --> BOTS
 ```
@@ -31,16 +33,16 @@ flowchart TB
 Dependencies, as the imports stand:
 
 - `rust/` imports nothing from Python except the weights it is given (`models/native.py` builds the evaluators).
-- `models/` imports `evaluation/` (`evaluator.py`, `native.py`, for `ChessGameState`) and, for the target representation, `training/`.
-- `training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). So `models/` and `training/` depend on each other; the only edge from `models/` to `training/` is `training/representation.py`.
+- `models/` imports `evaluation/` (`evaluator.py`, `native.py`, for `ChessGameState`). It holds `representation.py` and `spec.py` (target scale and shared defaults), which both the models and the training need.
+- `chess_lab/training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). `models/` imports nothing from `chess_lab`.
 - `bots/` imports `search/`, `evaluation/`, `models/` and `knowledge/`.
 - `engine/` imports `bots/` and `config/`; `config/` imports the data classes of `engine/`.
 - `gui/` imports `bots/`, `models/`, `search/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
-- `comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `training/`, `evaluation/`, `knowledge/` and `engine/`. Nothing else imports it.
+- `chess_lab/comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `chess_lab/training/`, `evaluation/`, `knowledge/` and `engine/`. Nothing else imports it.
 
 ## Packages
 
-| Package | Responsibility |
+| Package (`src/chess_engine/` unless noted) | Responsibility |
 |---|---|
 | `rust/src/board.rs` | The rules for the search: a position with the keys needed for repetitions, the terminal test of `board.outcome(claim_draw=True)`, legal moves in the order python-chess generates them, a key for the transposition table |
 | `rust/src/eval/` | The evaluations the search runs without Python: `h1.rs` (the heuristic), `linear.rs` (sparse features and the logistic models), `net.rs` (the sparse network `net4_pst`) |
@@ -50,18 +52,18 @@ Dependencies, as the imports stand:
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
 | `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py` |
 | `evaluation/` | `features.py`: hand-crafted features (material, mobility, king safety...). `heuristics.py`: the heuristic `h1` and its fitted weights. `chess_game_state.py`: a thin wrapper of a board for the evaluation functions |
-| `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py` (which also lists `ACCURACY_RECORDS`, the models that are only measured). Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`). Course models: `architectures.py` and `keras_model.py` (`mlp_features`, `cnn_resnet`) with the dense encodings of `dense_features.py`. `evaluator.py` adapts a model to a search; `native.py` hands a model's weights to the Rust core; `cards.py` reads and writes the model cards in `models/cards/` |
-| `training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`, `targets.py` and `representation.py`: split, target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept). `effort.py`: training size per effort level. `train.py`: the training command |
-| `comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
+| `models/` | Learned position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py` (which also lists `ACCURACY_RECORDS`, the models that are only measured). Linear family: `linear_features.py` (sparse feature sets) and `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models). Neural: `neural_eval.py` (`net4_pst`). Course models: `architectures.py` and `keras_model.py` (`mlp_features`, `cnn_resnet`) with the dense encodings of `dense_features.py`. `evaluator.py` adapts a model to a search; `native.py` hands a model's weights to the Rust core; `cards.py` reads and writes the model cards in `models/cards/`. `representation.py`: target scale and point of view. `spec.py`: defaults shared everywhere (sample seed, share of mates kept) |
+| `chess_lab/training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
+| `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
 | `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings → bot options; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
 | `engine/`, `config/` | Game loop with clocks, results and PGN export for the tournaments; tournament presets |
 
-Tournaments run with `python -m chess_engine.comparison.play_tournament`. Outside the packages, `scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
+Tournaments run with `python -m chess_lab.comparison.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
 `fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),
-`scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
+`src/chess_lab/scripts/bench/` holds the experiments (`profile_depth_vs_accuracy.py`,
 `measure_search_speed.py`, `compare_quiescence.py`, `compare_search_features.py`,
-`compare_target_representations.py`) and `scripts/run_full_pipeline.sh`
+`compare_target_representations.py`) and `src/chess_lab/scripts/run_full_pipeline.sh`
 runs the whole flow. See [DATA_AND_TRAINING.md](DATA_AND_TRAINING.md) for the data and
 [MODELS.md](MODELS.md) for the models themselves.
 

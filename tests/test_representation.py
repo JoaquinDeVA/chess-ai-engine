@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.training.representation import (
+from chess_engine.models.representation import (
     LICHESS_K,
     Representation,
     is_quiet,

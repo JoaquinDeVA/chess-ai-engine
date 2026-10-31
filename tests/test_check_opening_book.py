@@ -1,4 +1,4 @@
-"""Tests of scripts/data/check_opening_book.py with a fake engine (no network)."""
+"""Tests of src/chess_lab/scripts/data/check_opening_book.py with a fake engine (no network)."""
 
 import importlib.util
 from pathlib import Path
@@ -11,7 +11,14 @@ START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "data" / "check_opening_book.py"
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "data"
+        / "check_opening_book.py"
+    )
     spec = importlib.util.spec_from_file_location("check_opening_book", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

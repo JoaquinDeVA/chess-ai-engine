@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/compare_time_estimators.py on synthetic series."""
+"""Tests of src/chess_lab/scripts/bench/compare_time_estimators.py on synthetic series."""
 
 import importlib.util
 from pathlib import Path
@@ -9,7 +9,12 @@ import pytest
 @pytest.fixture(scope="module")
 def script():
     path = (
-        Path(__file__).resolve().parent.parent / "scripts" / "bench" / "compare_time_estimators.py"
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "bench"
+        / "compare_time_estimators.py"
     )
     spec = importlib.util.spec_from_file_location("compare_time_estimators", path)
     module = importlib.util.module_from_spec(spec)

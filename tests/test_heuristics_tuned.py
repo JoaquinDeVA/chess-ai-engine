@@ -9,13 +9,6 @@ import numpy as np
 import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
-from chess_engine.comparison import play_tournament, standings
-from chess_engine.comparison.tradeoff import (
-    HEURISTICS,
-    fixed_time_manager,
-    make_player,
-    validate_specs,
-)
 from chess_engine.evaluation import heuristics
 from chess_engine.evaluation.chess_game_state import ChessGameState
 from chess_engine.evaluation.heuristics import (
@@ -24,8 +17,15 @@ from chess_engine.evaluation.heuristics import (
     load_h1_weights,
     reset_h1_cache,
 )
-from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.sidecar import build_sidecar
+from chess_lab.comparison import play_tournament, standings
+from chess_lab.comparison.tradeoff import (
+    HEURISTICS,
+    fixed_time_manager,
+    make_player,
+    validate_specs,
+)
+from chess_lab.training.lichess_raw import shard_path, write_shard
+from chess_lab.training.sidecar import build_sidecar
 from tests.conftest import random_positions
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,7 +49,7 @@ def load_script(relative: str, name: str):
 
 @pytest.fixture(scope="module")
 def fit_script():
-    return load_script("scripts/data/fit_h1_weights.py", "fit_h1_weights")
+    return load_script("src/chess_lab/scripts/data/fit_h1_weights.py", "fit_h1_weights")
 
 
 @pytest.fixture(autouse=True)
@@ -120,7 +120,7 @@ def test_fit_script_runs_on_fixture_shards(fit_script, tmp_path, capsys):
 
 
 def test_missing_weights_file_raises_with_hint(tmp_path):
-    with pytest.raises(FileNotFoundError, match="scripts/data/fit_h1_weights.py"):
+    with pytest.raises(FileNotFoundError, match="src/chess_lab/scripts/data/fit_h1_weights.py"):
         load_h1_weights(tmp_path / "absent.json")
 
 

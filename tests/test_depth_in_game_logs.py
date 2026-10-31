@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/depth_in_game_logs.py."""
+"""Tests of src/chess_lab/scripts/bench/depth_in_game_logs.py."""
 
 import importlib.util
 import json
@@ -9,7 +9,14 @@ import pytest
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "bench" / "depth_in_game_logs.py"
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "bench"
+        / "depth_in_game_logs.py"
+    )
     spec = importlib.util.spec_from_file_location("depth_in_game_logs", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

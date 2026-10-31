@@ -18,7 +18,7 @@ so results of different engines are never mixed.
 **How they were judged.** Two measurements, both repeatable.
 
 1. Nodes and time at depth 6 over 100 positions, and how often the move equals the reference's:
-   `python scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
+   `python src/chess_lab/scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
    Position-terms model:
 
 | variant | nodes per move | s per move | same move as reference |
@@ -33,7 +33,7 @@ so results of different engines are never mixed.
 | `lmr` (mild) | 146,356 | 0.395 | 82 % |
 
 2. Games against the reference at equal time (4 s + 0.05 s per move, 100 games, colours swapped, same model):
-   `python scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
+   `python src/chess_lab/scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
 
 | candidate | score | Elo | mean depth (reference 4.68) |
 |---|---|---|---|
@@ -62,7 +62,7 @@ beside `GameState`. Switch: `incremental`. Test: `incremental_equals_full` (same
 to rounding) and `tests/test_core_golden.py::test_the_incremental_network_gives_the_same_search`.
 
 **Measured effect.** About 15 % more nodes per second for `net4_pst`
-(`python scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts
+(`python src/chess_lab/scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts
 agree within 1 %, not exactly.
 
 **Status.** On by default; since 2026-10-25.

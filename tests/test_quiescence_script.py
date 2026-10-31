@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/compare_quiescence.py (statistics and arguments only; no search)."""
+"""Tests of src/chess_lab/scripts/bench/compare_quiescence.py (statistics and arguments only; no search)."""
 
 import importlib.util
 from pathlib import Path
@@ -8,7 +8,14 @@ import pytest
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "bench" / "compare_quiescence.py"
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "bench"
+        / "compare_quiescence.py"
+    )
     spec = importlib.util.spec_from_file_location("compare_quiescence", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

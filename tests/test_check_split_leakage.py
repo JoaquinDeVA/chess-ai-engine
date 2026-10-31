@@ -1,4 +1,4 @@
-"""Tests of scripts/data/check_split_leakage.py with a handful of positions."""
+"""Tests of src/chess_lab/scripts/data/check_split_leakage.py with a handful of positions."""
 
 import importlib.util
 from pathlib import Path
@@ -9,12 +9,19 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from chess_engine.training.dataset import TEST, TRAIN, VALIDATION
+from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "data" / "check_split_leakage.py"
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "data"
+        / "check_split_leakage.py"
+    )
     spec = importlib.util.spec_from_file_location("check_split_leakage", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

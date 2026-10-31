@@ -58,7 +58,7 @@ flowchart TD
     L --> S
 ```
 
-The measured tables below come from `python scripts/bench/compare_search_features.py`: a fixed sample
+The measured tables below come from `python src/chess_lab/scripts/bench/compare_search_features.py`: a fixed sample
 of test positions searched with each technique switched off, one at a time, with `linear_material`
 as evaluation. Its report files are local (not versioned), so the numbers are copied here.
 

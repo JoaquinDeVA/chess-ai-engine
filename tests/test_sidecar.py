@@ -5,10 +5,10 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
-from chess_engine.training.dataset import TEST, TRAIN, VALIDATION, assign_split
-from chess_engine.training.lichess_raw import read_metadata, shard_path, write_shard
-from chess_engine.training.representation import is_quiet
-from chess_engine.training.sidecar import build_sidecar, iter_batches, load_sample
+from chess_engine.models.representation import is_quiet
+from chess_lab.training.dataset import TEST, TRAIN, VALIDATION, assign_split
+from chess_lab.training.lichess_raw import read_metadata, shard_path, write_shard
+from chess_lab.training.sidecar import build_sidecar, iter_batches, load_sample
 
 START = chess.STARTING_FEN
 CHECK = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"  # white in check
@@ -38,7 +38,7 @@ def random_fens(count, offset=0):
 
 @pytest.fixture
 def dirs(tmp_path, monkeypatch):
-    monkeypatch.setattr("chess_engine.training.lichess_raw.ROW_GROUP_SIZE", 64)  # many groups
+    monkeypatch.setattr("chess_lab.training.lichess_raw.ROW_GROUP_SIZE", 64)  # many groups
     raw, side = tmp_path / "raw", tmp_path / "side"
     raw.mkdir()
     side.mkdir()
@@ -140,7 +140,7 @@ def test_iter_batches_n_zero_yields_nothing(dirs):
 @pytest.fixture
 def mate_dirs(tmp_path, monkeypatch):
     """Two shards where every fourth position is a mate in 3 (cp is then NaN)."""
-    monkeypatch.setattr("chess_engine.training.lichess_raw.ROW_GROUP_SIZE", 64)
+    monkeypatch.setattr("chess_lab.training.lichess_raw.ROW_GROUP_SIZE", 64)
     raw, side = tmp_path / "raw", tmp_path / "side"
     raw.mkdir()
     side.mkdir()

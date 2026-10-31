@@ -12,7 +12,7 @@ import pytest
 
 from chess_engine.models.neural_eval import NeuralEvalModel, Nn4Model
 from chess_engine.models.registry import get_model_class
-from chess_engine.training.representation import Representation
+from chess_engine.models.representation import Representation
 from tests.conftest import material_cp, random_positions
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

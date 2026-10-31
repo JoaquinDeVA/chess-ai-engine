@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/record_iteration_times.py (selection of moves and arguments)."""
+"""Tests of src/chess_lab/scripts/bench/record_iteration_times.py (selection of moves and arguments)."""
 
 import importlib.util
 from pathlib import Path
@@ -9,7 +9,12 @@ import pytest
 @pytest.fixture(scope="module")
 def script():
     path = (
-        Path(__file__).resolve().parent.parent / "scripts" / "bench" / "record_iteration_times.py"
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "bench"
+        / "record_iteration_times.py"
     )
     spec = importlib.util.spec_from_file_location("record_iteration_times", path)
     module = importlib.util.module_from_spec(spec)

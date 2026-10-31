@@ -16,7 +16,7 @@ import chess
 import numpy as np
 import pandas as pd
 
-from chess_engine.training.representation import Representation
+from chess_engine.models.representation import Representation
 
 from .keras_model import _import_keras
 from .linear_eval import (

@@ -6,8 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\]\(([^)\s]+)\)")
-MODULE_COMMAND = re.compile(r"python -m (chess_engine(?:\.\w+)+)")
-SCRIPT_PATH = re.compile(r"\bscripts/[\w./-]+\.(?:py|sh)\b")
+MODULE_COMMAND = re.compile(r"python -m ((?:chess_engine|chess_lab)(?:\.\w+)+)")
+SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/scripts/[\w./-]+\.(?:py|sh)\b")
 
 
 def checked_docs():

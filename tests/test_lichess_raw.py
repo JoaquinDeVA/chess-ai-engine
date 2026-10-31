@@ -5,7 +5,7 @@ import json
 import pyarrow.parquet as pq
 import pytest
 
-from chess_engine.training.lichess_raw import (
+from chess_lab.training.lichess_raw import (
     RAW_COLUMNS,
     is_legal_position,
     parse_raw_record,
@@ -98,7 +98,7 @@ def test_fetch_is_sharded_and_restartable(tmp_path):
 
     spec = importlib.util.spec_from_file_location(
         "build_raw_shards",
-        Path(__file__).resolve().parent.parent / "scripts/data/build_raw_shards.py",
+        Path(__file__).resolve().parent.parent / "src/chess_lab/scripts/data/build_raw_shards.py",
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/compare_endgame_tablebase.py with the 3-piece tables of tests/data."""
+"""Tests of src/chess_lab/scripts/bench/compare_endgame_tablebase.py with the 3-piece tables of tests/data."""
 
 import importlib.util
 import random
@@ -17,6 +17,8 @@ TABLES = Path(__file__).resolve().parent / "data" / "syzygy"
 def script():
     path = (
         Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
         / "scripts"
         / "bench"
         / "compare_endgame_tablebase.py"

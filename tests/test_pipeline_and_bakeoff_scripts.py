@@ -8,9 +8,9 @@ from pathlib import Path
 import chess
 import pytest
 
-from chess_engine.training.lichess import SIDE_TO_MOVE, WHITE, detect_perspective
-from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.sidecar import build_sidecar
+from chess_lab.training.lichess import SIDE_TO_MOVE, WHITE, detect_perspective
+from chess_lab.training.lichess_raw import shard_path, write_shard
+from chess_lab.training.sidecar import build_sidecar
 from tests.conftest import material_cp, random_positions
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,7 +43,7 @@ class TestPerspectiveDetection:
 
 
 def load_script(name: str):
-    path = next((ROOT / "scripts").glob(f"*/{name}.py"))
+    path = next((ROOT / "src" / "chess_lab" / "scripts").glob(f"*/{name}.py"))
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -85,7 +85,7 @@ def test_bakeoff_depth_filter_counts_kept_training_rows(tmp_path):
     assert all((b["depth"] >= 20).all() for b in batches)
 
 
-SCRIPT = ROOT / "scripts" / "run_full_pipeline.sh"
+SCRIPT = ROOT / "src" / "chess_lab" / "scripts" / "run_full_pipeline.sh"
 PIPELINE_MODELS = "linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst"
 
 

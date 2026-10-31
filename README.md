@@ -65,7 +65,7 @@ pip install -e ".[gui]"
 python main.py
 
 # no window: tournaments between bots
-python -m chess_engine.comparison.play_tournament --help
+python -m chess_lab.comparison.play_tournament --help
 ```
 
 In the window you choose who plays White and Black (a person or an AI), the time control and, with the
@@ -93,8 +93,8 @@ whole flow, from the sidecars to the training of the models, the measurements, t
 the results table, is one script. It takes roughly a day on a six-core machine, most of it the 10-minute tournament (about 13 hours):
 
 ```bash
-DRY_RUN=1 bash scripts/run_full_pipeline.sh      # print every command without running anything
-nohup setsid bash scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
+DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh      # print every command without running anything
+nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
 ```
 
 ## Repository map
@@ -106,10 +106,11 @@ src/chess_engine/
   bots/         the playable bots (they call the core)
   evaluation/   hand-crafted features and the heuristic h1
   models/       the learned evaluators and their cards
+  gui/          the window: board, game page, player selection and AI settings
+src/chess_lab/  the laboratory (not needed to play)
   training/     sampling, targets and the training command
   comparison/   judge, trade-off profile, tournament (and its entry point) and the results table
-  gui/          the window: board, game page, player selection and AI settings
-scripts/        data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
+  scripts/      data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
 docs/           the documentation
 tests/          the test suite (tests/golden: the files that pin the core to the Python engine it replaced)
 ```

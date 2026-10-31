@@ -8,12 +8,13 @@ import pandas as pd
 import pytest
 
 from chess_engine import models
-from chess_engine.comparison import evaluate as evaluate_cli
-from chess_engine.comparison import report
 from chess_engine.models import base as models_base
 from chess_engine.models import cards, registry
-from chess_engine.training import train as train_cli
-from chess_engine.training.dataset import (
+from chess_engine.models.representation import Representation, white_score
+from chess_lab.comparison import evaluate as evaluate_cli
+from chess_lab.comparison import report
+from chess_lab.training import train as train_cli
+from chess_lab.training.dataset import (
     TEST,
     TRAIN,
     VALIDATION,
@@ -21,10 +22,9 @@ from chess_engine.training.dataset import (
     encode_positions,
     split_dataset,
 )
-from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.representation import Representation, white_score
-from chess_engine.training.sidecar import build_sidecar
-from chess_engine.training.targets import cp_to_target, mate_to_target, row_targets
+from chess_lab.training.lichess_raw import shard_path, write_shard
+from chess_lab.training.sidecar import build_sidecar
+from chess_lab.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
 
 

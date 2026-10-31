@@ -7,9 +7,10 @@ import pandas as pd
 import pytest
 
 from chess_engine.models.linear_eval import PstTaperedModel
-from chess_engine.training import effort
-from chess_engine.training.dataset import TRAIN, VALIDATION, assign_split
-from chess_engine.training.effort import (
+from chess_engine.models.representation import Representation
+from chess_lab.training import effort
+from chess_lab.training.dataset import TRAIN, VALIDATION, assign_split
+from chess_lab.training.effort import (
     MIN_POSITIONS,
     Timing,
     available_rows,
@@ -18,9 +19,8 @@ from chess_engine.training.effort import (
     estimated_seconds,
     search,
 )
-from chess_engine.training.lichess_raw import shard_path, write_shard
-from chess_engine.training.representation import Representation
-from chess_engine.training.sidecar import build_sidecar, load_sample
+from chess_lab.training.lichess_raw import shard_path, write_shard
+from chess_lab.training.sidecar import build_sidecar, load_sample
 from tests.conftest import material_cp, random_positions
 
 

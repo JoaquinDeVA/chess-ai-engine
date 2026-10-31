@@ -3,7 +3,7 @@
     python main.py
 
 Who plays each colour, the time control and the settings of every AI are chosen on the first page.
-Tournaments between bots have no window: ``python -m chess_engine.comparison.play_tournament``.
+Tournaments between bots have no window: ``python -m chess_lab.comparison.play_tournament``.
 Needs the ``gui`` extra: ``pip install -e ".[gui]"``.
 """
 

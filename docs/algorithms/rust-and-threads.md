@@ -30,7 +30,7 @@ the core with it. The legal moves are listed in the order python-chess generates
 of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with
 the same number of nodes; the 11 others differ in the last decimal of a value.
 
-**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
+**Measured effect.** Measured with `python src/chess_lab/scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
 (200 test positions, seed 42, a fresh table per position, five processes of one thread each, books
 and tables off), once with the Python engine (commit `148b86d`) and once with the core. Time to search
 every position to depth 4, in seconds per move:
@@ -84,7 +84,7 @@ XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options
 that games are reproducible and the clock is fair among processes. With more than one thread the
 search is not deterministic and the evaluation must run in the core.
 
-**Measured effect.** Measured with `python scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8
+**Measured effect.** Measured with `python src/chess_lab/scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8
 --players linear_pst_terms --threads 1,2,4,6 --workers 1 --techniques incremental,tt_move,history,pvs,aspiration,null_move`
 (the Position-terms logistic model, 60 test positions, the default techniques of [selective techniques](selective-techniques.md) on, nothing
 else running on the six-core machine). The nodes per second count the nodes of all threads:

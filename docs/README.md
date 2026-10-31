@@ -31,6 +31,6 @@ The history of changes is in the [changelog](../CHANGELOG.md).
 ## How the pages are kept
 
 A change of behaviour updates its page in the same commit. The models table in `RESULTS.md` is
-generated from the model cards (`python -m chess_engine.comparison.report`) and is never edited
+generated from the model cards (`python -m chess_lab.comparison.report`) and is never edited
 by hand. Every number in these pages is followed by the command or the file it comes from, and
 `tests/test_docs.py` checks that the links, the commands and the script paths they quote exist.

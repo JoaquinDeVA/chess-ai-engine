@@ -1,4 +1,4 @@
-"""Tests of scripts/data/build_opening_book.py with a fake evaluation table (no shards)."""
+"""Tests of src/chess_lab/scripts/data/build_opening_book.py with a fake evaluation table (no shards)."""
 
 import importlib.util
 from pathlib import Path
@@ -10,7 +10,14 @@ import pytest
 
 @pytest.fixture(scope="module")
 def script():
-    path = Path(__file__).resolve().parent.parent / "scripts" / "data" / "build_opening_book.py"
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "data"
+        / "build_opening_book.py"
+    )
     spec = importlib.util.spec_from_file_location("build_opening_book", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

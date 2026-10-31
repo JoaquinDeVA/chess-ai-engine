@@ -9,9 +9,9 @@ import chess
 import pytest
 
 from chess_engine import _core
-from chess_engine.comparison import play_tournament, tournament
-from chess_engine.comparison.standings import summarize
-from chess_engine.comparison.tournament import paired_openings, run_round_robin
+from chess_lab.comparison import play_tournament, tournament
+from chess_lab.comparison.standings import summarize
+from chess_lab.comparison.tournament import paired_openings, run_round_robin
 
 
 def read_records(path):

@@ -6,10 +6,10 @@ import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.comparison import tradeoff
-from chess_engine.comparison.tradeoff import fixed_time_manager, make_player, profile
 from chess_engine.evaluation.heuristics import h1
 from chess_engine.models import cards
+from chess_lab.comparison import tradeoff
+from chess_lab.comparison.tradeoff import fixed_time_manager, make_player, profile
 
 
 def test_fixed_time_manager_budget_is_exact():

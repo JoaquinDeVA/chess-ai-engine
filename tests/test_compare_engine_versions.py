@@ -1,4 +1,4 @@
-"""Tests of scripts/bench/compare_engine_versions.py (no games are played)."""
+"""Tests of src/chess_lab/scripts/bench/compare_engine_versions.py (no games are played)."""
 
 import importlib.util
 import json
@@ -6,14 +6,19 @@ from pathlib import Path
 
 import pytest
 
-from chess_engine.comparison.tradeoff import make_player, split_techniques
 from chess_engine.search.time_management import TimeManager
+from chess_lab.comparison.tradeoff import make_player, split_techniques
 
 
 @pytest.fixture(scope="module")
 def script():
     path = (
-        Path(__file__).resolve().parent.parent / "scripts" / "bench" / "compare_engine_versions.py"
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "chess_lab"
+        / "scripts"
+        / "bench"
+        / "compare_engine_versions.py"
     )
     spec = importlib.util.spec_from_file_location("compare_engine_versions", path)
     module = importlib.util.module_from_spec(spec)

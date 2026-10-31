@@ -9,29 +9,9 @@ from collections.abc import Iterable
 import chess
 import numpy as np
 
-from chess_engine.models.base import CP_SCALE
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.neural_eval import NeuralEvalModel
-
+from .definitions import CP_SCALE, NeuralEvalModel, SparseModel
 from .linear_features import features_of
 from .representation import Representation, score_to_cp
-
-#: Evaluations given to the search never get closer than this to the terminal values 0 and 1.
-EXPECTED_SCORE_MARGIN = 1e-2
-
-
-def cp_to_expected_score(cp: float, margin: float = EXPECTED_SCORE_MARGIN) -> float:
-    """Map centipawns (White's point of view) to an expected score in ``(0, 1)``.
-
-    ``0`` centipawns is ``0.5``; ``+CP_SCALE`` or more is ``1 - margin``. The linear map keeps
-    the scale of the heuristic evaluations, which also live in ``[margin, 1 - margin]``.
-
-    :param cp: Evaluation in centipawns, positive when White is better.
-    :param margin: Distance kept to the terminal values.
-    :return: Expected score for White in ``[margin, 1 - margin]``.
-    """
-    score = 0.5 + 0.5 * float(np.clip(cp / CP_SCALE, -1.0, 1.0))
-    return min(1.0 - margin, max(margin, score))
 
 
 def _sigmoid(z: float) -> float:
@@ -49,7 +29,7 @@ class PythonEvaluator:
     :param model: The model to evaluate.
     """
 
-    def __init__(self, model: LinearEvalModel):
+    def __init__(self, model: SparseModel):
         self.model = model
         self.name = model.name
         self.architecture = model.architecture

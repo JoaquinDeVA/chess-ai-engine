@@ -42,7 +42,7 @@ src/chess_engine/models/artifacts/*.tmp
 
 # Representation bake-off models (scripts/compare_target_representations.py; tags @<prefix>-<i>)
 src/chess_engine/models/artifacts/*@*bake-*
-src/chess_engine/models/cards/*@*bake-*
+src/chess_lab/models/cards/*@*bake-*
 
 # Plan e instrucciones personales de Claude Code
 PLAN.md

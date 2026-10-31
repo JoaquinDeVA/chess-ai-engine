@@ -18,9 +18,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.neural_eval import NeuralEvalModel
 from chess_lab.models import PythonEvaluator, fit_stream, new_model
+from chess_lab.models.definitions import NeuralEvalModel, SparseModel
 from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, _losses, _scores, encode_frame
 from chess_lab.models.linear_features import features_of
 from chess_lab.models.representation import (
@@ -152,7 +151,7 @@ def fit_config(
     lr_decay: Optional[float] = None,
     min_lr: float = 1e-5,
 ) -> Dict[str, Any]:
-    """Keyword configuration of :meth:`LinearEvalModel.fit_stream` for a plan.
+    """Keyword configuration of :func:`chess_lab.models.fit_stream` for a plan.
 
     :param plan: Output of :func:`effort_config`.
     :param l2: L2 penalty.
@@ -214,10 +213,10 @@ def fit(
     quiet_only: bool = False,
     seed: int = SAMPLE_SEED,
     use_cache: bool = True,
-) -> Tuple[LinearEvalModel, Dict[str, Any]]:
+) -> Tuple[SparseModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
-    :param model_class: A concrete :class:`LinearEvalModel` subclass.
+    :param model_class: A concrete :class:`SparseModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
@@ -227,7 +226,7 @@ def fit(
     :param quiet_only: Train on quiet positions only.
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
     :param use_cache: Keep the encoded batches in ``data/cache/linear`` and reuse them.
-    :return: The fitted model and the summary of :meth:`LinearEvalModel.fit_stream`. The TRAIN
+    :return: The fitted model and the summary of :func:`chess_lab.models.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
     model = new_model(model_class, rep)
@@ -265,7 +264,7 @@ def calibrate(
     as the real runs do. Featurizing and scoring the validation set are timed separately, and the
     rest of the fit time is attributed to training.
 
-    :param model_class: A concrete :class:`LinearEvalModel` subclass.
+    :param model_class: A concrete :class:`SparseModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
@@ -350,7 +349,7 @@ def search(
 
     Each trial fits on ``TRIAL_FRACTION`` of ``plan["positions"]``.
 
-    :param model_class: A concrete :class:`LinearEvalModel` subclass.
+    :param model_class: A concrete :class:`SparseModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.

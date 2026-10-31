@@ -6,7 +6,6 @@ import pytest
 
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.models import cards
 from chess_lab.comparison import tradeoff
 from chess_lab.comparison.tradeoff import (
     HEURISTICS,
@@ -15,6 +14,7 @@ from chess_lab.comparison.tradeoff import (
     profile,
     validate_specs,
 )
+from chess_lab.models import cards
 
 
 def test_fixed_time_manager_budget_is_exact():
@@ -64,12 +64,10 @@ def test_run_profiles_unknown_player_fails_before_profiling():
 @pytest.fixture
 def cards_dir(tmp_path, monkeypatch):
     """Model cards in a temporary directory, with the artifacts of the tests in it too."""
-    from chess_engine.models import base as models_base
-    from chess_engine.models import registry
+    from chess_engine.models import loader
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
-    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
     return tmp_path
 
 

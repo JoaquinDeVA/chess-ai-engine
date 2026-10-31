@@ -165,12 +165,10 @@ def test_calibrate_returns_none_when_no_game_is_played(script):
 
 
 def test_tournament_accepts_tagged_players_and_custom_anchor(script, tmp_path, monkeypatch, capsys):
-    from chess_engine.models import base as models_base
-    from chess_engine.models import registry
-    from chess_engine.models.linear_eval import PstTaperedModel
+    from chess_engine.models import loader
+    from chess_lab.models.definitions import PstTaperedModel
 
-    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
-    monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+    monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
     PstTaperedModel(weights=np.zeros(768)).save(tmp_path / "linear_pst@x.npz")
     tournament.check_specs(["h1", "linear_pst@x"])
     with pytest.raises(ValueError, match="linear_pst@missing"):

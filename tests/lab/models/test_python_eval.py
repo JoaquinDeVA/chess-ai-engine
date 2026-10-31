@@ -3,30 +3,12 @@
 import chess
 import numpy as np
 import pandas as pd
-import pytest
 
-from chess_engine.models import CP_SCALE, get_model_class
 from chess_lab.models import fit_stream, new_model
-from chess_lab.models.python_eval import PythonEvaluator, cp_to_expected_score
+from chess_lab.models.definitions import CP_SCALE, get_model_class
+from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation
 from tests.conftest import material_cp, random_positions
-
-
-class TestScale:
-    def test_expected_score_is_centred_bounded_and_monotonic(self):
-        assert cp_to_expected_score(0) == 0.5
-        assert cp_to_expected_score(CP_SCALE) == cp_to_expected_score(10 * CP_SCALE) == 0.99
-        assert cp_to_expected_score(-CP_SCALE) == 0.01
-        scores = [cp_to_expected_score(cp) for cp in range(-1500, 1501, 100)]
-        assert scores == sorted(scores)
-
-    def test_expected_score_is_antisymmetric_around_one_half(self):
-        for cp in (10, 250, 800):
-            assert cp_to_expected_score(cp) + cp_to_expected_score(-cp) == pytest.approx(1.0)
-
-    def test_evaluations_never_reach_the_terminal_values(self):
-        """Regression B10: the search compares evaluations with terminal values 0, 0.5 and 1."""
-        assert 0 < cp_to_expected_score(-1e9) and cp_to_expected_score(1e9) < 1
 
 
 class TestMaterialLinear:

@@ -9,7 +9,7 @@ from chess_engine.bots._search_bots import DEFAULT_TECHNIQUES
 from chess_engine.bots.bot_registry import BotRegistry
 from chess_engine.bots.chess_bot import ChessBot
 from chess_engine.bots.iterative_model_book_bot import DEFAULT_MODEL
-from chess_engine.models.registry import artifact_path, available_models
+from chess_engine.models import installed_models
 from chess_engine.search.time_management import TimeManager
 
 HEURISTIC = "h1"
@@ -47,7 +47,7 @@ def available_evaluations() -> List[str]:
 
     :return: Short ids, the default model first and the heuristic last.
     """
-    models = [name for name in available_models() if artifact_path(name).exists()]
+    models = installed_models()
     models.sort(key=lambda name: (name != DEFAULT_MODEL, name))
     return models + [HEURISTIC]
 

@@ -1,20 +1,19 @@
-"""Machine-learning position evaluators.
+"""Trained position evaluations, loaded by name for the Rust core.
 
-A model estimates the evaluation of a position in centipawns, from White's point of view, the
-way Stockfish would. Models are looked up by name through the registry::
+::
 
-    from chess_engine.models import load_model
-    model = load_model("linear_pst_terms")
-    evaluator = model_evaluator(model)  # from chess_engine.models.native
+    from chess_engine.models import load_evaluator
+    evaluator = load_evaluator("linear_pst_terms")
 
-Importing this package registers the built-in models. It only loads them: the core evaluates
-them, and training lives in the laboratory.
+Defining, training and measuring the models is the laboratory's job (``chess_lab.models``).
 """
 
-# Importing the modules below registers the built-in models.
-from . import (
-    linear_eval,  # noqa: F401,E402
-    neural_eval,  # noqa: F401,E402
+from .loader import (  # noqa: F401
+    ARTIFACTS_DIR,
+    artifact_path,
+    h1_evaluator,
+    installed_models,
+    load_evaluator,
+    load_h1_weights,
+    split_spec,
 )
-from .base import CP_SCALE, EvaluationModel  # noqa: F401
-from .registry import available_models, get_model_class, load_model, register_model  # noqa: F401

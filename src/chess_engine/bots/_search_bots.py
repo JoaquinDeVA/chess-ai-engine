@@ -121,7 +121,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     killer moves persist during a game and are cleared when a new game starts: their values are
     from the point of view of the colour the bot played.
 
-    Subclasses implement :meth:`evaluate` and, to evaluate inside the core, :meth:`native_evaluator`.
+    Subclasses implement :meth:`native_evaluator`, the evaluation the core runs.
 
     :param name: Bot name shown in games and tournaments.
     :param author: Author shown in bot listings.

@@ -7,9 +7,6 @@ import chess
 import numpy as np
 import pytest
 
-from chess_engine.models import load_model
-from chess_engine.models.base import EvaluationModel
-
 PIECE_CP = {
     chess.PAWN: 100,
     chess.KNIGHT: 300,
@@ -29,22 +26,14 @@ def material_cp(board: chess.Board) -> float:
     )
 
 
-class MaterialStubModel(EvaluationModel):
+class MaterialStubModel:
     """Deterministic stand-in for a trained model: evaluates by counting material.
 
     Python only, so it does not play (the core cannot run it): it serves the judge and the cards.
     """
 
     name = "stub"
-    artifact_suffix = ".stub"
     architecture = "material count"
-
-    @classmethod
-    def load(cls, path=None):
-        return cls()
-
-    def save(self, path=None):
-        raise NotImplementedError
 
     def count_parameters(self) -> int:
         return 0
@@ -63,8 +52,8 @@ def stub_model() -> MaterialStubModel:
 
 @pytest.fixture(scope="session")
 def material_model():
-    """A model the core can play: the shipped material logistic model."""
-    return load_model("linear_material")
+    """Name of a model the core can play: the shipped material logistic model."""
+    return "linear_material"
 
 
 def random_positions(count: int, seed: int = 0, max_plies: int = 70) -> List[chess.Board]:
@@ -99,7 +88,7 @@ _PROTECTED_HASHES: dict = {}
 def _artifact_hashes() -> dict:
     import hashlib
 
-    from chess_engine.models.base import ARTIFACTS_DIR
+    from chess_engine.models import ARTIFACTS_DIR
 
     hashes = {}
     for name in PROTECTED_ARTIFACTS:

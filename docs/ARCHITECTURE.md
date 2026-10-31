@@ -32,7 +32,7 @@ flowchart TB
 
 Dependencies, as the imports stand:
 
-- `rust/` imports nothing from Python except the weights it is given (`models/native.py` builds the evaluators).
+- `rust/` imports nothing from Python except the weights it is given (`models/loader.py` builds the evaluators).
 - `models/` imports nothing from the rest of the package: it only loads, saves and registers models.
 - `chess_lab/models/` imports `models/` (the classes it trains) and holds everything that builds a model: feature extractors, the target representation, fitting and the Python evaluation. `chess_lab/training/` imports both. `models/` imports nothing from `chess_lab`.
 - `bots/` imports `search/`, `models/` and `knowledge/`.
@@ -51,7 +51,7 @@ Dependencies, as the imports stand:
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Searcher`, `Book`, `Tablebase` |
 | `search/` | `statistics.py`: `SearchStatistics`. `time_management.py`: per-move time budget |
 | `bots/` | `chess_bot.py` (base class), `bot_registry.py` (finds the bots), `_search_bots.py` (`IterativeDeepeningBot`; options `techniques`, `threads`, `hash_mb`), `iterative_heuristic_bot.py`, `iterative_model_book_bot.py` |
-| `models/` | Saved position evaluators behind one interface, `EvaluationModel` (`base.py`), found by name in `registry.py`. A model is its weights and the name of its feature set: `linear_eval.py` (`LinearEvalModel` and the registered `linear_*` models) and `neural_eval.py` (`net4_pst`) only load and save them. `native.py` hands a model's weights (and those of `h1`, `h1_weights.json`) to the Rust core, which computes the features and the score; `cards.py` reads and writes the model cards in `models/cards/` |
+| `models/` | `loader.py`: turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) or `h1` (`h1_weights.json`) into the Rust `Evaluator`, which computes the features and the score. The models are defined, trained and saved in the lab: `chess_lab/models/definitions.py` (`SparseModel`, `LinearEvalModel`, `NeuralEvalModel` and the table `MODELS`) and `cards.py` (model cards in `chess_lab/models/cards/`) |
 | `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py` and `spec.py`: target scale and point of view, and the defaults shared by the training (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
 | `chess_lab/training/` | `lichess.py` and `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py` and `targets.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
 | `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
@@ -88,21 +88,21 @@ classDiagram
     IterativeDeepeningBot <|-- IterativeHeuristicBot
     IterativeDeepeningBot <|-- IterativeModelBookBot
 
-    class EvaluationModel {
-        <<abstract>>
+    class SparseModel {
+        <<abstract, chess_lab>>
         save()
         load()
     }
-    EvaluationModel <|-- LinearEvalModel
-    LinearEvalModel <|-- NeuralEvalModel
+    SparseModel <|-- LinearEvalModel
+    SparseModel <|-- NeuralEvalModel
     LinearEvalModel o-- LinearFeatures
-    IterativeModelBookBot o-- EvaluationModel
+    IterativeModelBookBot ..> Evaluator : load_evaluator(name)
     IterativeDeepeningBot o-- Searcher : Rust
     Searcher o-- Evaluator : Rust
 ```
 
-A bot's whole job is to say which evaluation the search uses: `native_evaluator()`. `models/native.py`
-builds it from the weights of a model (linear and sparse-network models) or of `h1`; the core runs it,
+A bot's whole job is to say which evaluation the search uses: `native_evaluator()`. `models/loader.py`
+builds it from the saved weights of a model (linear and sparse-network models) or of `h1`; the core runs it,
 with no call back into Python. The base class provides the search, the time budget and the bookkeeping.
 
 The core identifies a position by `(zobrist hash, halfmove clock, fullmove number)`: it names the
@@ -173,35 +173,29 @@ Python extractors by `tests/core/test_feature_parity.py`.
 ## Adding a bot
 
 A bot is one file in `src/chess_engine/bots/`: subclass `IterativeDeepeningBot` (from
-`bots/_search_bots.py`) and implement `evaluate(state, player)`, the expected score of `player` in
-`state`, strictly between 0 and 1. `BotRegistry` imports every public module in `bots/` and registers
+`bots/_search_bots.py`) and implement `native_evaluator()`, which returns the Rust `Evaluator` the search
+runs. `BotRegistry` imports every public module in `bots/` and registers
 each `ChessBot` subclass under its class name; modules starting with `_` hold shared code and are
 skipped. `get_bot(name, **options)` forwards constructor arguments, which is how the settings of the window
 reach the bots; the new bot can be named in tournaments.
 
 ```python
-# src/chess_engine/bots/material_bot.py
-import chess
-
+# src/chess_engine/bots/my_model_bot.py
 from chess_engine.bots._search_bots import IterativeDeepeningBot
-from chess_engine.evaluation.features import extract_material_features
+from chess_engine.models import load_evaluator
 
 
-class MaterialBot(IterativeDeepeningBot):
-    """Iterative-deepening alpha-beta that only counts material."""
+class MyModelBot(IterativeDeepeningBot):
+    """Iterative-deepening alpha-beta with the saved model `linear_pst`."""
 
     def __init__(self, max_depth: int = 2):
-        super().__init__("MaterialBot", max_depth=max_depth)
+        super().__init__("MyModelBot", max_depth=max_depth)
 
-    def evaluate(self, state, player):
-        white_score = extract_material_features(state.get_board())["material_diff_normalized"]
-        score = white_score if player == chess.WHITE else 1.0 - white_score
-        return min(0.99, max(0.01, score))
+    def native_evaluator(self):
+        return load_evaluator("linear_pst")
 ```
 
-This bot works as it stands, but the core calls `evaluate` back from Python for every leaf, which
-is slow. To run an evaluation at full speed it must be written in Rust and returned by
-`native_evaluator()` (see "Running a model in Rust" below).
+The evaluation is written in Rust and runs inside the core (see "Running a model in Rust" below).
 
 Rules: the constructor must work without arguments; override `on_game_start` to reset per-game
 state and `get_info()` to describe the bot. Use `ChessBot` directly only if you do not want a tree
@@ -212,14 +206,14 @@ several positions, mate in one (`tests.conftest.MATE_IN_ONE`) and the board left
 
 | To add... | Implement | Guide |
 |---|---|---|
-| a bot | `evaluate()` in a subclass of `IterativeDeepeningBot` | the section above |
-| an evaluation model | a `LinearFeatures` (`chess_lab/models/linear_features.py`, plus its Rust version) and a `LinearEvalModel` (`models/linear_eval.py`), or any `EvaluationModel`; register it by name in `models/registry.py`; train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
+| a bot | `native_evaluator()` in a subclass of `IterativeDeepeningBot` | the section above |
+| an evaluation model | a `LinearFeatures` (`chess_lab/models/linear_features.py`, plus its Rust version) and a model class in `chess_lab/models/definitions.py` (added to `MODELS`); train and measure it with the commands of [Data and training](DATA_AND_TRAINING.md) and [Results](RESULTS.md) | [Models](MODELS.md) |
 | a search technique | a change in `rust/src/search/`, measured and documented like the others | [Algorithms](ALGORITHMS.md) |
 
 ### Running a model in Rust
 
 The search runs in Rust, so a model plays at full speed only if its features are computed there too.
-`models/native.py` hands the weights of a `LinearEvalModel` or a `NeuralEvalModel` to the core by the
+`models/loader.py` hands the saved weights of a model to the core by the
 **name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
 `king_bucket` and `pst_slotted`. A model with another feature set still plays: the core calls it back
 from Python for every leaf (a warning says so), which is much slower and cannot use

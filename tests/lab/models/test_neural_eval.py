@@ -10,10 +10,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models.native import model_evaluator
-from chess_engine.models.neural_eval import NeuralEvalModel, Nn4Model
-from chess_engine.models.registry import get_model_class
+from chess_engine.models import load_evaluator
 from chess_lab.models import fit_stream, new_model
+from chess_lab.models.definitions import NeuralEvalModel, Nn4Model, get_model_class
 from chess_lab.models.linear_features import features_of
 from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation
@@ -127,19 +126,17 @@ def test_core_rejects_a_mismatching_input_layer(tmp_path):
         arrays[f"W{index}"], arrays[f"b{index}"] = weights, bias
     with open(path, "wb") as handle:
         np.savez(handle, meta=np.array(json.dumps(meta)), **arrays)
-    model = get_model_class("net4_pst").load(path)
     with pytest.raises(ValueError, match="768"):
-        model_evaluator(model)
+        load_evaluator("net4_pst", path)
 
 
 def test_play_path_does_not_import_tensorflow(tmp_path):
     path = random_nn4(seed=7).save(tmp_path / "net4_pst.npz")
     script = (
         "import sys, chess\n"
-        "from chess_engine.models.registry import get_model_class\n"
-        "from chess_engine.models.native import model_evaluator\n"
-        f"model = get_model_class('net4_pst').load({str(path)!r})\n"
-        "score = model_evaluator(model).evaluate(chess.Board().fen(), True)\n"
+        "from chess_engine.models import load_evaluator\n"
+        f"evaluator = load_evaluator('net4_pst', {str(path)!r})\n"
+        "score = evaluator.evaluate(chess.Board().fen(), True)\n"
         "print(0.0 < score < 1.0, 'tensorflow' in sys.modules, 'keras' in sys.modules)\n"
     )
     result = subprocess.run(

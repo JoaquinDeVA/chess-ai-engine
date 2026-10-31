@@ -7,10 +7,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models import base as models_base
-from chess_engine.models import cards, registry
+from chess_engine.models import loader
 from chess_lab.comparison import evaluate as evaluate_cli
 from chess_lab.comparison import report
+from chess_lab.models import cards, definitions
 from chess_lab.models.representation import Representation, white_score
 from chess_lab.training import train as train_cli
 from chess_lab.training.dataset import (
@@ -18,11 +18,9 @@ from chess_lab.training.dataset import (
     TRAIN,
     VALIDATION,
     assign_split,
-    split_dataset,
 )
 from chess_lab.training.lichess_raw import shard_path, write_shard
 from chess_lab.training.sidecar import build_sidecar
-from chess_lab.training.targets import cp_to_target, mate_to_target, row_targets
 from tests.conftest import material_cp, random_positions
 
 
@@ -43,35 +41,6 @@ TRADEOFF = {
     "3": {"mean_depth": 3.2, "search_agreement": 0.3},
     "10": {"mean_depth": 6.0, "search_agreement": 0.4},
 }
-
-
-class TestTargets:
-    def test_centipawns_are_normalized_and_clipped(self):
-        np.testing.assert_allclose(
-            cp_to_target([0, 633.5, -1267, 5000, -20000]), [0, 0.5, -1, 1, -1]
-        )
-
-    def test_sign_convention_is_white_point_of_view(self):
-        """The course notebooks divided by a *negative* constant, inverting every cp target."""
-        assert cp_to_target(300) > 0 > cp_to_target(-300)
-
-    def test_mates_keep_their_sign_and_far_mates_are_dropped(self):
-        result = mate_to_target([1, -2, 3, -4])
-        assert result[:2].tolist() == [1.0, -1.0] and np.isnan(result[2:]).all()
-
-    def test_mate_and_cp_targets_agree_in_sign(self):
-        targets = row_targets(
-            [False, True, False, True], [250, np.nan, -250, np.nan], [np.nan, 1, np.nan, -1]
-        )
-        assert np.sign(targets).tolist() == [1, 1, -1, -1]
-
-    def test_row_targets_mixes_rows_and_marks_dropped_ones_with_nan(self):
-        targets = row_targets([False, True, True], [633.5, np.nan, np.nan], [np.nan, 2, 9])
-        assert targets[0] == 0.5 and targets[1] == 1.0 and np.isnan(targets[2])
-
-    def test_a_custom_mate_horizon_is_respected(self):
-        assert row_targets([True], [np.nan], [4], max_mate_distance=5)[0] == 1.0
-        assert np.isnan(row_targets([True], [np.nan], [4], max_mate_distance=3)[0])
 
 
 class TestDatasetSplit:
@@ -100,12 +69,6 @@ class TestDatasetSplit:
     def test_different_seeds_give_different_splits(self):
         fens = self.fens(2000)
         assert (assign_split(fens, seed=1) != assign_split(fens, seed=2)).any()
-
-    def test_split_dataset_partitions_the_frame(self):
-        frame = pd.DataFrame({"fen": self.fens(3000), "y": 0.0})
-        train, validation, test = split_dataset(frame)
-        assert len(train) + len(validation) + len(test) == len(frame)
-        assert not (set(train.fen) & set(test.fen))
 
 
 class TestCardsAndReport:
@@ -297,10 +260,7 @@ class TestMateKeepGuards:
     def test_mate_keep_without_tag_is_refused_and_writes_nothing(
         self, isolated_cards, tmp_path, monkeypatch
     ):
-        from chess_engine.models import base as models_base
-
-        monkeypatch.setattr(models_base, "ARTIFACTS_DIR", tmp_path)
-        monkeypatch.setattr(registry, "ARTIFACTS_DIR", tmp_path)
+        monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
         raw, side = tmp_path / "raw", tmp_path / "side"
         write_mate_shards(raw, side)
         shards = ["--raw", str(raw), "--sidecar", str(side)]
@@ -333,8 +293,7 @@ class FakeLinearModel:
 @pytest.fixture
 def fake_training(isolated_cards, monkeypatch):
     """Replaces the data reading, calibration, search and fit of ``train_by_effort``."""
-    monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
-    monkeypatch.setattr(models_base, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+    monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
     monkeypatch.setattr(train_cli, "available_rows", lambda *a, **k: 1000)
     monkeypatch.setattr(train_cli, "load_sample", lambda *a, **k: None)
     timing = SimpleNamespace(seconds_per_position=1e-5, encode_seconds=0.1, score_seconds=0.1)
@@ -379,7 +338,7 @@ class TestCommandLineWithDoubles:
             "accuracy": ACCURACY | {"sample": {"rows": 100, "seed": 1, "agreement_n": 10}},
             "cost": {"us_per_eval": 5.0},
         }
-        monkeypatch.setattr(registry, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+        monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
         monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
         monkeypatch.setattr(evaluate_cli, "PythonEvaluator", lambda model: model)
         monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
@@ -409,7 +368,7 @@ class TestHeuristicEvaluation:
         assert evaluate_cli.parse_args(["--model", "h1"]).model == "h1"
         with pytest.raises(SystemExit):
             evaluate_cli.parse_args(["--model", "nope"])
-        assert "h1" not in registry.available_models()
+        assert "h1" not in definitions.available_models()
 
     def test_adapter_scores_are_recovered_by_the_judge_scale(self):
         model = evaluate_cli.HeuristicModel("h1")

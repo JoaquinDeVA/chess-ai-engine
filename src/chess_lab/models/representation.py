@@ -13,14 +13,11 @@ import chess
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.base import CP_SCALE
-
+from .definitions import CP_SCALE
 from .spec import DEFAULT_MATE_KEEP, mates_suffix
 
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
 LICHESS_K = 0.00368208
-#: Centipawns at which the linear scale saturates.
-CP_LINEAR_SCALE = CP_SCALE
 
 _SCALES = ("winprob", "cp_linear")
 _PERSPECTIVES = ("white", "side_to_move")
@@ -109,7 +106,7 @@ def white_score(cp: np.ndarray, mate: np.ndarray, rep: Representation) -> np.nda
     if rep.scale == "winprob":
         score = 1.0 / (1.0 + np.exp(-rep.k * safe_cp))
     else:
-        score = 0.5 + 0.5 * np.clip(safe_cp / CP_LINEAR_SCALE, -1.0, 1.0)
+        score = 0.5 + 0.5 * np.clip(safe_cp / CP_SCALE, -1.0, 1.0)
     return np.where(is_mate, (mate > 0).astype(np.float64), score)
 
 
@@ -141,7 +138,7 @@ def score_to_cp(score: float | np.ndarray, rep: Representation) -> float | np.nd
     s = np.clip(score, _SCORE_EPS, 1.0 - _SCORE_EPS)
     if rep.scale == "winprob":
         return np.log(s / (1.0 - s)) / rep.k
-    return (2.0 * s - 1.0) * CP_LINEAR_SCALE
+    return (2.0 * s - 1.0) * CP_SCALE
 
 
 def is_quiet(board: chess.Board, best_move: str | None) -> bool:

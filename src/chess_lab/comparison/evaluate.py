@@ -17,10 +17,9 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import chess
 import numpy as np
 
-import chess_engine.models  # noqa: F401  (registers the built-in models)
-from chess_engine.models.cards import current_commit, load_card, today, update_card
-from chess_engine.models.native import h1_evaluator, load_h1_weights
-from chess_engine.models.registry import artifact_path, available_models, load_model, split_spec
+from chess_engine.models import artifact_path, h1_evaluator, load_h1_weights, split_spec
+from chess_lab.models.cards import current_commit, load_card, today, update_card
+from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation, score_to_cp
 from chess_lab.models.spec import SAMPLE_SEED

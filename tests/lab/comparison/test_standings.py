@@ -85,8 +85,8 @@ def test_size_for_budget():
 
 
 def test_record_cards_writes_tournament_sections_shown_by_the_history(tmp_path, monkeypatch):
-    from chess_engine.models import cards
     from chess_lab.comparison import report
+    from chess_lab.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     cards.update_card("m", status="current", architecture="A")
@@ -137,7 +137,7 @@ def test_control_label_rule():
 
 
 def test_record_cards_keeps_one_entry_per_control(tmp_path, monkeypatch):
-    from chess_engine.models import cards
+    from chess_lab.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     cards.update_card("m", status="current")
@@ -152,7 +152,7 @@ def test_record_cards_keeps_one_entry_per_control(tmp_path, monkeypatch):
 
 
 def test_record_cards_migrates_an_old_flat_section(tmp_path, monkeypatch):
-    from chess_engine.models import cards
+    from chess_lab.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     flat = {"games": 8, "score": 55.0, "elo": 10.0, "elo_interval": 5.0,
@@ -165,7 +165,7 @@ def test_record_cards_migrates_an_old_flat_section(tmp_path, monkeypatch):
 
 
 def test_record_cards_records_h1_only_when_its_card_exists(tmp_path, monkeypatch):
-    from chess_engine.models import cards
+    from chess_lab.models import cards
 
     monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
     cards.update_card("m", status="current")

@@ -8,15 +8,13 @@ from typing import Any, Dict, Iterable, Optional
 
 import pandas as pd
 
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.neural_eval import NeuralEvalModel
-
 from . import linear_eval, neural_eval
+from .definitions import NeuralEvalModel, SparseModel
 from .python_eval import PythonEvaluator  # noqa: F401
 from .representation import Representation
 
 
-def new_model(model_class: type, rep: Optional[Representation] = None) -> LinearEvalModel:
+def new_model(model_class: type, rep: Optional[Representation] = None) -> SparseModel:
     """An untrained model of a class: zero weights for a linear one, random for a network.
 
     :param model_class: A concrete model class, e.g. ``get_model_class("linear_pst")``.
@@ -29,7 +27,7 @@ def new_model(model_class: type, rep: Optional[Representation] = None) -> Linear
 
 
 def fit_stream(
-    model: LinearEvalModel,
+    model: SparseModel,
     batches: Iterable[pd.DataFrame],
     validation: pd.DataFrame,
     config: Dict[str, Any],

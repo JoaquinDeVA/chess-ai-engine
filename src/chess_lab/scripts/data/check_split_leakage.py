@@ -30,14 +30,10 @@ import chess
 import numpy as np
 import pyarrow.parquet as pq
 
+from chess_engine.knowledge.opening_book import position_key
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}
-
-
-def position_key(board: chess.Board) -> str:
-    """First four FEN fields: the key of the raw shards."""
-    return " ".join(board.fen().split()[:4])
 
 
 def load_index(raw_dir: Path, sidecar_dir: Path) -> Tuple[np.ndarray, np.ndarray]:
@@ -162,8 +158,8 @@ def stratified_accuracy(
     :param flags: Which rows of the sample have a child in train.
     :return: ``{model: {"with neighbour": metrics, "without neighbour": metrics}}``.
     """
-    from chess_engine.models import load_model
     from chess_lab.comparison.judge import judge
+    from chess_lab.models.definitions import load_model
     from chess_lab.models.python_eval import PythonEvaluator
 
     result = {}

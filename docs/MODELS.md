@@ -101,7 +101,7 @@ A position activates at most 32 inputs (one per piece). The first layer, the acc
 
 ## The hand-written heuristic (`h1`)
 
-`h1` is not a trained model with a model file, and it is not in the model registry. It is a classical evaluation function written by hand: six readable features, each normalised to the range 0 to 1 where 0.5 means "equal", combined with a weighted sum. Its code is in `rust/src/eval/h1.rs`.
+`h1` is not a trained model with a model file, and it is not one of the models in `chess_lab/models/definitions.py`. It is a classical evaluation function written by hand: six readable features, each normalised to the range 0 to 1 where 0.5 means "equal", combined with a weighted sum. Its code is in `rust/src/eval/h1.rs`.
 
 | | |
 |---|---|

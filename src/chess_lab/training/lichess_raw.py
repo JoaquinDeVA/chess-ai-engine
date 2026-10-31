@@ -6,7 +6,6 @@ recorded in the metadata of every Parquet file under the ``perspective`` key.
 """
 
 import json
-from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -102,16 +101,6 @@ def parse_chunk(lines: list[str]) -> tuple[pa.Table, int, int]:
         else:
             illegal += 1
     return to_table(records), unusable, illegal
-
-
-def parse_lines(lines: Iterable[str]) -> Iterator[dict[str, Any] | None]:
-    """Parse every line; unusable ones yield None so the caller can count them.
-
-    :param lines: Lines of the database.
-    :return: One record or None per line.
-    """
-    for line in lines:
-        yield parse_raw_record(line)
 
 
 def to_table(records: list[dict[str, Any]]) -> pa.Table:

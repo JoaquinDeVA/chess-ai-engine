@@ -31,13 +31,13 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.cards import card_path, current_commit, today, update_card
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.registry import artifact_path, get_model_class
+from chess_engine.models import artifact_path
 from chess_lab.comparison.judge import judge
 from chess_lab.comparison.standings import record_cards, summarize
 from chess_lab.comparison.tournament import paired_openings, read_games, run_round_robin
 from chess_lab.models import fit_stream, new_model
+from chess_lab.models.cards import card_path, current_commit, today, update_card
+from chess_lab.models.definitions import LinearEvalModel, get_model_class
 from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG
 from chess_lab.models.representation import Representation
 from chess_lab.models.spec import SAMPLE_SEED

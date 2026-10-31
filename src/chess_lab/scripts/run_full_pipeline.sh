@@ -48,7 +48,7 @@ if [ -z "${PYTHON:-}" ]; then
 fi
 
 ARTIFACTS=src/chess_engine/models/artifacts
-CARDS=src/chess_engine/models/cards
+CARDS=src/chess_lab/models/cards
 
 log() { echo "=== $*"; }
 
@@ -58,7 +58,7 @@ run() {
 }
 
 registered() {
-  "$PYTHON" -c "import sys; from chess_engine.models import available_models as a; sys.exit(0 if '$1' in a() else 1)" 2>/dev/null
+  "$PYTHON" -c "import sys; from chess_lab.models.definitions import available_models as a; sys.exit(0 if '$1' in a() else 1)" 2>/dev/null
 }
 
 # Models of MODELS that are registered and (outside a dry run) have a trained artifact.

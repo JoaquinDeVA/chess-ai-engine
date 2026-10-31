@@ -13,7 +13,7 @@ import os
 import statistics
 import time
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import chess
 import pandas as pd
@@ -22,10 +22,10 @@ from chess_engine import _core
 from chess_engine.bots._search_bots import IterativeDeepeningBot
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
-from chess_engine.models import EvaluationModel, get_model_class
-from chess_engine.models.cards import card_path, update_card
-from chess_engine.models.registry import split_spec
+from chess_engine.models import split_spec
 from chess_engine.search.time_management import TimeManager
+from chess_lab.models.cards import card_path, update_card
+from chess_lab.models.definitions import get_model_class
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def split_techniques(spec: str) -> Tuple[str, Tuple[str, ...]]:
 
 
 def make_player(
-    spec: Union[str, EvaluationModel],
+    spec: str,
     time_manager: TimeManager,
     max_depth: int = 30,
     **search_options: Any,
@@ -79,8 +79,7 @@ def make_player(
     """Build an iterative-deepening player for measurements: no opening book and no tablebases.
 
     :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
-        name or ``name@tag`` (its player is named after the spec), or an :class:`EvaluationModel`
-        instance. A ``+`` suffix switches techniques of selective search on (``linear_pst+pvs,lmr``
+        name or ``name@tag`` (its player is named after the spec). A ``+`` suffix switches techniques of selective search on (``linear_pst+pvs,lmr``
         or ``linear_pst+all``); without it the player uses the reference search, so that measurements
         compare evaluations alone.
     :param time_manager: Time budgeting policy.
@@ -92,20 +91,19 @@ def make_player(
     search_options = {"opening_book": None, "tablebase": None, **search_options}
     label = spec
     techniques: Tuple[str, ...] = ()  # the reference search, unless the spec asks for techniques
-    if isinstance(spec, str) and "+" in spec:
+    if "+" in spec:
         spec, techniques = split_techniques(spec)
     search_options.setdefault("techniques", techniques)
-    if isinstance(spec, str) and spec in HEURISTICS:
+    if spec in HEURISTICS:
         return IterativeHeuristicBot(
             max_depth=max_depth,
             time_manager=time_manager,
             **search_options,
         )
-    name = label if isinstance(spec, str) else type(spec).name
     return IterativeModelBookBot(
         model=spec,
         max_depth=max_depth,
-        name=name,
+        name=label,
         time_manager=time_manager,
         **search_options,
     )
@@ -130,9 +128,7 @@ def _summary(rows: List[Tuple[int, int, float, Optional[bool]]]) -> Dict[str, fl
     }
 
 
-def profile(
-    spec: Union[str, EvaluationModel], positions: pd.DataFrame, seconds: float
-) -> Dict[str, object]:
+def profile(spec: str, positions: pd.DataFrame, seconds: float) -> Dict[str, object]:
     """Search every position for ``seconds`` and report depth, speed and agreement.
 
     :param spec: Player specification, see :func:`make_player`.

@@ -8,10 +8,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.native import model_evaluator
-from chess_engine.models.registry import available_models, get_model_class
+from chess_engine.models import load_evaluator
 from chess_lab.models import fit_stream, linear_eval, new_model
+from chess_lab.models.definitions import LinearEvalModel, available_models, get_model_class
 from chess_lab.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
@@ -159,13 +158,6 @@ def test_workers_give_the_same_weights_as_one_worker():
     assert env_after == env_before
 
 
-def test_base_class_refuses_save_and_load(tmp_path):
-    with pytest.raises(TypeError, match="defines no feature set"):
-        LinearEvalModel(weights=np.zeros(1)).save(tmp_path / "base.npz")
-    with pytest.raises(TypeError, match="defines no feature set"):
-        LinearEvalModel.load(tmp_path / "missing.npz")
-
-
 def test_core_rejects_weights_of_the_wrong_size(tmp_path):
     path = tmp_path / "wrong.npz"
     meta = {"features": "linear_pst", "rep": Representation().to_dict()}
@@ -176,9 +168,8 @@ def test_core_rejects_weights_of_the_wrong_size(tmp_path):
             bias=np.float64(0.0),
             meta=np.array(json.dumps(meta)),
         )
-    model = get_model_class("linear_pst").load(path)
     with pytest.raises(ValueError, match="768"):
-        model_evaluator(model)
+        load_evaluator("linear_pst", path)
 
 
 MATERIAL_BOARD = "4k3/8/8/8/8/8/PPB5/R3K3 w - - 0 1"  # white: 2 pawns, 1 bishop, 1 rook

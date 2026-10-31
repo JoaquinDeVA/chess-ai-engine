@@ -26,15 +26,12 @@ import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from chess_engine.knowledge.opening_book import position_key
+
 #: Score of a forced mate, minus the moves it takes (a faster mate is worth more).
 MATE_SCORE = 100_000.0
 
 Lookup = Callable[[str], Optional[float]]
-
-
-def position_key(board: chess.Board) -> str:
-    """First four FEN fields: the key of the raw shards and of the book."""
-    return " ".join(board.fen().split()[:4])
 
 
 def white_scores(cp: np.ndarray, mate: np.ndarray) -> np.ndarray:

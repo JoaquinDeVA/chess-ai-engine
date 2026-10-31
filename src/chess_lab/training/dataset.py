@@ -1,7 +1,6 @@
 """Splitting and encoding of the Stockfish evaluation dataset."""
 
 import zlib
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -44,21 +43,3 @@ def assign_split(
     split[buckets < validation_limit] = VALIDATION
     split[buckets < test_limit] = TEST
     return split
-
-
-def split_dataset(
-    frame: pd.DataFrame,
-    test_fraction: float = DEFAULT_TEST_FRACTION,
-    validation_fraction: float = DEFAULT_VALIDATION_FRACTION,
-    seed: int = SPLIT_SEED,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Split a dataset into train, validation and test frames (see :func:`assign_split`).
-
-    :param frame: DataFrame with a ``fen`` column.
-    :param test_fraction: Share of positions in the test split.
-    :param validation_fraction: Share of positions in the validation split.
-    :param seed: Salt of the hash.
-    :return: ``(train, validation, test)``.
-    """
-    split = assign_split(frame["fen"], test_fraction, validation_fraction, seed)
-    return frame[split == TRAIN], frame[split == VALIDATION], frame[split == TEST]

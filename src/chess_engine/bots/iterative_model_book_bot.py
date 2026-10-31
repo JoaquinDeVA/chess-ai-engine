@@ -4,8 +4,7 @@ from typing import Any, Optional, Union
 
 from chess_engine.bots._search_bots import AUTHOR, SHIPPED, IterativeDeepeningBot
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.models import EvaluationModel, load_model
-from chess_engine.models.native import model_evaluator
+from chess_engine.models import load_evaluator
 from chess_engine.search.time_management import TimeManager
 
 #: Model used when none is given: the best player in the tournaments (see docs/RESULTS.md), shipped with the repository.
@@ -18,7 +17,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
     Once the game leaves the book it never consults it again. The search is the clock-aware
     iterative deepening of :class:`IterativeDeepeningBot` with the learned evaluation.
 
-    :param model: Registered model name, or an already loaded :class:`EvaluationModel`.
+    :param model: Model name, or ``name@tag`` for a tagged artifact.
     :param opening_book: Book to use; the one shipped in ``data/`` by default (an empty book
         if that file is missing); ``None`` switches it off.
     :param max_depth: Deepest iteration to run; ``None`` (default) lets the time decide.
@@ -31,7 +30,7 @@ class IterativeModelBookBot(IterativeDeepeningBot):
 
     def __init__(
         self,
-        model: Union[str, EvaluationModel] = DEFAULT_MODEL,
+        model: str = DEFAULT_MODEL,
         opening_book: Union[OpeningBook, None, str] = SHIPPED,
         max_depth: Optional[int] = None,
         name: str = "IterativeModelBookBot",
@@ -41,14 +40,15 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         super().__init__(
             name, AUTHOR, max_depth, time_manager, opening_book=opening_book, **search_options
         )
-        self.ml_model = load_model(model) if isinstance(model, str) else model
+        self.model = model
+        self._evaluator = load_evaluator(model)
 
     def native_evaluator(self):
         """The evaluation the core runs: the model itself.
 
         :return: Evaluator for the model.
         """
-        return model_evaluator(self.ml_model)
+        return self._evaluator
 
     def get_info(self):
         """Describe the bot.
@@ -57,10 +57,8 @@ class IterativeModelBookBot(IterativeDeepeningBot):
         """
         info = super().get_info()
         info.update(
-            description=(
-                f"Opening book + iterative deepening evaluated by model '{self.ml_model.name}'"
-            ),
-            model=self.ml_model.name,
+            description=(f"Opening book + iterative deepening evaluated by model '{self.model}'"),
+            model=self.model,
             book_positions=len(self.opening_book) if self.opening_book is not None else 0,
             max_depth=self.max_depth,
         )

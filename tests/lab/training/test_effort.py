@@ -6,7 +6,7 @@ import chess
 import pandas as pd
 import pytest
 
-from chess_engine.models.linear_eval import PstTaperedModel
+from chess_lab.models.definitions import PstTaperedModel
 from chess_lab.models.representation import Representation
 from chess_lab.training import effort
 from chess_lab.training.dataset import TRAIN, VALIDATION, assign_split

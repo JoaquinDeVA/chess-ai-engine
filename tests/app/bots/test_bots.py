@@ -1,17 +1,16 @@
 """Behaviour of every bot: legality, tactics, time handling and the regressions B1-B16."""
 
+import shutil
 import time
 
 import chess
-import numpy as np
 import pytest
 
 from chess_engine.bots._search_bots import MAX_DEPTH, IterativeDeepeningBot, fallback_move
 from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
 from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.models.native import h1_evaluator, model_evaluator
-from chess_engine.models.registry import get_model_class
+from chess_engine.models import h1_evaluator, load_evaluator, loader
 from chess_engine.search.time_management import TimeManager
 from tests.conftest import MATE_IN_ONE
 
@@ -147,7 +146,7 @@ class TestIterativeDeepening:
 class TestMLBots:
     def test_evaluator_scale_uses_the_whole_interval(self, material_model):
         """Regression B10: centipawns were divided by 20000, squeezing evaluations into 0.47-0.53."""
-        evaluator = model_evaluator(material_model)
+        evaluator = load_evaluator(material_model)
         up_a_queen = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         white, black = evaluator.evaluate(up_a_queen, True), evaluator.evaluate(up_a_queen, False)
         assert white > 0.7 and black < 0.3
@@ -198,9 +197,8 @@ class TestMLBots:
         assert bot.get_info()["book_positions"] == 0
 
     def test_models_can_be_selected_by_name(self, tmp_path, monkeypatch):
-        model_class = get_model_class("linear_material")
-        saved = model_class(weights=np.zeros(5)).save(tmp_path / "linear_material.npz")
-        monkeypatch.setattr(model_class, "default_path", classmethod(lambda cls: saved))
+        shutil.copy(loader.artifact_path("linear_material"), tmp_path / "linear_material.npz")
+        monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
         bot = IterativeModelBookBot(model="linear_material", max_depth=1)
         assert bot.get_info()["model"] == "linear_material"
 

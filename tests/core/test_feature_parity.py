@@ -5,8 +5,6 @@ import numpy as np
 import pytest
 
 from chess_engine import _core
-from chess_engine.models.linear_eval import LinearEvalModel
-from chess_engine.models.native import model_evaluator
 from chess_lab.models.linear_features import FEATURE_SETS
 from tests.paths import POSITIONS
 
@@ -37,12 +35,3 @@ def test_rust_features_equal_python_features(name, perspective):
         got = evaluator.features(fen)
         assert list(got[0]) == list(expected[0]), fen
         assert got[1] == pytest.approx(expected[1], abs=1e-12), fen
-
-
-def test_a_feature_set_without_rust_version_is_rejected():
-    class UnportedModel(LinearEvalModel):
-        feature_set = "unported_test_features"
-        name = "unported_test"
-
-    with pytest.raises(ValueError, match="no Rust evaluation"):
-        model_evaluator(UnportedModel(weights=np.zeros(1)))

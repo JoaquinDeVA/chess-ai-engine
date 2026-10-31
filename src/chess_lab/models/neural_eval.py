@@ -14,8 +14,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.neural_eval import Layer, NeuralEvalModel
-
+from .definitions import Layer, NeuralEvalModel
 from .linear_eval import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,

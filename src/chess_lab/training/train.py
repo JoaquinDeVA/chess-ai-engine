@@ -12,13 +12,9 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-import chess_engine.models  # noqa: F401  (registers the built-in models)
-from chess_engine.models.cards import clear_measurements, current_commit, today, update_card
-from chess_engine.models.registry import (
-    artifact_path,
-    available_models,
-    get_model_class,
-)
+from chess_engine.models import artifact_path
+from chess_lab.models.cards import clear_measurements, current_commit, today, update_card
+from chess_lab.models.definitions import available_models, get_model_class
 from chess_lab.models.representation import Representation
 from chess_lab.models.spec import DEFAULT_MATE_KEEP, SAMPLE_SEED
 

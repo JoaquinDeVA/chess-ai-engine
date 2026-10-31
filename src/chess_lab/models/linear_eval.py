@@ -20,8 +20,7 @@ import chess
 import numpy as np
 import pandas as pd
 
-from chess_engine.models.linear_eval import LinearEvalModel
-
+from .definitions import LinearEvalModel
 from .linear_features import LinearFeatures, features_of
 from .representation import Representation, target
 

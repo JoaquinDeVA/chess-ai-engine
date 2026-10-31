@@ -3,7 +3,7 @@
 from typing import Any, Optional
 
 from chess_engine.bots._search_bots import AUTHOR, IterativeDeepeningBot
-from chess_engine.models.native import h1_evaluator
+from chess_engine.models import h1_evaluator
 from chess_engine.search.time_management import TimeManager
 
 

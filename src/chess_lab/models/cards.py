@@ -1,6 +1,6 @@
 """Model cards: small JSON files with everything known about a model.
 
-Cards live in ``models/cards/<name>.json``. ``training.train`` and ``comparison.evaluate`` fill
+Cards live in ``chess_lab/models/cards/<name>.json``. ``chess_lab.training.train`` and ``comparison.evaluate`` fill
 them in; ``comparison.report`` renders them into ``RESULTS.md``.
 """
 
@@ -10,7 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List
 
-CARDS_DIR = Path(__file__).resolve().parent.parent / "models" / "cards"
+CARDS_DIR = Path(__file__).resolve().parent / "cards"
 #: Card sections that hold measurements of one particular trained model.
 MEASUREMENT_SECTIONS = ("training", "accuracy", "cost", "tradeoff", "tournament")
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -20,7 +20,7 @@ def card_path(name: str) -> Path:
     """Path of the card of model ``name``.
 
     :param name: Model name.
-    :return: ``models/cards/<name>.json``.
+    :return: ``chess_lab/models/cards/<name>.json``.
     """
     return CARDS_DIR / f"{name}.json"
 

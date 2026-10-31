@@ -2,42 +2,17 @@
 Data classes for the chess engine.
 
 This module contains all the data structures used throughout the chess engine
-(tournament configuration, game and tournament results, PGN export).
+(game results, PGN export).
 
 Based on the AI course framework (Inteligencia Artificial e Ingeniería del Conocimiento,
 CEU San Pablo University).
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import chess
 import chess.pgn
-
-
-@dataclass
-class TournamentConfig:
-    """
-    Tournament configuration settings.
-
-    :param total_game_time: Total time per player in seconds
-    :type total_game_time: float
-    :param time_increment: Time increment per move in seconds
-    :type time_increment: float
-    :param rounds: Number of tournament rounds
-    :type rounds: int
-    :param scoring: Scoring system dictionary
-    :type scoring: Dict[str, float]
-    """
-
-    total_game_time: float
-    time_increment: float
-    rounds: int
-    scoring: Dict[str, float] = None
-
-    def __post_init__(self):
-        if self.scoring is None:
-            self.scoring = {"win": 1.0, "draw": 0.5, "loss": 0.0}
 
 
 @dataclass

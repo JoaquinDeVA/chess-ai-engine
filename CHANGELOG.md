@@ -7,6 +7,9 @@ All notable changes. The newest are first.
 ### Added
 - **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (evaluation, depth, time per move, opening book, tablebases, search techniques, quiescence, threads). See [The window](docs/GUI.md).
 
+### Removed
+- `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
+
 ### Changed
 - The laboratory is its own package, `chess_lab` (`src/chess_lab/`): `training/`, `comparison/` and the former top-level `scripts/` left `chess_engine`. Commands change from `python -m chess_engine.training.train` and `chess_engine.comparison.*` to `python -m chess_lab.training.train` and `chess_lab.comparison.*`, and scripts from `scripts/...` to `src/chess_lab/scripts/...`. `representation.py` and `spec.py` moved to `chess_engine.models`, so the application no longer imports the laboratory.
 - The tournament script moved from `scripts/bench/play_tournament.py` to `chess_lab.comparison.play_tournament`; it takes the same options and runs with `python -m chess_lab.comparison.play_tournament`.

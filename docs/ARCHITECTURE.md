@@ -36,7 +36,7 @@ Dependencies, as the imports stand:
 - `models/` imports `evaluation/` (`evaluator.py`, `native.py`, for `ChessGameState`). It holds `representation.py` and `spec.py` (target scale and shared defaults), which both the models and the training need.
 - `chess_lab/training/` imports `models/` (the base class, the registry, the cards and the model classes it fits). `models/` imports nothing from `chess_lab`.
 - `bots/` imports `search/`, `evaluation/`, `models/` and `knowledge/`.
-- `engine/` imports `bots/` and `config/`; `config/` imports the data classes of `engine/`.
+- `engine/` imports `bots/`.
 - `gui/` imports `bots/`, `models/`, `search/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
 - `chess_lab/comparison/` is the top layer: it imports `bots/`, `search/`, `models/`, `chess_lab/training/`, `evaluation/`, `knowledge/` and `engine/`. Nothing else imports it.
 
@@ -57,7 +57,7 @@ Dependencies, as the imports stand:
 | `chess_lab/comparison/` | `play_tournament.py` (entry point of the tournaments), `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `tradeoff.py` (depth against accuracy at a fixed time per move), `standings.py` (Elo, summaries and model cards of a tournament), `tournament.py` (round-robin at equal time, resumable records), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
 | `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings → bot options; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
-| `engine/`, `config/` | Game loop with clocks, results and PGN export for the tournaments; tournament presets |
+| `engine/` | Game loop with clocks, results and PGN export for the tournaments |
 
 Tournaments run with `python -m chess_lab.comparison.play_tournament`. `src/chess_lab/scripts/data/` builds the data (`build_raw_shards.py`, `build_sidecars.py`,
 `fit_h1_weights.py`, `build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`),

@@ -524,7 +524,7 @@ FEATURE_SETS: Dict[str, LinearFeatures] = {
 def features_of(model: object) -> LinearFeatures:
     """Python feature set of a saved model, or of its class.
 
-    :param model: A :class:`~chess_engine.models.linear_eval.LinearEvalModel` or its class.
+    :param model: A saved linear model or its class.
     :return: The feature set named by its ``feature_set``.
     :raises TypeError: If it is the abstract base, which defines no feature set.
     :raises KeyError: If the name has no Python version.

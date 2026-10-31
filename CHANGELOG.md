@@ -8,6 +8,9 @@ All notable changes. The newest are first.
 - **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (evaluation, depth, time per move, opening book, tablebases, search techniques, quiescence, threads). See [The window](docs/GUI.md).
 
 ### Changed
+- One bot, `chess_engine.bots.SearchBot`, replaces the bot registry and the three bot classes; its evaluation is a spec (`name`, `name@tag` or `h1`, optionally `+tech1,tech2` or `+all`). `chess_engine.engine` is now `chess_engine.game` (`play_game`, `GameResult`) and `chess_engine.search` was folded into `chess_engine.bots`. `_core.ESTIMATOR_NAMES` is now `_core.ESTIMATORS`.
+- `chess_lab.comparison` was split: `python -m chess_lab.measure.{report,evaluate}` (model measures) and `python -m chess_lab.tournaments.play_tournament`; the players shared by the scripts live in `chess_lab.players`.
+- Dependencies: `numpy` is a base dependency; `joblib` and `pytest-cov` were dropped.
 - Search depth is decided by the clock: the bots no longer default to `max_depth=3` and `min_depth` is 1 (was 3); `max_depth` is an optional explicit limit (`None` = no limit, technical cap `MAX_DEPTH` = 30). In the window, "Maximum depth" 0 means no limit.
 
 ### Removed

@@ -1,7 +1,6 @@
 """Training of the linear models: encoding, Adam fit and the epoch loop shared with the network.
 
-The saved model is a :class:`chess_engine.models.linear_eval.LinearEvalModel` (weights and feature
-set name); the Python feature extractors, the targets and the fit live here.
+The saved model holds the weights and the feature set name; the Python feature extractors, the targets and the fit live here.
 """
 
 import functools

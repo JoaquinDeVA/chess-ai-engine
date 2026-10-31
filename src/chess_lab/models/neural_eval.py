@@ -3,7 +3,7 @@
 The first weight layer is the accumulator: the rows of the active features are summed, and the
 sum is clipped to ``[0, 1]``. The remaining hidden layers use ReLU and the output is linear.
 Keras (imported lazily by :func:`fit_stream`) trains the network and its weights are exported
-to NumPy arrays, which are what :class:`chess_engine.models.neural_eval.NeuralEvalModel` saves.
+to NumPy arrays, which are what the saved model stores.
 """
 
 import math

@@ -6,43 +6,58 @@
 >
 > **Next:** [Several threads (Lazy SMP)](lazy-smp.md)
 
-**Problem.** In Python the search visited 3,000 to 12,000 nodes per second, so in the 3 to 10
-seconds a move gets it reached depth 4 or 5, far from the depths where a chess engine plays well.
-The time went into the interpreter, the board of python-chess and the evaluations, not into the
-algorithm.
+## Problem
 
-**What it does.** The same search, in Rust: the rules of the game, the evaluations the search calls
-(`h1`, the four logistic models and the sparse network), the alpha-beta with all the techniques
-above, the opening book and the endgame tables. Python keeps the game loop, the bots' interface, the
-training and the measurement tools, and calls the core once per move with the position, the
-evaluation and the time limits.
+In Python the search visited 3,000 to 12,000 nodes per second, so in the 3 to 10 seconds a move gets it reached
+depth 4 or 5, far from the depths where a chess engine plays well. The time went into the interpreter, the
+python-chess board and the evaluations, not into the algorithm.
 
-**How it is implemented.** The crate in `rust/` is built as the Python module `chess_engine._core`
-(PyO3 and `maturin`) on top of `shakmaty` for the rules. Nothing changed in the algorithm: the Rust
-core reproduced the Python engine node for node when it replaced it (checked then against files the Python engine
-produced; they were removed afterwards and live in git history). Today `rust/tests/rules.rs` (perft, end of game) and
-`rust/tests/knowledge.rs` check the rules, the book and the tables. The legal moves are listed in the order python-chess generates them
-(`generation_order`), so that moves of equal value are chosen as before. Replaying the 21,203 moves
-of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with
-the same number of nodes; the 11 others differ in the last decimal of a value. This was checked once, when the core replaced
-the Python engine, against game records that no longer exist (no command reproduces the figure today).
+## Idea
 
-**Measured effect.** Measured with `python (removed) scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
-(200 test positions, seed 42, a fresh table per position, five processes of one thread each, books
-and tables off), once with the Python engine (commit `148b86d`) and once with the core. Time to search
-every position to depth 4, in seconds per move:
+Keep the algorithm and change the language: the same search, node for node, in a compiled language, so that every
+earlier measurement of nodes and moves still holds and only the time per node changes.
+
+## How it works
+
+The crate in `rust/` holds the rules (on top of `shakmaty`), the evaluations the search calls (`h1`, the logistic
+models and the network), the alpha-beta with its techniques, the opening book and the endgame tables. It is built as
+two products: the Python module `chess_engine._core` (PyO3, `maturin`) for the laboratory and the tests, and the UCI
+binary `rust/target/release/uci` that the window and fastchess play.
+
+To keep the results identical, the legal moves are listed in the order python-chess generated them
+(`generation_order` in `rust/src/board.rs`), so moves of equal value are chosen as before.
+
+**Worked example.** The same position, `linear_pst_terms`, depth 4 (means of the table below): Python visits the
+same nodes as Rust and returns the same move, in 3.429 s against 0.139 s. With a 10 s budget the Python engine
+finished depth 4 and part of 5 (mean 4.62); the Rust core finishes 7 (mean 7.13).
+
+## Implementation
+
+`rust/src/lib.rs` (crate), `rust/src/py.rs` (Python bindings), `rust/src/bin/uci.rs` (UCI binary). Rules, book and
+tables are tested in `rust/tests/rules.rs` (perft, end of game) and `rust/tests/knowledge.rs`; the techniques in
+`rust/tests/techniques.rs`. Build: `pip install -e ".[dev]"` (module) and
+`cargo build --release --manifest-path rust/Cargo.toml --bin uci` (binary).
+
+## Measured effect
+
+**Same results.** Replaying the 21,203 moves of the 200 recorded games of the depth-3 tournament, the core played
+21,192 (99.95 %) with the same number of nodes; the 11 others differ in the last decimal of a value. Checked once,
+when the core replaced the Python engine, against records that no longer exist (no command reproduces it today).
+
+**Speed.** `scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4` (removed in
+`6162db8`; in the git history), 200 test positions, seed 42, a fresh table per position, one thread, books and
+tables off; Python at commit `148b86d`. Seconds per move to depth 4:
 
 | player | Python | Rust | times faster |
 |---|---|---|---|
-| Heuristic (`h1`) | 7.995 | 0.226 | 35.4 |
-| Position-terms logistic model (`linear_pst_terms`) | 3.429 | 0.139 | 24.7 |
-| Piece-square logistic model (`linear_pst`) | 2.279 | 0.110 | 20.6 |
-| Material logistic model (`linear_material`) | 1.335 | 0.076 | 17.6 |
-| King-bucket logistic model (`linear_king_bucket`) | 1.990 | 0.120 | 16.6 |
-| Four-layer piece-square network (`net4_pst`) | 2.266 | 0.286 | 7.9 |
+| `h1` | 7.995 | 0.226 | 35.4 |
+| `linear_pst_terms` | 3.429 | 0.139 | 24.7 |
+| `linear_pst` | 2.279 | 0.110 | 20.6 |
+| `linear_material` | 1.335 | 0.076 | 17.6 |
+| `linear_king_bucket` | 1.990 | 0.120 | 16.6 |
+| `net4_pst` | 2.266 | 0.286 | 7.9 |
 
-Mean depth completed in a time budget per move (the clock decides; the estimator stops an iteration
-that will not fit, so a move uses 50 to 80 % of the budget):
+Mean depth completed per move in a time budget:
 
 | player | 1 s: Python → Rust | 3 s: Python → Rust | 10 s: Python → Rust |
 |---|---|---|---|
@@ -53,9 +68,9 @@ that will not fit, so a move uses 50 to 80 % of the budget):
 | `linear_king_bucket` | 3.50 → 5.63 | 4.23 → 6.36 | 5.04 → 7.51 |
 | `net4_pst` | 3.35 → 4.80 | 4.04 → 5.61 | 4.85 → 6.82 |
 
-In 10 seconds the core searches 2.0 to 2.8 plies deeper. A 200-game round robin at a fixed depth of 3
-took 56 s (it took hours in Python). The network gains least because it still adds the 768 inputs
-to its first layer at every leaf; an accumulator updated move by move, as NNUE does, would remove
-that and has not been written.
+In 10 s the core searches 2.0 to 2.8 plies deeper. The network gained least because at the time it recomputed its
+first layer at every leaf; the [incremental accumulator](incremental.md) was written afterwards for that.
 
-**Status.** Kept; since 2026-10-25.
+## Status
+
+Adopted; since 2026-10-25. Since `6162db8` the Python search is gone and the UCI binary is the only engine.

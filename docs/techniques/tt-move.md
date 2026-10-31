@@ -1,20 +1,45 @@
 # Table move first (`tt_move`)
 
-> **What it is:** Trying the best move stored in the transposition table before any other.
+> **What it is:** Trying first the best move the transposition table remembers for the position.
 >
-> **Read it when:** You want to know the biggest saving in nodes among the switches.
+> **Read it when:** You want to know which technique saves the most nodes.
 >
 > **Next:** [History heuristic](history.md)
 
-**Problem.** A node whose table entry is too shallow to cut still knows the best move found there; the reference
-ignores it and orders by MVV-LVA and killers.
+## Problem
 
-**What it does.** Tries the stored best move before every other move.
+An entry of the [transposition table](transposition-table.md) that is too shallow to give a value still knows
+which move was best when the position was searched before. The reference search ignored it and ordered by
+[MVV-LVA](mvv-lva.md) and [killers](killer-moves.md) only, so a cut-off that one move would give came late.
 
-**How it is implemented.** `move_to_front` in `rust/src/search/ordering.rs`, called in `Search::node`. The value does
-not change (same tree, other order), only how soon a cut-off comes.
+## Idea
 
-**Measured effect.** Nodes at depth 6 fall from 672,800 to 256,693 (2.6 times); same move as the reference in 98 %
-(ties resolve differently). In games, with `history`: +92 Elo.
+The move that was best one iteration ago is usually still best. Search it first: alpha-beta cuts soonest when the
+best move comes first.
 
-**Status.** On by default.
+## How it works
+
+Before the moves of a node are searched, the stored best move (if any) is moved to the front; the rest keep their
+order. The value of the node does not change, only how soon a cut-off comes.
+
+**Worked example** (illustrative). At depth 6, a node was searched at depth 5 in the previous iteration and its entry says
+`Bb5`. The order by MVV-LVA and killers would try `Bb5` 12th of 30 moves. With `tt_move` it is tried first; it
+reaches beta again, and the 29 other moves are not searched. Without it, eleven moves are searched to depth 5
+before the cut.
+
+## Implementation
+
+`move_to_front` in `rust/src/search/ordering.rs`, called in `Search::node` (`rust/src/search/node.rs`). Helper
+threads of [Lazy SMP](lazy-smp.md) skip it at the root, where they rotate the moves on purpose. Switch: `tt_move`.
+
+## Measured effect
+
+Rust core, `linear_pst_terms`, 100 positions at depth 6
+(`scripts/bench/compare_search_features.py`, removed in `6162db8`; in the git history): nodes per move fall from
+672,800 to 256,693 (2.6 times) and time from 1.86 s to 0.71 s; the move equals the reference's in 98 % (ties are
+resolved in another order). In games, together with `history`: 63.0 %, +92 Elo against the reference
+(table in the [catalogue](README.md#how-the-switches-were-judged)).
+
+## Status
+
+Adopted, on by default; since 2026-10-25.

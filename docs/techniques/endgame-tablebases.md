@@ -6,38 +6,56 @@
 >
 > **Next:** [The search in Rust](rust-core.md)
 
-**Problem.** A search with a static evaluation plays simple endgames badly. King and queen against
-king is a win that takes about ten moves of method; at a depth of four or five plies the horizon
-is nowhere near the mate, so the evaluation wanders and the 50-move rule can arrive first.
-With five pieces or fewer the exact answer for every position is known and can be stored.
+## Problem
 
-**What it does.** When the position has at most five pieces (kings included) and no castling
-rights, the bot does not search: it plays the move given by Syzygy tablebases. The tables say, for
-every position, whether the side to move wins, draws or loses and how many moves are left before the
-next capture or pawn move (the distance to zeroing, DTZ). The bot keeps the best result and then
-mates at once if it can; among winning moves it takes the one with the smallest DTZ, and when it is
-losing it takes the one with the largest, to resist longest.
+A search with a static evaluation plays simple endgames badly. King and queen against king is a win that takes
+about ten moves of method; at four or five plies the mate is beyond the horizon, the evaluation wanders and the
+50-move rule can arrive first. Yet with five pieces or fewer the exact answer for every position is known.
 
-**How it is implemented.** `EndgameTablebase` in `rust/src/knowledge/tablebase.rs` (`covers`,
-`best_move` and the move ranking), on top of the `shakmaty-syzygy` crate, with
-`src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. The 3-4-5
-piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not versioned.
-`SearchBot` takes a `tablebase` argument and consults it at the root of `get_move`,
-recording `stop_reason = "tablebase"` in the search statistics; `tablebase=None`
-turns it off (the window has a switch for it). It is on by default when the tables are present; the tournaments and measurement scripts
-build their players without it (`make_player`), so that they compare evaluations and search, not tables.
+## Idea
 
-**Measured effect.** Measured with `python (removed) scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`
-(report: `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions with three to five pieces, the
-defender always plays the tablebase move, the winner has 0.5 s per move and 100 moves to mate. The search
-with the tables converts 52 of 60 (mean 14.2 moves to mate); the same search without them converts 8 of
-60 (20.6 moves).
+Look the position up instead of searching it. Syzygy tables give, for every position of up to five pieces, whether
+the side to move wins, draws or loses, and the distance to the next capture or pawn move (DTZ). Pick the move with
+the best result and, among those, the quickest progress.
 
-**Status.** Kept as an option; since 2026-10-21 (commit `2fc0f86`). It is used only at the root:
-the search never probes the tables inside the tree, and positions with six or more pieces are
-searched as usual.
+## How it works
 
-**The endgame tables** are the Syzygy tablebases for three, four and five pieces (290 files, 939 MB)
-in `data/knowledge/endgame`. They are not versioned and cannot be rebuilt by this project: they
-come from `tablebase.lichess.ovh` (or any Syzygy 3-4-5 set). The search bots use them when the folder exists
-(the `tablebase` option of the bots, or the setting of the window, switches them off).
+With five pieces or fewer (kings included) and no castling rights:
+
+1. Keep the moves with the best result for the side to move (win, then draw, then loss).
+2. If one of them mates at once, play it.
+3. Winning: play the move with the smallest DTZ. Losing: the one with the largest, to resist longest.
+
+**Worked example.** King and rook against king, White to move, three winning moves:
+
+| move | result | DTZ after the move |
+|---|---|---|
+| `Rh7` | win | 15 |
+| `Kd6` | win | 13 |
+| `Ra1` | win | 19 |
+| `Rh1` | draw (the rook can be taken) | - |
+
+`Rh1` is dropped (draw), and `Kd6`, the winning move with the smallest DTZ, is played. No search runs.
+
+## Implementation
+
+`EndgameTablebase` in `rust/src/knowledge/tablebase.rs` (`covers`, `best_move`, the ranking), on top of the
+`shakmaty-syzygy` crate, with `src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. Consulted by
+`UciBot.get_move` in `src/chess_engine/uci.py` after the [opening book](opening-book.md) and before the UCI binary,
+only at the root: the search never probes the tables inside the tree. Switch: the window's Settings → Endgame
+tablebases (`AISettings.tablebase`); used only if the tables are present.
+
+The tables (3-4-5 pieces, 290 files, 939 MB) live in `data/knowledge/endgame`. They are not versioned and this
+project cannot rebuild them: they come from `tablebase.lichess.ovh` or any Syzygy 3-4-5 set.
+
+## Measured effect
+
+Measured with the earlier Python engine (`scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`,
+removed in `6162db8`; in the git history; report `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions of
+three to five pieces, the defender plays the tablebase move, the winner has 0.5 s per move and 100 moves. With the
+tables the winner mates in 52 of 60 (mean 14.2 moves); without them, in 8 of 60 (20.6 moves).
+
+## Status
+
+Adopted as an option of the window; since 2026-10-21 (`2fc0f86`). The UCI binary does not use the tables, so
+engine matches compare search and evaluation only.

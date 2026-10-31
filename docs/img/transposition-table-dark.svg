@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
+  <title id="t">Transposition table: what a stored entry does when a position comes back</title>
+  <desc id="d">A position comes back with d plies left to search. If the table has no entry for it, or the entry was searched less deeply than d, the node is searched, trying the stored best move first if there is one. If the entry is deep enough, its flag decides: an exact value is returned at once; a lower bound raises alpha; an upper bound lowers beta. If the window is then closed (alpha at or above beta), the stored value is returned; otherwise the node is searched with the narrower window.</desc>
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #e2e8f0; }
+    .title { font-size: 20px; font-weight: 700; }
+    .label { font-size: 15px; }
+    .small { font-size: 13px; }
+    .bold { font-weight: 700; }
+    .on { fill: #052e16; stroke: #4ade80; stroke-width: 2; }
+    .cut { fill: #450a0a; stroke: #f87171; stroke-width: 2; }
+    .blue { fill: #172554; stroke: #60a5fa; stroke-width: 2; }
+    .gray { fill: #1f2937; stroke: #9ca3af; stroke-width: 2; stroke-dasharray: 5 4; }
+    .step { fill: #111827; stroke: #cbd5e1; stroke-width: 2; }
+    .edge { stroke: #cbd5e1; stroke-width: 2; fill: none; }
+    .t-green { fill: #bbf7d0; }
+    .t-red { fill: #fecaca; }
+    .t-blue { fill: #bfdbfe; }
+    .t-gray { fill: #d1d5db; }
+  </style>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#0f172a" stroke="#475569" stroke-width="2"/>
+  <text x="24" y="38" class="title">Transposition table: a position comes back</text>
+
+  <!-- edges -->
+  <path class="edge" d="M 400 104 L 400 124"/>
+  <path class="edge" d="M 260 144 L 160 144 L 160 190"/>
+  <path class="edge" d="M 540 144 L 640 144 L 640 190"/>
+  <path class="edge" d="M 520 270 L 400 270 L 400 300"/>
+  <path class="edge" d="M 760 210 L 780 210 L 780 380 L 760 380"/>
+  <path class="edge" d="M 780 270 L 760 270"/>
+  <path class="edge" d="M 780 320 L 760 320"/>
+  <path class="edge" d="M 400 340 L 400 360"/>
+
+  <!-- start -->
+  <rect x="200" y="64" width="400" height="40" rx="8" class="step"/>
+  <text x="400" y="89" text-anchor="middle" class="label bold">Position P comes back, d plies left</text>
+  <rect x="260" y="124" width="280" height="40" rx="8" class="step"/>
+  <text x="400" y="149" text-anchor="middle" class="label">Entry for P searched ≥ d plies?</text>
+  <text x="200" y="136" text-anchor="middle" class="small t-gray">no</text>
+  <text x="590" y="136" text-anchor="middle" class="small t-gray">yes</text>
+
+  <!-- shallow or missing -->
+  <rect x="30" y="190" width="260" height="58" rx="8" class="gray"/>
+  <text x="160" y="214" text-anchor="middle" class="label bold t-gray">Search P</text>
+  <text x="160" y="235" text-anchor="middle" class="small t-gray">its stored best move first, if any</text>
+
+  <!-- flag -->
+  <rect x="520" y="190" width="240" height="40" rx="8" class="step"/>
+  <text x="640" y="215" text-anchor="middle" class="label">Which flag?</text>
+  <rect x="520" y="250" width="240" height="40" rx="8" class="blue"/>
+  <text x="640" y="275" text-anchor="middle" class="label t-blue">LOWER: α ← max(α, v)</text>
+  <rect x="520" y="300" width="240" height="40" rx="8" class="blue"/>
+  <text x="640" y="325" text-anchor="middle" class="label t-blue">UPPER: β ← min(β, v)</text>
+  <rect x="520" y="360" width="240" height="40" rx="8" class="on"/>
+  <text x="640" y="385" text-anchor="middle" class="label bold t-green">EXACT: return v</text>
+
+  <!-- window closed? -->
+  <rect x="300" y="300" width="200" height="40" rx="8" class="step"/>
+  <text x="400" y="325" text-anchor="middle" class="label">Now α ≥ β?</text>
+  <rect x="300" y="360" width="200" height="40" rx="8" class="cut"/>
+  <text x="400" y="385" text-anchor="middle" class="label bold t-red">yes: return v</text>
+  <rect x="30" y="300" width="240" height="58" rx="8" class="blue"/>
+  <text x="150" y="324" text-anchor="middle" class="label t-blue">no: search P</text>
+  <text x="150" y="345" text-anchor="middle" class="small t-blue">in the narrower window</text>
+  <path class="edge" d="M 300 320 L 270 320"/>
+  <path class="edge" d="M 520 320 L 500 320"/>
+
+  <text x="24" y="432" class="small t-gray">v: stored value. Bounds come from cut-offs: a node cut at β only knows its value is at least β.</text>
+</svg>

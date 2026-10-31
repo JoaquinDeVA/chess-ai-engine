@@ -6,29 +6,49 @@
 >
 > **Next:** [Incremental network accumulator](incremental.md)
 
-**Problem.** A computer has several cores and the search used one.
+## Problem
 
-**What it does.** With `threads = N` the search runs on N threads. They all search the same position
-and share one transposition table, without locks; the main thread runs the iterative deepening as
-usual and the others, from other depths and with the moves of the root in a different order, fill the
-table with what they find. When the main thread finishes it raises a flag and the others stop. The
-move is the main thread's. Dividing the root moves among the threads was not chosen: the first move
-takes most of the work (the others are cut off by its value), so the threads would wait for each
-other and, ignoring what the others find, they would prune less.
+A computer has several cores and the search used one.
 
-![Lazy SMP: a main thread and two helpers search the same root with different move orders and share one lock-free transposition table](../img/threads-shared-table.svg)
+## Idea
 
-**How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; the
-table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
-XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of
-`SearchBot` and the thread setting of the window. The tournaments use one thread, so
-that games are reproducible and the clock is fair among processes. With more than one thread the
-search is not deterministic and the evaluation must run in the core.
+Let every thread search the same root and share one transposition table. The helpers do not need to coordinate:
+what one finds is in the table when another reaches the same position. Dividing the root moves among the threads
+was not chosen: the first move takes most of the work (the others are cut off by its value), so the threads would
+wait for each other and, blind to each other's results, prune less.
 
-**Measured effect.** Measured with `python (removed) scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8
---players linear_pst_terms --threads 1,2,4,6 --workers 1 --techniques incremental,tt_move,history,pvs,aspiration,null_move`
-(the Position-terms logistic model, 60 test positions, the default techniques of [selective techniques](README.md) on, nothing
-else running on the six-core machine). The nodes per second count the nodes of all threads:
+## How it works
+
+- The main thread runs [iterative deepening](iterative-deepening.md) as usual, with the clock, and its move is the
+  one played.
+- Each helper repeatedly searches one or two plies deeper than the main thread's current depth (helpers with an even
+  index one ply, odd two), so the table already holds what the main thread will need next.
+- The table is shared without locks; a slot written by two threads at once is detected and ignored.
+- When the main thread finishes it raises a stop flag and the helpers abandon their search.
+
+**Worked example.** Four threads; the main thread is on depth 6. Helpers 1 and 3 search depth 8, helper 2 depth 7.
+When helper 2 stores an exact value for a position at depth 5 from the root, the main thread, reaching that position
+with one ply left, finds an entry deep enough and returns without searching it. The four threads share the 1.18 s it
+takes to reach depth 8, against 1.93 s for one thread (table below).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../img/threads-shared-table-dark.svg">
+  <img src="../img/threads-shared-table-light.svg" alt="Lazy SMP: a main thread and two helpers search the same root with different move orders and share one lock-free transposition table">
+</picture>
+
+## Implementation
+
+`iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; `SharedTable` in `rust/src/search/shared.rs`,
+three atomic words per slot checked by XOR. `Memory::with_threads` (`rust/src/search/memory.rs`) builds the shared
+table only with more than one thread. UCI options `Threads` and `Hash` (megabytes of the shared table; with one
+thread `Hash` has no effect); in the window, Settings → Advanced. With more than one thread the search is not
+deterministic.
+
+## Measured effect
+
+`scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8 --players linear_pst_terms --threads 1,2,4,6 --workers 1 --techniques incremental,tt_move,history,pvs,aspiration,null_move`
+(removed in `6162db8`; in the git history), Rust core, 60 test positions, six-core machine otherwise idle; nodes per
+second count all threads:
 
 | threads | nodes/s (3 s) | mean depth in 3 s | seconds to depth 8 |
 |---|---|---|---|
@@ -37,11 +57,10 @@ else running on the six-core machine). The nodes per second count the nodes of a
 | 4 | 1,605,067 | 9.50 | 1.180 |
 | 6 | 2,099,554 | 9.43 | 1.211 |
 
-With the techniques on, the searches are deeper and share more, so the threads pay off more than with the
-reference search (there, six threads gave only 15 % less time to depth 6 and +0.23 plies in 10 s): four
-threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s. Six threads are no better than four
-on this machine (six cores, with the main thread of the measurement and the operating system on them).
-A first version in which the helpers started at depths 1 to 3 was slower; making them search one or two plies
-deeper than the main thread is, as here, improved it. Longer searches and further variants were not measured.
+Four threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s; six are no better than four on six cores.
+Without the techniques, six threads gave only 15 % less time to depth 6. A first version with helpers at depths 1
+to 3 was slower than helpers ahead of the main thread. Its effect in games is not measured.
 
-**Status.** Kept as an option, off by default (tournaments need one thread); since 2026-10-25.
+## Status
+
+Adopted as an option, off by default (one thread keeps matches reproducible and the clock fair); since 2026-10-25.

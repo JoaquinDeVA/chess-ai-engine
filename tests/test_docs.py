@@ -5,7 +5,15 @@ import re
 
 from tests.paths import ROOT
 
-LINK = re.compile(r"\]\(([^)\s]+)\)")
+LINK = re.compile(r"\]\(([^)\s]+)\)|\b(?:src|srcset)=\"([^\"]+)\"")
+TECHNIQUE_SECTIONS = [
+    "Problem",
+    "Idea",
+    "How it works",
+    "Implementation",
+    "Measured effect",
+    "Status",
+]
 MODULE_COMMAND = re.compile(r"python -m ((?:chess_engine|chess_lab)(?:\.\w+)+)")
 SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/scripts/[\w./-]+\.(?:py|sh)\b")
 
@@ -18,20 +26,29 @@ def checked_docs():
     return [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
 
 
+def links(doc):
+    """Targets of the Markdown links and of the ``src``/``srcset`` attributes of a page.
+
+    :param doc: Path of the Markdown file.
+    :return: Link targets, as written.
+    """
+    return [a or b for a, b in LINK.findall(doc.read_text(encoding="utf-8"))]
+
+
 def linked_from(index):
     """Files that an index page links to.
 
     :param index: Path of the index page.
     :return: Resolved paths of its relative links.
     """
-    targets = LINK.findall(index.read_text(encoding="utf-8"))
+    targets = links(index)
     return {(index.parent / t.split("#", 1)[0]).resolve() for t in targets if "://" not in t}
 
 
 def test_relative_links_resolve():
     broken = []
     for doc in checked_docs():
-        for target in LINK.findall(doc.read_text(encoding="utf-8")):
+        for target in links(doc):
             if target.startswith(("http://", "https://", "mailto:", "#")):
                 continue
             path = (doc.parent / target.split("#", 1)[0]).resolve()
@@ -70,3 +87,15 @@ def test_every_page_is_in_an_index():
         if page not in indexes and page.resolve() not in listed
     ]
     assert not orphans, "\n".join(orphans)
+
+
+def test_technique_pages_follow_the_template():
+    folder = ROOT / "docs" / "techniques"
+    wrong = []
+    for page in sorted(folder.glob("*.md")):
+        if page.name == "README.md":
+            continue
+        sections = re.findall(r"^## (.+)$", page.read_text(encoding="utf-8"), re.MULTILINE)
+        if sections != TECHNIQUE_SECTIONS:
+            wrong.append(f"{page.name}: {sections}")
+    assert not wrong, "\n".join(wrong)

@@ -21,14 +21,14 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Opening book | on, in the window | [opening-book](opening-book.md) |
 | Endgame tablebases | on | [endgame-tablebases](endgame-tablebases.md) |
 | Search in Rust | since 2026-10-25; 8 to 35 times faster | [rust-core](rust-core.md) |
-| Several threads (Lazy SMP) | option `threads`, off | [lazy-smp](lazy-smp.md) |
+| Several threads (Lazy SMP) | UCI option `Threads`, 1 by default | [lazy-smp](lazy-smp.md) |
 | Incremental network accumulator (`incremental`) | on; +15 % nodes/s for `net4_pst` | [incremental](incremental.md) |
 | Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | [tt-move](tt-move.md) |
 | History heuristic (`history`) | on; nodes to 391,130 | [history](history.md) |
 | Principal variation search (`pvs`) | on; nodes to 487,244 | [pvs](pvs.md) |
 | Aspiration windows (`aspiration`) | on; nodes to 440,213 | [aspiration](aspiration.md) |
 | Null move (`null_move`) | on; nodes to 446,129; +205 Elo with the set | [null-move](null-move.md) |
-| Late move reductions (`lmr`) | implemented, off: lost games | [lmr](lmr.md) |
+| Late move reductions (`lmr`) | implemented, off: lost games; SPRT at fixed nodes pending | [lmr](lmr.md) |
 | Tactical ordering with Prolog | removed | [prolog-ordering](prolog-ordering.md) |
 | History malus | idea; not measured | - |
 | Static exchange evaluation (SEE) | idea; not measured | - |
@@ -39,17 +39,17 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 
 ## How the switches were judged
 
-
-The search of the classic techniques (the pages above the switches in the table) and the Rust core ([the search in Rust](rust-core.md)) is the *reference*: every technique below is off in it. Each technique is a field of `Techniques` (`rust/src/search/options.rs`), a
-name in `_core.TECHNIQUES`, the option `techniques` of `SearchBot` and the Advanced panel of the AI settings of the window
-(`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`(removed) chess_engine/bots/search_bot.py`): all but
-`lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
-so results of different engines are never mixed.
+The classic techniques (the rows above `incremental` in the table) and the [Rust core](rust-core.md) form the
+*reference* search; the seven switches below them are off in it. Each switch is a field of `Techniques`
+(`rust/src/search/options.rs`) and a name in the comma-separated UCI option `Techniques` of the binary (an empty
+value turns them all off). The binary and the window (Settings → Advanced, `DEFAULT_TECHNIQUES` in
+`src/chess_engine/gui/settings.py`) use all of them but `lmr`. The measurements below were taken with
+scripts removed in `6162db8` (in the git history), on the Rust core through its Python module.
 
 **How they were judged.** Two measurements, both repeatable.
 
 1. Nodes and time at depth 6 over 100 positions, and how often the move equals the reference's:
-   `python (removed) scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
+   `scripts/bench/compare_search_features.py` (variants `with <technique>` and `with all of them`),
    Position-terms model:
 
 | variant | nodes per move | s per move | same move as reference |
@@ -64,7 +64,7 @@ so results of different engines are never mixed.
 | `lmr` (mild) | 146,356 | 0.395 | 82 % |
 
 2. Games against the reference at equal time (4 s + 0.05 s per move, 100 games, colours swapped, same model):
-   `python (removed) scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
+   `scripts/bench/compare_engine_versions.py --model linear_pst_terms --candidate tt_move,history --openings 50 --base 4 --increment 0.05`.
 
 | candidate | score | Elo | mean depth (reference 4.68) |
 |---|---|---|---|

@@ -6,42 +6,45 @@
 >
 > **Next:** [Opening book](opening-book.md)
 
-### Make/unmake on one state, with fast transposition keys
+## Problem
 
-**Problem.** The first version copied the whole game state at every node and built the position key
-from a FEN string, which costs time at every node.
+Two questions are asked at every node: "what does the position look like after this move?" and "is the game
+over here?". The first version copied the whole game state for every child, built the position key from a FEN
+string, and answered the second by replaying the game to claim a threefold repetition
+(`board.outcome(claim_draw=True)` of python-chess). All three cost time at every node.
 
-**What it does.** The search plays a move in place on one `GameState`, searches the child and
-takes the move back; the state keeps an undo stack (position, history). The transposition key is
-a hash of the position plus the two move counters, which identifies the same positions as the FEN
-without building the string.
+## Idea
 
-**How it is implemented.** `GameState::apply`, `undo` and `key` in `rust/src/board.rs`; the
-`apply` / `undo` pairs in `Search::node` and `Search::quiescence`.
+Keep one state and change it in place: play the move, search the child, take the move back. Keep, beside the
+state, the keys of the positions since the last irreversible move (capture or pawn move); a repetition can only
+happen among those, so the draw rules read that short list instead of replaying the game.
 
-**Measured effect.** Commit `ea86b20` reports, on the fixed benchmark at depth 3 of the Python
-engine, identical moves and node counts and a total time from 10.8 s to 3.7 s (2.9 times faster),
-*together with* the change of the terminal-detection section.
+## How it works
 
-**Status.** Kept; since 2026-10-16 (commit `ea86b20`), now in Rust.
+- **Make/unmake.** `apply` pushes the move onto an undo stack and updates the position; `undo` pops it.
+- **Key.** A hash of the position plus the two move counters: the same positions the FEN identifies, without
+  building the string.
+- **Terminal check**, same answer as `board.outcome(claim_draw=True)`: checkmate, stalemate and insufficient
+  material come from the position; the fifty-move claim needs 100 halfmoves and a legal move; the threefold
+  claim holds when the position occurred three times, or a legal move reaches one that occurred twice.
 
-### Fast terminal detection with the same draw rules
+**Worked example.** After 1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 the list of keys since the last irreversible
+move holds 8 positions, in which the position after Black's `Nf6` appears twice. Black to move asks: does a legal
+move reach a position seen twice? `Ng8` reaches the start position, seen twice (move 0 and after 2... Ng8): yes, a
+threefold claim is available. The check reads eight keys, not the whole game.
 
-**Problem.** "Is the game over here?" is asked at every node, and the reference rule,
-`board.outcome(claim_draw=True)` of python-chess, replays the game to claim a threefold repetition.
+## Implementation
 
-**What it does.** Same answer as `board.outcome(claim_draw=True)`, but the repetition is read from the
-keys of the positions since the last irreversible move, which the state extends in constant time per
-move. Checkmate, stalemate and insufficient material come from the rules of the position; the
-fifty-move claim needs 100 halfmoves and a legal move; the threefold claim holds when the position
-occurred three times or a legal move reaches one that occurred twice.
+`GameState::apply`, `undo`, `key`, `outcome` and `can_claim_threefold` in `rust/src/board.rs`; the `apply`/`undo`
+pairs in `Search::node` and `Search::quiescence` (`rust/src/search/node.rs`). Tests: `rust/tests/rules.rs` (mate,
+stalemate, insufficient material, fifty moves and repetition). Always on.
 
-**How it is implemented.** `GameState::outcome` and `can_claim_threefold` in `rust/src/board.rs`;
-the history is rebuilt on every call from the root FEN and the moves played. Tests:
-`rust/tests/rules.rs` (end of game by mate, stalemate, insufficient material, fifty moves and repetition).
+## Measured effect
 
-**Measured effect.** Commit `ba3d5cb` reports, at depth 3 on the fixed benchmark of the Python
-engine, the same moves and nodes as the baseline and a search 1.89 times faster (the 10.8 s to 3.7 s
-of the make/unmake section is the combined effect of both changes).
+Measured with the earlier Python engine, on its fixed benchmark at depth 3: the two changes together took the
+total time from 10.8 s to 3.7 s (2.9 times faster), with identical moves and node counts (commit messages of
+`ea86b20` and `ba3d5cb`; `git show ea86b20`). The terminal detection alone made the search 1.89 times faster.
 
-**Status.** Kept; since 2026-10-16 (commit `ba3d5cb`), now in Rust.
+## Status
+
+Adopted; since 2026-10-16 (`ea86b20`, `ba3d5cb`), in Rust since 2026-10-25.

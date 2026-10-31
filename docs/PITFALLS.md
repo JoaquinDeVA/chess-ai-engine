@@ -17,6 +17,7 @@
 - **Two long processes write the same log.** Use absolute paths, launch once, check with `ps`, stop by PID.
 - **Stopping a tournament or training with `kill` of the parent leaves `multiprocessing` workers orphaned** (alive two days later at 2.3 GB each). Afterwards run `ps -eo pid,ppid,etime,rss,args` and kill by PID those with `ppid 1`.
 - **Measuring speed under load.** `(removed) scripts/bench/measure_search_speed.py` uses the clock: do not run the suite or compile meanwhile, and compare with the same `--workers`.
+- **The remote worker stops answering after the desktop restarts.** The WSL2 address changes on every boot and the Windows port forward (2222 to the WSL address, port 22) points at the old one: repeat the `portproxy` rule. `sshd` in Ubuntu listens through `ssh.socket`, so editing `sshd_config` does not change the port. See [Remote worker](WORKER.md).
 
 ## Search
 

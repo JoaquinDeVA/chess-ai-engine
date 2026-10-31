@@ -6,6 +6,7 @@ All notable changes. The newest are first.
 
 ### Added
 - **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (depth, time per move, opening book, tablebases, search techniques, threads). See [The window](docs/GUI.md).
+- **A remote worker for matches**: `src/chess_lab/scripts/worker/` deploys the UCI binary and fastchess to the desktop and plays matches there over SSH. See [Remote worker](docs/WORKER.md).
 - **An opening suite for matches**: `src/chess_lab/scripts/build_openings.py` writes balanced positions (8 to 10 half-moves from the start, Stockfish within 0.5 pawns) for fastchess. See [Openings](docs/OPENINGS.md).
 - **A UCI engine**, `rust/target/release/uci` (`cargo build --release --bin uci`): the search of the Rust core behind the UCI protocol (`position`, `go depth|movetime|wtime … winc … binc|nodes|infinite`, `setoption` for `Threads`, `Hash`, `Techniques` and `Model`, `stop`, `bestmove`). The window plays through it with `chess_engine/uci.py`. See [Architecture](docs/ARCHITECTURE.md).
 

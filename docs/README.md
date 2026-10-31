@@ -24,6 +24,7 @@ where the training data comes from, what each model contains and what was measur
 | [Models](MODELS.md) | What each evaluation model is, what it contains and what it learns | You want to understand a model before reading its numbers |
 | [The window](GUI.md) | The board, the game page, the players and the AI settings of the window | You want to play, or to change the window |
 | [Openings](OPENINGS.md) | The suite of balanced starting positions for engine matches and how it is built | You run a match or rebuild the suite |
+| [Remote worker](WORKER.md) | How matches run on the desktop machine over SSH | You launch a match |
 | [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence | You wonder why something is the way it is |
 | [Pitfalls](PITFALLS.md) | What already cost time: symptom, cause, what to do | You are about to launch a long script or touch `rust/` |
 | [Results](RESULTS.md) | Which model plays best, at which time control, and how every number was obtained | You want to compare models or repeat a measurement |

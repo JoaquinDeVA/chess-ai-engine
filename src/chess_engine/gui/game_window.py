@@ -18,10 +18,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.bots.search_bot import SearchBot
 from chess_engine.gui.board_widget import BoardPanel, BoardWidget, PlayerBar
 from chess_engine.gui.game_model import Clock, GameModel, ai_accepts_draw
-from chess_engine.gui.settings import MatchSetup, build_bot
+from chess_engine.gui.settings import MatchSetup
 
 #: Pause between moves when two AIs play, by the name shown in the speed menu.
 SPEEDS = {"Fast": 0.0, "Normal": 0.8, "Slow": 2.0}
@@ -32,7 +32,7 @@ class MoveThread(QThread):
 
     found = Signal(int, object)  # token, chess.Move or None
 
-    def __init__(self, token: int, bot: ChessBot, board: chess.Board, time_left: float):
+    def __init__(self, token: int, bot: SearchBot, board: chess.Board, time_left: float):
         """Prepare the search.
 
         :param token: Number of the request; the page ignores answers to old ones.
@@ -73,7 +73,9 @@ class GamePage(QWidget):
         clock = Clock(setup.base, setup.increment) if setup.base is not None else None
         self.model = GameModel(setup.fen, clock)
         self.players = {chess.WHITE: setup.white, chess.BLACK: setup.black}
-        self.bots = {c: build_bot(p.ai) for c, p in self.players.items() if p.ai is not None}
+        self.bots = {
+            c: SearchBot(**p.ai.bot_options()) for c, p in self.players.items() if p.ai is not None
+        }
         self.names = {c: p.label for c, p in self.players.items()}
         if setup.white.label == setup.black.label:
             self.names = {

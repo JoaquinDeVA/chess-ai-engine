@@ -246,17 +246,6 @@ impl PySearcher {
         self.memory.clear();
     }
 
-    /// Number of threads that search.
-    #[getter]
-    fn threads(&self) -> usize {
-        self.memory.threads
-    }
-
-    /// Number of entries of the transposition table.
-    fn table_size(&self) -> usize {
-        self.memory.table.len()
-    }
-
     /// Iterative deepening. Returns `(move, statistics)`; `move` is a UCI string or `None`.
     #[pyo3(signature = (root_fen, moves, evaluator, max_depth, time_limit, hard_limit, quiescence_plies, min_depth, estimator, disabled=Vec::new(), techniques=Vec::new()))]
     #[allow(clippy::too_many_arguments)]

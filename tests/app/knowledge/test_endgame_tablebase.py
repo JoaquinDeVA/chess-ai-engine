@@ -5,7 +5,7 @@ import random
 import chess
 import pytest
 
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.search_bot import HEURISTIC, SearchBot
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from tests.paths import SYZYGY
 
@@ -97,7 +97,7 @@ def test_the_best_move_never_changes_the_theoretical_result(tablebase):
 
 def test_the_bot_plays_the_tablebase_move_without_searching(tablebase):
     board = chess.Board("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1")
-    bot = IterativeHeuristicBot(tablebase=tablebase)
+    bot = SearchBot(HEURISTIC, tablebase=tablebase)
     move = bot.get_move(board, 60.0)
     assert move == tablebase.best_move(board)
     assert bot.last_search_stats.stop_reason == "tablebase"
@@ -106,7 +106,7 @@ def test_the_bot_plays_the_tablebase_move_without_searching(tablebase):
 
 def test_the_bot_without_tablebase_searches(tablebase):
     board = chess.Board("7k/5Q2/6K1/8/8/8/8/8 w - - 0 1")
-    bot = IterativeHeuristicBot(tablebase=None)
+    bot = SearchBot(HEURISTIC, tablebase=None)
     bot.get_move(board, 5.0)
     assert bot.last_search_stats.stop_reason != "tablebase"
     assert bot.last_search_stats.nodes_visited > 0

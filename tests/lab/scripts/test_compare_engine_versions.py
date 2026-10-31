@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from chess_engine.search.time_management import TimeManager
+from chess_engine.bots.time_manager import TimeManager
 from chess_lab.comparison.tradeoff import make_player, split_techniques
 from tests.paths import ROOT
 

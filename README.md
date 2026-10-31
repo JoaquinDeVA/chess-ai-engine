@@ -125,7 +125,7 @@ cargo clippy --manifest-path rust/Cargo.toml --all-targets --features python -- 
 
 ## Credits
 
-Joaquín De Vicente Abad. The base framework (game manager, bot interface, registry)
+Joaquín De Vicente Abad. The base framework (game loop, bot interface)
 and the first test suite come from the course *Inteligencia Artificial e Ingeniería del
 Conocimiento* (Universidad CEU San Pablo). The search, the bots, the models and the tools are
 original work. The project uses [python-chess](https://python-chess.readthedocs.io),

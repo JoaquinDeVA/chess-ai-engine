@@ -80,8 +80,8 @@ hundred games can resolve.
 
 **How it is implemented.** `iterative_deepening` in `rust/src/search/deepening.rs` (loop,
 `OVERSHOOT_FACTOR = 1.15`, discard of truncated iterations; `completed_depth` in the statistics).
-`TimeManager` in `src/chess_engine/search/time_management.py` holds the numbers;
-`IterativeDeepeningBot.search` in `src/chess_engine/bots/_search_bots.py` computes the soft budget and
+`TimeManager` in `src/chess_engine/bots/time_manager.py` holds the numbers;
+`SearchBot.get_move` in `src/chess_engine/bots/search_bot.py` computes the soft budget and
 the hard limit and passes them to the core. `elapsed` runs from the start of the move, not of each
 iteration.
 
@@ -177,7 +177,7 @@ rest of the quiet moves by their history score (`history`, if on).
 **How it is implemented.** `mvv_lva_score` and `order` in `rust/src/search/ordering.rs` (score
 `10 × victim − attacker`; a stable sort, so equal captures keep the order python-chess generates
 them in, `generation_order` in `rust/src/board.rs`). `fallback_move` in
-`src/chess_engine/bots/_search_bots.py` picks the best capture when a search returns nothing.
+`src/chess_engine/bots/search_bot.py` picks the best capture when a search returns nothing.
 
 **Measured effect.** Depth 4, 60 positions: without ordering 64,003 nodes per move instead of 15,988
 (ordering saves 75.0 % of the nodes) and 5.408 s instead of 1.365 s (74.8 % less time); 11.7 % of the
@@ -199,7 +199,7 @@ for a few more plies, with alpha-beta pruning, and the best option is returned.
 **How it is implemented.** `Search::quiescence` in `rust/src/search/node.rs`, called from
 `Search::node` at `depth_remaining <= 0`, and `is_noisy` in `rust/src/board.rs` (legal captures and
 promotions). It uses neither the table nor killers; its nodes count in `nodes_visited`. The bots
-(`IterativeDeepeningBot`) use `DEFAULT_QUIESCENCE_PLIES = 4`; `quiescence_plies=0` switches it off, which
+(`SearchBot`) use `DEFAULT_QUIESCENCE_PLIES = 4`; `quiescence_plies=0` switches it off, which
 is also the default of the search function itself.
 
 **Measured effect.**
@@ -279,7 +279,7 @@ losing it takes the one with the largest, to resist longest.
 `best_move` and the move ranking), on top of the `shakmaty-syzygy` crate, with
 `src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. The 3-4-5
 piece tables (290 files, 939 MB) live in `data/knowledge/endgame`; they are not versioned.
-`IterativeDeepeningBot` takes a `tablebase` argument and consults it at the root of `get_move`,
+`SearchBot` takes a `tablebase` argument and consults it at the root of `get_move`,
 recording `stop_reason = "tablebase"` in the search statistics; `tablebase=None`
 turns it off (the window has a switch for it). It is on by default when the tables are present; the tournaments and measurement scripts
 build their players without it (`make_player`), so that they compare evaluations and search, not tables.
@@ -296,9 +296,8 @@ searched as usual.
 
 ## Around the search
 
-**The opening book.** Every search bot (`IterativeDeepeningBot`; on by default, `--no-opening-book` switches it off) plays
-book moves while the game follows the book, then searches. `IterativeModelBookBot`
-(`src/chess_engine/bots/iterative_model_book_bot.py`) is the learned-model bot of the registry. The book
+**The opening book.** The bot (`SearchBot`; on by default, `--no-opening-book` switches it off) plays
+book moves while the game follows the book, then searches. The book
 (`OpeningBook` in `rust/src/knowledge/book.rs`, with `src/chess_engine/knowledge/opening_book.py` as its
 Python face) is keyed by the first four FEN fields, so
 transpositions hit the same entry. Once the game leaves the book it is never consulted again;

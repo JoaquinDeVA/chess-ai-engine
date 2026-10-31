@@ -19,11 +19,9 @@ import chess
 import pandas as pd
 
 from chess_engine import _core
-from chess_engine.bots._search_bots import IterativeDeepeningBot
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
-from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.bots.search_bot import SearchBot
+from chess_engine.bots.time_manager import TimeManager
 from chess_engine.models import split_spec
-from chess_engine.search.time_management import TimeManager
 from chess_lab.models.cards import card_path, update_card
 from chess_lab.models.definitions import get_model_class
 
@@ -75,7 +73,7 @@ def make_player(
     time_manager: TimeManager,
     max_depth: int = 30,
     **search_options: Any,
-) -> IterativeDeepeningBot:
+) -> SearchBot:
     """Build an iterative-deepening player for measurements: no opening book and no tablebases.
 
     :param spec: ``"h1"`` for a hand-crafted heuristic, a registered model
@@ -94,18 +92,8 @@ def make_player(
     if "+" in spec:
         spec, techniques = split_techniques(spec)
     search_options.setdefault("techniques", techniques)
-    if spec in HEURISTICS:
-        return IterativeHeuristicBot(
-            max_depth=max_depth,
-            time_manager=time_manager,
-            **search_options,
-        )
-    return IterativeModelBookBot(
-        model=spec,
-        max_depth=max_depth,
-        name=label,
-        time_manager=time_manager,
-        **search_options,
+    return SearchBot(
+        spec, name=label, max_depth=max_depth, time_manager=time_manager, **search_options
     )
 
 

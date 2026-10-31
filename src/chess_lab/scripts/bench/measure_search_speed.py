@@ -57,7 +57,7 @@ def run_job(job: Tuple[str, str, float, List[str], int, Tuple[str, ...]]) -> Dic
     :param job: ``(player, kind, value, fens, threads, techniques)`` with ``kind`` ``"seconds"`` or ``"depth"``.
     :return: The player, the setting and the summary of the searches.
     """
-    from chess_engine.search.time_management import TimeManager
+    from chess_engine.bots.time_manager import TimeManager
     from chess_lab.comparison.tradeoff import fixed_time_manager, make_player
 
     player_name, kind, value, fens, threads, techniques = job

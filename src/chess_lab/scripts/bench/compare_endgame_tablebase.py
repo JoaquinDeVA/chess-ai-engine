@@ -18,7 +18,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import chess
 
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.search_bot import HEURISTIC, SearchBot
 from chess_engine.knowledge.endgame_tablebase import DEFAULT_TABLEBASE_DIR, EndgameTablebase
 from chess_lab.comparison.tradeoff import fixed_time_manager
 
@@ -63,7 +63,7 @@ def random_won_position(rng: random.Random, tables: EndgameTablebase) -> chess.B
 
 def convert(
     start: chess.Board,
-    winner: IterativeHeuristicBot,
+    winner: SearchBot,
     tables: EndgameTablebase,
     max_moves: int,
 ) -> Optional[int]:
@@ -117,11 +117,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     rng = random.Random(args.seed)
     starts = [random_won_position(rng, tables) for _ in range(args.positions)]
     variants = {
-        "search with tablebases": lambda: IterativeHeuristicBot(
-            time_manager=fixed_time_manager(args.seconds), tablebase=tables, opening_book=None
+        "search with tablebases": lambda: SearchBot(
+            HEURISTIC,
+            time_manager=fixed_time_manager(args.seconds),
+            tablebase=tables,
+            opening_book=None,
         ),
-        "search only": lambda: IterativeHeuristicBot(
-            time_manager=fixed_time_manager(args.seconds), tablebase=None, opening_book=None
+        "search only": lambda: SearchBot(
+            HEURISTIC,
+            time_manager=fixed_time_manager(args.seconds),
+            tablebase=None,
+            opening_book=None,
         ),
     }
     lines = [

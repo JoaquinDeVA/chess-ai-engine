@@ -5,16 +5,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from chess_engine import _core
-from chess_engine.bots._search_bots import DEFAULT_TECHNIQUES
-from chess_engine.bots.bot_registry import BotRegistry
-from chess_engine.bots.chess_bot import ChessBot
-from chess_engine.bots.iterative_model_book_bot import DEFAULT_MODEL
+from chess_engine.bots.search_bot import DEFAULT_MODEL, DEFAULT_TECHNIQUES, HEURISTIC
+from chess_engine.bots.time_manager import TimeManager
 from chess_engine.models import installed_models
-from chess_engine.search.time_management import TimeManager
-
-HEURISTIC = "h1"
-HEURISTIC_BOT = "IterativeHeuristicBot"
-MODEL_BOT = "IterativeModelBookBot"
 
 #: Name shown for each evaluation next to its short id (docs/MODELS.md).
 EVALUATION_NAMES: Dict[str, str] = {
@@ -75,24 +68,18 @@ class AISettings:
     techniques: Tuple[str, ...] = tuple(DEFAULT_TECHNIQUES)
     threads: int = DEFAULT_THREADS
 
-    @property
-    def bot_name(self) -> str:
-        """Registered bot that plays this evaluation."""
-        return HEURISTIC_BOT if self.evaluation == HEURISTIC else MODEL_BOT
-
     def bot_options(self) -> Dict[str, Any]:
-        """Constructor options for :meth:`BotRegistry.get_bot`.
+        """Constructor options for :class:`~chess_engine.bots.search_bot.SearchBot`.
 
         :return: Keyword arguments of the bot.
         """
         options: Dict[str, Any] = {
+            "evaluation": self.evaluation,
             "max_depth": self.max_depth,
             "quiescence_plies": self.quiescence_plies,
             "techniques": tuple(self.techniques),
             "threads": self.threads,
         }
-        if self.evaluation != HEURISTIC:
-            options["model"] = self.evaluation
         if not self.opening_book:
             options["opening_book"] = None
         if not self.tablebase:
@@ -141,18 +128,3 @@ class MatchSetup:
     def has_humans(self) -> bool:
         """True if somebody sits at the board."""
         return self.white.is_human or self.black.is_human
-
-
-def build_bot(settings: AISettings, registry: Optional[BotRegistry] = None) -> ChessBot:
-    """Create the bot for some settings.
-
-    :param settings: Choices of the settings dialog.
-    :param registry: Registry to take the bot class from (default: a new one).
-    :return: A new bot, not shared with anybody.
-    :raises RuntimeError: If the registry cannot build it (e.g. the model file is missing).
-    """
-    registry = registry or BotRegistry()
-    bot = registry.get_bot(settings.bot_name, **settings.bot_options())
-    if bot is None:
-        raise RuntimeError(f"could not build the bot for {settings.evaluation}")
-    return bot

@@ -2,7 +2,7 @@
 
 import math
 
-from chess_engine.search.time_management import TimeManager
+from chess_engine.bots.time_manager import TimeManager
 
 
 def test_budget_is_a_fraction_of_the_clock_within_bounds():

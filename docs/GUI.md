@@ -45,12 +45,12 @@ mate, which is a draw.
 
 ## AI settings
 
-Every setting is an option of `BotRegistry.get_bot(name, **options)` (`gui/settings.py`:
+Every setting is an option of `SearchBot(**options)` (`gui/settings.py`:
 `AISettings.bot_options`). The defaults are those of the bots.
 
 | Setting | Bot option | Default |
 |---|---|---|
-| Evaluation: the hand-written heuristic `h1` or a model whose file exists, shown as full name and id, e.g. "Piece-square-and-terms logistic model (`linear_pst_terms`)" | the bot (`IterativeHeuristicBot` or `IterativeModelBookBot`) and `model` | `linear_pst_terms` |
+| Evaluation: the hand-written heuristic `h1` or a model whose file exists, shown as full name and id, e.g. "Piece-square-and-terms logistic model (`linear_pst_terms`)" | `evaluation` | `linear_pst_terms` |
 | Maximum depth (0 = no limit: the time decides) | `max_depth` | no limit |
 | Fixed time per move; unchecked, the bot spends a share of its clock | `time_manager` | 3 s |
 | Opening book | `opening_book` | on |

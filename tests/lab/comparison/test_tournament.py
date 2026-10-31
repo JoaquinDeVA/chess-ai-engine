@@ -265,13 +265,9 @@ def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
     class Result:
         winner, result, termination, total_moves = "white", "1-0", "checkmate", 1
 
-    class FakeManager:
-        def __init__(self, registry):
-            pass
-
-        def play_game(self, white, black, base, increment, **kwargs):
-            white.get_move(chess.Board(kwargs["starting_position"]), base)
-            return Result()
+    def fake_play_game(white, black, base, increment, **kwargs):
+        white.get_move(chess.Board(kwargs["starting_position"]), base)
+        return Result()
 
     depths = []
 
@@ -280,7 +276,7 @@ def test_play_game_writes_the_move_log(tmp_path, monkeypatch):
         return _FakePlayer()
 
     monkeypatch.setattr(tournament, "make_player", fake_make_player)
-    monkeypatch.setattr(tournament, "GameManager", FakeManager)
+    monkeypatch.setattr(tournament, "play_game", fake_play_game)
     job = ("a:x", "h1", chess.STARTING_FEN, 5.0, 0.1, tmp_path / "logs", 3, 2)
     record = tournament._play_game(job)
     assert depths == [2, 2] and record["max_depth"] == 2
@@ -320,19 +316,15 @@ def test_play_game_records_and_passes_the_estimator(monkeypatch):
     class Result:
         winner, result, termination, total_moves = None, "1/2-1/2", "stalemate", 0
 
-    class FakeManager:
-        def __init__(self, registry):
-            pass
-
-        def play_game(self, white, black, base, increment, **kwargs):
-            return Result()
+    def fake_play_game(white, black, base, increment, **kwargs):
+        return Result()
 
     def fake_make_player(spec, tm, max_depth=30, **options):
         seen.append(options)
         return _FakePlayer()
 
     monkeypatch.setattr(tournament, "make_player", fake_make_player)
-    monkeypatch.setattr(tournament, "GameManager", FakeManager)
+    monkeypatch.setattr(tournament, "play_game", fake_play_game)
     record = tournament._play_game(
         ("a", "b", chess.STARTING_FEN, 5.0, 0.1, None, 0, 30, "node_growth")
     )

@@ -9,7 +9,7 @@ import math
 import statistics
 from typing import Any, Dict, List, Sequence, Tuple
 
-from chess_engine.engine.game_manager import FORFEIT_TERMINATIONS
+from chess_engine.game.play import FORFEIT_TERMINATIONS
 from chess_lab.comparison.tradeoff import HEURISTICS
 from chess_lab.models.cards import card_path, load_card, save_card
 

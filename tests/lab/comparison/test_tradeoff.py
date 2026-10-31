@@ -4,8 +4,7 @@ import chess
 import pandas as pd
 import pytest
 
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
-from chess_engine.bots.iterative_model_book_bot import IterativeModelBookBot
+from chess_engine.bots.search_bot import SearchBot
 from chess_lab.comparison import tradeoff
 from chess_lab.comparison.tradeoff import (
     HEURISTICS,
@@ -27,12 +26,12 @@ def test_fixed_time_manager_budget_is_exact():
 def test_make_player_builds_model_and_heuristic_players(material_model):
     manager = fixed_time_manager(0.2)
     model_player = make_player(material_model, manager, max_depth=4)
-    assert isinstance(model_player, IterativeModelBookBot)
+    assert isinstance(model_player, SearchBot)
     assert model_player.max_depth == 4
     assert model_player.opening_book is None and model_player.tablebase is None
     assert model_player.time_manager is manager
     player = make_player("h1", manager)
-    assert isinstance(player, IterativeHeuristicBot)
+    assert isinstance(player, SearchBot) and player.evaluation == "h1"
     assert player.time_manager is manager
 
 
@@ -75,4 +74,4 @@ def test_tradeoff_accepts_h1_spec():
     assert "h1" in HEURISTICS
     validate_specs(["h1"])
     player = make_player("h1", fixed_time_manager(0.2))
-    assert isinstance(player, IterativeHeuristicBot)
+    assert isinstance(player, SearchBot)

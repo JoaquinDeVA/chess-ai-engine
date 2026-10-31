@@ -13,7 +13,7 @@ const MAX_GROWTH: f64 = 8.0;
 /// Growth assumed when there is nothing to measure it from.
 const DEFAULT_GROWTH: f64 = 4.0;
 
-/// Names of the estimators, as the Python registry lists them.
+/// Names of the estimators, as `SearchBot` accepts them.
 pub const NAMES: [&str; 7] = [
     "never_stop",
     "ratio_squared",

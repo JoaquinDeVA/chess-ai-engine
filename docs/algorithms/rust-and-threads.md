@@ -78,7 +78,7 @@ other and, ignoring what the others find, they would prune less.
 **How it is implemented.** `iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; the
 table is `SharedTable` in `rust/src/search/shared.rs`, with three atomic words per slot checked by
 XOR (a slot torn by two writers is ignored). `threads` and `hash_mb` are options of
-`IterativeDeepeningBot` and the thread setting of the window. The tournaments use one thread, so
+`SearchBot` and the thread setting of the window. The tournaments use one thread, so
 that games are reproducible and the clock is fair among processes. With more than one thread the
 search is not deterministic and the evaluation must run in the core.
 

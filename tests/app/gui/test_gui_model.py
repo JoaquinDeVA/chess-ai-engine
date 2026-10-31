@@ -3,6 +3,7 @@
 import chess
 import pytest
 
+from chess_engine.bots.search_bot import SearchBot
 from chess_engine.gui.game_model import (
     Clock,
     GameModel,
@@ -14,7 +15,6 @@ from chess_engine.gui.settings import (
     MatchSetup,
     PlayerSetup,
     available_evaluations,
-    build_bot,
     evaluation_label,
 )
 
@@ -144,23 +144,21 @@ def test_ai_settings_become_bot_options():
     options = AISettings(
         evaluation="linear_material", max_depth=5, move_time=2.0, opening_book=False
     ).bot_options()
-    assert options["model"] == "linear_material" and options["max_depth"] == 5
+    assert options["evaluation"] == "linear_material" and options["max_depth"] == 5
     assert options["opening_book"] is None and "tablebase" not in options
     assert options["time_manager"].max_turn_time == 2.0
     heuristic = AISettings(evaluation=HEURISTIC, move_time=None, tablebase=False)
-    assert heuristic.bot_name == "IterativeHeuristicBot"
-    assert "model" not in heuristic.bot_options()
+    assert heuristic.bot_options()["evaluation"] == HEURISTIC
     assert "time_manager" not in heuristic.bot_options()
     assert heuristic.bot_options()["tablebase"] is None
 
 
-def test_build_bot_applies_the_settings():
+def test_bot_options_build_a_search_bot():
     settings = AISettings(
         evaluation="linear_material", max_depth=4, opening_book=False, tablebase=False, threads=1
     )
-    bot = build_bot(settings)
+    bot = SearchBot(**settings.bot_options())
     assert bot.max_depth == 4 and bot.opening_book is None and bot.tablebase is None
-    assert bot is not build_bot(settings)
 
 
 def test_setup_names_and_evaluations():

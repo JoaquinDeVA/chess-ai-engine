@@ -6,7 +6,7 @@ import random
 import chess
 import pytest
 
-from chess_engine.bots.iterative_heuristic_bot import IterativeHeuristicBot
+from chess_engine.bots.search_bot import HEURISTIC, SearchBot
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from tests.paths import ROOT, SYZYGY
 
@@ -40,7 +40,7 @@ def test_random_won_positions_are_legal_wins_for_white(script, tables, monkeypat
 
 def test_the_tablebase_winner_converts_kq_against_k(script, tables):
     start = chess.Board("8/8/8/8/8/2k5/8/K6Q w - - 0 1")
-    winner = IterativeHeuristicBot(tablebase=tables, opening_book=None)
+    winner = SearchBot(HEURISTIC, tablebase=tables, opening_book=None)
     assert script.convert(start, winner, tables, max_moves=30) is not None
 
 
@@ -48,7 +48,7 @@ def test_a_game_that_is_not_mated_in_time_returns_none(script, tables):
     start = chess.Board("8/8/8/8/8/2k5/8/K6Q w - - 0 1")
     assert (
         script.convert(
-            start, IterativeHeuristicBot(tablebase=tables, opening_book=None), tables, max_moves=2
+            start, SearchBot(HEURISTIC, tablebase=tables, opening_book=None), tables, max_moves=2
         )
         is None
     )

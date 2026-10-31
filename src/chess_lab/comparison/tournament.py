@@ -24,9 +24,8 @@ from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequenc
 import chess
 
 from chess_engine import _core
-from chess_engine.bots.bot_registry import BotRegistry
-from chess_engine.engine.game_manager import GameManager
-from chess_engine.search.time_management import TimeManager
+from chess_engine.bots.time_manager import TimeManager
+from chess_engine.game.play import play_game
 from chess_lab.comparison.standings import DEFAULT_MAX_DEPTH
 from chess_lab.comparison.tradeoff import make_player
 
@@ -290,7 +289,7 @@ def _play_game(job: Job) -> Dict[str, Any]:
         black_player = RecordingPlayer(
             make_player(black, TimeManager(), max_depth, estimator=estimator)
         )
-        result = GameManager(BotRegistry()).play_game(
+        result = play_game(
             white_player, black_player, base, increment, starting_position=fen, verbose=False
         )
     except Exception as exc:  # a crashed game must not stop the tournament

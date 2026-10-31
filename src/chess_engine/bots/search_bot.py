@@ -1,23 +1,16 @@
-"""Base classes shared by the search-based bots.
-
-The leading underscore keeps this file out of the bot registry (it contains no playable bot).
-
-* :class:`IterativeDeepeningBot` - clock-aware iterative deepening with a transposition table,
-  killer moves and capture ordering; subclasses only provide an evaluation.
-"""
+"""The bot: clock-aware iterative deepening run by the Rust core, with an opening book and tablebases."""
 
 import logging
-from abc import abstractmethod
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 import chess
 
 from chess_engine import _core
-from chess_engine.bots.chess_bot import ChessBot
+from chess_engine.bots.search_statistics import SearchStatistics
+from chess_engine.bots.time_manager import TimeManager
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
-from chess_engine.search.statistics import SearchStatistics
-from chess_engine.search.time_management import TimeManager
+from chess_engine.models import h1_evaluator, load_evaluator
 
 #: Techniques of selective search the bots use by default: the ones that won in the games against
 #: the reference search (docs/algorithms/selective-techniques.md). ``lmr`` is left out.
@@ -31,7 +24,11 @@ DEFAULT_MAX_TT_ENTRIES = _core.DEFAULT_MAX_TT_ENTRIES
 
 logger = logging.getLogger(__name__)
 
-AUTHOR = "Joaquin De Vicente Abad"
+#: Evaluation that is the hand-written heuristic instead of a saved model.
+HEURISTIC = "h1"
+
+#: Model used when none is given: the best player in the tournaments (see docs/RESULTS.md), shipped with the repository.
+DEFAULT_MODEL = "linear_pst_terms"
 
 #: Value of ``opening_book`` and ``tablebase`` that means "the ones shipped with the project".
 SHIPPED = "shipped"
@@ -65,54 +62,7 @@ def fallback_move(board: chess.Board) -> chess.Move:
 DEFAULT_QUIESCENCE_PLIES = _core.DEFAULT_QUIESCENCE_PLIES
 
 
-class _StatisticsMixin:
-    """Accumulates search statistics over a game."""
-
-    last_search_stats: Optional[SearchStatistics]
-    total_nodes_visited: int
-    total_pruning_count: int
-    move_count: int
-
-    def reset_statistics(self) -> None:
-        """Forget the statistics of previous games."""
-        self.last_search_stats = None
-        self.total_nodes_visited = 0
-        self.total_pruning_count = 0
-        self.move_count = 0
-
-    def record_statistics(self, stats: SearchStatistics) -> None:
-        """Add the statistics of one search.
-
-        :param stats: Statistics returned by the search.
-        """
-        self.last_search_stats = stats
-        self.total_nodes_visited += stats.nodes_visited
-        self.total_pruning_count += stats.pruning_count
-        self.move_count += 1
-
-    def get_search_statistics(self) -> Dict[str, Any]:
-        """Search statistics of the current game, for analysis.
-
-        :return: Totals, per-move averages and the details of the last search.
-        """
-        moves = self.move_count
-        stats: Dict[str, Any] = {
-            "total_nodes_visited": self.total_nodes_visited,
-            "total_pruning_count": self.total_pruning_count,
-            "move_count": moves,
-            "avg_nodes_per_move": self.total_nodes_visited / moves if moves else 0,
-            "avg_pruning_per_move": self.total_pruning_count / moves if moves else 0,
-        }
-        if self.last_search_stats:
-            stats["last_search"] = {
-                "nodes_visited": self.last_search_stats.nodes_visited,
-                "pruning_count": self.last_search_stats.pruning_count,
-                "max_depth_reached": self.last_search_stats.max_depth_reached,
-            }
-        return stats
-
-
-class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
+class SearchBot:
     """Clock-aware iterative deepening alpha-beta, run by the Rust core.
 
     Every move gets a time budget from the :class:`TimeManager`; the search deepens until the
@@ -121,10 +71,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
     killer moves persist during a game and are cleared when a new game starts: their values are
     from the point of view of the colour the bot played.
 
-    Subclasses implement :meth:`native_evaluator`, the evaluation the core runs.
-
-    :param name: Bot name shown in games and tournaments.
-    :param author: Author shown in bot listings.
+    :param evaluation: ``"h1"`` (the hand-written heuristic), a model name or ``name@tag`` for a
+        tagged artifact.
+    :param name: Bot name shown in games and tournaments (default: the evaluation).
     :param max_depth: Deepest iteration to run; ``None`` (default) lets the time decide. A fixed
         depth is for benchmarks and tests.
     :param time_manager: Time budgeting policy.
@@ -151,8 +100,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
 
     def __init__(
         self,
-        name: str,
-        author: str = AUTHOR,
+        evaluation: str = DEFAULT_MODEL,
+        name: Optional[str] = None,
         max_depth: Optional[int] = None,
         time_manager: Optional[TimeManager] = None,
         max_tt_entries: int = DEFAULT_MAX_TT_ENTRIES,
@@ -165,7 +114,8 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         hash_mb: int = 64,
         techniques: Sequence[str] = DEFAULT_TECHNIQUES,
     ):
-        super().__init__(name, author)
+        self.evaluation = evaluation
+        self.name = name or evaluation
         self.max_depth = MAX_DEPTH if max_depth is None else max_depth
         self.time_manager = time_manager or TimeManager()
         self.max_tt_entries = max_tt_entries
@@ -179,16 +129,9 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         self.techniques = tuple(techniques)
         self.threads = threads
         self.searcher = _core.Searcher(max_tt_entries, threads, hash_mb)
-        self._native: Optional[_core.Evaluator] = None
+        self._evaluator = h1_evaluator() if evaluation == HEURISTIC else load_evaluator(evaluation)
         self.turn_budget = self.time_manager.turn_budget(float("inf"))
-        self.reset_statistics()
-
-    @abstractmethod
-    def native_evaluator(self) -> "_core.Evaluator":
-        """The evaluation the Rust core runs.
-
-        :return: Evaluator.
-        """
+        self.last_search_stats: Optional[SearchStatistics] = None
 
     def on_game_start(self, color: chess.Color, opponent_name: str) -> None:
         """Clear everything learned in the previous game.
@@ -197,7 +140,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param opponent_name: Name of the opponent.
         """
         self.searcher.clear()
-        self.reset_statistics()
+        self.last_search_stats = None
         self.in_book = self.opening_book is not None
 
     def search(self, board: chess.Board, time_limit: float) -> Optional[chess.Move]:
@@ -207,13 +150,11 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
         :param time_limit: Seconds left on the clock.
         :return: The best move found, or None if the search could not produce one.
         """
-        if self._native is None:
-            self._native = self.native_evaluator()
         self.turn_budget = self.time_manager.turn_budget(time_limit)
         uci, raw = self.searcher.search(
             board.root().fen(),
             [move.uci() for move in board.move_stack],
-            self._native,
+            self._evaluator,
             self.max_depth,
             self.turn_budget,
             self.time_manager.hard_limit(self.turn_budget),
@@ -224,7 +165,7 @@ class IterativeDeepeningBot(_StatisticsMixin, ChessBot):
             list(self.techniques),
         )
         stats = SearchStatistics.from_core(raw)
-        self.record_statistics(stats)
+        self.last_search_stats = stats
         logger.debug(
             "%s searched %d nodes to ply %d",
             self.name,

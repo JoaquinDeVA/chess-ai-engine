@@ -4,7 +4,7 @@ The folders mirror the source: a test sits where the code it checks sits.
 
 | Folder | Checks | Source |
 |---|---|---|
-| `app/bots/`, `app/engine/`, `app/search/` | bots and their registry, the game loop, the time budget and the estimators | `src/chess_engine/{bots,engine,search}/` |
+| `app/bots/`, `app/game/` | the bot, the time budget and the estimators, the game loop | `src/chess_engine/{bots,game}/` |
 | `app/models/` | the loader, tagged specs and the shipped models through the core | `src/chess_engine/models/` |
 | `lab/models/` | model definitions, feature extractors, target representation, fitting and the Python evaluation | `src/chess_lab/models/` |
 | `app/knowledge/`, `app/gui/` | opening book, endgame tables, the window (the widgets are skipped without PySide6) | `src/chess_engine/{knowledge,gui}/` |

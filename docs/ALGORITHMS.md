@@ -13,7 +13,7 @@ with five parts (problem, what it does, how it is implemented, measured effect, 
 
 The search was first written in Python and moved to Rust ([Rust and threads](algorithms/rust-and-threads.md)). The node counts, the pruning
 counts and the moves quoted in these pages were measured with the Python engine; the Rust core
-reproduces them exactly (the golden files in `tests/golden/` check it on every run), so they hold
+reproduced them exactly when it replaced the Python engine, so they hold
 for both. Only the time per node changed, and that page gives the speed.
 
 ## The main algorithm: alpha-beta search

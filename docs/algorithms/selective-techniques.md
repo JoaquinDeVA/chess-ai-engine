@@ -8,8 +8,7 @@
 
 ## Search techniques: the switches and how they were judged
 
-The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it, and `tests/golden/` pins
-its values, moves and node counts. Each technique is a field of `Techniques` (`rust/src/search/mod.rs`), a
+The search of the classic techniques ([search basics](search-basics.md)) and the Rust core ([Rust and threads](rust-and-threads.md)) is the *reference*: every technique below is off in it. Each technique is a field of `Techniques` (`rust/src/search/mod.rs`), a
 name in `_core.TECHNIQUES`, the option `techniques` of `IterativeDeepeningBot` and the Advanced panel of the AI settings of the window
 (`list`, `all` or `none`; `all` is the seven names of `_core.TECHNIQUES`, `lmr` included, and so is the suffix `+all`). The bots use `DEFAULT_TECHNIQUES` (`src/chess_engine/bots/_search_bots.py`): all but
 `lmr`. `make_player` (tournaments and measurements) uses none unless the player is written `model+tech1,tech2`,
@@ -59,7 +58,7 @@ Black as the reference) and the one of the player to move is read.
 **How it is implemented.** `NetState` in `rust/src/eval/net.rs` behind the `EvalState` trait (`apply`,
 `apply_null`, `undo`, `evaluate`), with a stack of snapshots so `undo` is a pop. The search holds the state
 beside `GameState`. Switch: `incremental`. Test: `incremental_equals_full` (same values as the full evaluation up
-to rounding) and `tests/core/test_core_golden.py::test_the_incremental_network_gives_the_same_search`.
+to rounding).
 
 **Measured effect.** About 15 % more nodes per second for `net4_pst`
 (`python src/chess_lab/scripts/bench/measure_search_speed.py --techniques incremental`). Rounding can break a tie, so node counts

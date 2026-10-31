@@ -7,9 +7,7 @@ import pytest
 from chess_engine import _core
 from chess_engine.models import linear_eval, linear_features
 from chess_engine.models.native import model_evaluator
-from tests.paths import GOLDEN
-
-POSITIONS = GOLDEN / "positions.json"
+from tests.paths import POSITIONS
 
 
 def feature_classes():

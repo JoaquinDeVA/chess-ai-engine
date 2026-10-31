@@ -30,10 +30,9 @@ fn layer(fan_in: usize, fan_out: usize, seed: u64) -> Layer {
 #[ignore]
 fn split_of_the_cost_of_one_evaluation() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let file: Value = serde_json::from_str(
-        &fs::read_to_string(root.join("tests/golden/positions.json")).unwrap(),
-    )
-    .unwrap();
+    let file: Value =
+        serde_json::from_str(&fs::read_to_string(root.join("tests/data/positions.json")).unwrap())
+            .unwrap();
     let positions: Vec<_> = file["positions"]
         .as_array()
         .unwrap()

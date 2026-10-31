@@ -111,7 +111,7 @@ src/chess_lab/  the laboratory (not needed to play)
   comparison/   judge, trade-off profile, tournament (and its entry point) and the results table
   scripts/      data pipeline, experiments (data/, bench/) and run_full_pipeline.sh
 docs/           the documentation
-tests/          the test suite (tests/golden: the files that pin the core to the Python engine it replaced)
+tests/          the test suite
 ```
 
 ## Tests

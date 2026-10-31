@@ -21,11 +21,9 @@ evaluation and the time limits.
 
 **How it is implemented.** The crate in `rust/` is built as the Python module `chess_engine._core`
 (PyO3 and `maturin`) on top of `shakmaty` for the rules. Nothing changed in the algorithm: the Rust
-core reproduces the Python engine node for node. `tests/golden/` holds what the Python engine
-produced (2,000 positions with their histories, the features and values of every evaluation,
-fixed-depth searches of `h1` and the five models with value, move, nodes and prunings, book
-lookups and tablebase moves) and `rust/tests/golden_*.rs` and `tests/core/test_core_golden.py` compare
-the core with it. The legal moves are listed in the order python-chess generates them
+core reproduced the Python engine node for node when it replaced it (checked then against files the Python engine
+produced; they were removed afterwards and live in git history). Today `rust/tests/rules.rs` (perft, end of game) and
+`rust/tests/knowledge.rs` check the rules, the book and the tables. The legal moves are listed in the order python-chess generates them
 (`generation_order`), so that moves of equal value are chosen as before. Replaying the 21,203 moves
 of the 200 recorded games of the depth-3 tournament, the core plays 21,192 of them (99.95 %) with
 the same number of nodes; the 11 others differ in the last decimal of a value.

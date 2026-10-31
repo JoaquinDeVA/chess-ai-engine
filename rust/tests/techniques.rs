@@ -1,5 +1,5 @@
 //! The techniques that only change the order or the windows of the search must give the value of
-//! the reference search. Positions: the golden ones; evaluation: `h1`.
+//! the reference search. Positions: tests/data/positions.json; evaluation: `h1`.
 
 use std::fs;
 use std::path::PathBuf;
@@ -29,7 +29,7 @@ fn h1() -> H1 {
 /// Values of the first `count` positions at `depth` with the given techniques (iterative
 /// deepening from depth 1, so that the table and the history have something to use).
 fn values(techniques: Techniques, depth: i32, count: usize) -> Vec<f64> {
-    let positions = read(root().join("tests/golden/positions.json"));
+    let positions = read(root().join("tests/data/positions.json"));
     let eval = h1();
     let clock = || 0.0;
     let options = Options {
@@ -130,7 +130,7 @@ fn pvs_does_not_change_the_value() {
 fn aspiration_windows_do_not_change_the_value() {
     // the iterations of this helper are searched by hand, so the windows are tested through the
     // deepening below
-    let positions = read(root().join("tests/golden/positions.json"));
+    let positions = read(root().join("tests/data/positions.json"));
     let eval = h1();
     let clock = || 0.0;
     let mut checked = 0;
@@ -192,7 +192,7 @@ fn aspiration_windows_do_not_change_the_value() {
 
 /// Values of the first `count` positions at depth `depth`, one search each (no deepening).
 fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(f64, Option<String>)> {
-    let positions = read(root().join("tests/golden/positions.json"));
+    let positions = read(root().join("tests/data/positions.json"));
     let eval = h1();
     let clock = || 0.0;
     let options = Options {

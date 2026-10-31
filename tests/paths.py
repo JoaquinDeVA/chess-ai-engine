@@ -3,5 +3,5 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-GOLDEN = Path(__file__).resolve().parent / "golden"
+POSITIONS = Path(__file__).resolve().parent / "data" / "positions.json"
 SYZYGY = Path(__file__).resolve().parent / "data" / "syzygy"

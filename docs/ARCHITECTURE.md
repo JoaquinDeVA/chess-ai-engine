@@ -166,10 +166,9 @@ toolchain, `rustup`). After a change in `rust/` run the same command again, or `
 and then the tests. `cargo test --manifest-path rust/Cargo.toml` runs the Rust tests;
 `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` are checked by CI as well.
 
-The Rust core was checked against the Python engine it replaced through golden files
-(`tests/golden/`): positions, terminal tests, features, evaluations, fixed-depth searches (value,
-move and node counts), opening-book lookups and tablebase moves. The tests that read them are
-`tests/core/test_core_golden.py` and `rust/tests/golden_*.rs`.
+The rules of the Rust core are checked by perft and end-of-game tests (`rust/tests/rules.rs`), the book and the
+tables by `rust/tests/knowledge.rs`, the techniques by `rust/tests/techniques.rs` and the features against the
+Python extractors by `tests/core/test_feature_parity.py`.
 
 ## Adding a bot
 
@@ -231,7 +230,7 @@ several threads. To give a feature set its Rust version:
    same order, as the Python `active` (the training encodes with the Python one, so a difference
    means training on one thing and playing with another);
 2. run `tests/core/test_feature_parity.py`, which compares the two on 300 positions for every registered
-   feature family (and, for the shipped ones, `tests/core/test_core_golden.py`);
+   feature family;
 3. rebuild with `pip install -e .` and run `cargo test --manifest-path rust/Cargo.toml`.
 
 The search is written for chess (it uses `shakmaty` for the rules); another game would need

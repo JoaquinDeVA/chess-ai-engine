@@ -11,6 +11,7 @@ All notable changes. The newest are first.
 - Search depth is decided by the clock: the bots no longer default to `max_depth=3` and `min_depth` is 1 (was 3); `max_depth` is an optional explicit limit (`None` = no limit, technical cap `MAX_DEPTH` = 30). In the window, "Maximum depth" 0 means no limit.
 
 ### Removed
+- The reference files that pinned the core to the Python engine (their test and the Rust tests that read them); the rules are checked by perft and end-of-game tests in `rust/tests/rules.rs`, the book and tables by `rust/tests/knowledge.rs`, and the positions of the technique tests moved to `tests/data/positions.json`.
 - The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
 - `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
 
@@ -38,7 +39,7 @@ results published for 1.1 were played with the Python engine and are not compara
   with `maturin`): the rules (on `shakmaty`), alpha-beta with iterative deepening, transposition table, killers,
   MVV-LVA and quiescence, the time estimators, the evaluations of `h1`, the four logistic models and `net4_pst`, the
   opening book and the Syzygy tables. It plays the same moves with the same node counts as the Python engine it
-  replaces (`tests/golden/`, `tests/test_core_golden.py`, `rust/tests/`), only faster. Installing needs a Rust
+  replaces, only faster. Installing needs a Rust
   toolchain; CI runs `cargo fmt`, `clippy` and `cargo test`. See [Algorithms](docs/algorithms/rust-and-threads.md).
 - **Six search techniques** behind switches (`--techniques LIST|all|none`, constructor option `techniques`): incremental
   accumulator for `net4_pst`, table move first, history heuristic, principal variation search, aspiration windows
@@ -72,7 +73,7 @@ results published for 1.1 were played with the Python engine and are not compara
 ### Removed
 - The Python search (`game_algorithms`, `search_utils`, `time_estimators`, `game_problems`, `chess_problem`), its tests,
   `scripts/bench/bench_search_speed.py` (replaced by `measure_search_speed.py`) and `docs/benchmarks/`. The Python
-  engine is recoverable from git history; `tests/golden/` keeps its behaviour.
+  engine is recoverable from git history.
 - `main.py --mode tournament`, `GameManager.run_tournament`, `TournamentResult` and
   `BotRegistry.get_tournament_ready_bots`: tournaments run from `scripts/bench/play_tournament.py`. `--export` now
   only names the PGN file of the game.

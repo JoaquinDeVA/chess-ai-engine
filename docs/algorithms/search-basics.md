@@ -255,7 +255,7 @@ occurred three times or a legal move reaches one that occurred twice.
 
 **How it is implemented.** `GameState::outcome` and `can_claim_threefold` in `rust/src/board.rs`;
 the history is rebuilt on every call from the root FEN and the moves played. Tests:
-`rust/tests/golden_board.rs`, which checks 2,066 positions and histories against the Python engine.
+`rust/tests/rules.rs` (end of game by mate, stalemate, insufficient material, fifty moves and repetition).
 
 **Measured effect.** Commit `ba3d5cb` reports, at depth 3 on the fixed benchmark of the Python
 engine, the same moves and nodes as the baseline and a search 1.89 times faster (the 10.8 s to 3.7 s

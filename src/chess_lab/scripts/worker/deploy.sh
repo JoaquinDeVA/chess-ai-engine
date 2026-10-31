@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Copia al trabajador el binario UCI, fastchess y las aperturas.
 # Uso: deploy.sh   (HOST y PORT se pueden sobrescribir por entorno)
+# Se compila en el portátil (glibc 2.39) y se copia: el trabajador tiene glibc 2.43 y no tiene Rust.
 set -euo pipefail
 
 HOST="${HOST:-devicente@192.168.1.124}"

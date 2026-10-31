@@ -15,7 +15,9 @@ python-chess board and the evaluations, not into the algorithm.
 ## Idea
 
 Keep the algorithm and change the language: the same search, node for node, in a compiled language, so that every
-earlier measurement of nodes and moves still holds and only the time per node changes.
+earlier measurement of nodes and moves still holds and only the time per node changes. Rust rather than C or C++,
+which would be as fast per node but need CMake and `ctypes`: Rust builds into the Python package with PyO3 and
+`maturin`, and brings `shakmaty` and `shakmaty-syzygy` for the rules and the tables.
 
 ## How it works
 

@@ -58,4 +58,5 @@ tables the winner mates in 52 of 60 (mean 14.2 moves); without them, in 8 of 60 
 ## Status
 
 Adopted as an option of the window; since 2026-10-21 (`2fc0f86`). The UCI binary does not use the tables, so
-engine matches compare search and evaluation only.
+engine matches compare search and evaluation only. The tables are permanent data, kept when the training data is
+deleted.

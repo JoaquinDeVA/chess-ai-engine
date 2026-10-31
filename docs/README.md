@@ -35,9 +35,6 @@ laboratory that trains and measures the models are in Python.
 | [Training](TRAINING.md) | The effort scale, what training does, how to reproduce everything |
 | [Measurement](MEASUREMENT.md) | How a change is judged: fastchess matches, paired openings, SPRT, the A/A check |
 | [Openings](OPENINGS.md) | The suite of balanced starting positions for engine matches |
-| [Remote worker](WORKER.md) | How matches run on the desktop machine over SSH |
-| [Decisions](DECISIONS.md) | The design decisions in force, with reason and evidence |
-| [Pitfalls](PITFALLS.md) | What already cost time: symptom, cause, what to do |
 
 The installation and the commands to play are in the [README of the repository](../README.md).
 The history of changes is in the [changelog](../CHANGELOG.md).

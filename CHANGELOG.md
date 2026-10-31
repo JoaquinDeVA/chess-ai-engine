@@ -6,23 +6,16 @@ All notable changes. The newest are first.
 
 ### Added
 - **A window to play** (`python main.py`, `chess_engine.gui`, optional extra `gui` with PySide6): board in the chess.com style, pieces by cburnett (GPLv2+, `src/chess_engine/gui/assets/pieces/LICENSE.md`), human vs AI and AI vs AI, clocks, move list with navigation, undo, draw, resign, and a Settings dialog per AI (depth, time per move, opening book, tablebases, search techniques, threads). See [The window](docs/GUI.md).
-- **A remote worker for matches**: `src/chess_lab/scripts/worker/` deploys the UCI binary and fastchess to the desktop and plays matches there over SSH. See [Remote worker](docs/WORKER.md).
+- **A remote worker for matches**: `src/chess_lab/scripts/worker/` deploys the UCI binary and fastchess to the desktop and plays matches there over SSH.
 - **An opening suite for matches**: `src/chess_lab/scripts/build_openings.py` writes balanced positions (8 to 10 half-moves from the start, Stockfish within 0.5 pawns) for fastchess. See [Openings](docs/OPENINGS.md).
 - **A UCI engine**, `rust/target/release/uci` (`cargo build --release --bin uci`): the search of the Rust core behind the UCI protocol (`position`, `go depth|movetime|wtime … winc … binc|nodes|infinite`, `setoption` for `Threads`, `Hash`, `Techniques` and `Model`, `stop`, `bestmove`). The window plays through it with `chess_engine/uci.py`. See [Architecture](docs/ARCHITECTURE.md).
+- **Reader-first documentation**: a front page with reader paths, one page per search technique (problem, idea, how it works with a worked example, implementation, measured effect, status) with light and dark diagrams, [How the engine chooses a move](docs/SEARCH.md) and [How a change is measured](docs/MEASUREMENT.md) (fastchess, SPRT, the A/A check). [Results](docs/RESULTS.md) separates what is measured from what is estimated and marks the Python-engine tournaments as history.
 
 ### Changed
 - The window's AI is the UCI engine: the Python bot classes, the Python game loop and the Python search wrapper are gone. The window keeps the book and the tablebases in Python, before the engine. The engine has one evaluation (`linear_pst_terms`) and quiescence fixed at 4 plies, so the Settings dialog no longer offers them.
 - The laboratory measures models with `python -m chess_lab.measure.{report,evaluate}`. Games between engines are no longer played by this repository: fastchess plays them against the UCI binary. The pipeline `run_full_pipeline.sh` no longer runs tournaments.
 - Dependencies: `numpy` is a base dependency; `joblib` and `pytest-cov` were dropped.
 - Search depth is decided by the clock: the bots no longer default to `max_depth=3` and `min_depth` is 1 (was 3); `max_depth` is an optional explicit limit (`None` = no limit, technical cap `MAX_DEPTH` = 30). In the window, "Maximum depth" 0 means no limit.
-
-### Removed
-- The reference files that pinned the core to the Python engine (their test and the Rust tests that read them); the rules are checked by perft and end-of-game tests in `rust/tests/rules.rs`, the book and tables by `rust/tests/knowledge.rs`, and the positions of the technique tests moved to `tests/data/positions.json`.
-- The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
-- `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
-- The Python game loop and bots (`chess_engine.bots`, `chess_engine.game`), the Python tournament (`chess_lab.tournaments`, `chess_lab.players`, `measure/tradeoff.py`) and the experiment scripts in `scripts/bench/`. The results they produced stay in [Results](docs/RESULTS.md); their code is in the git history before this version.
-
-### Changed
 - Training moved out of the application: `chess_lab.models` now holds the feature extractors, `representation.py`, `spec.py`, `new_model`/`fit_stream` and `PythonEvaluator`. `chess_engine.models` only loads, saves and registers models (`LinearEvalModel(weights, bias, rep)` takes the weights instead of building zeros; `rep` is a plain dictionary and the `.npz` format is unchanged). `EvaluationModel` lost `predict_cp`, `predict_cp_batch` and `cp_to_expected_score`; only the laboratory evaluates in Python.
 - The laboratory is its own package, `chess_lab` (`src/chess_lab/`): `training/`, `comparison/` and the former top-level `scripts/` left `chess_engine`. Commands change from `python -m chess_engine.training.train` and `chess_engine.comparison.*` to `python -m chess_lab.training.train` and `chess_lab.comparison.*`, and scripts from `scripts/...` to `src/chess_lab/scripts/...`. The application no longer imports the laboratory.
 
@@ -32,8 +25,13 @@ All notable changes. The newest are first.
 - The PGN `Event` header is "ChessAIEngine game".
 
 ### Removed
+- The reference files that pinned the core to the Python engine (their test and the Rust tests that read them); the rules are checked by perft and end-of-game tests in `rust/tests/rules.rs`, the book and tables by `rust/tests/knowledge.rs`, and the positions of the technique tests moved to `tests/data/positions.json`.
+- The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
+- `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.
+- The Python game loop and bots (`chess_engine.bots`, `chess_engine.game`), the Python tournament (`chess_lab.tournaments`, `chess_lab.players`, `measure/tradeoff.py`) and the experiment scripts in `scripts/bench/`. The results they produced stay in [Results](docs/RESULTS.md); their code is in the git history before this version.
 - The console game: the ~17 options of `main.py`, `HumanPlayer`, the board printing of `GameManager` and `--mode`; `main.py` now only opens the window.
 - `TimeManager.expired` and `game_manager.load_config`, which nothing used.
+- The Decisions, Pitfalls and Remote worker pages: what was decided is in the page of each technique or model.
 
 ## 2.0.0 (2026-10-26)
 

@@ -49,7 +49,7 @@ Both searched deeper and played no better.
 
 > [!NOTE]
 > **Pending: SPRT at a fixed 20,000 nodes per move.** A re-test of the default with `lmr` (A) against the
-> default without it (B) is running on the [remote worker](../WORKER.md): SPRT with bounds [−5, 0] Elo,
+> default without it (B) is running ([How a change is measured](../MEASUREMENT.md)): SPRT with bounds [−5, 0] Elo,
 > alpha = beta = 0.05, at most 6,000 rounds (12,000 games), 8 games at a time, `Hash` 16 MB. This section will
 > get its result:
 >

@@ -27,3 +27,14 @@ positions of the feature-parity and technique tests) and `data/syzygy/` (five 3-
   handful of synthetic positions.
 - A test that takes more than a few seconds is marked `slow` (`pytest -m "not slow"` skips it).
 - The Rust tests live in `rust/tests/` (`cargo test --release`).
+
+## Pitfalls
+
+- **After touching `rust/`, run `pip install -e ".[dev]"` again.** Otherwise `pytest` tests the old compiled core.
+  `cargo test` does not build the bindings (the `python` feature is off).
+- **The features exist twice.** Training encodes with `src/chess_lab/models/linear_features.py`, the core plays
+  with `rust/src/eval/features.rs`; if they differ, one thing is trained and another played, with no error.
+  `core/test_feature_parity.py` compares them on 300 positions per feature family: keep it green.
+- **The models table of `docs/RESULTS.md` is generated** (`python -m chess_lab.measure.report`); a hand edit is
+  lost, and `test_docs.py` does not check its numbers.
+- **Timing figures need an idle machine.** Do not run the suite or compile while measuring speed.

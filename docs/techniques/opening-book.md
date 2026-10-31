@@ -69,4 +69,5 @@ measured.
 
 ## Status
 
-Adopted in the window; a book was part of the coursework base (2026-10-16), replaced by the one built from the Lichess shards on 2026-10-21 (`19c859e`). The UCI binary has no book.
+Adopted in the window; a book was part of the coursework base (2026-10-16), replaced by the one built from the Lichess shards on 2026-10-21 (`19c859e`). The UCI binary has no book. The book
+(`data/opening_book.json`) is permanent data, kept when the training data is deleted.

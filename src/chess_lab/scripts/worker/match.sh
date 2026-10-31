@@ -6,6 +6,13 @@
 #      match.sh stop NOMBRE                                para fastchess (el estado queda guardado para reanudar)
 # A_ARGS y B_ARGS añaden opciones solo a un motor (p. ej. A_ARGS='nodes=20000 option.Techniques=lmr').
 # Reanudar = repetir el mismo `start NOMBRE`: carga results/NOMBRE/config.json, que fastchess guarda solo.
+# fastchess escribe config.json solo al salir limpio o con SIGINT: parar siempre con `stop`, nunca `kill -9`
+# (se pierde el estado del SPRT; las partidas del PGN siguen valiendo).
+# Un nombre de técnica mal escrito no para nada: el binario responde `info string unknown technique` y sigue con
+# las de serie, y fastchess no lo muestra; probar antes la lista con `setoption` a mano.
+# Si el trabajador no responde tras reiniciar el sobremesa: la IP de WSL2 cambia en cada arranque y hay que
+# rehacer en Windows el `netsh interface portproxy` (2222 -> IP de WSL, puerto 22). sshd escucha por ssh.socket,
+# así que tocar el puerto en sshd_config no hace nada.
 set -euo pipefail
 
 HOST="${HOST:-devicente@192.168.1.124}"

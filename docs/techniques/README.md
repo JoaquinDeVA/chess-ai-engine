@@ -83,5 +83,5 @@ the table shows what was decided, not small differences.
 1. Copy [TEMPLATE.md](TEMPLATE.md) to `docs/techniques/<name>.md` and fill its six parts.
 2. Add a row to the table above and link the page.
 3. Put it behind a switch in `Techniques` (`rust/src/search/options.rs`) and add a test to `rust/tests/techniques.rs`.
-4. Measure it with an SPRT match against the current default ([Remote worker](../WORKER.md)) and write the figure and its command in the page.
-5. If it changes the default, update [RESULTS.md](../RESULTS.md), [DECISIONS.md](../DECISIONS.md) and the [changelog](../../CHANGELOG.md).
+4. Measure it with an SPRT match against the current default ([How a change is measured](../MEASUREMENT.md)) and write the figure and its command in the page.
+5. If it changes the default, update [RESULTS.md](../RESULTS.md) and the [changelog](../../CHANGELOG.md).

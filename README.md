@@ -31,9 +31,9 @@ its command are in [Results](docs/RESULTS.md#the-short-answer).
 | Play against the engine | [The window](docs/GUI.md) |
 | Understand how it chooses a move | [How the engine chooses a move](docs/SEARCH.md), then [Search techniques](docs/techniques/README.md) |
 | Know what each evaluation model contains | [Models](docs/MODELS.md) |
-| Change the code | [Architecture](docs/ARCHITECTURE.md), [Pitfalls](docs/PITFALLS.md) |
+| Change the code | [Architecture](docs/ARCHITECTURE.md) |
 | Rebuild the data or retrain | [Training data](docs/DATA.md), [Training](docs/TRAINING.md) |
-| Read or repeat a measurement | [Results](docs/RESULTS.md), [Remote worker](docs/WORKER.md) |
+| Read or repeat a measurement | [Results](docs/RESULTS.md), [How a change is measured](docs/MEASUREMENT.md) |
 
 Every page is listed in [docs/README.md](docs/README.md); the history of changes is the [changelog](CHANGELOG.md).
 
@@ -80,7 +80,7 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
 
 - Working: the Rust search with six techniques on, the UCI binary, the window, the training and measurement
   pipeline (`DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` prints every command without running it).
-- Engine matches are played with fastchess on a remote machine ([Remote worker](docs/WORKER.md)); the model
+- Engine matches are played with fastchess on a separate machine ([Measurement](docs/MEASUREMENT.md)); the model
   tournaments in [Results](docs/RESULTS.md) predate the Rust engine and are kept as history.
 - Known gaps: the UCI binary ignores the increment (`winc`/`binc`); late move reductions (`lmr`) are
   implemented and off ([lmr](docs/techniques/lmr.md)).

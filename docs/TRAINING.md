@@ -39,6 +39,10 @@ After each epoch the model is scored on a validation sample of up to 50,000 posi
 python -m chess_lab.training.train --model linear_pst_terms --effort 30 --lr-decay 0.5
 ```
 
+Training writes the model's card (`src/chess_lab/models/cards/`); retraining first empties the measurements of
+the previous model (`clear_measurements` in `src/chess_lab/models/cards.py`), so a card never mixes the numbers of
+two models.
+
 ### The cache of encoded batches
 
 Turning a FEN into features is the slow part, and it is identical in every epoch. So the first epoch stores each encoded batch on disk (`data/cache/linear`) and later epochs read them back. The cache directory is a short hash of everything that shapes the batches: model class, representation name (which includes the mate share), number of positions, seed, quiet filter, mate share, batch size and a cache version (`cache_path` in `src/chess_lab/training/effort.py`). Change any of them and a new directory is used.

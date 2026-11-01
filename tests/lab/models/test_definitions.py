@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from chess_engine.models import loader
+from chess_lab.models import loader
 from chess_lab.models.definitions import (
     available_models,
     get_model_class,

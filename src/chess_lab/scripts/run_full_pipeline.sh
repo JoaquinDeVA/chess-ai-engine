@@ -9,7 +9,7 @@
 # artifact and card are deleted ("DISCARDED net4_pst"). Per-model training logs go to
 # $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
 #
-# h1 is fixed (src/chess_engine/models/h1_weights.json): changing it would change the anchor, so every result
+# h1 is fixed (src/chess_lab/models/h1_weights.json): changing it would change the anchor, so every result
 # measured against the old h1 would stop being comparable.
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
@@ -35,7 +35,7 @@ if [ -z "${PYTHON:-}" ]; then
   if [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; else PYTHON=python; fi
 fi
 
-ARTIFACTS=src/chess_engine/models/artifacts
+ARTIFACTS=src/chess_lab/models/artifacts
 CARDS=src/chess_lab/models/cards
 
 log() { echo "=== $*"; }

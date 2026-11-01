@@ -10,10 +10,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List
 
+from chess_engine.paths import ROOT
+
 CARDS_DIR = Path(__file__).resolve().parent / "cards"
 #: Card sections that hold measurements of one particular trained model.
 MEASUREMENT_SECTIONS = ("training", "accuracy", "cost", "tradeoff", "tournament")
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def card_path(name: str) -> Path:
@@ -106,14 +107,14 @@ def current_commit() -> str:
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=PROJECT_ROOT,
+            cwd=ROOT,
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
         dirty = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=PROJECT_ROOT,
+            cwd=ROOT,
             capture_output=True,
             text=True,
             check=True,

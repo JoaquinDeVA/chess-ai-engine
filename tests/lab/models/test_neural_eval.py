@@ -10,9 +10,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models import load_evaluator
 from chess_lab.models import fit_stream, new_model
-from chess_lab.models.definitions import NeuralEvalModel, Nn4Model, get_model_class
+from chess_lab.models.definitions import NeuralEvalModel, Nn4Model, get_model_class, load_evaluator
 from chess_lab.models.linear_features import features_of
 from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation
@@ -134,7 +133,7 @@ def test_play_path_does_not_import_tensorflow(tmp_path):
     path = random_nn4(seed=7).save(tmp_path / "net4_pst.npz")
     script = (
         "import sys, chess\n"
-        "from chess_engine.models import load_evaluator\n"
+        "from chess_lab.models.definitions import load_evaluator\n"
         f"evaluator = load_evaluator('net4_pst', {str(path)!r})\n"
         "score = evaluator.evaluate(chess.Board().fen(), True)\n"
         "print(0.0 < score < 1.0, 'tensorflow' in sys.modules, 'keras' in sys.modules)\n"

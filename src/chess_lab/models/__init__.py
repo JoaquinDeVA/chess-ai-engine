@@ -1,7 +1,7 @@
-"""Training side of the models: features, targets, fitting and the Python evaluation.
+"""The models: definitions, saved files, features, targets, fitting and the Python evaluation.
 
-The app (``chess_engine.models``) only loads weights and hands them to the core; everything that
-builds, trains or measures a model in Python lives here.
+The app does not load models: the window plays through the UCI binary, which embeds its own
+(``chess_lab.scripts.export_uci_model``).
 """
 
 from typing import Any, Dict, Iterable, Optional

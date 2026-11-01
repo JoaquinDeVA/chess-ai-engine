@@ -12,10 +12,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-from chess_engine.models import artifact_path
 from chess_lab.models.cards import clear_measurements, current_commit, today, update_card
 from chess_lab.models.defaults import DEFAULT_MATE_KEEP, SAMPLE_SEED
 from chess_lab.models.definitions import available_models, get_model_class
+from chess_lab.models.loader import artifact_path
 from chess_lab.models.representation import Representation
 
 from .dataset import VALIDATION
@@ -44,7 +44,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
     parser.add_argument(
-        "--output", type=Path, help="where to save (default: src/chess_engine/models/artifacts)"
+        "--output", type=Path, help="where to save (default: src/chess_lab/models/artifacts)"
     )
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--effort", type=int, help="models: effort level 0-100")

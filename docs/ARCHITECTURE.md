@@ -10,8 +10,8 @@ The engine has two parts. The part that must be fast, the search, the evaluation
 opening book and endgame tables, is written in Rust (`rust/`). It is built as two products: the
 extension module `chess_engine._core` (for the Python code and the tests) and the UCI binary
 `rust/target/release/uci`, which the window plays through. Everything else is Python in two
-packages: `src/chess_engine/` is the application (window, UCI client, models), and `src/chess_lab/` is the
-laboratory that produces and measures it (training and measurements). The laboratory imports the application;
+packages: `src/chess_engine/` is the application (window, UCI client, opening book and tables), and `src/chess_lab/` is the
+laboratory that produces and measures it (the models, training and measurements). The laboratory imports the application;
 the application never imports the laboratory. The window talks to the UCI binary once per move.
 
 ```mermaid
@@ -20,7 +20,7 @@ flowchart TB
     UCIB -->|"UCI: position, go, bestmove"| BIN["rust/ uci binary<br/>search · evaluations · table"]
     UCIB --> BOOK["knowledge/<br/>opening book · endgame tables"]
     BIN --> CORE["rust/ (chess_engine._core)<br/>same crate, for Python"]
-    TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL["models/<br/>h1 and the learned models"]
+    TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL["chess_lab/models/<br/>h1 and the learned models"]
     MEAS["chess_lab/measure/<br/>judge · evaluate · report"] --> TRAIN
     MEAS --> EVAL
     MEAS --> CORE
@@ -28,12 +28,11 @@ flowchart TB
 
 Dependencies, as the imports stand:
 
-- `rust/` imports nothing from Python except the weights it is given (`models/loader.py` builds the evaluators).
-- `models/` imports nothing from the rest of the package: it only loads, saves and registers models.
-- `chess_lab/models/` imports `models/` (the classes it trains) and holds everything that builds a model: feature extractors, the target representation, fitting and the Python evaluation. `chess_lab/training/` imports both. `models/` imports nothing from `chess_lab`.
+- `rust/` imports nothing from Python except the weights it is given (`chess_lab/models/` builds the evaluators).
+- `chess_lab/models/` holds everything about a model: its classes, the saved files, the feature extractors, the target representation, fitting and the Python evaluation. `chess_lab/training/` imports it.
 - `chess_engine/uci.py` imports `knowledge/`; it talks to the UCI binary through pipes and imports nothing from the Rust core.
-- `gui/` imports `uci.py`, `models/` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
-- `chess_lab/measure/` is the top layer: it imports `models/`, `chess_lab/training/` and the Rust core. Nothing else imports it.
+- `gui/` imports `uci.py` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
+- `chess_lab/measure/` is the top layer: it imports `chess_lab/models/`, `chess_lab/training/` and the Rust core. Nothing else imports it.
 
 ## Packages
 
@@ -45,8 +44,7 @@ Dependencies, as the imports stand:
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/py.rs` | The Python module: `Evaluator`, `Book`, `Tablebase`, and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
 | `uci.py` | `UciEngine` (one process of the UCI binary: `position fen … moves …`, `go`, `bestmove`), `UciBot` (the AI player of the window: the opening book and the tablebases first, then the engine; the clock or the fixed time become the `go` limits) |
-| `models/` | `loader.py`: turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) or `h1` (`h1_weights.json`) into the Rust `Evaluator`, which computes the features and the score. The models are defined, trained and saved in the lab: `chess_lab/models/definitions.py` (`SparseModel`, `LinearEvalModel`, `NeuralEvalModel` and the table `MODELS`) and `cards.py` (model cards in `chess_lab/models/cards/`) |
-| `chess_lab/models/` | What builds a model. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
+| `chess_lab/models/` | Everything about a model. `definitions.py`: `SparseModel`, `LinearEvalModel`, `NeuralEvalModel`, the table `MODELS` and `load_evaluator`, which turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) into the Rust `Evaluator`. `loader.py`: paths and tagged specs of the saved models, and `h1` (`h1_weights.json`). `cards.py`: model cards in `cards/`. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). `python_eval.py`: `PythonEvaluator`, the evaluation in Python used by the judge, the cost measure and the parity tests |
 | `chess_lab/training/` | `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards, and the detection of its perspective. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
 | `chess_lab/measure/` | `judge.py` (accuracy and best-move agreement against Stockfish), `evaluate.py` (judge plus cost of one model), `report.py` (model cards into the models table of `RESULTS.md`) |
 | `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
@@ -147,7 +145,7 @@ Python extractors by `tests/core/test_feature_parity.py`.
 ### Running a model in Rust
 
 The search runs in Rust, so a model plays at full speed only if its features are computed there too.
-`models/loader.py` hands the saved weights of a model to the core by the
+`chess_lab/models/definitions.py` hands the saved weights of a model to the core by the
 **name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
 `king_bucket` and `pst_slotted`. A model with another feature set is rejected by the core. To give a feature set its Rust version:
 

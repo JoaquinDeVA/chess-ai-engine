@@ -1,16 +1,13 @@
-"""Tests of the app's model loader: saved files, tagged specs and the shipped artifacts."""
+"""Tests of the saved models through the core: tagged specs and the shipped artifacts."""
 
 import json
 
 import numpy as np
 import pytest
 
-from chess_engine.models import (
-    installed_models,
-    load_evaluator,
-    loader,
-    split_spec,
-)
+from chess_lab.models import loader
+from chess_lab.models.definitions import load_evaluator
+from chess_lab.models.loader import installed_models, split_spec
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
@@ -58,4 +55,4 @@ def test_tagged_spec_round_trip(tmp_path, monkeypatch):
 def test_a_feature_set_without_rust_version_is_rejected(tmp_path):
     save_linear(tmp_path / "unported.npz", "unported_test_features", 1)
     with pytest.raises(ValueError):
-        load_evaluator("unported", tmp_path / "unported.npz")
+        load_evaluator("linear_pst", tmp_path / "unported.npz")

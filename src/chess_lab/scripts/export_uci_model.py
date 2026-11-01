@@ -12,12 +12,10 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-import numpy as np
+from chess_engine.paths import ROOT
+from chess_lab.models.definitions import LinearEvalModel, load_model
 
-from chess_engine.models.loader import artifact_path
-
-REPO = Path(__file__).resolve().parents[3]
-DEFAULT_OUT = REPO / "rust" / "models"
+DEFAULT_OUT = ROOT / "rust" / "models"
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -39,16 +37,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     :return: Exit code.
     """
     args = parse_args(argv)
-    with np.load(artifact_path(args.model)) as data:
-        if "W0" in data:
-            raise SystemExit(f"{args.model} is a network; only linear models are exported")
-        meta = json.loads(str(data["meta"]))
-        payload = {
-            "features": meta["features"],
-            "perspective": meta["rep"].get("perspective", "side_to_move"),
-            "weights": [float(w) for w in data["weights"]],
-            "bias": float(data["bias"]),
-        }
+    model = load_model(args.model)
+    if not isinstance(model, LinearEvalModel):
+        raise SystemExit(f"{args.model} is a network; only linear models are exported")
+    payload = {
+        "features": model.feature_set,
+        "perspective": model.perspective,
+        "weights": [float(w) for w in model.weights],
+        "bias": model.bias,
+    }
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / f"{args.model}.json"
     target.write_text(json.dumps(payload) + "\n", encoding="utf-8")

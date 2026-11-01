@@ -1,8 +1,8 @@
 """The trained models as the laboratory defines them: weights, feature set and saved file.
 
 A model is its weights plus the name of the feature set the Rust core computes. The laboratory
-trains it and saves it as a ``.npz`` file in ``chess_engine.models.ARTIFACTS_DIR``; the app loads
-that file straight into the core (:func:`chess_engine.models.load_evaluator`) without these classes.
+trains it, saves it as a ``.npz`` file in :data:`chess_lab.models.loader.ARTIFACTS_DIR` and reads it
+back here, the only reader of that format; :meth:`SparseModel.evaluator` hands it to the core.
 """
 
 import json
@@ -12,8 +12,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Sequence, Tuple, Type
 
 import numpy as np
 
-from chess_engine.models import artifact_path, split_spec
-from chess_engine.models.loader import DEFAULT_PERSPECTIVE
+from chess_engine import _core
+
+from .loader import DEFAULT_PERSPECTIVE, artifact_path, split_spec
 
 #: Centipawns that correspond to a normalized target of ``1.0``. It is the 0.5% quantile of the
 #: course dataset: evaluations beyond it are clipped, so the target covers ~99% of the data.
@@ -87,6 +88,14 @@ class SparseModel(ABC):
         :return: Parameter count.
         """
 
+    @abstractmethod
+    def evaluator(self) -> "_core.Evaluator":
+        """The model as an evaluation of the core.
+
+        :return: Evaluator that runs inside the core.
+        :raises ValueError: If the weights do not fit the feature set.
+        """
+
 
 def _open_for_loading(cls: Type[SparseModel], path: Optional[Path]) -> Path:
     path = Path(path) if path else cls.default_path()
@@ -119,6 +128,15 @@ class LinearEvalModel(SparseModel):
         :return: ``size + 1``.
         """
         return int(self.weights.size) + 1
+
+    def evaluator(self) -> "_core.Evaluator":
+        """The model as an evaluation of the core.
+
+        :return: Evaluator that runs inside the core.
+        :raises ValueError: If the number of weights does not fit the feature set.
+        """
+        weights = np.ascontiguousarray(self.weights, dtype=np.float64)
+        return _core.Evaluator.linear(self.feature_set, self.perspective, weights, self.bias)
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "LinearEvalModel":
@@ -185,6 +203,18 @@ class NeuralEvalModel(SparseModel):
         :return: Total number of parameters.
         """
         return sum(weights.size + bias.size for weights, bias in self.layers)
+
+    def evaluator(self) -> "_core.Evaluator":
+        """The model as an evaluation of the core.
+
+        :return: Evaluator that runs inside the core.
+        :raises ValueError: If the input layer does not fit the feature set.
+        """
+        layers = [
+            (np.ascontiguousarray(weights), np.ascontiguousarray(bias))
+            for weights, bias in self.layers
+        ]
+        return _core.Evaluator.network(self.feature_set, self.perspective, layers)
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "NeuralEvalModel":
@@ -311,10 +341,23 @@ def load_model(spec: str, path: Optional[Path] = None) -> SparseModel:
     """Load the saved model named by ``spec``.
 
     :param spec: Model name, or ``name@tag`` for a tagged artifact.
-    :param path: Saved file; defaults to :func:`chess_engine.models.artifact_path`.
+    :param path: Saved file; defaults to :func:`chess_lab.models.loader.artifact_path`.
     :return: The loaded model.
     :raises KeyError: If the name is unknown.
     :raises FileNotFoundError: If the model file does not exist (train it first).
     """
     name, _ = split_spec(spec)
     return get_model_class(name).load(path or artifact_path(spec))
+
+
+def load_evaluator(spec: str, path: Optional[Path] = None) -> "_core.Evaluator":
+    """The core evaluation of the saved model named by ``spec``.
+
+    :param spec: Model name, or ``name@tag`` for a tagged artifact.
+    :param path: Saved file; defaults to :func:`chess_lab.models.loader.artifact_path`.
+    :return: Evaluator that runs inside the core.
+    :raises KeyError: If the name is unknown.
+    :raises FileNotFoundError: If the model file does not exist (train it first).
+    :raises ValueError: If the weights do not fit the feature set.
+    """
+    return load_model(spec, path).evaluator()

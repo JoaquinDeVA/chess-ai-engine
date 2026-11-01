@@ -8,9 +8,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_engine.models import load_evaluator
 from chess_lab.models import fit_stream, linear_eval, new_model
-from chess_lab.models.definitions import LinearEvalModel, available_models, get_model_class
+from chess_lab.models.definitions import (
+    LinearEvalModel,
+    available_models,
+    get_model_class,
+    load_evaluator,
+)
 from chess_lab.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,

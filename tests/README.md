@@ -5,8 +5,7 @@ The folders mirror the source: a test sits where the code it checks sits.
 | Folder | Checks | Source |
 |---|---|---|
 | `app/test_uci.py` | the UCI client: the limits it sends and the moves of the binary | `src/chess_engine/uci.py` |
-| `app/models/` | the loader, tagged specs and the shipped models through the core | `src/chess_engine/models/` |
-| `lab/models/` | model definitions, feature extractors, target representation, fitting and the Python evaluation | `src/chess_lab/models/` |
+| `lab/models/` | model definitions, saved files and tagged specs, the shipped models through the core, feature extractors, target representation, fitting and the Python evaluation | `src/chess_lab/models/` |
 | `app/knowledge/`, `app/gui/` | opening book, endgame tables, the window (the widgets are skipped without PySide6) | `src/chess_engine/{knowledge,gui}/` |
 | `core/` | the Rust core against the Python feature extractors of `chess_lab/models/` | `rust/` |
 | `lab/training/` | sampling, split, effort, cards, the raw Lichess export | `src/chess_lab/training/` |

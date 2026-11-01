@@ -13,10 +13,11 @@ the depth-limited matches (``depthN``) and then any other control. A missing val
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from chess_lab.models.cards import PROJECT_ROOT, load_all_cards
+from chess_engine.paths import ROOT
+from chess_lab.models.cards import load_all_cards
 from chess_lab.models.representation import Representation
 
-HISTORY_FILE = PROJECT_ROOT / "docs" / "RESULTS.md"
+HISTORY_FILE = ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 

@@ -99,7 +99,7 @@ A position activates at most 32 inputs (one per piece). The first layer, the acc
 A classical evaluation written by hand (`rust/src/eval/h1.rs`), not a model file: six differences between White and
 Black (material, hand-written piece-square tables, mobility, centre control, king safety and development), each
 normalised to 0–1, combined as `0.5 + sum(weight * (feature - 0.5))` and clipped to 0.01–0.99 so it is never taken
-for a decided game. The six weights were fitted to Stockfish (`src/chess_engine/models/h1_weights.json`). It is the
+for a decided game. The six weights were fitted to Stockfish (`src/chess_lab/models/h1_weights.json`). It is the
 anchor of the timed tournaments in [Results](RESULTS.md).
 
 For accuracy, speed and tournament numbers of every model above, see [Results](RESULTS.md).

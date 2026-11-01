@@ -1,16 +1,16 @@
 """Client of the UCI engine (``rust/target/release/uci``): the AI players of the game page."""
 
 import subprocess
-from pathlib import Path
 from typing import Dict, Optional, Sequence
 
 import chess
 
 from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
 from chess_engine.knowledge.opening_book import OpeningBook
+from chess_engine.paths import ROOT
 
 #: The engine binary, built with ``cargo build --release --bin uci`` in ``rust/``.
-ENGINE = Path(__file__).resolve().parents[2] / "rust" / "target" / "release" / "uci"
+ENGINE = ROOT / "rust" / "target" / "release" / "uci"
 #: Seconds per move when there is no clock and no fixed time.
 NO_CLOCK_MOVE_TIME = 3.0
 

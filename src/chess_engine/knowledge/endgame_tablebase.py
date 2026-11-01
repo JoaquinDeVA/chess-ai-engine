@@ -18,9 +18,10 @@ from typing import Optional, Union
 import chess
 
 from chess_engine import _core
+from chess_engine.paths import ROOT
 
 #: Default location of the tables.
-DEFAULT_TABLEBASE_DIR = Path(__file__).resolve().parents[3] / "data" / "knowledge" / "endgame"
+DEFAULT_TABLEBASE_DIR = ROOT / "data" / "knowledge" / "endgame"
 
 #: The most pieces (kings included) of a position the 3-4-5 piece tables cover.
 MAX_PIECES = 5

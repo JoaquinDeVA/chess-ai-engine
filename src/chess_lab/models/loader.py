@@ -1,15 +1,12 @@
-"""Loading of the trained evaluations: the app reads a saved model and hands it to the Rust core.
+"""Where the trained models are saved, and the fixed heuristic ``h1``.
 
-A saved model is a ``.npz`` file in :data:`ARTIFACTS_DIR` written by the laboratory
-(``chess_lab.models.definitions``). The core computes the features and the score, so nothing here
-evaluates anything: it only turns a file into a ``_core.Evaluator``.
+A saved model is a ``.npz`` file in :data:`ARTIFACTS_DIR`; :mod:`chess_lab.models.definitions`
+reads and writes it and turns it into a ``_core.Evaluator``.
 """
 
 import json
 from pathlib import Path
 from typing import Optional, Tuple
-
-import numpy as np
 
 from chess_engine import _core
 
@@ -66,39 +63,6 @@ def installed_models() -> list[str]:
     :return: Sorted list of names.
     """
     return sorted(path.stem for path in ARTIFACTS_DIR.glob("*.npz") if "@" not in path.stem)
-
-
-def load_evaluator(spec: str, path: Optional[Path] = None) -> "_core.Evaluator":
-    """The native evaluation of a saved model.
-
-    The file says whether it is a linear model (``weights``, ``bias``) or a sparse network
-    (``W0``, ``b0``, ...); the core rejects weights that do not fit the feature set.
-
-    :param spec: Model name, or ``name@tag`` for a tagged artifact.
-    :param path: Saved file; defaults to :func:`artifact_path`.
-    :return: Evaluator that runs inside the core.
-    :raises FileNotFoundError: If the model file does not exist (train it first).
-    """
-    path = Path(path) if path else artifact_path(spec)
-    if not path.exists():
-        raise FileNotFoundError(f"model file not found: {path}")
-    with np.load(path) as data:
-        meta = json.loads(str(data["meta"]))
-        feature_set = meta["features"]
-        perspective = meta["rep"].get("perspective", DEFAULT_PERSPECTIVE)
-        if "W0" not in data:
-            weights = np.ascontiguousarray(data["weights"], dtype=np.float64)
-            return _core.Evaluator.linear(feature_set, perspective, weights, float(data["bias"]))
-        layers = []
-        while f"W{len(layers)}" in data:
-            weights, bias = data[f"W{len(layers)}"], data[f"b{len(layers)}"]
-            layers.append(
-                (
-                    np.ascontiguousarray(weights, dtype=np.float64),
-                    np.ascontiguousarray(bias, dtype=np.float64),
-                )
-            )
-    return _core.Evaluator.network(feature_set, perspective, layers)
 
 
 def load_h1_weights() -> dict:

@@ -17,12 +17,12 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import chess
 import numpy as np
 
-from chess_engine.models import artifact_path, h1_evaluator, load_h1_weights, split_spec
 from chess_lab.measure.judge import judge
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.cards import current_commit, load_card, today, update_card
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import available_models, load_model
+from chess_lab.models.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
 from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation, score_to_cp
 from chess_lab.training.dataset import TEST

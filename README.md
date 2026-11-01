@@ -11,18 +11,18 @@ and the measurements, with the commands that reproduce them.
 
 ## What it found
 
-Six evaluation functions played each other at equal time, from a 6-parameter material count to a
-206,000-parameter network. These tournaments were played with the earlier Python engine; every figure and
-its command are in [Results](docs/RESULTS.md#the-short-answer).
+Every figure and its command are in [Results](docs/RESULTS.md#the-short-answer).
 
-- The best player is the **Piece-square-and-terms logistic model** (`linear_pst_terms`, 791 parameters):
-  66 % of the points at 10 min + 5 s, the best point estimate in all three tournaments (the intervals
-  overlap those of the next models). It is the model the engine plays with.
-- The neural network judges positions best (Spearman 0.700 against Stockfish) but does not win more games.
-- Counting material alone is clearly the worst (21 % at 10 min + 5 s).
-- The move of the search to Rust made it 8 to 35 times faster to a given depth
-  ([the search in Rust](docs/techniques/rust-core.md)); six pruning and ordering techniques on top of it scored 76.5 %
-  against the plain search ([search techniques](docs/techniques/README.md)).
+- **Search.** Moving the search to Rust made it 8 to 35 times faster to a given depth
+  ([the search in Rust](docs/techniques/rust-core.md)). Six pruning and ordering techniques on top of it scored
+  76.5 % (+205 Elo) against the plain search ([search techniques](docs/techniques/README.md)).
+- **Measurement.** Changes are kept or dropped by SPRT matches with fastchess
+  ([how a change is measured](docs/MEASUREMENT.md)). Late move reductions searched deeper but lost 8.6 ± 6.1 Elo
+  over 10,244 games, so they are off.
+- **Evaluation.** The engine plays with the **Piece-square-and-terms logistic model** (`linear_pst_terms`, 791
+  parameters), the best point estimate in three tournaments of six evaluations (played with the earlier Python
+  engine). The 206,000-parameter network judges positions better (Spearman 0.700 against Stockfish) but does not
+  win more games at this search depth.
 
 ## Where to read
 
@@ -82,8 +82,7 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
   pipeline (`DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` prints every command without running it).
 - Engine matches are played with fastchess on a separate machine ([Measurement](docs/MEASUREMENT.md)); the model
   tournaments in [Results](docs/RESULTS.md) predate the Rust engine and are kept as history.
-- Known gaps: the UCI binary ignores the increment (`winc`/`binc`); late move reductions (`lmr`) are
-  implemented and off ([lmr](docs/techniques/lmr.md)).
+- Known gaps: the UCI binary ignores the increment (`winc`/`binc`).
 
 ## Repository map
 

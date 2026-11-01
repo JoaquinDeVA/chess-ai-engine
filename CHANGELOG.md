@@ -32,6 +32,7 @@ All notable changes. The newest are first.
 - The console game: the ~17 options of `main.py`, `HumanPlayer`, the board printing of `GameManager` and `--mode`; `main.py` now only opens the window.
 - `TimeManager.expired` and `game_manager.load_config`, which nothing used.
 - The Decisions, Pitfalls and Remote worker pages: what was decided is in the page of each technique or model.
+- The page on tactical move ordering with Prolog: the code went in `ca35218` (2026-10-18) after costing about 2 ms per node; it was never measured in games.
 
 ## 2.0.0 (2026-10-26)
 

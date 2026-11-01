@@ -9,25 +9,23 @@
 All numbers are from this project, on a six-core CPU, with the five models trained at effort 30 (30
 million positions, 10 % of the mate positions kept; see [Training data](DATA.md)). Commands are run from the
 repository root. Two engines produced them: the Python engine, until 2026-10-25, and the Rust engine since
-([The search in Rust](techniques/rust-core.md)); every section says which one.
+([The search in Rust](techniques/rust-core.md)); every section says which one. Scripts under `scripts/bench/` and
+`play_tournament` were removed in `6162db8` and are in the git history.
 
 ## The short answer
 
 - **The engine that plays is the Rust UCI binary** with six search techniques on by default (incremental
   accumulator, table move, history, PVS, aspiration windows, null move). Together they scored 76.5 % against the
-  plain search in 100 games ("Engine speed" below); each one's own measurement is in the
+  plain search in 100 games ("Search techniques in games" below); each one's own measurement is in the
   [catalogue](techniques/README.md). Late move reductions are off: they lose 8.6 Elo at a fixed node count (next section).
 - **Best model: the Piece-square-and-terms logistic model (`linear_pst_terms`).** It has the best score in the
   three tournaments that were played (59.5 % at 60 s + 1 s, 66.0 % at 10 min + 5 s, 72.5 % at a fixed depth of 3)
   and is second in the static judge. Its intervals overlap those of the next models, so "best" means best point
   estimate, not a proven gap. Those tournaments were played by the Python engine.
-- **Worst model, with certainty: the Material logistic model (`linear_material`).** It has the lowest static
-  accuracy and the lowest score in every tournament; at 10 min + 5 s it wins 8 of 50 games.
 - **Best judge of a position: the Four-layer piece-square network (`net4_pst`)**, with a Spearman correlation of
   0.700 against Stockfish, but it does not translate into more wins (50.0 % at 10 min + 5 s).
-- **The order of the models is stable across time controls**: `linear_material` last and `linear_pst_terms`
-  first in all three. An earlier finding that `linear_material` won at 60 s + 1 s came from training every model
-  with all the mate positions and is not reproduced with 10 % of them.
+- **The order of the models does not depend on the time control**: `linear_pst_terms` is first in all three
+  tournaments.
 
 ## Measured and estimated
 
@@ -38,7 +36,6 @@ repository root. Two engines produced them: the Python engine, until 2026-10-25,
 | Late move reductions make the engine weaker | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |
 | `linear_pst_terms` is the best model | Three tournaments, 50 to 150 games per player | Python | Best point estimate; intervals overlap the next models |
-| `linear_material` is the worst model | Same tournaments and the static judge | Python | Measured, separated from the rest |
 | The model ranking holds on the Rust engine | Only the fixed-depth tournament was replayed (71.9 % against 72.5 %) | Rust core through Python | Estimated for the timed tournaments |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |
 
@@ -59,8 +56,8 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 | Judge | What it measures | Command |
 |---|---|---|
 | Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42) | `python -m chess_lab.measure.evaluate --model linear_pst_terms` |
-| Profile | Depth reached in 1, 3 and 10 s and agreement of the searched move with Stockfish | `scripts/bench/profile_depth_vs_accuracy.py` (removed in `6162db8`; in the git history) |
-| Tournament | Round robin at equal time per move, paired openings, Elo against an anchor | `play_tournament` (removed in `6162db8`; in the git history); today, fastchess ([Measurement](MEASUREMENT.md)) |
+| Profile | Depth reached in 1, 3 and 10 s and agreement of the searched move with Stockfish | `scripts/bench/profile_depth_vs_accuracy.py` |
+| Tournament | Round robin at equal time per move, paired openings, Elo against an anchor | `play_tournament`; today, fastchess ([Measurement](MEASUREMENT.md)) |
 
 The tournaments report the score (wins plus half the draws) with a 95 % interval; no game in any of them ended by
 forfeit, time or illegal move.
@@ -72,9 +69,9 @@ forfeit, time or illegal move.
   <img src="img/tournament-format-light.svg" alt="Tournament format: every pair plays every opening with both colours, games run in a process pool into a resumable JSONL file, and Elo is measured against the anchor">
 </picture>
 
-These tournaments were played by the Python engine before 2026-10-25, with `play_tournament` (removed in `6162db8`; in the git history), and
-cannot be played again as they were: the Rust engine reaches 2 to 3 plies more in the same time. They still
-rank the evaluations; a re-run with fastchess is not planned yet.
+These tournaments were played by the Python engine before 2026-10-25, with `play_tournament`, and cannot be played again as they were: the Rust engine reaches 2 to 3 plies more in the same time. They still
+rank the evaluations; a re-run with fastchess is not planned yet. They measured the evaluation alone: quiescence on, opening book and
+endgame tables off.
 
 Anchor `h1` (the hand-written heuristic), 10 openings (20 games per pair, 300 games), 60 s + 1 s:
 
@@ -109,7 +106,7 @@ Fixed depth of 3 for everybody (no player can reach more depth than another), an
 | `linear_king_bucket` | 44.4 |
 | `linear_material` | 27.5 |
 
-Commands, as they were run (`src/chess_lab/tournaments/play_tournament.py`, removed in `6162db8`; in the git history):
+Commands, as they were run:
 
 ```text
 play_tournament --players linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst,h1 \
@@ -127,71 +124,32 @@ evaluations themselves, since speed plays no part.
 
 ## Does the time control matter?
 
-Less than it first seemed. With the five models trained the same way, the order of the extremes does
-not move: `linear_pst_terms` has 59.5 %, 66.0 % and 72.5 % and `linear_material` 34.0 %, 21.0 % and
-27.5 % in the three tournaments. The gap between the best and the worst widens with time, from
-25 points at 60 s + 1 s to 45 points at 10 min + 5 s. The models in the middle (`linear_pst`,
-`linear_king_bucket`, `net4_pst`, `h1`) swap places from one table to another, but their intervals
-overlap (±13 to ±14 points at 10 min + 5 s), so those swaps are within noise.
-
-Speed still matters, only not enough to reverse the order. The model table below gives the cost of
-one evaluation and the depth reached in a second: `linear_material` evaluates in 19.6 µs and
-reaches depth 4.0 in 1 s, `linear_pst_terms` takes 113 µs and reaches 3.3, and `net4_pst` takes
-46 µs and reaches 3.5. At a fixed depth of 3 (no speed advantage) `net4_pst` falls to 47.5 % and
-`linear_pst` stays second, so the network's quality as a judge (0.700) is not turned into play
-strength by a search this shallow. For a game at 10 min + 5 s use `linear_pst_terms`.
+No: `linear_pst_terms` is first in all three tournaments and the middle models swap places within their intervals.
+At a fixed depth of 3 the network falls to 47.5 %: its quality as a judge (0.700) does not become playing strength
+at this search depth.
 
 ![Depth reached against agreement with Stockfish, per model](img/depth-vs-accuracy.png)
 
-*Generated by `scripts/bench/profile_depth_vs_accuracy.py` (removed in `6162db8`; in the git history).*
+*Generated by `scripts/bench/profile_depth_vs_accuracy.py`.*
 
-## Engine speed (Python and Rust)
+## Search techniques in games
 
-The search, the evaluations and the knowledge moved from Python to Rust on 2026-10-25 (see
-[The search in Rust](techniques/rust-core.md)). **The tournaments of this page were played with the Python
-engine**, which searched 3 to 5 plies deep in the times they use; the Rust core plays the same
-moves from the same positions but reaches 2 to 3 plies more, so a new tournament at the same time
-control is not comparable with them and the ranking could change. The core was checked against
-the Python engine node for node, and the fixed-depth tournament gives the same standings (the
-`linear_pst_terms` score 71.9 % against 72.5 %); the tournaments at 60 s + 1 s and 10 min + 5 s have
-not been played again.
-
-Depth reached in 10 seconds per move, mean over 200 test positions (`scripts/bench/measure_search_speed.py --positions 200 --seconds 1,3,10 --depths 4`
-(removed in `6162db8`; in the git history), five processes of one thread):
-
-| Player | Python | Rust | Time to depth 4 (Python → Rust) |
-|---|---|---|---|
-| `h1` | 4.12 | 6.93 | 7.995 s → 0.226 s (35 times faster) |
-| `linear_material` | 5.37 | 7.68 | 1.335 s → 0.076 s (18 times) |
-| `linear_pst` | 4.94 | 7.18 | 2.279 s → 0.110 s (21 times) |
-| `linear_pst_terms` | 4.62 | 7.13 | 3.429 s → 0.139 s (25 times) |
-| `linear_king_bucket` | 5.04 | 7.51 | 1.990 s → 0.120 s (17 times) |
-| `net4_pst` | 4.85 | 6.82 | 2.266 s → 0.286 s (8 times) |
-
-The table above is the reference search (no selective techniques). The bots add six techniques
-([search techniques](techniques/README.md)); in 100 games at 4 s + 0.05 s they scored 76.5 % against the
-reference with the same model (`scripts/bench/compare_engine_versions.py --candidate
-incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`, removed in `6162db8`; in the git history), and reached 5.54
-plies against 4.68. With the techniques on, four threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s
-([Lazy SMP](techniques/lazy-smp.md)). The model tournaments of this page were played without them.
+The tournaments above used the plain search of the Python engine; the Rust engine reaches 2 to 3 plies more in
+the same time ([The search in Rust](techniques/rust-core.md)). On it, the six default techniques
+([search techniques](techniques/README.md)) scored 76.5 % against the plain search with the same model in 100
+games at 4 s + 0.05 s, reaching 5.54 plies against 4.68 (`scripts/bench/compare_engine_versions.py --candidate
+incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`).
 
 ## Decisions that are settled
 
 | Question | Answer | Where it comes from |
 |---|---|---|
-| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). Those two models are not shipped any more; the all-mates one is recreated with `--mate-keep 1.0 --tag mates100`. | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100`, then a tournament between that model and the default one (`play_tournament`, removed in `6162db8`; in the git history) |
+| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, anchor `linear_pst_terms`). Those two models are not shipped any more; the all-mates one is recreated with `--mate-keep 1.0 --tag mates100`. | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100`, then a tournament between that model and the default one (`play_tournament`) |
 | Does more training effort help? | Not for the Material logistic model: effort 90 gives Spearman 0.474, the same as effort 30; the validation loss stays flat (0.6722 to 0.6719). | `python -m chess_lab.training.train --model linear_material --effort 90` |
-| Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` (removed in `6162db8`; in the git history); [Quiescence](techniques/quiescence.md) |
-| Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `scripts/bench/compare_time_estimators.py` (removed in `6162db8`; in the git history); [Iterative deepening](techniques/iterative-deepening.md) |
-| Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5` (removed in `6162db8`; in the git history); [Endgame tablebases](techniques/endgame-tablebases.md) |
+| Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`; [Quiescence](techniques/quiescence.md) |
+| Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `scripts/bench/compare_time_estimators.py`; [Iterative deepening](techniques/iterative-deepening.md) |
+| Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`; [Endgame tablebases](techniques/endgame-tablebases.md) |
 | Is the opening book good? | 98.7 % of 2,438 sampled moves are within 50 centipawns of Stockfish's best line, none illegal. | `python src/chess_lab/scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16` |
-
-The model tournaments measured the evaluation alone: the endgame tables and the opening book were off in
-them, and the time estimator was pinned to the original rule (`ratio_squared`, with the floor of depth 3)
-so that a stopped tournament can be resumed with identical conditions. Quiescence was on, as in the
-bots by default. Each game record also carried the version of the Rust core that played it (`core`,
-`chess_engine._core.version()`); a file was never resumed with another version, and records without the
-field counted as `python`, the engine before 2.0. The published tournaments were played by that Python engine.
 
 ## Limits and leakage
 
@@ -201,9 +159,8 @@ field counted as `python`, the engine before 2.0. The published tournaments were
   position one move away (60.2 % in train).
 - **The neighbours do not flatter the models.** Judged separately on test positions with and
   without a neighbour in train, the Spearman correlation is not higher with it
-  (`linear_pst_terms` 0.665 against 0.623, `net4_pst` 0.714 against 0.679, `linear_material` 0.493
-  against 0.446). Every model scores higher on those positions, including the 6-parameter one that
-  cannot memorise anything, so the difference comes from easier positions and not from memorisation.
+  (`linear_pst_terms` 0.665 against 0.623, `net4_pst` 0.714 against 0.679). Every model scores higher on those
+  positions, also the ones too small to memorise, so the difference comes from easier positions.
 - **Statistical power.** The tournaments have 50 games per player at 10 min + 5 s and 100 to 150 per
   player in the others; read them with the intervals.
 - **One machine, one run.** The figures depend on the CPU (the 1 s depth in particular).

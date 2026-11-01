@@ -2,9 +2,9 @@
 
 > **What it is:** Searching the late quiet moves of an ordered list one ply less; implemented, off by default.
 >
-> **Read it when:** You wonder why an obvious technique is off, or want to know where its re-test stands.
+> **Read it when:** You wonder why an obvious technique is off, or how it was measured.
 >
-> **Next:** [Tactical move ordering with Prolog](prolog-ordering.md)
+> **Next:** [Data](../DATA.md)
 
 ## Problem
 
@@ -36,16 +36,9 @@ value counts. The other late quiet moves cost a 3- or 4-ply search instead of a 
 
 ## Measured effect
 
-Rust core, `linear_pst_terms`, 100 positions at depth 6 (`scripts/bench/compare_search_features.py`, removed in
-`6162db8`; in the git history), and 100 games at 4 s + 0.05 s against the reference
-(`scripts/bench/compare_engine_versions.py`, same removal):
-
-| version | nodes per move | same move as reference | games |
-|---|---|---|---|
-| first, aggressive | 86,830 | 70 % | all techniques with it: 63.5 %, below 76.5 % without it |
-| mild | 146,356 | 82 % | against the set without it: 49.0 % (−7 Elo), half a ply deeper |
-
-Both searched deeper and played no better.
+A first test (100 games at 4 s + 0.05 s, 2026-10-25) already pointed this way: with `lmr` the search was half a
+ply deeper and scored 49.0 % (`scripts/bench/compare_engine_versions.py`, removed in `6162db8`; in the git
+history). The SPRT settled it:
 
 **SPRT at a fixed 20,000 nodes per move** (2026-11-01, `data/matches/lmr_nodes/match.log`). The default with
 `lmr` (A) against the default without it (B), with the same search effort for both, so the clock plays no part
@@ -67,6 +60,5 @@ plays worse. The depth reached was not recorded in this match.
 
 ## Status
 
-Implemented, off by default; rejected on the evidence of the games above (2026-10-25, `f5e368a`) and
-confirmed by the SPRT at 20,000 nodes (2026-11-01: −8.6 ± 6.1 Elo, H0). A stronger evaluation orders moves better and would make reductions
-safer, so a negative result now does not close it.
+Implemented, off by default; rejected by the SPRT at 20,000 nodes (2026-11-01: −8.6 ± 6.1 Elo, H0). A stronger
+evaluation orders moves better and would make reductions safer, so a negative result now does not close it.

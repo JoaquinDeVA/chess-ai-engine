@@ -24,17 +24,10 @@ A note on names: every model has a descriptive name, used in this page, and a sh
 
 ## Material logistic model (`linear_material`)
 
-The simplest model there is. It counts, for each piece type, how many more pieces the side to move has than the opponent, and learns how much each piece type is worth. It knows nothing about where the pieces stand.
-
-| | |
-|---|---|
-| Type | Logistic regression |
-| Input features | 5 numbers: pawns, knights, bishops, rooks and queens, each as (my count minus opponent's count). Kings are skipped |
-| Parameters | 6, computed from a fresh instance: 5 weights plus the bias |
-| Meaning of each weight | The value of one extra piece of that type, on the logit scale |
-| Output | Sigmoid of the weighted sum plus bias: win probability of the side to move |
-
-A worked example, using the weights from the version at the time of writing (they change whenever the model is retrained): pawn 0.38, knight 0.63, bishop 0.75, rook 1.03, queen 2.12, bias 0.14. With equal material the sum is just the bias, and the sigmoid of 0.14 is about 0.53: a slight edge for having the move. If the side to move is a rook up, the sum is 0.14 + 1.03 = 1.17, and the sigmoid of 1.17 is about 0.76. Notice that the learned values come out in the familiar order pawn < knight < bishop < rook < queen, without anyone telling the model the textbook values.
+The baseline: one learned value per piece type, (my count minus the opponent's) for pawns, knights, bishops, rooks
+and queens, and nothing about where the pieces stand. 6 parameters: 5 weights and the bias. The values it learns
+come out in the textbook order (pawn 0.38, knight 0.63, bishop 0.75, rook 1.03, queen 2.12 on the logit scale, in
+the version at the time of writing). The other models are measured by how much they add to it.
 
 ## Piece-square logistic model (`linear_pst`)
 
@@ -103,16 +96,10 @@ A position activates at most 32 inputs (one per piece). The first layer, the acc
 
 ## The hand-written heuristic (`h1`)
 
-`h1` is not a trained model with a model file, and it is not one of the models in `chess_lab/models/definitions.py`. It is a classical evaluation function written by hand: six readable features, each normalised to the range 0 to 1 where 0.5 means "equal", combined with a weighted sum. Its code is in `rust/src/eval/h1.rs`.
-
-| | |
-|---|---|
-| Type | Hand-designed linear combination (no sigmoid, no bias) |
-| Input features | Six differences between White and Black: material, positional (hand-written piece-square tables), mobility, centre control, king safety and development |
-| Parameters | 6 weights, stored in `src/chess_engine/models/h1_weights.json` |
-| Meaning of each weight | How strongly that feature pulls the evaluation away from 0.5 |
-| Output | `0.5 + sum(weight * (feature - 0.5))`, clipped to 0.01 to 0.99 |
-
-The features are designed by a person, but the six weights were fitted to Stockfish evaluations by a small script, so the heuristic also "learns", just very little: it can only choose how much to trust each of the six ideas. Weights may be negative, and a feature can end up with almost no weight at all if it does not help predict Stockfish. The clipping keeps a heuristic value strictly between 0.01 and 0.99, so it can never be mistaken for a real win or loss, which are scored exactly 1 and 0. It serves as the classical baseline that the learned models are compared with.
+A classical evaluation written by hand (`rust/src/eval/h1.rs`), not a model file: six differences between White and
+Black (material, hand-written piece-square tables, mobility, centre control, king safety and development), each
+normalised to 0–1, combined as `0.5 + sum(weight * (feature - 0.5))` and clipped to 0.01–0.99 so it is never taken
+for a decided game. The six weights were fitted to Stockfish (`src/chess_engine/models/h1_weights.json`). It is the
+anchor of the timed tournaments in [Results](RESULTS.md).
 
 For accuracy, speed and tournament numbers of every model above, see [Results](RESULTS.md).

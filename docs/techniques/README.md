@@ -28,7 +28,7 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Principal variation search (`pvs`) | on; nodes to 487,244 | [pvs](pvs.md) |
 | Aspiration windows (`aspiration`) | on; nodes to 440,213 | [aspiration](aspiration.md) |
 | Null move (`null_move`) | on; nodes to 446,129; +205 Elo with the set | [null-move](null-move.md) |
-| Late move reductions (`lmr`) | implemented, off: lost games; SPRT at fixed nodes pending | [lmr](lmr.md) |
+| Late move reductions (`lmr`) | implemented, off: loses 8.6 ± 6.1 Elo at fixed nodes (SPRT) | [lmr](lmr.md) |
 | Tactical ordering with Prolog | removed | [prolog-ordering](prolog-ordering.md) |
 | History malus | idea; not measured | - |
 | Static exchange evaluation (SEE) | idea; not measured | - |

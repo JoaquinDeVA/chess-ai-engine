@@ -47,21 +47,26 @@ Rust core, `linear_pst_terms`, 100 positions at depth 6 (`scripts/bench/compare_
 
 Both searched deeper and played no better.
 
-> [!NOTE]
-> **Pending: SPRT at a fixed 20,000 nodes per move.** A re-test of the default with `lmr` (A) against the
-> default without it (B) is running ([How a change is measured](../MEASUREMENT.md)): SPRT with bounds [−5, 0] Elo,
-> alpha = beta = 0.05, at most 6,000 rounds (12,000 games), 8 games at a time, `Hash` 16 MB. This section will
-> get its result:
->
-> | test | games | score | Elo (95 %) | LLR | pentanomial | verdict |
-> |---|---|---|---|---|---|---|
-> | default + `lmr` vs default, 20,000 nodes | pending | pending | pending | pending | pending | pending |
->
-> with the fastchess command, the opening suite and the mean depth of each side. A fixed node count compares
-> the searches without the clock; if `lmr` does not lose, a match at 10 min + 5 s confirms it with the clock.
+**SPRT at a fixed 20,000 nodes per move** (2026-11-01, `data/matches/lmr_nodes/match.log`). The default with
+`lmr` (A) against the default without it (B), with the same search effort for both, so the clock plays no part
+([How a change is measured](../MEASUREMENT.md)):
+
+```bash
+fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,lmr \
+    -engine cmd=rust/target/release/uci name=B option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move \
+    -each proto=uci nodes=20000 option.Hash=16 -openings file=data/openings/openings.epd format=epd order=random \
+    -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 6000 -games 2 -concurrency 8 -ratinginterval 100 -srand 21
+```
+
+| test | games | score | Elo (95 %) | LLR | pentanomial | verdict |
+|---|---|---|---|---|---|---|
+| default + `lmr` vs default, 20,000 nodes | 10,244 | 48.76 % | −8.6 ± 6.1 | −2.94 | 988, 543, 2,212, 493, 886 | H0: `lmr` regresses |
+
+The whole interval is below 0 (−14.8 to −2.5 Elo): with the same number of nodes, the search with reductions
+plays worse. The depth reached was not recorded in this match.
 
 ## Status
 
-Implemented, off by default; rejected on the evidence of the games above (2026-10-25, `f5e368a`). Pending: the
-decision after the SPRT at 20,000 nodes. A stronger evaluation orders moves better and would make reductions
+Implemented, off by default; rejected on the evidence of the games above (2026-10-25, `f5e368a`) and
+confirmed by the SPRT at 20,000 nodes (2026-11-01: −8.6 ± 6.1 Elo, H0). A stronger evaluation orders moves better and would make reductions
 safer, so a negative result now does not close it.

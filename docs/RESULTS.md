@@ -16,7 +16,7 @@ repository root. Two engines produced them: the Python engine, until 2026-10-25,
 - **The engine that plays is the Rust UCI binary** with six search techniques on by default (incremental
   accumulator, table move, history, PVS, aspiration windows, null move). Together they scored 76.5 % against the
   plain search in 100 games ("Engine speed" below); each one's own measurement is in the
-  [catalogue](techniques/README.md). Late move reductions are off, pending an SPRT (next section).
+  [catalogue](techniques/README.md). Late move reductions are off: they lose 8.6 Elo at a fixed node count (next section).
 - **Best model: the Piece-square-and-terms logistic model (`linear_pst_terms`).** It has the best score in the
   three tournaments that were played (59.5 % at 60 s + 1 s, 66.0 % at 10 min + 5 s, 72.5 % at a fixed depth of 3)
   and is second in the static judge. Its intervals overlap those of the next models, so "best" means best point
@@ -35,7 +35,7 @@ repository root. Two engines produced them: the Python engine, until 2026-10-25,
 |---|---|---|---|
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | The default techniques make the engine stronger | 100 games at 4 s + 0.05 s against the plain search, 76.5 % | Rust core through Python | Measured, one match; per technique only node counts and short matches ([catalogue](techniques/README.md)) |
-| Late move reductions do not help | 49.0 % (−7 Elo) in 100 games at 4 s + 0.05 s | Rust core through Python | Inconclusive; SPRT pending (next section) |
+| Late move reductions make the engine weaker | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |
 | `linear_pst_terms` is the best model | Three tournaments, 50 to 150 games per player | Python | Best point estimate; intervals overlap the next models |
 | `linear_material` is the worst model | Same tournaments and the static judge | Python | Measured, separated from the rest |
@@ -52,13 +52,7 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 | `aa_s11` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 400 counted | 50.5 % | +3.5 ± 26.8 | +0.11 | no bias |
 | `aa_s12` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 500 | 51.3 % | +9.0 ± 25.0 | +0.28 | no bias |
 | `aa_s13` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 500 | 50.7 % | +4.9 ± 23.9 | +0.18 | no bias |
-| `lmr_nodes` | default + `lmr` against default | 20,000 nodes per move, SPRT [−5, 0] | pending | pending | pending | pending | pending |
-
-> [!NOTE]
-> **Pending: the `lmr_nodes` row.** The SPRT of [late move reductions](techniques/lmr.md) at a fixed 20,000 nodes
-> per move (at most 6,000 rounds, `-srand 21`) fills the last row: games played, score, Elo with its interval,
-> final LLR and whether H0 (regression of 5 Elo) or H1 was accepted. If H1 is accepted, a confirmation at
-> 10 min + 5 s follows and gets its own row.
+| `lmr_nodes` | default + `lmr` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,244 | 48.76 % | −8.6 ± 6.1 | −2.94 | H0: regresses |
 
 ## How the models were measured
 

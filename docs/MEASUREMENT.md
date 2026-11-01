@@ -60,15 +60,15 @@ under H0. With error rates alpha = beta = 0.05 the bounds are `ln(0.05 / 0.95) =
 regresses), above +2.94 H1 is accepted (it does not). A cap on rounds stops a match that crosses neither, which
 means the difference is smaller than the test can see in that many games.
 
-**Worked example** (illustrative numbers). Testing a change with `[−5, 0]`: after 1,000 pairs A has 50.4 % and the
-LLR is +0.9, about a third of the way to the upper bound. The next 2,000 pairs stay near 50.5 % and the LLR climbs
-to +2.96: H1 is accepted after 6,000 games, so the change does not regress by 5 Elo, with a 5 % risk of being
-wrong. Had A scored 49.3 %, the LLR would have fallen through −2.94 and the change would be dropped.
+**Worked example**: the test of [late move reductions](techniques/lmr.md) at 20,000 nodes per move, `[−5, 0]`
+(`data/matches/lmr_nodes/match.log`). A scored a little under 49 % from the start, and the LLR fell steadily:
 
-> [!NOTE]
-> **Pending: the real trace of the `lmr` SPRT.** The re-test of [late move reductions](techniques/lmr.md) at
-> 20,000 nodes per move will replace the illustrative example above with its own numbers: the LLR every 100 pairs
-> until it crosses a bound (or the cap of 6,000 rounds), the final block of fastchess and the verdict.
+| games | 200 | 2,200 | 4,200 | 6,200 | 8,200 | 10,200 | 10,244 |
+|---|---|---|---|---|---|---|---|
+| LLR | −0.19 | −0.67 | −1.16 | −1.65 | −2.13 | −2.62 | −2.94 |
+
+At 10,244 games it crossed −2.94 and the match stopped: H0 accepted, the change regresses (final score 48.76 %,
+−8.6 ± 6.1 Elo), with a 5 % risk of being wrong. Had A held 50 %, the LLR would have climbed towards +2.94.
 
 How many games a test needs grows with the square of the precision: the A/A matches below have an interval of
 about ±25 Elo after 500 games, so ±5 Elo takes roughly 25 times as many, about 12,000 games. That is why the

@@ -10,7 +10,7 @@ import pytest
 from chess_lab.measure import evaluate as evaluate_cli
 from chess_lab.measure import report
 from chess_lab.models import cards, definitions, loader
-from chess_lab.models.representation import Representation, white_score
+from chess_lab.models.representation import Representation
 from chess_lab.training import train as train_cli
 from chess_lab.training.dataset import (
     TEST,
@@ -339,7 +339,6 @@ class TestCommandLineWithDoubles:
         }
         monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
         monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
-        monkeypatch.setattr(evaluate_cli, "PythonEvaluator", lambda model: model)
         monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
         assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
         assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912
@@ -368,14 +367,6 @@ class TestHeuristicEvaluation:
         with pytest.raises(SystemExit):
             evaluate_cli.parse_args(["--model", "nope"])
         assert "h1" not in definitions.available_models()
-
-    def test_adapter_scores_are_recovered_by_the_judge_scale(self):
-        model = evaluate_cli.HeuristicModel("h1")
-        boards = random_positions(5, seed=3, max_plies=12)
-        recovered = white_score(model.predict_cp_batch(boards), np.nan, Representation())
-        expected = [model.expected_score(board) for board in boards]
-        assert recovered == pytest.approx(expected)
-        assert all(0.01 <= score <= 0.99 for score in expected)
 
     def test_main_writes_a_reference_card_that_the_report_lists(self, isolated_cards, monkeypatch):
         boards = random_positions(30, seed=5, max_plies=20)

@@ -28,9 +28,8 @@ from chess_lab.models.linear_features import (
     features_of,
     phase,
 )
-from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation
-from tests.conftest import material_cp, random_positions
+from tests.conftest import material_cp, mover_score, random_positions, white_score_of
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
@@ -76,8 +75,8 @@ def test_pst_features_are_antisymmetric():
 def test_mirrored_position_gets_complementary_white_score():
     model = random_model(seed=3)
     for board in random_positions(20, seed=11):
-        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
-            1.0 - PythonEvaluator(model).expected_score(board.mirror())
+        assert white_score_of(model, board) == pytest.approx(
+            1.0 - white_score_of(model, board.mirror())
         )
 
 
@@ -90,8 +89,8 @@ def test_fit_learns_material():
     summary = fit_stream(model, batches, frame(random_positions(300, seed=9)), config)
 
     assert summary["epochs"] >= 1
-    assert PythonEvaluator(model).expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.9
-    assert PythonEvaluator(model).expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.1
+    assert white_score_of(model, chess.Board(WHITE_UP_A_QUEEN)) > 0.9
+    assert white_score_of(model, chess.Board(BLACK_UP_A_QUEEN)) < 0.1
 
 
 def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
@@ -104,23 +103,18 @@ def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
     assert Representation.from_dict(loaded.rep) == rep
     assert loaded.count_parameters() == model.count_parameters() == 769 + 1
     for board in random_positions(10, seed=2):
-        assert PythonEvaluator(loaded).expected_score(board) == pytest.approx(
-            PythonEvaluator(model).expected_score(board)
-        )
-        assert PythonEvaluator(loaded).predict_cp(board) == pytest.approx(
-            PythonEvaluator(model).predict_cp(board)
-        )
+        assert white_score_of(loaded, board) == pytest.approx(white_score_of(model, board))
 
 
-def test_logit_matches_dense_computation():
+def test_core_score_matches_dense_computation():
     model = random_model(seed=6)
     for board in random_positions(10, seed=8):
         indices, values = features_of(model).active(board, model.perspective)
         dense = np.zeros(model.weights.shape)
         for index, value in zip(indices, values, strict=True):
             dense[index] += value
-        assert PythonEvaluator(model).logit(board) == pytest.approx(
-            float(model.weights @ dense + model.bias)
+        assert model.evaluator().evaluate(board.fen(), board.turn) == pytest.approx(
+            mover_score(float(model.weights @ dense + model.bias))
         )
 
 
@@ -199,8 +193,8 @@ def test_material_model_mirror_complement():
     model = get_model_class("linear_material")(weights=np.array([0.3, 0.1, 0.2, 0.5, 0.9]))
     model.bias = 0.05
     for board in random_positions(20, seed=11):
-        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
-            1.0 - PythonEvaluator(model).expected_score(board.mirror())
+        assert white_score_of(model, board) == pytest.approx(
+            1.0 - white_score_of(model, board.mirror())
         )
 
 
@@ -272,8 +266,8 @@ def test_pst_terms_mirror_complement():
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
     for board in random_positions(20, seed=17):
-        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
-            1.0 - PythonEvaluator(model).expected_score(board.mirror())
+        assert white_score_of(model, board) == pytest.approx(
+            1.0 - white_score_of(model, board.mirror())
         )
 
 
@@ -375,8 +369,8 @@ def test_pst_kb_mirror_complement():
     model.weights = rng.normal(0.0, 0.3, size=model.weights.shape)
     model.bias = 0.1
     for board in random_positions(20, seed=24):
-        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
-            1.0 - PythonEvaluator(model).expected_score(board.mirror())
+        assert white_score_of(model, board) == pytest.approx(
+            1.0 - white_score_of(model, board.mirror())
         )
 
 
@@ -389,8 +383,8 @@ def test_pst_kb_fit_learns_material():
     fit_stream(model, batches, frame(random_positions(300, seed=26)), config)
 
     # Looser than the PST test: each king-bucket weight sees fewer examples, so it fits slower.
-    assert PythonEvaluator(model).expected_score(chess.Board(WHITE_UP_A_QUEEN)) > 0.8
-    assert PythonEvaluator(model).expected_score(chess.Board(BLACK_UP_A_QUEEN)) < 0.2
+    assert white_score_of(model, chess.Board(WHITE_UP_A_QUEEN)) > 0.8
+    assert white_score_of(model, chess.Board(BLACK_UP_A_QUEEN)) < 0.2
 
 
 def test_pst_kb_save_load_round_trip(tmp_path):
@@ -404,9 +398,7 @@ def test_pst_kb_save_load_round_trip(tmp_path):
 
     assert loaded.count_parameters() == model.count_parameters() == 10368 + 1
     for board in random_positions(10, seed=27):
-        assert PythonEvaluator(loaded).expected_score(board) == pytest.approx(
-            PythonEvaluator(model).expected_score(board)
-        )
+        assert white_score_of(loaded, board) == pytest.approx(white_score_of(model, board))
 
 
 def test_pst_kb_is_registered():

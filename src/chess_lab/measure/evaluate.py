@@ -2,7 +2,7 @@
 
 By default the model is judged on the fixed test sample of the raw shards (``--raw``,
 ``--sidecar``): the ``accuracy`` section (:func:`~.judge.judge`) and the ``cost`` section (median
-microseconds per single-position evaluation, as the search calls it). Every model can be
+microseconds per single-position evaluation in the core, from a FEN). Every model can be
 evaluated this way, including the older ones that are not retrained.
 
 Playing strength is measured with the UCI engine and fastchess instead.
@@ -12,24 +12,22 @@ import argparse
 import statistics
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
-import chess
-import numpy as np
-
+from chess_engine import _core
 from chess_lab.measure.judge import judge
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.cards import current_commit, load_card, today, update_card
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
-from chess_lab.models.python_eval import PythonEvaluator
-from chess_lab.models.representation import Representation, score_to_cp
 from chess_lab.training.dataset import TEST
 from chess_lab.training.sidecar import load_sample
 
 #: Evaluations that are not saved models: the hand-written heuristic.
 HEURISTICS = ("h1",)
+#: Architecture written in the card of a heuristic.
+HEURISTIC_ARCHITECTURE = "Hand-crafted heuristic (weights fitted to Stockfish)"
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000
@@ -41,84 +39,43 @@ DEFAULT_RAW_DIR = Path("data/lichess/raw")
 DEFAULT_SIDECAR_DIR = Path("data/lichess/sidecar")
 
 
-class HeuristicModel:
-    """Adapter that lets the heuristic ``h1`` go through the judge.
-
-    It offers what :func:`~.judge.judge` and :func:`sample_benchmark` use of a model:
-    ``expected_score`` and ``predict_cp_batch``. The batch method returns the centipawns whose
-    default-representation score is exactly the heuristic value, so the judge recovers it.
-    """
-
-    architecture = "Hand-crafted heuristic (weights fitted to Stockfish)"
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.evaluator = h1_evaluator()
-
-    def expected_score(self, board: chess.Board) -> float:
-        """Expected score of White in ``[0.01, 0.99]``."""
-        return self.evaluator.evaluate(board.fen(), True)
-
-    def predict_cp_batch(self, boards) -> np.ndarray:
-        """Centipawns (White's point of view) equivalent to the heuristic scores."""
-        scores = np.array([self.expected_score(board) for board in boards], dtype=np.float64)
-        return score_to_cp(scores, Representation())
-
-    def count_parameters(self) -> int:
-        """Number of weights in ``h1_weights.json``."""
-        return len(load_h1_weights())
-
-
-def _median_ms(call: Callable[[chess.Board], float], fens: List[str], warmup: int) -> float:
-    """Median time of ``call`` over single positions, in milliseconds."""
-    boards = [chess.Board(fen) for fen in fens]
-    for board in boards[:warmup]:
-        call(board)
+def _median_us(evaluator: _core.Evaluator, fens: List[str], warmup: int) -> float:
+    """Median time of one evaluation of White's score, in microseconds."""
+    for fen in fens[:warmup]:
+        evaluator.evaluate(fen, True)
     timings = []
-    for board in boards:
+    for fen in fens:
         started = time.perf_counter()
-        call(board)
-        timings.append((time.perf_counter() - started) * 1000.0)
+        evaluator.evaluate(fen, True)
+        timings.append((time.perf_counter() - started) * 1e6)
     return statistics.median(timings)
 
 
 def sample_benchmark(
-    model: Union[PythonEvaluator, HeuristicModel],
+    evaluator: _core.Evaluator,
     raw: Path,
     sidecar: Path,
     agreement_n: int = AGREEMENT_ROWS,
 ) -> Dict[str, Any]:
-    """Judge a model on the fixed test sample and time its single-position evaluation.
+    """Judge an evaluation on the fixed test sample and time it on single positions.
 
-    :param model: Model to evaluate.
+    :param evaluator: Evaluation to judge, as the engine plays it.
     :param raw: Directory with the raw shards.
     :param sidecar: Directory with their sidecars.
     :param agreement_n: Leading sample rows used for best-move agreement.
     :return: ``accuracy`` (judge output plus the sample description) and ``cost``.
     """
     sample = load_sample(raw, sidecar, TEST, TEST_SAMPLE_ROWS, seed=SAMPLE_SEED)
-    accuracy = judge(model, sample, agreement_n)
+    accuracy = judge(evaluator, sample, agreement_n)
     accuracy["sample"] = {"rows": len(sample), "seed": SAMPLE_SEED, "agreement_n": agreement_n}
     cost_fens = sample["fen"].head(COST_SAMPLES).tolist()
     cost = {
-        "us_per_eval": round(_median_ms(model.expected_score, cost_fens, 20) * 1000.0, 2),
+        "us_per_eval": round(_median_us(evaluator, cost_fens, 20), 2),
         "samples": len(cost_fens),
         "date": today(),
         "commit": current_commit(),
     }
     return {"accuracy": accuracy, "cost": cost}
-
-
-def features_name(model: Union[PythonEvaluator, HeuristicModel]) -> str:
-    """Name of the feature set of a model, for the card.
-
-    :param model: Model instance.
-    :return: The class's ``features.name``.
-    """
-    if isinstance(model, HeuristicModel):
-        return model.name
-    features = getattr(model, "features", None)
-    return features.name if features is not None else "—"
 
 
 def model_spec_arg(text: str) -> str:
@@ -173,19 +130,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     """
     args = parse_args(argv)
     heuristic = args.model in HEURISTICS
-    model = (
-        HeuristicModel(args.model)
-        if heuristic
-        else PythonEvaluator(load_model(args.model, args.path))
-    )
+    if heuristic:
+        evaluator = h1_evaluator()
+        sections: Dict[str, Any] = {
+            "architecture": HEURISTIC_ARCHITECTURE,
+            "features": args.model,
+            "parameters": len(load_h1_weights()),
+        }
+    else:
+        model = load_model(args.model, args.path)
+        evaluator = model.evaluator()
+        sections = {
+            "architecture": model.architecture,
+            "features": model.feature_set,
+            "parameters": model.count_parameters(),
+        }
     print(f"Evaluating {args.model} ...")
-
-    sections: Dict[str, Any] = {
-        "architecture": model.architecture,
-        "features": features_name(model),
-        "parameters": model.count_parameters(),
-    }
-    sections.update(sample_benchmark(model, args.raw, args.sidecar, args.agreement_n))
+    sections.update(sample_benchmark(evaluator, args.raw, args.sidecar, args.agreement_n))
     if heuristic:
         sections["status"] = "reference"
     else:

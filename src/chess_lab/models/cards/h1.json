@@ -32,10 +32,10 @@
     }
   },
   "cost": {
-    "us_per_eval": 190.11,
+    "us_per_eval": 2.86,
     "samples": 1000,
-    "date": "2026-10-21",
-    "commit": "e14cf12+dirty"
+    "date": "2026-11-01",
+    "commit": "2d76f00+dirty"
   },
   "status": "reference",
   "tournament": {

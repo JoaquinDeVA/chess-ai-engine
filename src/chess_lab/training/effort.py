@@ -13,12 +13,11 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Dict, NamedTuple, Optional, Tuple
 
-import chess
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from chess_lab.models import PythonEvaluator, fit_stream, new_model
+from chess_lab.models import fit_stream, new_model
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import NeuralEvalModel, SparseModel
 from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, _losses, _scores, encode_frame
@@ -284,9 +283,10 @@ def calibrate(
     rows, cols, vals, targets = encode_frame(features_of(model_class), rep, validation)
     encode_seconds = time.perf_counter() - started
     if isinstance(model, NeuralEvalModel):
-        boards = [chess.Board(fen) for fen in validation["fen"]]
+        evaluator = model.evaluator()
         started = time.perf_counter()
-        PythonEvaluator(model).predict_cp_batch(boards)
+        for fen in validation["fen"]:
+            evaluator.evaluate(fen, True)
     else:
         theta = np.append(model.weights, model.bias)
         started = time.perf_counter()

@@ -27,22 +27,35 @@ def material_cp(board: chess.Board) -> float:
 
 
 class MaterialStubModel:
-    """Deterministic stand-in for a trained model: evaluates by counting material.
+    """Deterministic stand-in for a trained model and its evaluator: scores by counting material.
 
-    Python only, so it does not play (the core cannot run it): it serves the judge and the cards.
+    Python only, so it does not play: it serves the judge and the cards.
     """
 
     name = "stub"
     architecture = "material count"
+    feature_set = "material count"
 
     def count_parameters(self) -> int:
         return 0
 
-    def predict_cp(self, board: chess.Board) -> float:
-        return max(-1267.0, min(1267.0, material_cp(board)))
+    def evaluator(self) -> "MaterialStubModel":
+        return self
 
-    def predict_cp_batch(self, boards):
-        return np.array([self.predict_cp(board) for board in boards], dtype=np.float64)
+    def evaluate(self, fen: str, white: bool) -> float:
+        """Score of White (``white``) or Black, as ``_core.Evaluator.evaluate`` gives it."""
+        score = mover_score(0.00368208 * material_cp(chess.Board(fen)))
+        return score if white else 1.0 - score
+
+
+def white_score_of(model, board: chess.Board) -> float:
+    """White's score of a position under a model, evaluated by the core as the engine plays it."""
+    return model.evaluator().evaluate(board.fen(), True)
+
+
+def mover_score(logit: float) -> float:
+    """The core's score of the side to move for a logit: the logistic, clipped to [0.01, 0.99]."""
+    return min(0.99, max(0.01, 1.0 / (1.0 + np.exp(-logit))))
 
 
 @pytest.fixture

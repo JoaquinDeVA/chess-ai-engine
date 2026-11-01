@@ -10,7 +10,7 @@ An evaluation model answers one question: given a chess position, how likely is 
 
 ## The idea behind the linear models
 
-Four of the models are, underneath, the same machine: a logistic regression over sparse features. A position is turned into a short list of "active" features (for example "I have 2 more knights than my opponent", or "my rook stands on e1"), each with a value. The model keeps one weight per feature, adds up `weight * value` over the active ones, adds a single bias, and squeezes the total through a sigmoid to get a probability between 0 and 1. The slides of a university course on machine learning call exactly this "logistic regression", and the code in `src/chess_lab/models/python_eval.py` (and `rust/src/eval/linear.rs`, which plays) implements it as `sigmoid(w . x + b)`. Sparse input was chosen because depth per second matters more than
+Four of the models are, underneath, the same machine: a logistic regression over sparse features. A position is turned into a short list of "active" features (for example "I have 2 more knights than my opponent", or "my rook stands on e1"), each with a value. The model keeps one weight per feature, adds up `weight * value` over the active ones, adds a single bias, and squeezes the total through a sigmoid to get a probability between 0 and 1. The slides of a university course on machine learning call exactly this "logistic regression", and `rust/src/eval/linear.rs` implements it as `sigmoid(w . x + b)`. Sparse input was chosen because depth per second matters more than
 accuracy per evaluation: a move changes few features, so the sum can be updated incrementally, while the
 convolutional networks tried first took about 13 ms per evaluation, some 100 times a linear model.
 
@@ -92,7 +92,7 @@ This is the only model that can combine features. It reads the same kind of piec
 | Meaning of the parameters | The first layer holds 256 numbers for each of the 768 piece-square inputs; the later layers mix those 256 numbers into 32, then 32, then one score |
 | Output | A single logit, passed through the same sigmoid: win probability of the side to move |
 
-A position activates at most 32 inputs (one per piece). The first layer, the accumulator, simply adds up the 256-number rows of the active inputs and clips the result to the range 0 to 1. The remaining hidden layers use ReLU activations, and the last layer is linear. Because the second and third layers receive all 256 accumulated values at once, a hidden unit can respond to "king exposed and queens present" and stay silent otherwise, which is precisely the combination the linear models are blind to. Evaluation at play time uses only NumPy, with no deep-learning framework, so it stays fast enough to run inside the search; Keras is used only to train the weights.
+A position activates at most 32 inputs (one per piece). The first layer, the accumulator, simply adds up the 256-number rows of the active inputs and clips the result to the range 0 to 1. The remaining hidden layers use ReLU activations, and the last layer is linear. Because the second and third layers receive all 256 accumulated values at once, a hidden unit can respond to "king exposed and queens present" and stay silent otherwise, which is precisely the combination the linear models are blind to. Evaluation at play time runs in the Rust core (`rust/src/eval/net.rs`), with no deep-learning framework, so it stays fast enough to run inside the search; Keras is used only to train the weights.
 
 ## The hand-written heuristic (`h1`)
 

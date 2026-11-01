@@ -1,4 +1,4 @@
-"""The models: definitions, saved files, features, targets, fitting and the Python evaluation.
+"""The models: definitions, saved files, features, targets and fitting.
 
 The app does not load models: the window plays through the UCI binary, which embeds its own
 (``chess_lab.scripts.export_uci_model``).
@@ -10,7 +10,6 @@ import pandas as pd
 
 from . import linear_eval, neural_eval
 from .definitions import NeuralEvalModel, SparseModel
-from .python_eval import PythonEvaluator  # noqa: F401
 from .representation import Representation
 
 

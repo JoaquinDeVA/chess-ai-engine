@@ -3,7 +3,6 @@
 import json
 import subprocess
 import sys
-import time
 
 import chess
 import numpy as np
@@ -13,9 +12,8 @@ import pytest
 from chess_lab.models import fit_stream, new_model
 from chess_lab.models.definitions import NeuralEvalModel, Nn4Model, get_model_class, load_evaluator
 from chess_lab.models.linear_features import features_of
-from chess_lab.models.python_eval import PythonEvaluator
 from chess_lab.models.representation import Representation
-from tests.conftest import material_cp, random_positions
+from tests.conftest import material_cp, mover_score, random_positions, white_score_of
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
@@ -73,17 +71,20 @@ def test_nn4_has_the_documented_layer_shapes_and_parameter_count():
     assert Nn4Model.hidden == (256, 32, 32)
 
 
-def test_logit_matches_a_dense_numpy_reference():
+def test_core_score_matches_a_dense_numpy_reference():
     model = random_nn4(seed=6)
+    evaluator = model.evaluator()
     for board in random_positions(10, seed=8):
-        assert PythonEvaluator(model).logit(board) == pytest.approx(dense_logit(model, board))
+        assert evaluator.evaluate(board.fen(), board.turn) == pytest.approx(
+            mover_score(dense_logit(model, board))
+        )
 
 
 def test_mirror_complement_holds_for_random_weights():
     model = random_nn4(seed=3)
     for board in random_positions(20, seed=11):
-        assert PythonEvaluator(model).expected_score(board) == pytest.approx(
-            1.0 - PythonEvaluator(model).expected_score(board.mirror())
+        assert white_score_of(model, board) == pytest.approx(
+            1.0 - white_score_of(model, board.mirror())
         )
 
 
@@ -103,12 +104,7 @@ def test_save_load_round_trip_gives_identical_scores(tmp_path):
     assert Representation.from_dict(loaded.rep) == rep
     assert loaded.count_parameters() == model.count_parameters()
     for board in random_positions(10, seed=2):
-        assert PythonEvaluator(loaded).expected_score(board) == pytest.approx(
-            PythonEvaluator(model).expected_score(board)
-        )
-        assert PythonEvaluator(loaded).predict_cp(board) == pytest.approx(
-            PythonEvaluator(model).predict_cp(board)
-        )
+        assert white_score_of(loaded, board) == pytest.approx(white_score_of(model, board))
 
 
 def test_core_rejects_a_mismatching_input_layer(tmp_path):
@@ -142,13 +138,3 @@ def test_play_path_does_not_import_tensorflow(tmp_path):
         [sys.executable, "-c", script], capture_output=True, text=True, check=True, timeout=120
     )
     assert result.stdout.split() == ["True", "False", "False"]
-
-
-def test_logit_cost_is_reported():
-    model = random_nn4(seed=9)
-    boards = random_positions(200, seed=10)
-    started = time.perf_counter()
-    for board in boards:
-        PythonEvaluator(model).logit(board)
-    micros = (time.perf_counter() - started) / len(boards) * 1e6
-    print(f"\nnn4 logit: {micros:.1f} us per call")

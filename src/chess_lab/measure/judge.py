@@ -12,11 +12,8 @@ import chess
 import numpy as np
 import pandas as pd
 
-from chess_lab.models.python_eval import PythonEvaluator
+from chess_engine import _core
 from chess_lab.models.representation import Representation, white_score
-
-#: Positions per call of ``predict_cp_batch`` when judging a whole sample.
-CHUNK_SIZE = 4096
 
 
 def _average_ranks(values: np.ndarray) -> np.ndarray:
@@ -58,13 +55,12 @@ def static_metrics(pred_white: np.ndarray, true_white: np.ndarray) -> dict:
     return {"spearman": _spearman(pred, truth), "mae": mae, "n": int(pred.size)}
 
 
-def one_ply_choice(model: PythonEvaluator, board: chess.Board) -> chess.Move:
-    """Best move of the mover after one ply, judged by the model.
+def one_ply_choice(evaluator: _core.Evaluator, board: chess.Board) -> chess.Move:
+    """Best move of the mover after one ply, judged by the evaluation.
 
-    All the non-terminal children are evaluated with a single ``predict_cp_batch`` call. A
-    mating move ranks first; stalemate and other draws count as 0 centipawns.
+    A mating move ranks first; stalemate and other draws count as an even score.
 
-    :param model: Model that evaluates the resulting positions.
+    :param evaluator: Evaluation of the resulting positions, as the engine plays it.
     :param board: Position to move in; it is not modified.
     :return: The legal move with the highest evaluation for the side to move.
     :raises ValueError: If the position has no legal move.
@@ -72,43 +68,28 @@ def one_ply_choice(model: PythonEvaluator, board: chess.Board) -> chess.Move:
     moves = list(board.legal_moves)
     if not moves:
         raise ValueError("the position has no legal move")
-    sign = 1.0 if board.turn == chess.WHITE else -1.0
-    scores = [0.0] * len(moves)
-    children, indices = [], []
-    for index, move in enumerate(moves):
+    mover = board.turn
+    scores = []
+    for move in moves:
         child = board.copy(stack=False)
         child.push(move)
         if child.is_checkmate():
-            scores[index] = float("inf")
+            scores.append(float("inf"))
         elif child.is_game_over():
-            scores[index] = 0.0
+            scores.append(0.5)
         else:
-            children.append(child)
-            indices.append(index)
-    if children:
-        for index, cp in zip(indices, model.predict_cp_batch(children), strict=True):
-            scores[index] = sign * float(cp)
+            scores.append(evaluator.evaluate(child.fen(), mover == chess.WHITE))
     return moves[max(range(len(moves)), key=lambda i: scores[i])]
 
 
-def _predict_white(model: PythonEvaluator, fens: list[str]) -> np.ndarray:
-    """Predicted expected scores for White, computed in chunks of :data:`CHUNK_SIZE`."""
-    rep = Representation()
-    parts = []
-    for start in range(0, len(fens), CHUNK_SIZE):
-        boards = [chess.Board(fen) for fen in fens[start : start + CHUNK_SIZE]]
-        parts.append(white_score(model.predict_cp_batch(boards), np.nan, rep))
-    return np.concatenate(parts) if parts else np.empty(0)
-
-
-def judge(model: PythonEvaluator, test: pd.DataFrame, agreement_n: int = 20_000) -> dict:
-    """Judge a model on a test sample, on all positions and on each quiet slice.
+def judge(evaluator: _core.Evaluator, test: pd.DataFrame, agreement_n: int = 20_000) -> dict:
+    """Judge an evaluation on a test sample, on all positions and on each quiet slice.
 
     Static metrics use every row; the Stockfish truth is always on the Lichess win-probability
     scale. Best-move agreement uses the first ``agreement_n`` rows of the sample (rows without a
     best move are skipped) and is split by slice with the same rows.
 
-    :param model: Model to judge.
+    :param evaluator: Evaluation to judge, as the engine plays it (scores in ``[0.01, 0.99]``).
     :param test: Sample with columns ``fen``, ``cp``, ``mate``, ``best_move``, ``quiet``.
     :param agreement_n: Number of leading rows used for best-move agreement.
     :return: ``{"all": ..., "quiet": ..., "non_quiet": ...}``, each with the keys of
@@ -116,7 +97,7 @@ def judge(model: PythonEvaluator, test: pd.DataFrame, agreement_n: int = 20_000)
         ``agreement_n`` (rows with a best move that were compared).
     """
     fens = test["fen"].tolist()
-    pred = _predict_white(model, fens)
+    pred = np.array([evaluator.evaluate(fen, True) for fen in fens], dtype=np.float64)
     truth = white_score(test["cp"].to_numpy(), test["mate"].to_numpy(), Representation())
     quiet = test["quiet"].to_numpy(dtype=bool)
 
@@ -127,7 +108,7 @@ def judge(model: PythonEvaluator, test: pd.DataFrame, agreement_n: int = 20_000)
         if best is None or (isinstance(best, float) and np.isnan(best)):
             agree[row] = np.nan
             continue
-        choice = one_ply_choice(model, chess.Board(fens[row]))
+        choice = one_ply_choice(evaluator, chess.Board(fens[row]))
         agree[row] = float(choice.uci() == best)
 
     def slice_report(mask: np.ndarray) -> dict:

@@ -55,7 +55,7 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 
 | Judge | What it measures | Command |
 |---|---|---|
-| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42) | `python -m chess_lab.measure.evaluate --model linear_pst_terms` |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model linear_pst_terms` |
 | Profile | Depth reached in 1, 3 and 10 s and agreement of the searched move with Stockfish | `scripts/bench/profile_depth_vs_accuracy.py` |
 | Tournament | Round robin at equal time per move, paired openings, Elo against an anchor | `play_tournament`; today, fastchess ([Measurement](MEASUREMENT.md)) |
 
@@ -173,12 +173,12 @@ columns are the Python-engine tournaments above.
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval | Depth 1 s | Depth 3 s | Depth 10 s | Search agreement, 10 s | 10 min + 5 s, score % | 10 min + 5 s, Elo vs anchor | 1 min + 1 s, score % | 1 min + 1 s, Elo vs anchor | Depth 3, score % | Depth 3, Elo vs anchor |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 190.1 | — | — | — | — | 55.0% | +0 ± 92 | 54.0% | +0 ± 60 | — | — |
-| `linear_king_bucket` | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 24.9 | 3.8 | 4.5 | 5.2 | 45.0% | 51.0% | -25 ± 96 | 50.5% | -21 ± 66 | 44.4% | -173 ± 68 |
-| `linear_material` | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 19.6 | 4.0 | 4.8 | 5.7 | 43.0% | 21.0% | -227 ± 117 | 34.0% | -121 ± 66 | 27.5% | -279 ± 76 |
-| `linear_pst` | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 44.4 | 3.6 | 4.2 | 5.2 | 48.0% | 57.0% | +12 ± 97 | 45.0% | -53 ± 62 | 58.1% | -91 ± 63 |
-| `linear_pst_terms` | 791 | winprob-k0.00368-stm-all | 30 | 0.648 | 0.132 | 20.0% / 54.0% | 113.2 | 3.3 | 4.0 | 4.8 | 46.0% | 66.0% | +70 ± 98 | 59.5% | +33 ± 63 | 72.5% | +0 ± 72 |
-| `net4_pst` | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 46.1 | 3.5 | 4.2 | 5.0 | 48.0% | 50.0% | -31 ± 92 | 57.0% | +18 ± 64 | 47.5% | -154 ± 68 |
+| `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.9 | — | — | — | — | 55.0% | +0 ± 92 | 54.0% | +0 ± 60 | — | — |
+| `linear_king_bucket` | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 2.0 | 3.8 | 4.5 | 5.2 | 45.0% | 51.0% | -25 ± 96 | 50.5% | -21 ± 66 | 44.4% | -173 ± 68 |
+| `linear_material` | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 1.9 | 4.0 | 4.8 | 5.7 | 43.0% | 21.0% | -227 ± 117 | 34.0% | -121 ± 66 | 27.5% | -279 ± 76 |
+| `linear_pst` | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 2.3 | 3.6 | 4.2 | 5.2 | 48.0% | 57.0% | +12 ± 97 | 45.0% | -53 ± 62 | 58.1% | -91 ± 63 |
+| `linear_pst_terms` | 791 | winprob-k0.00368-stm-all | 30 | 0.648 | 0.132 | 20.0% / 54.0% | 2.9 | 3.3 | 4.0 | 4.8 | 46.0% | 66.0% | +70 ± 98 | 59.5% | +33 ± 63 | 72.5% | +0 ± 72 |
+| `net4_pst` | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 5.8 | 3.5 | 4.2 | 5.0 | 48.0% | 50.0% | -31 ± 92 | 57.0% | +18 ± 64 | 47.5% | -154 ± 68 |
 <!-- END GENERATED TABLES -->
 
 ## Reproduce

@@ -159,16 +159,15 @@ def stratified_accuracy(
     :return: ``{model: {"with neighbour": metrics, "without neighbour": metrics}}``.
     """
     from chess_lab.measure.judge import judge
-    from chess_lab.models.definitions import load_model
-    from chess_lab.models.python_eval import PythonEvaluator
+    from chess_lab.models.definitions import load_evaluator
 
     result = {}
     for name in model_names:
-        model = PythonEvaluator(load_model(name))
+        evaluator = load_evaluator(name)
         groups = {}
         for label, mask in (("with neighbour", flags), ("without neighbour", ~flags)):
             part = sample[mask].reset_index(drop=True)
-            groups[label] = {**judge(model, part, agreement_n=0)["all"], "rows": len(part)}
+            groups[label] = {**judge(evaluator, part, agreement_n=0)["all"], "rows": len(part)}
         result[name] = groups
     return result
 

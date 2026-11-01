@@ -60,24 +60,24 @@
   },
   "accuracy": {
     "all": {
-      "spearman": 0.6126426882893508,
-      "mae": 0.14071503028491072,
+      "spearman": 0.6126427052102558,
+      "mae": 0.14071832212148114,
       "n": 200000,
-      "best_move_agreement": 0.19435,
+      "best_move_agreement": 0.1943,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.6417999807242164,
-      "mae": 0.12719565246118883,
+      "spearman": 0.6418000415080239,
+      "mae": 0.1271990586666122,
       "n": 138657,
       "best_move_agreement": 0.048969258589511754,
       "agreement_n": 13825
     },
     "non_quiet": {
-      "spearman": 0.5565305061875765,
-      "mae": 0.17127363307420715,
+      "spearman": 0.5565304213527011,
+      "mae": 0.17127666639648828,
       "n": 61343,
-      "best_move_agreement": 0.5198380566801619,
+      "best_move_agreement": 0.5196761133603239,
       "agreement_n": 6175
     },
     "sample": {
@@ -87,10 +87,10 @@
     }
   },
   "cost": {
-    "us_per_eval": 24.86,
+    "us_per_eval": 1.96,
     "samples": 1000,
-    "date": "2026-10-21",
-    "commit": "e14cf12+dirty"
+    "date": "2026-11-01",
+    "commit": "2d76f00+dirty"
   },
   "tradeoff": {
     "1": {

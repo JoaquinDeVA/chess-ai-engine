@@ -31,7 +31,7 @@ def table(script, entries):
     return scores.get
 
 
-def test_white_scores_turn_mates_into_large_signed_scores(script):
+def test_ranking_scores_turn_mates_into_large_signed_scores(script):
     cp = np.array([35.0, np.nan, np.nan])
     mate = np.array([np.nan, 3.0, -2.0])
     result = script.ranking_scores(cp, mate)

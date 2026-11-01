@@ -15,6 +15,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.representation import is_quiet, keep_mate_rows, validate_mate_keep
 
 from .dataset import assign_split
@@ -154,7 +155,7 @@ def load_sample(
     sidecar_dir: Path,
     split: int,
     n: int,
-    seed: int = 42,
+    seed: int = SAMPLE_SEED,
     quiet_only: bool = False,
     mate_keep: float = 1.0,
 ) -> pd.DataFrame:

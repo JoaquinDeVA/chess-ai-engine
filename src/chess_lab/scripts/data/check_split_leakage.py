@@ -31,7 +31,7 @@ import numpy as np
 import pyarrow.parquet as pq
 
 from chess_engine.knowledge.opening_book import position_key
-from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
+from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}
@@ -207,7 +207,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--raw", type=Path, default=RAW_DIR)
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR)
     parser.add_argument("--positions", type=int, default=20_000, help="test positions examined")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=SAMPLE_SEED)
     parser.add_argument(
         "--models", help="comma-separated models to judge on both groups of positions"
     )
@@ -246,7 +246,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"| a position one move away | {near['child_in_data']:.1%} | {near['child_in_train']:.1%} |",
     ]
     if args.models:
-        from chess_lab.measure.evaluate import SAMPLE_SEED
         from chess_lab.training.sidecar import load_sample
 
         sample = load_sample(args.raw, args.sidecar, TEST, args.sample_rows, seed=SAMPLE_SEED)

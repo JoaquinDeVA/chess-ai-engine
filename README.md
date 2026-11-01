@@ -90,10 +90,10 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
 rust/           the core: rules, search, evaluations, opening book and endgame tables (Rust)
 src/chess_engine/
   uci.py        the UCI client the window plays through (book and tables first, then the binary)
-  models/       h1, the learned evaluators and their cards
   knowledge/    the opening book and the endgame tables (Python faces of the Rust core)
   gui/          the window: board, game page, player selection and AI settings
 src/chess_lab/  the laboratory (not needed to play)
+  models/       h1, the learned evaluators, their files and cards
   training/     sampling, targets and the training command
   measure/      judge, model evaluation and the results table
   scripts/      data pipeline and run_full_pipeline.sh

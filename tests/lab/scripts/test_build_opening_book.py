@@ -34,7 +34,7 @@ def table(script, entries):
 def test_white_scores_turn_mates_into_large_signed_scores(script):
     cp = np.array([35.0, np.nan, np.nan])
     mate = np.array([np.nan, 3.0, -2.0])
-    result = script.white_scores(cp, mate)
+    result = script.ranking_scores(cp, mate)
     assert result[0] == 35.0
     assert result[1] == script.MATE_SCORE - 3 and result[2] == -(script.MATE_SCORE - 2)
 

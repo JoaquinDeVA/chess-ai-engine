@@ -14,7 +14,7 @@ must not decide the result by itself: a suite of balanced positions a few moves 
 
 ## How it is built
 
-`src/chess_lab/scripts/build_openings.py` writes one FEN per line:
+`src/chess_lab/scripts/data/build_openings.py` writes one FEN per line:
 
 1. Draw random legal playouts of 8 to 10 half-moves from the start position, with a seeded generator (the same seed
    gives the same draw). Playouts that end the game or repeat a position already drawn are discarded.
@@ -26,7 +26,7 @@ The Lichess evaluation shards (`data/lichess/raw`) are not the source: their FEN
 distance from the start cannot be read from them.
 
 ```bash
-python src/chess_lab/scripts/build_openings.py --out data/openings/openings.epd   # seed 1, depth 12, 6000 playouts, 1000 kept
+python src/chess_lab/scripts/data/build_openings.py --out data/openings/openings.epd   # seed 1, depth 12, 6000 playouts, 1000 kept
 ```
 
 ## How a match uses it

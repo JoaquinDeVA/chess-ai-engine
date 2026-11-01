@@ -31,6 +31,7 @@ import numpy as np
 import pyarrow.parquet as pq
 
 from chess_engine.knowledge.opening_book import position_key
+from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
 from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}
@@ -203,8 +204,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     :return: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
-    parser.add_argument("--sidecar", type=Path, default=Path("data/lichess/sidecar"))
+    parser.add_argument("--raw", type=Path, default=RAW_DIR)
+    parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR)
     parser.add_argument("--positions", type=int, default=20_000, help="test positions examined")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(

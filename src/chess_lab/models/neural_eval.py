@@ -18,9 +18,9 @@ from .definitions import Layer, NeuralEvalModel
 from .linear_eval import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,
-    _losses,
     encode_frame,
     encoded_frames,
+    losses,
     run_epochs,
 )
 from .linear_features import features_of
@@ -260,7 +260,7 @@ def fit_stream(
         val_z = network.predict(
             [val_index, val_value], batch_size=_PREDICT_BATCH, verbose=0
         ).reshape(-1)
-        return float(np.mean(_losses(val_z.astype(np.float64), val_y)))
+        return float(np.mean(losses(val_z.astype(np.float64), val_y)))
 
     summary, best_layers = run_epochs(
         cfg=cfg,

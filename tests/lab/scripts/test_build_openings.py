@@ -1,4 +1,4 @@
-"""Tests of src/chess_lab/scripts/build_openings.py with a fake engine (no Stockfish)."""
+"""Tests of src/chess_lab/scripts/data/build_openings.py with a fake engine (no Stockfish)."""
 
 import importlib.util
 
@@ -11,7 +11,7 @@ from tests.paths import ROOT
 
 @pytest.fixture(scope="module")
 def script():
-    path = ROOT / "src" / "chess_lab" / "scripts" / "build_openings.py"
+    path = ROOT / "src" / "chess_lab" / "scripts" / "data" / "build_openings.py"
     spec = importlib.util.spec_from_file_location("build_openings", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

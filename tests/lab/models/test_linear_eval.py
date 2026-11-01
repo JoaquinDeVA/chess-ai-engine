@@ -506,6 +506,6 @@ def test_lr_decay_restores_the_weights_of_the_best_epoch():
         features_of(model), Representation.from_dict(model.rep), validation
     )
     theta = np.append(model.weights, model.bias)
-    z = linear_eval._scores(rows, cols, vals, len(targets), theta)
-    restored = float(np.mean(linear_eval._losses(z, targets)))
+    z = linear_eval.scores(rows, cols, vals, len(targets), theta)
+    restored = float(np.mean(linear_eval.losses(z, targets)))
     assert restored == pytest.approx(summary["val_losses"][best - 1])

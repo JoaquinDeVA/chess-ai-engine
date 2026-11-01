@@ -13,7 +13,7 @@
 # measured against the old h1 would stop being comparable.
 #
 # Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
-# AGREEMENT_N (20000), MODELS ("linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst"),
+# AGREEMENT_N (20000), MODELS (every registered model, from chess_lab.models.definitions),
 # STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/pipeline),
 # PYTHON (.venv/bin/python if it exists, else python).
 #
@@ -26,7 +26,6 @@ RAW="${RAW:-data/lichess/raw}"
 SIDECAR="${SIDECAR:-data/lichess/sidecar}"
 EFFORT="${EFFORT:-30}"
 AGREEMENT_N="${AGREEMENT_N:-20000}"
-MODELS="${MODELS:-linear_material linear_pst linear_king_bucket linear_pst_terms net4_pst}"
 STEPS="${STEPS:-sidecars train evaluate report}"
 FORCE="${FORCE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -35,8 +34,10 @@ if [ -z "${PYTHON:-}" ]; then
   if [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; else PYTHON=python; fi
 fi
 
-ARTIFACTS=src/chess_lab/models/artifacts
-CARDS=src/chess_lab/models/cards
+# The model list and the folders come from the registry, not from copies here.
+MODELS="${MODELS:-$("$PYTHON" -c "from chess_lab.models.definitions import available_models as a; print(' '.join(a()))")}"
+ARTIFACTS=$("$PYTHON" -c "from chess_lab.models.loader import ARTIFACTS_DIR; print(ARTIFACTS_DIR)")
+CARDS=$("$PYTHON" -c "from chess_lab.models.cards import CARDS_DIR; print(CARDS_DIR)")
 
 log() { echo "=== $*"; }
 

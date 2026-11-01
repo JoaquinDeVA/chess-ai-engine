@@ -10,14 +10,15 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
 from chess_lab.training.sidecar import build_sidecar, sidecar_path
 
 
 def main() -> None:
     """Parse the arguments and build the missing sidecars."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
-    parser.add_argument("--out", type=Path, default=Path("data/lichess/sidecar"))
+    parser.add_argument("--raw", type=Path, default=RAW_DIR)
+    parser.add_argument("--out", type=Path, default=SIDECAR_DIR)
     parser.add_argument("--jobs", type=int, default=5, help="worker processes")
     args = parser.parse_args()
 

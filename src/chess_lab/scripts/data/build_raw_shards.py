@@ -26,6 +26,7 @@ from pathlib import Path
 import pyarrow as pa
 import zstandard
 
+from chess_lab.models.defaults import RAW_DIR, format_duration
 from chess_lab.training.lichess_raw import (
     DETECTION_SAMPLE,
     ROW_GROUP_SIZE,
@@ -117,15 +118,6 @@ def parse_in_order(pool, chunks, window: int):
             yield pending.popleft().get()
     while pending:
         yield pending.popleft().get()
-
-
-def format_duration(seconds: float) -> str:
-    """Format a duration as ``H:MM:SS``.
-
-    :param seconds: Duration.
-    :return: The text.
-    """
-    return f"{int(seconds) // 3600}:{int(seconds) // 60 % 60:02d}:{int(seconds) % 60:02d}"
 
 
 def fetch(
@@ -261,7 +253,7 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--rows", type=int, default=None, help="lines to read (default: all)")
-    parser.add_argument("--output-dir", type=Path, default=Path("data/lichess/raw"))
+    parser.add_argument("--output-dir", type=Path, default=RAW_DIR)
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--input", help="local .zst file")
     source.add_argument("--url", default=DEFAULT_URL)

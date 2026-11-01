@@ -18,7 +18,7 @@ from chess_engine import _core
 from chess_lab.measure.judge import judge
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.cards import current_commit, load_card, today, update_card
-from chess_lab.models.defaults import SAMPLE_SEED
+from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
 from chess_lab.training.dataset import TEST
@@ -35,8 +35,6 @@ TEST_SAMPLE_ROWS = 200_000
 AGREEMENT_ROWS = 20_000
 #: Positions timed for the cost section.
 COST_SAMPLES = 1000
-DEFAULT_RAW_DIR = Path("data/lichess/raw")
-DEFAULT_SIDECAR_DIR = Path("data/lichess/sidecar")
 
 
 def _median_us(evaluator: _core.Evaluator, fens: List[str], warmup: int) -> float:
@@ -109,10 +107,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "--model", required=True, type=model_spec_arg, help="model name, or name@tag"
     )
     parser.add_argument("--path", type=Path, help="saved model file (default: models/artifacts)")
-    parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
-    parser.add_argument(
-        "--sidecar", type=Path, default=DEFAULT_SIDECAR_DIR, help="sidecar directory"
-    )
+    parser.add_argument("--raw", type=Path, default=RAW_DIR, help="raw shards directory")
+    parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR, help="sidecar directory")
     parser.add_argument(
         "--agreement-n",
         type=int,

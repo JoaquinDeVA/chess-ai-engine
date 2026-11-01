@@ -13,7 +13,7 @@ import chess
 import numpy as np
 import pandas as pd
 
-from .defaults import DEFAULT_MATE_KEEP, mates_suffix
+from .defaults import DEFAULT_MATE_KEEP, SPLIT_SEED, mates_suffix
 from .definitions import CP_SCALE
 
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
@@ -156,7 +156,7 @@ def is_quiet(board: chess.Board, best_move: str | None) -> bool:
     return not (board.is_capture(move) or move.promotion is not None)
 
 
-def keep_mate_rows(fens: pd.Series, mate_keep: float, seed: int = 42) -> np.ndarray:
+def keep_mate_rows(fens: pd.Series, mate_keep: float, seed: int = SPLIT_SEED) -> np.ndarray:
     """Which mate positions to keep when only a share ``mate_keep`` of them is wanted.
 
     Each FEN gets a CRC32 hash (salted with ``seed``) mapped to ``[0, 1)``; it is kept when the

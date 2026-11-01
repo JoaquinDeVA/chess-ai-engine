@@ -14,7 +14,7 @@ from chess_engine.paths import ROOT
 
 CARDS_DIR = Path(__file__).resolve().parent / "cards"
 #: Card sections that hold measurements of one particular trained model.
-MEASUREMENT_SECTIONS = ("training", "accuracy", "cost", "tradeoff", "tournament")
+MEASUREMENT_SECTIONS = ("training", "accuracy", "cost")
 
 
 def card_path(name: str) -> Path:
@@ -73,8 +73,8 @@ def update_card(name: str, **sections: Any) -> Dict[str, Any]:
 def clear_measurements(name: str) -> None:
     """Remove the sections that describe a trained model, keeping its identity.
 
-    Used after retraining: ``training``, ``accuracy``, ``cost``, ``tradeoff`` and ``tournament``
-    belong to the previous model and would otherwise survive the merge of :func:`update_card`.
+    Used after retraining: ``training``, ``accuracy`` and ``cost`` belong to the previous model
+    and would otherwise survive the merge of :func:`update_card`.
     Nothing happens if the card does not exist.
 
     :param name: Model name.

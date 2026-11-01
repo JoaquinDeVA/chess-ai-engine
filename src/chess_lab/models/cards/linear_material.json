@@ -91,51 +91,5 @@
     "samples": 1000,
     "date": "2026-11-01",
     "commit": "2d76f00+dirty"
-  },
-  "tradeoff": {
-    "1": {
-      "mean_depth": 4.04,
-      "search_agreement": 0.36
-    },
-    "3": {
-      "mean_depth": 4.79,
-      "search_agreement": 0.4
-    },
-    "10": {
-      "mean_depth": 5.65,
-      "search_agreement": 0.43
-    }
-  },
-  "tournament": {
-    "60+1": {
-      "games": 100,
-      "score": 34.0,
-      "elo": -120.69324577637187,
-      "elo_interval": 66.1899975754402,
-      "anchor": "h1",
-      "base": 60.0,
-      "increment": 1.0,
-      "max_depth": 30
-    },
-    "depth3": {
-      "games": 80,
-      "score": 27.500000000000004,
-      "elo": -279.0849495128883,
-      "elo_interval": 75.68233400501987,
-      "anchor": "linear_pst_terms",
-      "base": 600.0,
-      "increment": 0.0,
-      "max_depth": 3
-    },
-    "600+5": {
-      "games": 50,
-      "score": 21.0,
-      "elo": -226.9976606137082,
-      "elo_interval": 117.38852844268878,
-      "anchor": "h1",
-      "base": 600.0,
-      "increment": 5.0,
-      "max_depth": 30
-    }
   }
 }

@@ -5,13 +5,13 @@ import zlib
 import numpy as np
 import pandas as pd
 
+from chess_lab.models.defaults import SPLIT_SEED
+
 TRAIN, VALIDATION, TEST = 0, 1, 2
 
 #: Default benchmark split: 10% test, 10% validation, 80% train.
 DEFAULT_TEST_FRACTION = 0.10
 DEFAULT_VALIDATION_FRACTION = 0.10
-#: Salt of the split hash. Changing it changes the benchmark: keep it fixed.
-SPLIT_SEED = 42
 
 
 def assign_split(

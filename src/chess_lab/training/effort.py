@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 from chess_lab.models import fit_stream, new_model
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import NeuralEvalModel, SparseModel
-from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, _losses, _scores, encode_frame
+from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, encode_frame, losses, scores
 from chess_lab.models.linear_features import features_of
 from chess_lab.models.representation import (
     Representation,
@@ -290,7 +290,7 @@ def calibrate(
     else:
         theta = np.append(model.weights, model.bias)
         started = time.perf_counter()
-        _losses(_scores(rows, cols, vals, len(targets), theta), targets).mean()
+        losses(scores(rows, cols, vals, len(targets), theta), targets).mean()
     score_seconds = time.perf_counter() - started
 
     train_seconds = max(0.0, summary["seconds"] - encode_seconds - score_seconds)

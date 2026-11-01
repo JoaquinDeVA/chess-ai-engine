@@ -108,8 +108,8 @@ def fit_stream(
         for local in _minibatches(*encoded, batch_size):
             local_rows, local_cols, local_vals, local_y = local
             count = len(local_y)
-            z = _scores(local_rows, local_cols, local_vals, count, theta)
-            loss_sum += float(np.sum(_losses(z, local_y)))
+            z = scores(local_rows, local_cols, local_vals, count, theta)
+            loss_sum += float(np.sum(losses(z, local_y)))
             rows_seen += count
             grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
             grad_w = (
@@ -132,8 +132,8 @@ def fit_stream(
 
     def validation_loss() -> float:
         val_rows, val_cols, val_vals, val_y = validation_data
-        val_z = _scores(val_rows, val_cols, val_vals, len(val_y), theta)
-        return float(np.mean(_losses(val_z, val_y)))
+        val_z = scores(val_rows, val_cols, val_vals, len(val_y), theta)
+        return float(np.mean(losses(val_z, val_y)))
 
     def set_lr(value: float) -> None:
         nonlocal lr
@@ -397,7 +397,7 @@ def _minibatches(rows, cols, vals, y, batch_size: int):
         yield rows[first:last] - start, cols[first:last], vals[first:last], y[start:stop]
 
 
-def _scores(rows, cols, vals, count: int, theta: np.ndarray) -> np.ndarray:
+def scores(rows, cols, vals, count: int, theta: np.ndarray) -> np.ndarray:
     """Logits of ``count`` rows, from the sparse entries and ``theta = (weights, bias)``.
 
     :return: Array of shape ``(count,)``.
@@ -406,7 +406,7 @@ def _scores(rows, cols, vals, count: int, theta: np.ndarray) -> np.ndarray:
     return np.bincount(rows, weights=vals * weights[cols], minlength=count) + theta[-1]
 
 
-def _losses(z: np.ndarray, y: np.ndarray) -> np.ndarray:
+def losses(z: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Binary cross-entropy with soft targets, from logits.
 
     :return: ``log(1 + exp(z)) - y * z`` per row.

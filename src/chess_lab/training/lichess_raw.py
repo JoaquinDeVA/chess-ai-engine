@@ -17,13 +17,20 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9}
+#: Rough piece values, used only to probe the perspective of ``cp`` (:func:`detect_perspective`).
+PROBE_PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+}
 WHITE, SIDE_TO_MOVE = "white", "side-to-move"
 #: Records inspected to detect the perspective.
 DETECTION_SAMPLE = 5000
 
 
-def material_difference(fen: str) -> int:
+def probe_material_balance(fen: str) -> int:
     """White material minus Black material, in pawns (kings excluded).
 
     :param fen: Position.
@@ -31,7 +38,7 @@ def material_difference(fen: str) -> int:
     """
     board = chess.Board(fen)
     return sum(
-        PIECE_VALUES.get(piece.piece_type, 0) * (1 if piece.color == chess.WHITE else -1)
+        PROBE_PIECE_VALUES.get(piece.piece_type, 0) * (1 if piece.color == chess.WHITE else -1)
         for piece in board.piece_map().values()
     )
 
@@ -52,7 +59,7 @@ def detect_perspective(records: Iterable[dict[str, Any]]) -> str:
         if record["cp"] is None or " b " not in f" {record['fen']} ":
             continue
         cps.append(record["cp"])
-        balances.append(material_difference(record["fen"]))
+        balances.append(probe_material_balance(record["fen"]))
     if len(cps) < 50 or np.std(balances) == 0 or np.std(cps) == 0:
         raise ValueError("not enough Black-to-move positions to detect the perspective")
     correlation = np.corrcoef(cps, balances)[0, 1]

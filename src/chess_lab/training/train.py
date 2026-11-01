@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import List, Optional
 
 from chess_lab.models.cards import clear_measurements, current_commit, today, update_card
-from chess_lab.models.defaults import DEFAULT_MATE_KEEP, SAMPLE_SEED
+from chess_lab.models.defaults import (
+    DEFAULT_MATE_KEEP,
+    RAW_DIR,
+    SAMPLE_SEED,
+    SIDECAR_DIR,
+    format_duration,
+)
 from chess_lab.models.definitions import available_models, get_model_class
 from chess_lab.models.loader import artifact_path
 from chess_lab.models.representation import Representation
@@ -31,8 +37,6 @@ from .effort import (
 from .sidecar import load_sample
 
 MAX_VALIDATION_ROWS = 50_000
-DEFAULT_RAW_DIR = Path("data/lichess/raw")
-DEFAULT_SIDECAR_DIR = Path("data/lichess/sidecar")
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -74,10 +78,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-cache", action="store_true", help="do not cache the encoded training batches"
     )
-    parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="raw shards directory")
-    parser.add_argument(
-        "--sidecar", type=Path, default=DEFAULT_SIDECAR_DIR, help="sidecar directory"
-    )
+    parser.add_argument("--raw", type=Path, default=RAW_DIR, help="raw shards directory")
+    parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR, help="sidecar directory")
     args = parser.parse_args(argv)
     if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
@@ -128,19 +130,6 @@ def effort_representation(args: argparse.Namespace) -> Representation:
     return replace(rep, mate_keep=args.mate_keep)
 
 
-def _format_duration(seconds: float) -> str:
-    """Human-readable duration.
-
-    :param seconds: Duration in seconds.
-    :return: Seconds, minutes or hours, with one decimal.
-    """
-    if seconds < 120:
-        return f"{seconds:.0f} s"
-    if seconds < 7200:
-        return f"{seconds / 60:.1f} min"
-    return f"{seconds / 3600:.1f} h"
-
-
 def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     """Train a linear model from the raw shards, sized by ``--effort``.
 
@@ -189,7 +178,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         f"validation {timing.encode_seconds:.2f} s to featurize and "
         f"{timing.score_seconds:.2f} s per epoch"
     )
-    print(f"Estimated duration: {_format_duration(estimate)}")
+    print(f"Estimated duration: {format_duration(estimate)}")
 
     best = search(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
     print(f"Final fit with l2={best['l2']:.2e}, lr={best['lr']:.2e}")

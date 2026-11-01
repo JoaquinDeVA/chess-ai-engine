@@ -4,7 +4,7 @@ Each candidate is a random legal playout of 8 to 10 half-moves from the start po
 with a fixed seed. A local Stockfish, at a fixed depth, keeps the ones it scores within
 ``--limit`` pawns of equality. The same arguments give the same file (``sha256`` is printed).
 
-Usage: ``python src/chess_lab/scripts/build_openings.py --out data/openings/openings.epd``
+Usage: ``python src/chess_lab/scripts/data/build_openings.py --out data/openings/openings.epd``
 """
 
 import argparse

@@ -27,6 +27,7 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from chess_engine.knowledge.opening_book import position_key
+from chess_lab.models.defaults import RAW_DIR
 
 #: Score of a forced mate, minus the moves it takes (a faster mate is worth more).
 MATE_SCORE = 100_000.0
@@ -34,8 +35,10 @@ MATE_SCORE = 100_000.0
 Lookup = Callable[[str], Optional[float]]
 
 
-def white_scores(cp: np.ndarray, mate: np.ndarray) -> np.ndarray:
-    """Evaluation from White's point of view, in centipawns, mates turned into large scores.
+def ranking_scores(cp: np.ndarray, mate: np.ndarray) -> np.ndarray:
+    """Score that ranks the book moves: centipawns from White's point of view, mates as large scores.
+
+    Not the [0, 1] ``white_score`` of the models: the scale here is centipawns up to ``MATE_SCORE``.
 
     :param cp: Centipawns of each row (NaN where the row is a mate).
     :param mate: Moves to mate, positive when White mates (NaN where the row is not a mate).
@@ -74,7 +77,7 @@ def load_index(
         cp = table["cp"].to_numpy(zero_copy_only=False).astype(np.float64)
         mate = table["mate"].to_numpy(zero_copy_only=False).astype(np.float64)
         hashes.append(np.fromiter((hash(f) for f in table["fen"].to_pylist()), np.int64))
-        scores.append(white_scores(cp, mate))
+        scores.append(ranking_scores(cp, mate))
     all_hashes, all_scores = np.concatenate(hashes), np.concatenate(scores)
     order = np.argsort(all_hashes, kind="stable")
     return all_hashes[order], all_scores[order]
@@ -152,7 +155,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     :return: Parsed arguments.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--raw", type=Path, default=Path("data/lichess/raw"))
+    parser.add_argument("--raw", type=Path, default=RAW_DIR)
     parser.add_argument("--out", type=Path, default=Path("data/opening_book.json"))
     parser.add_argument("--plies", type=int, default=16, help="half-moves followed")
     parser.add_argument("--margin", type=float, default=30.0, help="centipawns within the best")

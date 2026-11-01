@@ -51,7 +51,7 @@ Dependencies, as the imports stand:
 | `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
 
 Data scripts live in `src/chess_lab/scripts/data/` (`build_raw_shards.py`, `build_sidecars.py`,
-`build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`), and `src/chess_lab/scripts/run_full_pipeline.sh`
+`build_opening_book.py`, `check_opening_book.py`, `check_split_leakage.py`, `build_openings.py`), and `src/chess_lab/scripts/run_full_pipeline.sh`
 runs the data, training and measurement flow. Games between engines are played by fastchess against the UCI binary, not by
 Python code in this repository. See [Training data](DATA.md) for the data and
 [MODELS.md](MODELS.md) for the models themselves.

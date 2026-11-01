@@ -28,7 +28,7 @@ Before training, the command prints the configuration and an estimated duration,
 
 ## What training does
 
-The linear models score a position as a weighted sum of features (material, piece-square tables and so on), pass the sum through the logistic function, and compare the result with the soft target. The loss is binary cross-entropy against targets that may be any number from 0 to 1, not just 0 or 1 (`_losses` in `src/chess_lab/models/linear_eval.py`). Adam, a standard gradient-descent variant, updates the weights, with an L2 penalty that keeps them small.
+The linear models score a position as a weighted sum of features (material, piece-square tables and so on), pass the sum through the logistic function, and compare the result with the soft target. The loss is binary cross-entropy against targets that may be any number from 0 to 1, not just 0 or 1 (`losses` in `src/chess_lab/models/linear_eval.py`). Adam, a standard gradient-descent variant, updates the weights, with an L2 penalty that keeps them small.
 
 After each epoch the model is scored on a validation sample of up to 50,000 positions (`MAX_VALIDATION_ROWS` in `src/chess_lab/training/train.py`). The weights of the epoch with the lowest validation loss are the ones saved. Two ways of stopping are available (`run_epochs` in `src/chess_lab/models/linear_eval.py`):
 
@@ -84,7 +84,7 @@ python src/chess_lab/scripts/data/check_split_leakage.py --models linear_materia
 python src/chess_lab/scripts/data/build_opening_book.py --out data/opening_book.json
 ```
 
-The whole flow, from sidecars to evaluation, tournaments and the results table, is `src/chess_lab/scripts/run_full_pipeline.sh`. Each step runs once and leaves a `.done` marker. Preview it without running anything, then launch it in the background:
+The whole flow, from sidecars to training, evaluation and the results table, is `src/chess_lab/scripts/run_full_pipeline.sh`. Each step runs once and leaves a `.done` marker; it trains every registered model unless `MODELS` names some. Preview it without running anything, then launch it in the background:
 
 ```bash
 DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh

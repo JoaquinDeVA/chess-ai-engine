@@ -4,9 +4,7 @@
 # Se compila en el portátil (glibc 2.39) y se copia: el trabajador tiene glibc 2.43 y no tiene Rust.
 set -euo pipefail
 
-HOST="${HOST:-devicente@192.168.1.124}"
-PORT="${PORT:-2222}"
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+source "$(dirname "$0")/env.sh"
 FASTCHESS="${FASTCHESS:-$HOME/fastchess/fastchess}"
 
 ssh -p "$PORT" "$HOST" 'mkdir -p ~/worker/results'

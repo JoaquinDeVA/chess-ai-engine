@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from chess_engine import _core
 from chess_engine.gui.settings import MAX_SETTABLE_DEPTH, AISettings
+from chess_engine.uci import NO_CLOCK_MOVE_TIME
 
 
 class AISettingsDialog(QDialog):
@@ -42,7 +43,7 @@ class AISettingsDialog(QDialog):
         self.move_time.setRange(0.1, 600.0)
         self.move_time.setSingleStep(0.5)
         self.move_time.setSuffix(" s")
-        self.move_time.setValue(current.move_time or 3.0)
+        self.move_time.setValue(current.move_time or NO_CLOCK_MOVE_TIME)
         self.move_time.setEnabled(self.fixed_time.isChecked())
         self.fixed_time.toggled.connect(self.move_time.setEnabled)
 

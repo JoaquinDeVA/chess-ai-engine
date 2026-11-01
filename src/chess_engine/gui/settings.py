@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
 from chess_engine import _core
+from chess_engine.uci import NO_CLOCK_MOVE_TIME
 
 #: Techniques of selective search the AI players use by default, the binary's own.
 DEFAULT_TECHNIQUES = tuple(_core.DEFAULT_TECHNIQUES)
@@ -31,7 +32,7 @@ class AISettings:
     """
 
     max_depth: Optional[int] = None
-    move_time: Optional[float] = 3.0
+    move_time: Optional[float] = NO_CLOCK_MOVE_TIME
     opening_book: bool = True
     tablebase: bool = True
     techniques: Tuple[str, ...] = DEFAULT_TECHNIQUES

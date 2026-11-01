@@ -15,9 +15,7 @@
 # así que tocar el puerto en sshd_config no hace nada.
 set -euo pipefail
 
-HOST="${HOST:-devicente@192.168.1.124}"
-PORT="${PORT:-2222}"
-ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+source "$(dirname "$0")/env.sh"
 CMD="${1:?uso: match.sh start|status|fetch|stop NOMBRE [opciones de fastchess...]}"
 NAME="${2:?falta NOMBRE}"
 shift 2

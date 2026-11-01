@@ -63,12 +63,6 @@ def stub_model() -> MaterialStubModel:
     return MaterialStubModel()
 
 
-@pytest.fixture(scope="session")
-def material_model():
-    """Name of a model the core can play: the shipped material logistic model."""
-    return "linear_material"
-
-
 def random_positions(count: int, seed: int = 0, max_plies: int = 70) -> List[chess.Board]:
     """Positions reached by random play, reproducible through ``seed``."""
     rng = random.Random(seed)

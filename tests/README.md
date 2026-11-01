@@ -15,7 +15,8 @@ The folders mirror the source: a test sits where the code it checks sits.
 
 Shared pieces: `conftest.py` (fixtures, a material stub model, and a guard that fails the run if a test
 overwrites a shipped model file), `paths.py` (`ROOT`, `POSITIONS`, `SYZYGY`), `data/positions.json` (the
-positions of the feature-parity and technique tests) and `data/syzygy/` (five 3-piece tables).
+positions of the feature-parity and technique tests), `data/syzygy/` (five 3-piece tables) and
+`lab/models/positions.py` (the positions and raw-shard rows of the linear and neural model tests).
 
 ## Rules
 

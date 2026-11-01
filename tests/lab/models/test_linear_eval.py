@@ -5,7 +5,6 @@ import os
 
 import chess
 import numpy as np
-import pandas as pd
 import pytest
 
 from chess_lab.models import fit_stream, linear_eval, new_model
@@ -29,24 +28,8 @@ from chess_lab.models.linear_features import (
     phase,
 )
 from chess_lab.models.representation import Representation
-from tests.conftest import material_cp, mover_score, random_positions, white_score_of
-
-WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
-
-
-def frame(boards: list[chess.Board]) -> pd.DataFrame:
-    """Raw-shard-like rows whose White-POV centipawns are the material balance."""
-    return pd.DataFrame(
-        {
-            "fen": [board.fen() for board in boards],
-            "cp": [material_cp(board) for board in boards],
-            "mate": np.full(len(boards), np.nan),
-            "best_move": [None] * len(boards),
-            "quiet": [True] * len(boards),
-            "white_to_move": [board.turn == chess.WHITE for board in boards],
-        }
-    )
+from tests.conftest import mover_score, random_positions, white_score_of
+from tests.lab.models.positions import BLACK_UP_A_QUEEN, WHITE_UP_A_QUEEN, frame
 
 
 def random_model(seed: int = 0, rep: Representation | None = None) -> LinearEvalModel:

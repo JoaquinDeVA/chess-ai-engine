@@ -123,7 +123,7 @@ def _accumulator_class(keras: Any) -> type:
             super().__init__(**kwargs)
             self.rows, self.units, self.l2 = rows, units, l2
 
-        def build(self, input_shape: Any) -> None:
+        def build(self, _input_shape: Any) -> None:
             # L2(c) penalises c * sum(w**2); half the coefficient gives gradient l2 * w.
             self.table = self.add_weight(
                 name="table",

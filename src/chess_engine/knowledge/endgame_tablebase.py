@@ -23,9 +23,6 @@ from chess_engine.paths import ROOT
 #: Default location of the tables.
 DEFAULT_TABLEBASE_DIR = ROOT / "data" / "knowledge" / "endgame"
 
-#: The most pieces (kings included) of a position the 3-4-5 piece tables cover.
-MAX_PIECES = 5
-
 
 class EndgameTablebase:
     """Syzygy tables opened from a directory.
@@ -69,7 +66,7 @@ class EndgameTablebase:
         """Whether the position can be probed.
 
         :param board: Position to check.
-        :return: True with at most :data:`MAX_PIECES` pieces and no castling rights.
+        :return: True with at most 5 pieces (kings included) and no castling rights.
         """
         return self._tables.covers(board.fen())
 

@@ -52,8 +52,8 @@ past 59.7 s, it would have been cut and thrown away, and the move of depth 5 pla
 
 `iterative_deepening` in `rust/src/search/deepening.rs` (loop, `OVERSHOOT_FACTOR = 1.15`, discard of
 truncated iterations). The estimators are in `rust/src/search/estimators.rs`; `geometric_growth` is the
-default and `ratio_squared`, `fixed_factor`, `clamped_growth`, `median_growth`, `node_growth` and
-`never_stop` stay available. The budget and the hard limit are `clock_budget` in `rust/src/bin/uci.rs`;
+default; `fixed_factor` and `never_stop` remain for the tests. The other rules in the table below were
+removed after the comparison. The budget and the hard limit are `clock_budget` in `rust/src/bin/uci.rs`;
 `go movetime N` uses `N` as both. Minimum depth: `DEFAULT_MIN_DEPTH = 1`; technical cap `MAX_DEPTH = 30`
 (`rust/src/search/options.rs`). The elapsed time runs from the start of the move, not of each iteration.
 

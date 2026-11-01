@@ -4,14 +4,15 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
-#: Techniques of selective search the AI players use by default: the ones that won in the games
-#: against the reference search (docs/techniques/README.md). ``lmr`` is left out.
-DEFAULT_TECHNIQUES = ("incremental", "tt_move", "history", "pvs", "aspiration", "null_move")
+from chess_engine import _core
+
+#: Techniques of selective search the AI players use by default, the binary's own.
+DEFAULT_TECHNIQUES = tuple(_core.DEFAULT_TECHNIQUES)
 
 #: Threads an AI gets by default against a person, at most.
 DEFAULT_THREADS = max(1, min(4, os.cpu_count() or 1))
 #: Deepest iteration the window lets a person set; the default is no limit (the clock decides).
-MAX_SETTABLE_DEPTH = 30
+MAX_SETTABLE_DEPTH = _core.MAX_DEPTH
 
 #: Name shown on the board for an AI.
 AI_NAME = "AI"

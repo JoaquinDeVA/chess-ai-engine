@@ -3,8 +3,8 @@
 //! The terminal test is the one of `python-chess`' `board.outcome(claim_draw=True)`: checkmate,
 //! stalemate, insufficient material, the fifty-move claim and the threefold-repetition claim
 //! (a position that has occurred three times, or a move that reaches one that has occurred twice).
-//! Legal moves are listed in the order `python-chess` generates them, so that the search makes the
-//! same choice as the Python engine among moves of equal value.
+//! Legal moves are listed in the order `python-chess` generates them (kept from the engine's Python
+//! days); among moves of equal value the search plays the first.
 
 use shakmaty::attacks::{
     between, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, queen_attacks,
@@ -85,8 +85,7 @@ pub fn is_noisy(m: &Move) -> bool {
 /// (targets also from the highest), castling (rook on the highest square first), pawn captures,
 /// single pushes, double pushes and en passant. Promotions go queen, rook, bishop, knight.
 ///
-/// Sorting by this key reproduces the move order of the Python engine, so the two make the same
-/// choice among moves of equal value.
+/// Sorting by this key reproduces the move order of `python-chess`.
 pub fn generation_order(m: &Move, in_check: bool) -> (u8, i32, i32, i32) {
     let square = |s: shakmaty::Square| u32::from(s) as i32;
     match *m {

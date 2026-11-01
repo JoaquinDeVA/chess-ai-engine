@@ -101,6 +101,7 @@ const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const MATE_IN_ONE: &str = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1";
 const MATE_IN_TWO: &str = "7k/8/5K2/8/8/8/8/6R1 w - - 0 1";
 
+/// A fixed-depth search without quiescence.
 fn fixed(fen: &str, depth: i32) -> SearchResult {
     let clock = FakeClock::default();
     let eval = Material {
@@ -120,7 +121,10 @@ fn fixed(fen: &str, depth: i32) -> SearchResult {
         &mut state(fen),
         &eval,
         &mut Memory::default(),
-        &Options::default(),
+        &Options {
+            quiescence_plies: 0,
+            ..Options::default()
+        },
         depth,
         &control,
     )

@@ -11,6 +11,16 @@ pub const DEFAULT_ESTIMATOR: &str = "geometric_growth";
 pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
+/// Techniques the binary and the window switch on by default: the ones that won in the games
+/// against the reference search (`docs/techniques/README.md`). `lmr` is left out.
+pub const DEFAULT_TECHNIQUES: [&str; 6] = [
+    "incremental",
+    "tt_move",
+    "history",
+    "pvs",
+    "aspiration",
+    "null_move",
+];
 
 /// Settings of a search.
 #[derive(Clone, Debug)]
@@ -19,10 +29,6 @@ pub struct Options {
     pub min_depth: usize,
     pub estimator: String,
     pub epsilon: f64,
-    /// Techniques that can be switched off to measure what each one saves (all on by default).
-    pub use_table: bool,
-    pub use_killers: bool,
-    pub use_capture_order: bool,
     /// Techniques of selective search; all off reproduces the reference engine.
     pub techniques: Techniques,
     /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
@@ -102,13 +108,10 @@ impl Techniques {
 impl Default for Options {
     fn default() -> Options {
         Options {
-            quiescence_plies: 0,
+            quiescence_plies: DEFAULT_QUIESCENCE_PLIES,
             min_depth: DEFAULT_MIN_DEPTH,
             estimator: DEFAULT_ESTIMATOR.to_string(),
             epsilon: DEPTH_PREFERENCE_EPSILON,
-            use_table: true,
-            use_killers: true,
-            use_capture_order: true,
             techniques: Techniques::default(),
             node_limit: None,
         }

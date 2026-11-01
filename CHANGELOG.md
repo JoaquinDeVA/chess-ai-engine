@@ -25,6 +25,7 @@ All notable changes. The newest are first.
 - The PGN `Event` header is "ChessAIEngine game".
 
 ### Removed
+- From `chess_engine._core`: `Searcher` (the search runs only in the UCI binary), `estimate`, `version` and the constants `DEFAULT_ESTIMATOR`, `DEFAULT_MIN_DEPTH`, `DEFAULT_QUIESCENCE_PLIES`, `DEFAULT_MAX_TT_ENTRIES` and `ESTIMATORS`. `_core.DEFAULT_TECHNIQUES` and `_core.MAX_DEPTH` are new, and the window reads them instead of its own copies. The time estimators `ratio_squared`, `clamped_growth`, `median_growth` and `node_growth` and the search switches that turned off the table, the killer moves and the capture ordering are gone; the moves and node counts are unchanged (`uci bench`).
 - The reference files that pinned the core to the Python engine (their test and the Rust tests that read them); the rules are checked by perft and end-of-game tests in `rust/tests/rules.rs`, the book and tables by `rust/tests/knowledge.rs`, and the positions of the technique tests moved to `tests/data/positions.json`.
 - The Keras course models (`mlp_features`, `cnn_resnet`) and the "Kind" column of the results table; the Python evaluation fallback (`evaluation/`, `ChessGameState`, `ModelEvaluator`, `callback_evaluator`): the core evaluates every bot, so the Keras dependency is only for training `net4_pst`. `h1_weights.json` moved to `models/` and stays fixed (`fit_h1_weights.py` and the Python feature code were removed).
 - `chess_engine.config` (`BLITZ_CONFIG`, `load_config`) and `TournamentConfig`, which nothing used.

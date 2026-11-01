@@ -149,11 +149,7 @@ impl Search<'_> {
         // Order of the checks: the table first (it can end the node for free), then game end and
         // horizon, then the clock, and only then the techniques that cost a search.
         let key = self.state.key();
-        let entry = if self.options.use_table {
-            self.memory.table.get(&key)
-        } else {
-            None
-        };
+        let entry = self.memory.table.get(&key);
         let table_move = entry.and_then(|e| e.best);
         if let Some(entry) = entry {
             if entry.depth >= depth_remaining {
@@ -195,18 +191,14 @@ impl Search<'_> {
         }
 
         let maximizing = self.state.turn() == self.root_player;
-        let killers: Vec<u32> = if self.options.use_killers {
-            self.memory.killers.get(depth_remaining).to_vec()
-        } else {
-            Vec::new()
-        };
+        let killers: Vec<u32> = self.memory.killers.get(depth_remaining).to_vec();
         let mover = self.state.turn();
         let history = if self.options.techniques.history {
             Some((&self.memory.history, mover))
         } else {
             None
         };
-        let mut ordered = order(moves, &killers, self.options.use_capture_order, history);
+        let mut ordered = order(moves, &killers, history);
         // Helper threads rotate the root moves so they do not all search the same subtree; the
         // table move is not put first there for the same reason.
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
@@ -294,9 +286,7 @@ impl Search<'_> {
             // in sibling nodes; captures are already ordered first.
             if alpha >= beta {
                 self.prunings += 1;
-                if self.options.use_killers {
-                    self.memory.killers.record(depth_remaining, action);
-                }
+                self.memory.killers.record(depth_remaining, action);
                 if self.options.techniques.history && !action.is_capture() && !action.is_promotion()
                 {
                     self.memory.history.reward(mover, &action, depth_remaining);
@@ -305,7 +295,7 @@ impl Search<'_> {
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
-        if !self.truncated && self.options.use_table {
+        if !self.truncated {
             self.memory.table.store(
                 key,
                 best_value,

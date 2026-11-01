@@ -115,12 +115,7 @@ pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
 /// The moves in the order the search tries them: killers first, then captures (best MVV-LVA first)
 /// and then the quiet moves, each group keeping its incoming order. With a history the quiet moves
 /// that are not killers come by their score instead, best first.
-pub fn order(
-    moves: Vec<Move>,
-    killers: &[u32],
-    capture_order: bool,
-    history: Option<(&History, Color)>,
-) -> Vec<Move> {
+pub fn order(moves: Vec<Move>, killers: &[u32], history: Option<(&History, Color)>) -> Vec<Move> {
     let mut front: Vec<Move> = Vec::with_capacity(moves.len());
     let mut rest: Vec<Move> = Vec::new();
     for m in moves {
@@ -131,9 +126,6 @@ pub fn order(
         }
     }
     front.extend(rest);
-    if !capture_order {
-        return front;
-    }
     let (mut captures, quiets): (Vec<Move>, Vec<Move>) =
         front.into_iter().partition(|m| m.is_capture());
     captures.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
@@ -207,7 +199,6 @@ mod tests {
         let ordered = order(
             vec![a, b, c],
             &[move_id(&a)],
-            true,
             Some((&history, Color::White)),
         );
         assert_eq!(ordered, vec![a, c, b]);
@@ -241,16 +232,8 @@ mod tests {
         let ordered = order(
             vec![a, queen_takes_pawn, b, pawn_takes_queen],
             &[move_id(&b)],
-            true,
             None,
         );
         assert_eq!(ordered, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
-        let plain = order(
-            vec![a, queen_takes_pawn, b, pawn_takes_queen],
-            &[move_id(&b)],
-            false,
-            None,
-        );
-        assert_eq!(plain, vec![b, a, queen_takes_pawn, pawn_takes_queen]);
     }
 }

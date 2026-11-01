@@ -41,8 +41,8 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 The classic techniques (the rows above `incremental` in the table) and the [Rust core](rust-core.md) form the
 *reference* search; the seven switches below them are off in it. Each switch is a field of `Techniques`
 (`rust/src/search/options.rs`) and a name in the comma-separated UCI option `Techniques` of the binary (an empty
-value turns them all off). The binary and the window (Settings → Advanced, `DEFAULT_TECHNIQUES` in
-`src/chess_engine/gui/settings.py`) use all of them but `lmr`.
+value turns them all off). The binary and the window (Settings → Advanced) use all of them but `lmr`: `DEFAULT_TECHNIQUES` in
+`rust/src/search/options.rs`, which the window reads as `_core.DEFAULT_TECHNIQUES`.
 
 **The default set was adopted before the SPRT instrument existed.** These are standard techniques of alpha-beta
 engines, so each was checked for what can go wrong (more nodes, a different move: the node counts in its page)

@@ -1,8 +1,8 @@
 //! The engine as a UCI program: `uci`, `isready`, `position`, `go`, `stop`, `setoption`, `quit`.
 //!
-//! The search is the one the Python package calls through `_core`. The clock is the port of the
-//! Python `TimeManager`, which does not use the increment (`winc`/`binc` are read and ignored: a
-//! known defect, see `docs/`).
+//! The window and the tournaments play through this binary. The clock spends a share of the
+//! time left and does not use the increment (`winc`/`binc` are read and ignored: a known defect,
+//! see `docs/`).
 
 use std::io::{self, BufRead};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
@@ -15,22 +15,13 @@ use _core::eval::features::{FeatureSet, Perspective};
 use _core::eval::linear::LinearModel;
 use _core::eval::Eval;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
-use _core::search::{self, Control, Memory, Options, Techniques};
+use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
 
 /// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
 const MODEL_JSON: &str = include_str!("../../models/linear_pst_terms.json");
 const MODEL_NAME: &str = "linear_pst_terms";
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-/// The techniques the Python search uses by default.
-const DEFAULT_TECHNIQUES: [&str; 6] = [
-    "incremental",
-    "tt_move",
-    "history",
-    "pvs",
-    "aspiration",
-    "null_move",
-];
 const DEFAULT_HASH_MB: usize = 64;
 
 /// Settings changed with `setoption`.
@@ -92,7 +83,8 @@ fn load_model() -> Result<Eval, String> {
     )?))
 }
 
-/// Soft budget and hard limit of one move in seconds, as the Python `TimeManager` computes them.
+/// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
+/// and at most half of it; the hard limit is 1.5 times the budget minus 0.3 s.
 fn clock_budget(time_left: f64) -> (f64, f64) {
     let budget = (time_left * 0.15).clamp(1.5, 40.0).min(time_left * 0.5);
     (budget, budget * 1.5 - 0.3)
@@ -116,7 +108,7 @@ fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
             "movetime" => movetime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
             "wtime" => wtime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
             "btime" => btime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
-            _ => {} // winc and binc: ignored, as the Python TimeManager does
+            _ => {} // winc and binc: ignored (see the module comment)
         }
     }
     let (time_limit, hard_limit) = match (movetime, if white_to_move { wtime } else { btime }) {
@@ -142,21 +134,13 @@ fn think(mut memory: Memory, eval: Arc<Eval>, job: Job) -> Memory {
     memory
 }
 
-/// The options every search of the binary uses (the defaults of the Python search).
-fn search_options(techniques: Techniques, node_limit: Option<u64>) -> Options {
-    Options {
-        quiescence_plies: search::DEFAULT_QUIESCENCE_PLIES,
-        min_depth: search::DEFAULT_MIN_DEPTH,
-        estimator: search::DEFAULT_ESTIMATOR.to_string(),
-        techniques,
-        node_limit,
-        ..Options::default()
-    }
-}
-
 fn run_search(memory: &mut Memory, eval: &Eval, job: Job) -> Result<String, String> {
     let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
-    let options = search_options(job.techniques, job.limits.nodes);
+    let options = Options {
+        techniques: job.techniques,
+        node_limit: job.limits.nodes,
+        ..Options::default()
+    };
     let origin = Instant::now();
     let clock = || origin.elapsed().as_secs_f64();
     let control = Control {
@@ -253,7 +237,10 @@ fn bench(eval: &Eval) {
     for fen in BENCH_FENS {
         let mut memory = Memory::new(DEFAULT_MAX_TT_ENTRIES);
         let mut state = GameState::from_moves(fen, &[]).expect("bench position is valid");
-        let options = search_options(techniques, None);
+        let options = Options {
+            techniques,
+            ..Options::default()
+        };
         let clock = || 0.0;
         let control = Control {
             start: 0.0,

@@ -58,7 +58,8 @@ quiescence depth of 4 plies, so neither is a setting.
 | Advanced: search threads | `threads` | `setoption name Threads` | up to 4 |
 
 With a clock and no fixed time, the window sends `wtime`, `btime`, `winc` and `binc`; the binary
-does not use the increment yet (see [Architecture](ARCHITECTURE.md)).
+spends the time left over the moves still to play plus most of the increment
+([Iterative deepening](techniques/iterative-deepening.md)).
 
 **Implementation.** The bot searches on a `QThread` (`game_window.py: MoveThread`), so the window
 does not freeze: the UCI binary is a separate process, and `UciBot` (`chess_engine/uci.py`) waits for its

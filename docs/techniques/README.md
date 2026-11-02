@@ -36,7 +36,7 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Futility pruning | idea; not measured | - |
 | Razoring | idea; not measured | - |
 | Check extensions | idea; not measured | - |
-| Using the increment in the clock | pending: the UCI binary ignores `winc`/`binc` | - |
+| Clock rule (moves to go plus the increment) | implemented 2026-11-02; not measured in games yet | [iterative-deepening](iterative-deepening.md) |
 
 ## How the switches were judged
 

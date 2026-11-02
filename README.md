@@ -82,7 +82,6 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
   pipeline (`DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` prints every command without running it).
 - Engine matches are played with fastchess on a separate machine ([Measurement](docs/MEASUREMENT.md)); the model
   tournaments in [Results](docs/RESULTS.md) predate the Rust engine and are kept as history.
-- Known gaps: the UCI binary ignores the increment (`winc`/`binc`).
 
 ## Repository map
 

@@ -54,11 +54,15 @@ pub struct Techniques {
     pub null_move: bool,
     /// Search late quiet moves with less depth.
     pub lmr: bool,
+    /// In check, the quiescence search has no stand pat and tries every move.
+    pub qs_evasions: bool,
+    /// Store the value of a horizon node in the table (depth 0) when it has no entry.
+    pub qs_tt: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 7] = [
+    pub const NAMES: [&'static str; 9] = [
         "incremental",
         "tt_move",
         "history",
@@ -66,6 +70,8 @@ impl Techniques {
         "aspiration",
         "null_move",
         "lmr",
+        "qs_evasions",
+        "qs_tt",
     ];
 
     /// The techniques with the given names.
@@ -80,6 +86,8 @@ impl Techniques {
                 "aspiration" => techniques.aspiration = true,
                 "null_move" => techniques.null_move = true,
                 "lmr" => techniques.lmr = true,
+                "qs_evasions" => techniques.qs_evasions = true,
+                "qs_tt" => techniques.qs_tt = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -101,6 +109,8 @@ impl Techniques {
             aspiration: true,
             null_move: true,
             lmr: true,
+            qs_evasions: true,
+            qs_tt: true,
         }
     }
 }

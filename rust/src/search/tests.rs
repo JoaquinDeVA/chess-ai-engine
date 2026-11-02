@@ -213,6 +213,86 @@ fn quiescence_sees_the_recapture_at_the_horizon() {
     assert_ne!(with.best.as_ref().map(uci_string).as_deref(), Some("e2e5"));
 }
 
+/// Fixed-depth search with quiescence of 4 plies and the given techniques.
+fn quiescent(fen: &str, depth: i32, techniques: Techniques) -> SearchResult {
+    let clock = FakeClock::default();
+    let eval = Material {
+        clock: &clock,
+        tick: 0.0,
+    };
+    let now = || clock.now();
+    let control = Control {
+        start: 0.0,
+        hard_limit: f64::INFINITY,
+        clock: &now,
+        stop: None,
+        progress: None,
+        rotation: 0,
+    };
+    let options = Options {
+        quiescence_plies: 4,
+        techniques,
+        ..Options::default()
+    };
+    alpha_beta(
+        &mut state(fen),
+        &eval,
+        &mut Memory::default(),
+        &options,
+        depth,
+        &control,
+    )
+}
+
+#[test]
+fn quiescence_evasions_see_the_fork_after_a_check() {
+    // Nc7+ forks king and queen. After it the quiescence search stands pat and sees a lost
+    // queen for White; with evasions the king must move and Nxa8 follows (a pawn keeps the
+    // ending from being a draw by insufficient material).
+    let fen = "q3k3/8/8/1N6/8/8/7P/6K1 w - - 0 1";
+    let plain = quiescent(fen, 1, Techniques::default());
+    let with = quiescent(
+        fen,
+        1,
+        Techniques {
+            qs_evasions: true,
+            ..Techniques::default()
+        },
+    );
+    assert_eq!(with.best.as_ref().map(uci_string).as_deref(), Some("b5c7"));
+    assert!(
+        with.value > plain.value + 0.1,
+        "{} {}",
+        with.value,
+        plain.value
+    );
+}
+
+#[test]
+fn the_horizon_table_entries_do_not_change_the_value() {
+    for fen in [
+        START,
+        "4k3/8/3p4/4p3/8/8/4Q3/4K3 w - - 0 1",
+        "r3k2r/8/8/3pP3/8/8/8/R3K2R w KQkq d6 0 1",
+    ] {
+        let plain = quiescent(fen, 3, Techniques::default());
+        let with = quiescent(
+            fen,
+            3,
+            Techniques {
+                qs_tt: true,
+                ..Techniques::default()
+            },
+        );
+        assert!(
+            (plain.value - with.value).abs() < 1e-9,
+            "{fen}: {} {}",
+            plain.value,
+            with.value
+        );
+    }
+}
+
 #[test]
 fn a_search_cut_by_the_clock_stores_nothing() {
     let clock = FakeClock::default();

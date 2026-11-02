@@ -171,6 +171,12 @@ impl Search<'_> {
         if depth_remaining <= 0 {
             if self.options.quiescence_plies > 0 {
                 let value = self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves);
+                // Only where the table has nothing: a depth-0 entry must not replace a deeper one.
+                if self.options.techniques.qs_tt && entry.is_none() && !self.truncated {
+                    self.memory
+                        .table
+                        .store(key, value, None, 0, alpha_orig, beta_orig);
+                }
                 return (value, None);
             }
             return (self.static_value(), None);
@@ -308,7 +314,8 @@ impl Search<'_> {
         (best_value, best_move)
     }
 
-    /// Value of a horizon node searching only captures and promotions (stand pat, no table).
+    /// Value of a horizon node searching only captures and promotions (stand pat, no table); with
+    /// `qs_evasions`, in check it searches every move and does not stand pat.
     fn quiescence(
         &mut self,
         mut alpha: f64,
@@ -322,16 +329,26 @@ impl Search<'_> {
             return best_value;
         }
         let maximizing = self.state.turn() == self.root_player;
-        if maximizing {
-            alpha = alpha.max(best_value);
+        let evading = self.options.techniques.qs_evasions && self.state.pos().is_check();
+        if evading {
+            // In check the side must move: standing pat would hide a mate or a lost piece.
+            best_value = if maximizing {
+                f64::NEG_INFINITY
+            } else {
+                f64::INFINITY
+            };
         } else {
-            beta = beta.min(best_value);
+            if maximizing {
+                alpha = alpha.max(best_value);
+            } else {
+                beta = beta.min(best_value);
+            }
+            if alpha >= beta {
+                self.prunings += 1;
+                return best_value;
+            }
         }
-        if alpha >= beta {
-            self.prunings += 1;
-            return best_value;
-        }
-        for action in moves.into_iter().filter(is_noisy) {
+        for action in moves.into_iter().filter(|m| evading || is_noisy(m)) {
             self.play(action);
             self.nodes += 1;
             let child_moves = ordered_moves(self.state.pos());

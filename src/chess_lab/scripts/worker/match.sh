@@ -11,8 +11,8 @@
 # Un nombre de técnica mal escrito no para nada: el binario responde `info string unknown technique` y sigue con
 # las de serie, y fastchess no lo muestra; probar antes la lista con `setoption` a mano.
 # Si el trabajador no responde tras reiniciar el sobremesa: la IP de WSL2 cambia en cada arranque y hay que
-# rehacer en Windows el `netsh interface portproxy` (2222 -> IP de WSL, puerto 22). sshd escucha por ssh.socket,
-# así que tocar el puerto en sshd_config no hace nada.
+# rehacer en Windows el `netsh interface portproxy` (2222 -> IP de WSL, puerto 2222: sshd escucha en el 2222
+# de WSL, por ssh.socket, que toma el puerto de `Port` en sshd_config).
 set -euo pipefail
 
 source "$(dirname "$0")/env.sh"

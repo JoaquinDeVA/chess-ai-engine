@@ -29,6 +29,8 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Aspiration windows (`aspiration`) | on; nodes to 440,213 | [aspiration](aspiration.md) |
 | Null move (`null_move`) | on; nodes to 446,129; +205 Elo with the set | [null-move](null-move.md) |
 | Late move reductions (`lmr`) | implemented, off: loses 8.6 ± 6.1 Elo at fixed nodes (SPRT) | [lmr](lmr.md) |
+| Quiescence evasions (`qs_evasions`) | implemented, off: loses 21.3 ± 10.6 Elo at fixed nodes (SPRT) | [qs-evasions](qs-evasions.md) |
+| Quiescence with the table (`qs_tt`) | implemented, off: +0.7 ± 3.9 Elo at fixed nodes, no verdict (SPRT) | [qs-tt](qs-tt.md) |
 | History malus | idea; not measured | - |
 | Static exchange evaluation (SEE) | idea; not measured | - |
 | Futility pruning | idea; not measured | - |
@@ -39,9 +41,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 ## How the switches were judged
 
 The classic techniques (the rows above `incremental` in the table) and the [Rust core](rust-core.md) form the
-*reference* search; the seven switches below them are off in it. Each switch is a field of `Techniques`
+*reference* search; the nine switches below them are off in it. Each switch is a field of `Techniques`
 (`rust/src/search/options.rs`) and a name in the comma-separated UCI option `Techniques` of the binary (an empty
-value turns them all off). The binary and the window (Settings → Advanced) use all of them but `lmr`: `DEFAULT_TECHNIQUES` in
+value turns them all off). The binary and the window (Settings → Advanced) use all of them but `lmr`, `qs_evasions` and `qs_tt`: `DEFAULT_TECHNIQUES` in
 `rust/src/search/options.rs`, which the window reads as `_core.DEFAULT_TECHNIQUES`.
 
 **The default set was adopted before the SPRT instrument existed.** These are standard techniques of alpha-beta

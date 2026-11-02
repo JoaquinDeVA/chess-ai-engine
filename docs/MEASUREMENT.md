@@ -95,6 +95,23 @@ count an A/A match says nothing: the engine is deterministic, so both games of a
 colours exchanged and every pair scores exactly 1–1 (`data/matches/aa_probe*/match.log`: Elo 0.00 ± 0.00 over 16
 and 32 games). A fixed-node test has variance only because A and B differ.
 
+## Which time control
+
+A test needs about 12,000 games to see ±5 Elo (above), so the cost of a test is the length of one game times
+12,000, divided by the games played at once. Three levels follow from that:
+
+| Level | Control | Use | Status |
+|---|---|---|---|
+| Screening | `tc=10+0.1`, SPRT `[−5, 0]` | every candidate; one that regresses here is dropped | used for the A/A matches above |
+| Confirmation | `tc=60+0.6`, SPRT `[0, 5]` | only a candidate that did not regress | not run yet |
+| Reference | `tc=600+5` | the final engine against other engines, never one test per technique | not run yet (a game lasts tens of minutes: 12,000 games would take hundreds of hours even eight at a time, not measured) |
+
+**Fixed nodes favour a change that saves nodes.** With the same node budget such a change searches deeper, so the
+test is the best case for it. [Late move reductions](techniques/lmr.md) lost anyway (48.76 % at 20,000 nodes,
+`data/matches/lmr_nodes/match.log`), and a change that loses at equal nodes does not win at equal time unless it
+also makes each node cheaper. A win at fixed nodes proves nothing about time: it has to be confirmed at a time
+control. Fixed nodes are therefore the first filter for a change that should not lose, never the last.
+
 ## How to measure a change
 
 1. Build the binary (`cargo build --release --bin uci` in `rust/`) and the opening suite ([Openings](OPENINGS.md)).

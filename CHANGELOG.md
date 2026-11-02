@@ -2,6 +2,14 @@
 
 All notable changes. The newest are first.
 
+## Unreleased
+
+### Added
+- Two quiescence switches, off by default and measured at a fixed 20,000 nodes: [`qs_evasions`](docs/techniques/qs-evasions.md) (a side in check searches every legal move; rejected, −21.3 ± 10.6 Elo) and [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
+
+### Changed
+- [How a change is measured](docs/MEASUREMENT.md) says which time control to use and that fixed nodes favour changes that save nodes. The worker notes in `match.sh` describe the port forwarding of the desktop's SSH.
+
 ## 3.1.0 (2026-11-01)
 
 A cleanup of 3.0: every piece serves playing or the laboratory, the models live in the laboratory, and the

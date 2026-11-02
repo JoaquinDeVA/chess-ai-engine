@@ -1,8 +1,7 @@
 //! The engine as a UCI program: `uci`, `isready`, `position`, `go`, `stop`, `setoption`, `quit`.
 //!
-//! The window and the tournaments play through this binary. The clock spends a share of the
-//! time left and does not use the increment (`winc`/`binc` are read and ignored: a known defect,
-//! see `docs/`).
+//! The window and the tournaments play through this binary. The clock spends the time left over
+//! the moves still to play plus most of the increment (`clock_budget`).
 
 use std::io::{self, BufRead};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
@@ -83,19 +82,27 @@ fn load_model() -> Result<Eval, String> {
     )?))
 }
 
-/// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
-/// and at most half of it; the hard limit is 1.5 times the budget minus 0.3 s.
-fn clock_budget(time_left: f64) -> (f64, f64) {
-    let budget = (time_left * 0.15).clamp(1.5, 40.0).min(time_left * 0.5);
-    (budget, budget * 1.5 - 0.3)
+/// Moves still to play assumed at move `move_number`: 50 minus the moves played, never fewer than 20.
+fn moves_to_go(move_number: usize) -> f64 {
+    50usize.saturating_sub(move_number).max(20) as f64
+}
+
+/// Soft budget and hard limit of one move in seconds: the time left over the moves still to play,
+/// plus 75 % of the increment (it comes back after the move), at most half of the time left.
+/// The hard limit is 1.5 times the budget minus 0.3 s, between the budget and 80 % of the time left.
+fn clock_budget(time_left: f64, increment: f64, move_number: usize) -> (f64, f64) {
+    let budget = (time_left / moves_to_go(move_number) + 0.75 * increment).min(time_left * 0.5);
+    let hard = (budget * 1.5 - 0.3).min(time_left * 0.8).max(budget);
+    (budget, hard)
 }
 
 /// The limits of a `go` command. `movetime` wins over the clock; with neither the search runs to
 /// the maximum depth.
-fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
+fn go_limits(args: &[&str], white_to_move: bool, move_number: usize) -> Limits {
     let (mut depth, mut nodes) = (None, None);
     let (mut movetime, mut wtime, mut btime): (Option<f64>, Option<f64>, Option<f64>) =
         (None, None, None);
+    let (mut winc, mut binc) = (0.0, 0.0);
     let mut words = args.iter().copied();
     while let Some(key) = words.next() {
         if key == "infinite" {
@@ -108,12 +115,18 @@ fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
             "movetime" => movetime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
             "wtime" => wtime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
             "btime" => btime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
-            _ => {} // winc and binc: ignored (see the module comment)
+            "winc" => winc = value.parse::<f64>().map_or(0.0, |ms| ms / 1000.0),
+            "binc" => binc = value.parse::<f64>().map_or(0.0, |ms| ms / 1000.0),
+            _ => {}
         }
     }
     let (time_limit, hard_limit) = match (movetime, if white_to_move { wtime } else { btime }) {
         (Some(seconds), _) => (seconds, seconds),
-        (None, Some(time_left)) => clock_budget(time_left),
+        (None, Some(time_left)) => clock_budget(
+            time_left,
+            if white_to_move { winc } else { binc },
+            move_number,
+        ),
         (None, None) => (f64::INFINITY, f64::INFINITY),
     };
     Limits {
@@ -338,7 +351,7 @@ fn main() {
                     .map_or(true, |state| state.turn() == Color::White);
                 let job = Job {
                     position: position.clone(),
-                    limits: go_limits(args, white),
+                    limits: go_limits(args, white, position.moves.len() / 2 + 1),
                     techniques: settings.techniques,
                     stop: Arc::new(AtomicBool::new(false)),
                 };
@@ -376,4 +389,37 @@ fn parse_position(fen: String, rest: &[&str]) -> Position {
         .map(|word| word.to_string())
         .collect();
     Position { fen, moves }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_budget_adds_the_increment_and_follows_the_moves_to_go() {
+        let (without, _) = clock_budget(600.0, 0.0, 1);
+        let (with, _) = clock_budget(600.0, 5.0, 1);
+        assert!((without - 600.0 / 49.0).abs() < 1e-9);
+        assert!((with - without - 3.75).abs() < 1e-9);
+        // From move 30 on the moves to go stay at 20.
+        assert!((clock_budget(100.0, 0.0, 40).0 - 5.0).abs() < 1e-9);
+        assert!((clock_budget(100.0, 0.0, 90).0 - 5.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_budget_never_passes_half_the_clock_and_the_hard_limit_stays_inside_it() {
+        let (budget, hard) = clock_budget(1.0, 5.0, 1);
+        assert!(budget <= 0.5 + 1e-9);
+        assert!(hard >= budget && hard <= 0.8 + 1e-9);
+    }
+
+    #[test]
+    fn go_reads_the_increment_of_the_side_to_move() {
+        let args = [
+            "wtime", "60000", "btime", "60000", "winc", "5000", "binc", "0",
+        ];
+        let white = go_limits(&args, true, 1);
+        let black = go_limits(&args, false, 1);
+        assert!(white.time_limit > black.time_limit + 3.0);
+    }
 }

@@ -87,4 +87,4 @@ iteration seeds the move ordering of the next.
 
 Adopted; part of the reference search since the first commit (2026-10-16). `geometric_growth` default since
 2026-10-21 (`d3e848c`). Minimum depth 3 from 2026-10-21 (`0cdf404`), 1 since 2026-10-31, with no default depth
-cap: only the clock decides. Clock rule of 2026-11-02 (moves to go plus the increment) replaces the share of 15 % of the time left (at most 40 s per move), which spent 40 s on each of the first ten moves of a 10 min + 5 s game; its effect in games is not measured yet.
+cap: only the clock decides. Clock rule of 2026-11-02 (moves to go plus the increment) replaces the share of 15 % of the time left (at most 40 s per move), which spent 40 s on each of the first ten moves of a 10 min + 5 s game; measured at 60 s + 1 s against the old rule (same model and techniques): −64 ± 24 Elo in 720 games, SPRT [0, 5] stopped by hand without verdict (`data/matches/reloj_nuevo/match.log`), so the new rule plays worse and its status is open.

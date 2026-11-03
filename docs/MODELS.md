@@ -20,7 +20,7 @@ All features are written from the point of view of the side to move: the board i
 
 The one thing a linear model cannot do is combine features. Its verdict is a plain sum, so every feature contributes the same amount whatever else is on the board. A king with no pawn shield is worth the same penalty with queens on the board and with queens already traded, even though in reality it is far more dangerous in the first case. Only the neural network below, which has hidden layers, can learn that kind of interaction.
 
-A note on names: every model has a descriptive name, used in this page, and a short identifier, written in parentheses, which is what you type in the code and in the command-line tools. Two identifiers can carry a suffix such as `linear_pst_terms@quiet`, which names a second copy of the same model trained on different data; the structure described here is the same.
+A note on names: every model has a descriptive name, used in this page, and a short identifier, written in parentheses, which is what you type in the code and in the command-line tools. An identifier can carry a suffix such as `linear_pst_terms@mates100`, which names a variant of the same model trained with other options (`--tag`); the structure described here is the same.
 
 ## Material logistic model (`linear_material`)
 
@@ -64,6 +64,8 @@ The terms, in the order of `TERM_NAMES`, are:
 - `mobility_knight`, `mobility_bishop`, `mobility_rook` and `mobility_queen`: how many squares those pieces attack that are not occupied by their own side.
 
 Every term is the side to move's value minus the opponent's, and is blended by game phase exactly like the piece squares. What it learns beyond the previous model is how much each of these ideas is worth, and that the answer differs between middlegame and endgame (a passed pawn matters much more late).
+
+**Trained on quiet positions only.** A sum of weights cannot represent an exchange in progress, so positions where the side to move is in check or the best move is a capture or a promotion (see [Data](DATA.md)) only distort what it learns; the search resolves those with quiescence. The shipped model is trained on the quiet ones (10 M positions, effort 10, `python -m chess_lab.training.train --model linear_pst_terms --effort 10 --representation '{"filter":"quiet"}'`). Its static scores are slightly lower than those of the all-positions version trained earlier (Spearman 0.638 against 0.648), but it plays far better: +284 ± 43 Elo in 362 games at 60 s + 1 s (`data/matches/quiet_vs_actual/match.log`, [Results](RESULTS.md)). Three variants did not beat it: a steeper target (`k` 0.0065), keeping 0.5 % of the mates instead of 10 %, and 30 M positions (all within the error of 280 games). Status: shipped.
 
 ## King-bucket logistic model (`linear_king_bucket`)
 

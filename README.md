@@ -20,7 +20,7 @@ Every figure and its command are in [Results](docs/RESULTS.md#the-short-answer).
   ([how a change is measured](docs/MEASUREMENT.md)). Late move reductions searched deeper but lost 8.6 ± 6.1 Elo
   over 10,244 games, so they are off.
 - **Evaluation.** The engine plays with the **Piece-square-and-terms logistic model** (`linear_pst_terms`, 791
-  parameters), the best point estimate in three tournaments of six evaluations (played with the earlier Python
+  parameters, trained on quiet positions only: +284 Elo over the all-positions version), the best point estimate in three tournaments of six evaluations (played with the earlier Python
   engine). The 206,000-parameter network judges positions better (Spearman 0.700 against Stockfish) but does not
   win more games at this search depth.
 

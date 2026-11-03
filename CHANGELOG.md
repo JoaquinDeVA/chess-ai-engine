@@ -8,7 +8,8 @@ All notable changes. The newest are first.
 - Two quiescence switches, off by default and measured at a fixed 20,000 nodes: [`qs_evasions`](docs/techniques/qs-evasions.md) (a side in check searches every legal move; rejected, −21.3 ± 10.6 Elo) and [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
 
 ### Changed
-- The clock of the UCI binary spends the time left over the moves still to play plus 75 % of the increment (`winc`/`binc` were ignored, and 15 % of the time left, up to 40 s, went on each early move). Not yet measured in games.
+- The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).
+- The clock of the UCI binary spends the time left over the moves still to play plus 75 % of the increment (`winc`/`binc` were ignored, and 15 % of the time left, up to 40 s, went on each early move). Measured at 60 s + 1 s against the old clock: −64 ± 24 Elo in 720 games (SPRT stopped by hand), so it is worse; see [Results](docs/RESULTS.md).
 - [How a change is measured](docs/MEASUREMENT.md) says which time control to use and that fixed nodes favour changes that save nodes. The worker notes in `match.sh` describe the port forwarding of the desktop's SSH.
 
 ## 3.1.0 (2026-11-01)

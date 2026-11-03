@@ -120,9 +120,9 @@ iteration is discarded unless it is the first one, so there is always a move. Th
 are in [How the engine chooses a move](SEARCH.md) and the [catalogue of techniques](techniques/README.md).
 
 The binary takes its options by `setoption`: `Threads`, `Hash`, `Techniques` (a list of names, as in
-`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. From the clock fields the
-binary spends the time left over the moves still to play plus most of the increment
-([Iterative deepening](techniques/iterative-deepening.md)).
+`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. Known gap: the binary reads
+the clock fields but ignores `winc`/`binc`, so the increment has no effect on the search until the
+selective-search work of the plan fixes it.
 
 ## Building and testing
 

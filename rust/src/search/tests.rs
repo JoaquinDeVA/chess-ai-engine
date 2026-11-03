@@ -389,6 +389,71 @@ fn an_exhausted_budget_still_completes_min_depth_and_then_stops() {
 }
 
 #[test]
+fn a_single_legal_move_is_played_after_the_first_iteration() {
+    // Kxb2 is the only move; with the rule the deepening stops at once, without it it goes on.
+    let fen = "k7/8/8/8/8/8/1q6/K7 w - - 0 1";
+    let base = Options {
+        estimator: "never_stop".into(),
+        ..Options::default()
+    };
+    let single = Options {
+        time_rules: TimeRules {
+            single: true,
+            ..TimeRules::default()
+        },
+        ..base.clone()
+    };
+    let (best, stats, _) = run(fen, &single, 6, 1e9, 1e9, 1e-3);
+    assert_eq!(best.as_deref(), Some("a1b2"));
+    assert_eq!(stats.completed_depth, 1, "{stats:?}");
+    let (_, stats, _) = run(fen, &base, 6, 1e9, 1e9, 1e-3);
+    assert_eq!(stats.completed_depth, 6, "{stats:?}");
+}
+
+#[test]
+fn half_the_budget_stops_the_next_iteration() {
+    let half = Options {
+        estimator: "never_stop".into(),
+        time_rules: TimeRules {
+            half: true,
+            ..TimeRules::default()
+        },
+        ..Options::default()
+    };
+    // depth 1 and 2 take 0.063 fake seconds in total: past half of 0.1, but inside the whole
+    let (_, with, _) = run(START, &half, 8, 0.1, 1e9, 1e-3);
+    let (_, without, _) = run(
+        START,
+        &Options {
+            time_rules: TimeRules::default(),
+            ..half.clone()
+        },
+        8,
+        0.1,
+        1e9,
+        1e-3,
+    );
+    assert!(
+        with.completed_depth < without.completed_depth,
+        "{with:?} {without:?}"
+    );
+}
+
+#[test]
+fn the_stability_and_node_factors_scale_the_budget() {
+    let stab = TimeRules::from_names(&["stab"]).unwrap();
+    assert!((stab.scale(0, 0.0) - 1.2).abs() < 1e-9);
+    assert!((stab.scale(5, 0.0) - 1.0).abs() < 1e-9);
+    assert!((stab.scale(50, 0.0) - 0.8).abs() < 1e-9);
+    let nodes = TimeRules::from_names(&["nodes"]).unwrap();
+    assert!((nodes.scale(0, 0.9) - 0.6).abs() < 1e-9);
+    assert!((nodes.scale(0, 0.99) - 0.5).abs() < 1e-9);
+    assert!((nodes.scale(0, 0.2) - 2.0).abs() < 1e-9);
+    assert_eq!(TimeRules::default().scale(9, 0.1), 1.0);
+    assert!(TimeRules::from_names(&["nope"]).is_err());
+}
+
+#[test]
 fn an_iteration_cut_by_the_hard_limit_is_discarded() {
     let options = Options {
         estimator: "never_stop".into(),

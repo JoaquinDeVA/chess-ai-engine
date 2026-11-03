@@ -13,7 +13,7 @@ use super::ordering::{History, Killers};
 use super::shared::SharedTable;
 use super::stats::*;
 use super::tt::Tt;
-use crate::board::GameState;
+use crate::board::{move_id, ordered_moves, GameState};
 use crate::eval::Evaluator;
 
 /// Tolerance for finishing a depth that was started within the budget.
@@ -223,12 +223,20 @@ fn deepen(
     let mut stop_reason = StopReason::MaxDepth;
     let mut stop_predicted = 0.0;
     let mut last_value: Option<f64> = None;
+    let rules = options.time_rules;
+    let single = rules.single && ordered_moves(state.pos()).len() == 1;
+    // Iterations in a row with the same best move, and the budget they leave.
+    let (mut equal, mut limit) = (0u32, time_limit);
 
     for depth in 1..=max_depth {
         // Clock policy: before an iteration, skip it if the estimate says it will not finish in
         // what is left (the overshoot factor forgives a near miss); never skip before `min_depth`,
         // so the move always comes from a minimum of real search.
-        let remaining = time_limit - (clock() - start);
+        let remaining = limit - (clock() - start);
+        if rules.half && depth > options.min_depth && clock() - start >= time_limit * 0.5 {
+            stop_reason = StopReason::Budget;
+            break;
+        }
         if depth > options.min_depth && !history.is_empty() {
             let predicted = estimate(&history);
             if predicted > remaining * OVERSHOOT_FACTOR {
@@ -272,10 +280,19 @@ fn deepen(
         }
         history.push((seconds, result.nodes));
         last_value = Some(result.value);
+        equal = match (&best_move, &result.best) {
+            (Some(old), Some(new)) if move_id(old) == move_id(new) => equal + 1,
+            _ => 0,
+        };
         best_move = result.best;
         completed_depth = depth;
+        limit = time_limit * rules.scale(equal, result.best_fraction);
+        if single {
+            stop_reason = StopReason::Budget;
+            break;
+        }
         // The soft budget is also checked after the iteration, since the estimate can be low.
-        if depth >= options.min_depth && clock() - start >= time_limit {
+        if depth >= options.min_depth && clock() - start >= limit {
             stop_reason = StopReason::Budget;
             break;
         }

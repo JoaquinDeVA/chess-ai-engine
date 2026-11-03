@@ -9,7 +9,7 @@ All notable changes. The newest are first.
 
 ### Changed
 - The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).
-- The clock of the UCI binary spends the time left over the moves still to play plus 75 % of the increment (`winc`/`binc` were ignored, and 15 % of the time left, up to 40 s, went on each early move). Measured at 60 s + 1 s against the old clock: −64 ± 24 Elo in 720 games (SPRT stopped by hand), so it is worse; see [Results](docs/RESULTS.md).
+- The clock of the UCI binary is again the share of the time left (15 %, between 1.5 and 40 s): the rule that spent the time left over the moves to go plus 75 % of the increment lost −64 ± 24 Elo at 60 s + 1 s in 720 games (SPRT stopped by hand), see [Results](docs/RESULTS.md).
 - [How a change is measured](docs/MEASUREMENT.md) says which time control to use and that fixed nodes favour changes that save nodes. The worker notes in `match.sh` describe the port forwarding of the desktop's SSH.
 
 ## 3.1.0 (2026-11-01)

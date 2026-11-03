@@ -34,6 +34,60 @@ pub struct Options {
     /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
     /// its own nodes, so a fixed-node search is deterministic whatever the machine.
     pub node_limit: Option<u64>,
+    /// Rules that stop the deepening early or late (all off by default).
+    pub time_rules: TimeRules,
+}
+
+/// Rules of the clock on top of the soft budget (UCI option `TimeRules`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TimeRules {
+    /// A single legal move is played after the first iteration.
+    pub single: bool,
+    /// No iteration starts once half of the soft budget is spent.
+    pub half: bool,
+    /// The budget shrinks while the best move stays the same: `1.20 - 0.04 n` after `n` equal
+    /// iterations (at most 10).
+    pub stab: bool,
+    /// The budget follows the share of nodes the best root move took: `max(0.5, 2 (1 - f) + 0.4)`.
+    pub nodes: bool,
+}
+
+impl TimeRules {
+    /// Names, as the switches are called from UCI.
+    pub const NAMES: [&'static str; 4] = ["single", "half", "stab", "nodes"];
+
+    /// The rules with the given names.
+    pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<TimeRules, String> {
+        let mut rules = TimeRules::default();
+        for name in names {
+            match name.as_ref() {
+                "single" => rules.single = true,
+                "half" => rules.half = true,
+                "stab" => rules.stab = true,
+                "nodes" => rules.nodes = true,
+                other => {
+                    return Err(format!(
+                        "unknown time rule {other:?}; available: {:?}",
+                        TimeRules::NAMES
+                    ))
+                }
+            }
+        }
+        Ok(rules)
+    }
+
+    /// Factor of the soft budget after `equal` iterations with the same best move, the best move
+    /// having taken the share `fraction` of the nodes of the last one.
+    pub fn scale(&self, equal: u32, fraction: f64) -> f64 {
+        let mut scale = 1.0;
+        if self.stab {
+            scale *= 1.2 - 0.04 * f64::from(equal.min(10));
+        }
+        if self.nodes {
+            scale *= (2.0 * (1.0 - fraction) + 0.4).max(0.5);
+        }
+        scale
+    }
 }
 
 /// The techniques added to the reference search, each with its own switch (all off by default).
@@ -130,6 +184,7 @@ impl Default for Options {
             epsilon: DEPTH_PREFERENCE_EPSILON,
             techniques: Techniques::default(),
             node_limit: None,
+            time_rules: TimeRules::default(),
         }
     }
 }

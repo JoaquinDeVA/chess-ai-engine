@@ -33,6 +33,8 @@ struct Search<'a> {
     prunings: u64,
     max_ply: i32,
     truncated: bool,
+    /// Nodes the best move of the root has taken so far.
+    root_best_nodes: u64,
     /// Evaluation that follows the moves, when the technique is on and the evaluator supports it.
     incremental: Option<Box<dyn EvalState + 'a>>,
 }
@@ -266,6 +268,7 @@ impl Search<'_> {
         };
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
+            let nodes_before = self.nodes;
             self.play(action);
             // LMR only reduces moves unlikely to matter: not captures, promotions, killers or
             // moves in or giving check, whose value can change a lot with depth.
@@ -291,11 +294,17 @@ impl Search<'_> {
                     best_value = child;
                     best_move = Some(move_id(&action));
                     alpha = alpha.max(best_value);
+                    if ply == 0 {
+                        self.root_best_nodes = self.nodes - nodes_before;
+                    }
                 }
             } else if child < best_value {
                 best_value = child;
                 best_move = Some(move_id(&action));
                 beta = beta.min(best_value);
+                if ply == 0 {
+                    self.root_best_nodes = self.nodes - nodes_before;
+                }
             }
             // Cutoff: quiet moves that cut are remembered (killers, history) to be tried earlier
             // in sibling nodes; captures are already ordered first.
@@ -399,6 +408,8 @@ pub struct SearchResult {
     pub max_ply: i32,
     /// Whether the clock or the stop flag cut the search.
     pub truncated: bool,
+    /// Share of the nodes that went to the best move of the root.
+    pub best_fraction: f64,
 }
 
 /// One alpha-beta search of exactly `max_depth` plies.
@@ -454,6 +465,7 @@ pub fn alpha_beta_window(
         prunings: 0,
         max_ply: 0,
         truncated: false,
+        root_best_nodes: 0,
         incremental,
     };
     let (value, best) = search.node(window.0, window.1, max_depth, 0, true);
@@ -465,5 +477,6 @@ pub fn alpha_beta_window(
         prunings: search.prunings,
         max_ply: search.max_ply,
         truncated: search.truncated,
+        best_fraction: search.root_best_nodes as f64 / search.nodes.max(1) as f64,
     }
 }

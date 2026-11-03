@@ -23,6 +23,7 @@ from chess_lab.models.linear_features import (
     PstFeatures,
     PstTermsFeatures,
     SlottedPstFeatures,
+    _extra_terms,
     _pawn_terms,
     features_of,
     phase,
@@ -203,6 +204,25 @@ def test_passed_pawn_term():
     # A black pawn on b5 is ahead on an adjacent file: nobody is passed.
     blocked = term_values(chess.Board("4k3/8/8/1p6/8/8/P7/4K3 w - - 0 1"))
     assert blocked["passed"] == pytest.approx(0.0)
+
+
+def test_passed_pawn_by_rank_and_king_distance():
+    # White pawn on a2 (relative rank 1) is passed; kings on e1 and e8 are 4 and 6 moves away.
+    terms = _extra_terms(chess.Board("4k3/8/8/8/8/8/P7/4K3 w - - 0 1"), chess.WHITE)
+    assert terms[:6] == [1.0, 0, 0, 0, 0, 0]
+    assert terms[6] == pytest.approx(1 / 12)
+    # Black's passed pawn on a7 is on its own relative rank 1 too.
+    black = _extra_terms(chess.Board("4k3/p7/8/8/8/8/8/4K3 w - - 0 1"), chess.BLACK)
+    assert black[:6] == [1.0, 0, 0, 0, 0, 0]
+
+
+def test_king_attack_and_open_files():
+    # The queen on d1 hits d8 and d7, next to the black king on e8; no black pawns at all.
+    terms = _extra_terms(chess.Board("4k3/8/8/8/8/8/8/3QK3 w - - 0 1"), chess.WHITE)
+    assert terms[7] == pytest.approx(0.5)
+    assert terms[8] == pytest.approx(1.0)
+    # Black attacks nothing, but the white king also stands on three files without black pawns.
+    assert _extra_terms(chess.Board("4k3/8/8/8/8/8/8/3QK3 w - - 0 1"), chess.BLACK)[7] == 0.0
 
 
 def test_doubled_and_isolated():

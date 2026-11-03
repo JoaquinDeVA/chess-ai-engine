@@ -288,6 +288,77 @@ def _piece_terms(board: chess.Board, color: chess.Color) -> List[float]:
     return terms
 
 
+#: Names of the extra terms, in weight order after :data:`TERM_NAMES`: the first seven are the
+#: passed-pawn group, the last two the king-attack group.
+EXTRA_TERM_NAMES = (
+    "passed_r2",
+    "passed_r3",
+    "passed_r4",
+    "passed_r5",
+    "passed_r6",
+    "passed_r7",
+    "passed_king_distance",
+    "king_attack",
+    "king_open_files",
+)
+_PASSED_EXTRA = 7
+_KING_ATTACK_SCALE = 10.0
+_KING_OPEN_SCALE = 3.0
+_KING_ATTACK_UNITS = ((chess.KNIGHT, 2), (chess.BISHOP, 2), (chess.ROOK, 3), (chess.QUEEN, 5))
+
+
+def _extra_terms(board: chess.Board, color: chess.Color) -> List[float]:
+    """Passed pawns by rank, their king distances and the pressure on the enemy king, of one colour.
+
+    The first six values count the passed pawns of ``color`` on its second to seventh rank. The
+    seventh is the sum over those pawns of ``rank / 6 * (distance of the enemy king - distance of
+    its own king) / 4``, with distances in king moves. ``king_attack`` adds ``2``, ``2``, ``3`` and
+    ``5`` for every knight, bishop, rook and queen of ``color`` that attacks a square of the enemy
+    king's zone (its square and the squares around it), scaled by ``1 / 10``; ``king_open_files``
+    counts the files within one of the enemy king without a pawn of the enemy, scaled by ``1 / 3``.
+
+    :param board: The position.
+    :param color: The colour that attacks.
+    :return: Nine values, in the order of :data:`EXTRA_TERM_NAMES`.
+    """
+    own_king, enemy_king = board.king(color), board.king(not color)
+    enemy = [
+        (chess.square_file(square), chess.square_rank(square))
+        for square in chess.scan_forward(board.pawns & board.occupied_co[not color])
+    ]
+    by_rank = [0.0] * 6
+    distance = 0.0
+    for square in chess.scan_forward(board.pawns & board.occupied_co[color]):
+        file, rank = chess.square_file(square), chess.square_rank(square)
+        if color == chess.WHITE:
+            blocked = any(abs(f - file) <= 1 and r > rank for f, r in enemy)
+        else:
+            blocked = any(abs(f - file) <= 1 and r < rank for f, r in enemy)
+        if blocked:
+            continue
+        relative = rank if color == chess.WHITE else 7 - rank
+        by_rank[relative - 1] += 1.0
+        if own_king is not None and enemy_king is not None:
+            gap = chess.square_distance(enemy_king, square) - chess.square_distance(
+                own_king, square
+            )
+            distance += relative / 6.0 * gap / 4.0
+
+    attack = open_files = 0
+    if enemy_king is not None:
+        zone = chess.BB_KING_ATTACKS[enemy_king] | chess.BB_SQUARES[enemy_king]
+        for piece_type, units in _KING_ATTACK_UNITS:
+            for square in chess.scan_forward(board.pieces_mask(piece_type, color)):
+                if board.attacks_mask(square) & zone:
+                    attack += units
+        enemy_pawns = board.pawns & board.occupied_co[not color]
+        king_file = chess.square_file(enemy_king)
+        for file in range(max(0, king_file - 1), min(7, king_file + 1) + 1):
+            if not enemy_pawns & chess.BB_FILES[file]:
+                open_files += 1
+    return [*by_rank, distance, attack / _KING_ATTACK_SCALE, open_files / _KING_OPEN_SCALE]
+
+
 class PstTermsFeatures(LinearFeatures):
     """Tapered piece-square tables plus classical terms, one middlegame and one endgame weight each.
 
@@ -303,6 +374,8 @@ class PstTermsFeatures(LinearFeatures):
     """
 
     name = "linear_pst_terms"
+    #: How many of :data:`EXTRA_TERM_NAMES` follow the terms of :data:`TERM_NAMES`.
+    _extra = 0
     _TERM_BASE = 2 * BLOCK_SIZE
     _TURN_INDEX = _TERM_BASE + 2 * len(TERM_NAMES)
     _pst = PstFeatures()
@@ -331,6 +404,10 @@ class PstTermsFeatures(LinearFeatures):
         white = _piece_terms(board, chess.WHITE)
         black = _piece_terms(board, chess.BLACK)
         terms = list(_pawn_terms(board)) + [w - b for w, b in zip(white, black, strict=True)]
+        if self._extra:
+            attack = _extra_terms(board, chess.WHITE)[: self._extra]
+            defence = _extra_terms(board, chess.BLACK)[: self._extra]
+            terms += [w - b for w, b in zip(attack, defence, strict=True)]
         sign = 1.0 if perspective == "white" or board.turn == chess.WHITE else -1.0
         for term, value in enumerate(terms):
             index = self._TERM_BASE + 2 * term
@@ -340,6 +417,28 @@ class PstTermsFeatures(LinearFeatures):
             indices.append(self._TURN_INDEX)
             values.append(1.0 if board.turn == chess.WHITE else -1.0)
         return indices, values
+
+
+class PstPassedFeatures(PstTermsFeatures):
+    """:class:`PstTermsFeatures` plus the passed-pawn group of :data:`EXTRA_TERM_NAMES`.
+
+    :cvar name: ``"linear_pst_passed"``.
+    """
+
+    name = "linear_pst_passed"
+    _extra = _PASSED_EXTRA
+    _TURN_INDEX = 2 * BLOCK_SIZE + 2 * (len(TERM_NAMES) + _PASSED_EXTRA)
+
+
+class PstKingFeatures(PstTermsFeatures):
+    """:class:`PstPassedFeatures` plus the king-attack group (every term of :data:`EXTRA_TERM_NAMES`).
+
+    :cvar name: ``"linear_pst_king"``.
+    """
+
+    name = "linear_pst_king"
+    _extra = len(EXTRA_TERM_NAMES)
+    _TURN_INDEX = 2 * BLOCK_SIZE + 2 * (len(TERM_NAMES) + len(EXTRA_TERM_NAMES))
 
 
 #: Offset of the opponent's piece block in :class:`SlottedPstFeatures`.
@@ -515,6 +614,8 @@ FEATURE_SETS: Dict[str, LinearFeatures] = {
         PstFeatures(),
         MaterialCountFeatures(),
         PstTermsFeatures(),
+        PstPassedFeatures(),
+        PstKingFeatures(),
         SlottedPstFeatures(),
         KingBucketFeatures(),
     )

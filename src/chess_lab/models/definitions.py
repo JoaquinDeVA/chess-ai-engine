@@ -282,6 +282,24 @@ class PstTermsModel(LinearEvalModel):
     architecture = "Tapered piece-square tables plus 11 classical terms (790 weights), logistic"
 
 
+class PstPassedModel(LinearEvalModel):
+    """The terms model plus seven passed-pawn terms (804 weights), logistic."""
+
+    name = "linear_pst_passed"
+    feature_set = "linear_pst_passed"
+    architecture = (
+        "Piece-square tables, 11 classical terms and 7 passed-pawn terms (804 weights), logistic"
+    )
+
+
+class PstKingModel(LinearEvalModel):
+    """The passed-pawn model plus two king-attack terms (808 weights), logistic."""
+
+    name = "linear_pst_king"
+    feature_set = "linear_pst_king"
+    architecture = "Piece-square tables, 11 classical terms, 7 passed-pawn and 2 king-attack terms (808 weights), logistic"
+
+
 class MaterialLinearModel(LinearEvalModel):
     """Logistic regression on five piece-count differences (and the turn under ``"white"``)."""
 
@@ -310,7 +328,15 @@ class Nn4Model(NeuralEvalModel):
 #: The models of the project by name.
 MODELS: Dict[str, Type[SparseModel]] = {
     cls.name: cls
-    for cls in (PstTaperedModel, PstTermsModel, MaterialLinearModel, KingBucketModel, Nn4Model)
+    for cls in (
+        PstTaperedModel,
+        PstTermsModel,
+        PstPassedModel,
+        PstKingModel,
+        MaterialLinearModel,
+        KingBucketModel,
+        Nn4Model,
+    )
 }
 
 

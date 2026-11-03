@@ -58,11 +58,14 @@ pub struct Techniques {
     pub qs_evasions: bool,
     /// Store the value of a horizon node in the table (depth 0) when it has no entry.
     pub qs_tt: bool,
+    /// Static exchange evaluation: the quiescence search skips captures that lose material and the
+    /// search tries them after the quiet moves.
+    pub see: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 9] = [
+    pub const NAMES: [&'static str; 10] = [
         "incremental",
         "tt_move",
         "history",
@@ -72,6 +75,7 @@ impl Techniques {
         "lmr",
         "qs_evasions",
         "qs_tt",
+        "see",
     ];
 
     /// The techniques with the given names.
@@ -88,6 +92,7 @@ impl Techniques {
                 "lmr" => techniques.lmr = true,
                 "qs_evasions" => techniques.qs_evasions = true,
                 "qs_tt" => techniques.qs_tt = true,
+                "see" => techniques.see = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -111,6 +116,7 @@ impl Techniques {
             lmr: true,
             qs_evasions: true,
             qs_tt: true,
+            see: true,
         }
     }
 }

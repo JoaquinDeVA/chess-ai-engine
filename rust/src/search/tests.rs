@@ -294,6 +294,26 @@ fn the_horizon_table_entries_do_not_change_the_value() {
 }
 
 #[test]
+fn see_keeps_the_obvious_capture() {
+    // A queen hangs: with or without SEE the search takes it.
+    let fen = "4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1";
+    for see in [false, true] {
+        let result = quiescent(
+            fen,
+            3,
+            Techniques {
+                see,
+                ..Techniques::default()
+            },
+        );
+        assert_eq!(
+            result.best.as_ref().map(uci_string).as_deref(),
+            Some("d2d5")
+        );
+    }
+}
+
+#[test]
 fn a_search_cut_by_the_clock_stores_nothing() {
     let clock = FakeClock::default();
     let eval = Material {

@@ -6,7 +6,7 @@ use shakmaty::{Color, Move, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order};
+use super::ordering::{move_to_front, order, see_ge};
 use super::tt::Flag;
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
@@ -205,6 +205,15 @@ impl Search<'_> {
             None
         };
         let mut ordered = order(moves, &killers, history);
+        if self.options.techniques.see {
+            // Captures that lose material come after the quiet moves (the order is otherwise kept).
+            let pos = self.state.pos();
+            let (good, bad): (Vec<Move>, Vec<Move>) = ordered
+                .into_iter()
+                .partition(|m| !m.is_capture() || see_ge(pos, m, 0));
+            ordered = good;
+            ordered.extend(bad);
+        }
         // Helper threads rotate the root moves so they do not all search the same subtree; the
         // table move is not put first there for the same reason.
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
@@ -348,7 +357,11 @@ impl Search<'_> {
                 return best_value;
             }
         }
+        let see = self.options.techniques.see && !evading;
         for action in moves.into_iter().filter(|m| evading || is_noisy(m)) {
+            if see && !see_ge(self.state.pos(), &action, 0) {
+                continue;
+            }
             self.play(action);
             self.nodes += 1;
             let child_moves = ordered_moves(self.state.pos());

@@ -36,7 +36,7 @@ Before training, the command prints the configuration and an estimated duration,
 
 The linear models score a position as a weighted sum of features (material, piece-square tables and so on), pass the sum through the logistic function, and compare the result with the soft target. The loss is binary cross-entropy against targets that may be any number from 0 to 1, not just 0 or 1 (`losses` in `src/chess_lab/models/linear_eval.py`). Adam, a standard gradient-descent variant, updates the weights, with an L2 penalty that keeps them small.
 
-After each epoch the model is scored on a validation sample of up to 50,000 positions (`MAX_VALIDATION_ROWS` in `src/chess_lab/training/train.py`). The weights of the epoch with the lowest validation loss are the ones saved. Two ways of stopping are available (`run_epochs` in `src/chess_lab/models/linear_eval.py`):
+After each epoch the model is scored on a validation sample of up to 50,000 positions (`MAX_VALIDATION_ROWS` in `src/chess_lab/training/train.py`). Each epoch prints one line (epoch, train loss, validation loss, learning rate), flushed at once so a log file follows the run. The weights of the epoch with the lowest validation loss are the ones saved. Two ways of stopping are available (`run_epochs` in `src/chess_lab/models/linear_eval.py`):
 
 - Default: stop after more than `patience` (2) epochs without improvement.
 - With `--lr-decay F` (a factor between 0 and 1, for example 0.5): each epoch without improvement multiplies the learning rate by F and training continues, until the rate falls below 1e-5 or the epochs run out.

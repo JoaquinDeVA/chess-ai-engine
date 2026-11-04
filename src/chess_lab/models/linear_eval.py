@@ -259,6 +259,11 @@ def run_epochs(
             if not math.isfinite(val_loss):
                 raise ValueError(f"validation loss is not finite at epoch {epoch}: {val_loss}")
             val_losses.append(val_loss)
+            print(
+                f"epoch {epoch}/{int(cfg['max_epochs'])}: train {train_losses[-1]:.5f} "
+                f"val {val_loss:.5f} lr {lr_history[-1]:.2e}",
+                flush=True,
+            )
             if val_loss < best_loss:
                 best_loss, best_epoch, best_state = val_loss, epoch, snapshot()
                 bad_epochs = 0

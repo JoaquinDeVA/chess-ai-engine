@@ -70,11 +70,6 @@ pub fn uci_string(m: &Move) -> String {
     UciMove::from_move(*m, CastlingMode::Standard).to_string()
 }
 
-/// Whether the move captures (en passant included).
-pub fn is_capture(m: &Move) -> bool {
-    m.is_capture()
-}
-
 /// Whether the move is a capture or a promotion, the moves of the quiescence search.
 pub fn is_noisy(m: &Move) -> bool {
     m.is_capture() || m.is_promotion()

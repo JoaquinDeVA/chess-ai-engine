@@ -32,10 +32,19 @@ another piece; none touches more than six rows.
 `NetState` in `rust/src/eval/sparse_net.rs`, behind the `EvalState` trait (`apply`, `apply_null`, `undo`, `evaluate`),
 with a stack of snapshots so `undo` is a pop. The search keeps the state beside `GameState` (`Search::play` and
 `Search::unplay` in `rust/src/search/node.rs`). Switch: `incremental` (UCI option `Techniques`). Test:
-`incremental_equals_full` in `rust/src/eval/sparse_net.rs` (same values as the full evaluation up to rounding). It does
-nothing for the logistic models, which are already cheap sums.
+`incremental_equals_full` in `rust/src/eval/sparse_net.rs` (same values as the full evaluation up to rounding).
+
+The Material logistic model has no first layer, so it has nothing to follow. The `linear_pst_terms` model
+(piece-square values plus eleven classical terms) does: `LinearState` in `rust/src/eval/logistic_model.rs` keeps the
+four running sums of its table part (White and Black, opening and ending block), updated move by move with the same
+trait and the same snapshots; the classical terms are still computed from the position at each leaf. Test:
+`incremental_equals_full` in that file (random games, both perspectives, three start positions, tolerance 1e-12,
+also after taking moves back). The other logistic models fall back to the full evaluation.
 
 ## Measured effect
+
+**`linear_pst_terms`** (2026-11-04, `uci bench` on the six-core laptop, median of 5 runs, same session, commands in
+[Rust core](rust-core.md#measured-effect)): 788 k to 928 k nodes per second (+17 %), 275,144 nodes in both.
 
 Not measured with the light network candidates ([Models](../MODELS.md#light-network-candidates-net_pst_w32-net_pst_w64-net_pst_w64x16)), which are not trained yet. Rounding can break a tie between two moves, so node counts agree with the full evaluation within 1 %, not exactly.
 

@@ -18,6 +18,7 @@ from chess_lab.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
     TERM_NAMES,
+    KingSlottedPstFeatures,
     PstFeatures,
     PstTermsFeatures,
     SlottedPstFeatures,
@@ -393,3 +394,22 @@ def test_lr_decay_restores_the_weights_of_the_best_epoch():
     z = linear_eval.scores(rows, cols, vals, len(targets), theta)
     restored = float(np.mean(linear_eval.losses(z, targets)))
     assert restored == pytest.approx(summary["val_losses"][best - 1])
+
+
+def test_king_slotted_features_move_the_slotted_indices_into_the_own_king_block():
+    features = KingSlottedPstFeatures()
+    plain = SlottedPstFeatures()
+    assert features.size("side_to_move") == 64 * 768
+    assert features.size("white") == 64 * 768 + 1
+    board = chess.Board()
+    indices, values = features.active(board, "side_to_move")
+    base, _ = plain.active(board, "side_to_move")
+    # White to move, king on e1 (square 4): the block starts at 4 * 768.
+    assert indices == [index + 4 * 768 for index in base]
+    assert values == [1.0] * 32
+    board.turn = chess.BLACK
+    black, _ = features.active(board, "side_to_move")
+    assert black == [index + 4 * 768 for index in plain.active(board, "side_to_move")[0]]
+    white_view, white_values = features.active(board, "white")
+    assert white_view[-1] == 64 * 768
+    assert white_values[-1] == 0.0

@@ -301,6 +301,15 @@ class NnW64x16Model(NeuralEvalModel):
     architecture = "Sparse network: 768 slotted piece-square inputs, 64-16-1 (3 layers)"
 
 
+class NnKingsW32Model(NeuralEvalModel):
+    """49,152 king-relative piece-square inputs, a 32 accumulator and one output (2 layers)."""
+
+    name = "net_kings_w32"
+    feature_set = "pst_kings"
+    hidden = (32,)
+    architecture = "Sparse network: 49,152 king-relative piece-square inputs, 32-1 (2 layers)"
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[SparseModel]] = {
     cls.name: cls
@@ -309,6 +318,7 @@ MODELS: Dict[str, Type[SparseModel]] = {
         NnW32Model,
         NnW64Model,
         NnW64x16Model,
+        NnKingsW32Model,
     )
 }
 

@@ -30,11 +30,14 @@ pub enum FeatureSet {
     PstTerms,
     /// `pst_slotted`: one-hot piece squares (the network's inputs).
     Slotted,
+    /// `pst_kings`: the slotted inputs once per square of the own king.
+    Kings,
 }
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 3] = ["linear_pst", "linear_pst_terms", "pst_slotted"];
+    pub const NAMES: [&'static str; 4] =
+        ["linear_pst", "linear_pst_terms", "pst_slotted", "pst_kings"];
 
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
@@ -42,6 +45,7 @@ impl FeatureSet {
             "linear_pst" => FeatureSet::Pst,
             "linear_pst_terms" => FeatureSet::PstTerms,
             "pst_slotted" => FeatureSet::Slotted,
+            "pst_kings" => FeatureSet::Kings,
             _ => return None,
         })
     }
@@ -53,6 +57,7 @@ impl FeatureSet {
             FeatureSet::Pst => 2 * BLOCK_SIZE + turn,
             FeatureSet::PstTerms => 2 * BLOCK_SIZE + 2 * TERM_COUNT + turn,
             FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK + turn,
+            FeatureSet::Kings => 64 * 2 * OPPONENT_PIECE_BLOCK + turn,
         }
     }
 
@@ -70,6 +75,7 @@ impl FeatureSet {
             FeatureSet::Pst => pst(pos, perspective, indices, values, true),
             FeatureSet::PstTerms => pst_terms(pos, perspective, indices, values),
             FeatureSet::Slotted => slotted(pos, perspective, indices, values),
+            FeatureSet::Kings => kings(pos, perspective, indices, values),
         }
     }
 }
@@ -327,5 +333,30 @@ fn slotted(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, valu
     if perspective == Perspective::White {
         indices.push(2 * OPPONENT_PIECE_BLOCK);
         values.push(if mover == Color::White { 1.0 } else { 0.0 });
+    }
+}
+
+/// The slotted indices moved into the block of the own king (the mover's, or White's under the
+/// White perspective).
+fn kings(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+    slotted(pos, perspective, indices, values);
+    let owner = if perspective == Perspective::White {
+        Color::White
+    } else {
+        pos.turn()
+    };
+    let king = pos.board().king_of(owner).expect("a king per side");
+    let king = if owner == Color::Black {
+        mirror(king)
+    } else {
+        u32::from(king) as usize
+    };
+    let shift = king * 2 * OPPONENT_PIECE_BLOCK;
+    let pieces = indices.len() - usize::from(perspective == Perspective::White);
+    for index in &mut indices[..pieces] {
+        *index += shift;
+    }
+    if perspective == Perspective::White {
+        indices[pieces] = 64 * 2 * OPPONENT_PIECE_BLOCK;
     }
 }

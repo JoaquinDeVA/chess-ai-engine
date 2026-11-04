@@ -365,6 +365,49 @@ class SlottedPstFeatures(LinearFeatures):
         return indices, values
 
 
+class KingSlottedPstFeatures(SlottedPstFeatures):
+    """One-hot piece-square features per square of the king of the player to move.
+
+    Every entry of :class:`SlottedPstFeatures` is shifted by ``768 * king``, where ``king`` is the
+    square of the king of the player to move (mirrored by rank when it is Black), so each of the 64
+    king squares has its own copy of the 768 piece-square inputs and a neuron can detect patterns
+    that depend on where the own king is. Under ``"white"`` the king is White's, squares are not
+    mirrored, and the turn entry follows at index ``64 * 768``.
+
+    :cvar name: ``"pst_kings"``.
+    """
+
+    name = "pst_kings"
+    _TURN_INDEX = 64 * 2 * _OPPONENT_PIECE_BLOCK
+
+    def size(self, perspective: str) -> int:
+        """64 copies of the 768 piece-square weights, plus one turn weight under ``"white"``.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``49152`` or ``49153``.
+        """
+        return self._TURN_INDEX + (1 if perspective == "white" else 0)
+
+    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
+        """The slotted indices moved into the block of the own king, in the same order.
+
+        :param board: The position.
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: Two parallel lists; one entry per piece (plus the turn entry under ``"white"``).
+        """
+        indices, values = super().active(board, perspective)
+        owner = chess.WHITE if perspective == "white" else board.turn
+        king = board.king(owner)
+        if owner == chess.BLACK:
+            king = chess.square_mirror(king)
+        shift = king * 2 * _OPPONENT_PIECE_BLOCK
+        pieces = len(indices) - (1 if perspective == "white" else 0)
+        shifted = [index + shift for index in indices[:pieces]]
+        if perspective == "white":
+            shifted.append(self._TURN_INDEX)
+        return shifted, values
+
+
 #: Every feature set by its name, the one the saved models and the core refer to.
 FEATURE_SETS: Dict[str, LinearFeatures] = {
     features.name: features
@@ -372,6 +415,7 @@ FEATURE_SETS: Dict[str, LinearFeatures] = {
         PstFeatures(),
         PstTermsFeatures(),
         SlottedPstFeatures(),
+        KingSlottedPstFeatures(),
     )
 }
 

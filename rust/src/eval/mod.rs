@@ -74,7 +74,8 @@ impl Evaluator for Eval {
     fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
         match self {
             Eval::Net(e) => e.new_state(pos),
-            _ => None,
+            Eval::Linear(e) => e.new_state(pos),
+            Eval::H1(_) => None,
         }
     }
 }

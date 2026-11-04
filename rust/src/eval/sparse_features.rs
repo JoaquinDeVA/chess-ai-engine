@@ -7,7 +7,7 @@ use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 
 /// Phase of the start position (sum of the phase weights of all pieces).
 const MAX_PHASE: usize = 24;
-const BLOCK_SIZE: usize = 6 * 64;
+pub(crate) const BLOCK_SIZE: usize = 6 * 64;
 const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 const TERM_COUNT: usize = 11;
 const PAWN_SCALE: f64 = 4.0;
@@ -102,7 +102,7 @@ pub fn phase(pos: &Chess) -> f64 {
     total.min(MAX_PHASE) as f64 / MAX_PHASE as f64
 }
 
-fn sign_of(piece: Piece, mover: Color, perspective: Perspective) -> f64 {
+pub(crate) fn sign_of(piece: Piece, mover: Color, perspective: Perspective) -> f64 {
     match perspective {
         Perspective::White => {
             if piece.color == Color::White {
@@ -121,6 +121,17 @@ fn sign_of(piece: Piece, mover: Color, perspective: Perspective) -> f64 {
     }
 }
 
+/// Index of the table entry of `piece` on `square` in the first (opening) block.
+pub(crate) fn pst_index(perspective: Perspective, piece: Piece, square: Square) -> usize {
+    let type_offset = (piece.role as usize - 1) * 64;
+    let oriented = if perspective == Perspective::SideToMove && piece.color == Color::Black {
+        mirror(square)
+    } else {
+        u32::from(square) as usize
+    };
+    type_offset + oriented
+}
+
 fn pst(
     pos: &Chess,
     perspective: Perspective,
@@ -131,14 +142,8 @@ fn pst(
     let tapered = phase(pos);
     let mover = pos.turn();
     for (square, piece) in pieces(pos) {
-        let type_offset = (piece.role as usize - 1) * 64;
-        let oriented = if perspective == Perspective::SideToMove && piece.color == Color::Black {
-            mirror(square)
-        } else {
-            u32::from(square) as usize
-        };
         let sign = sign_of(piece, mover, perspective);
-        let index = type_offset + oriented;
+        let index = pst_index(perspective, piece, square);
         indices.push(index);
         indices.push(BLOCK_SIZE + index);
         values.push(sign * tapered);
@@ -272,6 +277,16 @@ fn pst_terms(
     values: &mut Vec<f64>,
 ) {
     pst(pos, perspective, indices, values, false);
+    terms(pos, perspective, indices, values);
+}
+
+/// The classical terms of `linear_pst_terms` (and its turn feature), after the table entries.
+pub(crate) fn terms(
+    pos: &Chess,
+    perspective: Perspective,
+    indices: &mut Vec<usize>,
+    values: &mut Vec<f64>,
+) {
     let tapered = phase(pos);
     let white = pawn_counts(pos, Color::White);
     let black = pawn_counts(pos, Color::Black);

@@ -31,8 +31,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Late move reductions (`lmr`) | implemented, off: loses 8.6 ± 6.1 Elo at fixed nodes (SPRT) | [lmr](lmr.md) |
 | Quiescence evasions (`qs_evasions`) | implemented, off: loses 21.3 ± 10.6 Elo at fixed nodes (SPRT) | [qs-evasions](qs-evasions.md) |
 | Quiescence with the table (`qs_tt`) | implemented, off: +0.7 ± 3.9 Elo at fixed nodes, no verdict (SPRT) | [qs-tt](qs-tt.md) |
+| Static exchange evaluation (`see`) | implemented, off: screening +47.8 ± 34.3 Elo at 10 s + 0.1 s; SPRT pending | [see](see.md) |
 | History malus | idea; not measured | - |
-| Static exchange evaluation (SEE) | idea; not measured | - |
+| Time rules (`TimeRules`: `single`, `half`, `stab`, `nodes`) | implemented, off: `half` −10.4, `stab` −25.5, `nodes` −80.1 Elo at 10 s + 0.1 s; `single` not measured | [iterative-deepening](iterative-deepening.md) |
 | Futility pruning | idea; not measured | - |
 | Razoring | idea; not measured | - |
 | Check extensions | idea; not measured | - |

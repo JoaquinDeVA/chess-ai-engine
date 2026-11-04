@@ -67,6 +67,30 @@ Every term is the side to move's value minus the opponent's, and is blended by g
 
 **Trained on quiet positions only.** A sum of weights cannot represent an exchange in progress, so positions where the side to move is in check or the best move is a capture or a promotion (see [Data](DATA.md)) only distort what it learns; the search resolves those with quiescence. The shipped model is trained on the quiet ones (10 M positions, effort 10, `python -m chess_lab.training.train --model linear_pst_terms --effort 10 --representation '{"filter":"quiet"}'`). Its static scores are slightly lower than those of the all-positions version trained earlier (Spearman 0.638 against 0.648), but it plays far better: +284 ± 43 Elo in 362 games at 60 s + 1 s (`data/matches/quiet_vs_actual/match.log`, [Results](RESULTS.md)). Three variants did not beat it: a steeper target (`k` 0.0065), keeping 0.5 % of the mates instead of 10 %, and 30 M positions (all within the error of 280 games). Status: shipped.
 
+## Passed-pawn logistic model (`linear_pst_passed`)
+
+**Problem.** `linear_pst_terms` counts passed pawns but not how far they have advanced or where the kings stand, so it plays endgames with a far-advanced passed pawn as if it were any pawn.
+
+**What it does.** The terms model plus seven passed-pawn weights (804 in total): the number of passed pawns on each of the second to seventh ranks, and a sum over the passed pawns of their rank times the difference between the distance of the enemy king and that of the own king (`EXTRA_TERM_NAMES` in `src/chess_lab/models/linear_features.py`).
+
+**Implementation.** `PstPassedFeatures` in `src/chess_lab/models/linear_features.py`, the same terms in `rust/src/eval/features.rs`, trained like the shipped model: `python -m chess_lab.training.train --model linear_pst_passed --effort 10 --representation '{"filter":"quiet"}'`.
+
+**Measured effect.** Static: Spearman 0.641 and error 0.130 against 0.638 of `linear_pst_terms`, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_passed`, [Results](RESULTS.md)). In play: not measured.
+
+**Status.** Implemented, not shipped.
+
+## King-attack logistic model (`linear_pst_king`)
+
+**Problem.** Nothing in the models above sees an attack on the king until the pieces have captured.
+
+**What it does.** The passed-pawn model plus two weights (808 in total): `king_attack`, the sum of 2, 2, 3 and 5 for every knight, bishop, rook and queen that attacks a square of the enemy king's zone (its square and the neighbours), and `king_open_files`, the files within one of the enemy king without an enemy pawn.
+
+**Implementation.** `PstKingFeatures` in `src/chess_lab/models/linear_features.py` and `rust/src/eval/features.rs`; trained with `python -m chess_lab.training.train --model linear_pst_king --effort 10 --representation '{"filter":"quiet"}'`.
+
+**Measured effect.** Static: Spearman 0.643 and error 0.129, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_king`). In play: not measured.
+
+**Status.** Implemented, not shipped.
+
 ## King-bucket logistic model (`linear_king_bucket`)
 
 Here the idea is that a piece is worth different amounts depending on where the kings are. A knight near the enemy king is a different thing from the same knight far from it. The model gets this by keeping a separate piece-square table for each "king situation".

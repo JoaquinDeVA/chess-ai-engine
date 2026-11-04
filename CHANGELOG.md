@@ -6,6 +6,9 @@ All notable changes. The newest are first.
 
 ### Added
 - Two quiescence switches, off by default and measured at a fixed 20,000 nodes: [`qs_evasions`](docs/techniques/qs-evasions.md) (a side in check searches every legal move; rejected, −21.3 ± 10.6 Elo) and [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
+- Two models, not shipped: [`linear_pst_passed`](docs/MODELS.md) (passed pawns by rank and king distance) and [`linear_pst_king`](docs/MODELS.md) (plus king attack); Spearman 0.641 and 0.643 against 0.638, play not measured.
+- Static exchange evaluation, [`see`](docs/techniques/see.md), off by default: +47.8 ± 34.3 Elo in a 300-game screening at 10 s + 0.1 s.
+- The UCI option `TimeRules` (`single`, `half`, `stab`, `nodes`), empty by default; `half`, `stab` and `nodes` lost in a 300-game screening ([Iterative deepening](docs/techniques/iterative-deepening.md)).
 
 ### Changed
 - The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).

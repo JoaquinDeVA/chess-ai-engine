@@ -189,6 +189,8 @@ engine are in the sections above (the model cards carried them until 2026-11-01)
 | `linear_king_bucket` | 10,369 | winprob-k0.00368-stm-all | 30 | 0.613 | 0.141 | 19.4% / 52.0% | 2.0 |
 | `linear_material` | 6 | winprob-k0.00368-stm-all | 30 | 0.474 | 0.157 | 19.1% / 54.9% | 1.9 |
 | `linear_pst` | 769 | winprob-k0.00368-stm-all | 30 | 0.626 | 0.135 | 19.8% / 53.5% | 2.3 |
+| `linear_pst_king` | 809 | winprob-k0.00368-stm-quiet | 10 | 0.643 | 0.129 | 20.7% / 55.9% | 3.3 |
+| `linear_pst_passed` | 805 | winprob-k0.00368-stm-quiet | 10 | 0.641 | 0.130 | 20.6% / 55.9% | 3.3 |
 | `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 10 | 0.638 | 0.131 | 20.4% / 55.9% | 2.9 |
 | `net4_pst` | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 5.8 |
 <!-- END GENERATED TABLES -->

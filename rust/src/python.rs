@@ -11,10 +11,10 @@ use pyo3::prelude::*;
 use shakmaty::Color;
 
 use crate::board::{position_from_fen, uci_string};
-use crate::eval::features::{FeatureSet, Perspective};
-use crate::eval::h1::H1;
-use crate::eval::linear::LinearModel;
-use crate::eval::net::{Layer, Net};
+use crate::eval::classic_heuristic::H1;
+use crate::eval::logistic_model::LinearModel;
+use crate::eval::sparse_features::{FeatureSet, Perspective};
+use crate::eval::sparse_net::{Layer, Net};
 use crate::eval::{Eval, Evaluator};
 use crate::knowledge::book::OpeningBook;
 use crate::knowledge::tablebase::EndgameTablebase;
@@ -208,7 +208,7 @@ mod _core {
         module.add("TECHNIQUES", crate::search::Techniques::NAMES.to_vec())?;
         module.add(
             "FEATURE_SETS",
-            crate::eval::features::FeatureSet::NAMES.to_vec(),
+            crate::eval::sparse_features::FeatureSet::NAMES.to_vec(),
         )?;
         Ok(())
     }

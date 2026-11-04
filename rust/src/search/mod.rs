@@ -7,12 +7,12 @@
 //! and promotions.
 
 mod deepening;
-pub mod estimators;
+pub mod iteration_time;
 mod memory;
 mod node;
 mod options;
 pub mod ordering;
-pub mod shared;
+pub mod shared_tt;
 mod stats;
 pub mod tt;
 

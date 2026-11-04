@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use shakmaty::{Chess, Color, Position};
 
-use super::features::{FeatureSet, Perspective};
+use super::sparse_features::{FeatureSet, Perspective};
 use super::{for_player, sigmoid, Evaluator};
 
 thread_local! {

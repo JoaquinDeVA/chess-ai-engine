@@ -9,4 +9,4 @@ pub mod knowledge;
 pub mod search;
 
 #[cfg(feature = "python")]
-mod py;
+mod python;

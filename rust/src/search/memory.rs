@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 use super::ordering::{History, Killers};
-use super::shared::SharedTable;
+use super::shared_tt::SharedTable;
 use super::tt::{Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
 /// What a game keeps between two moves: the transposition table and the killer moves, and how

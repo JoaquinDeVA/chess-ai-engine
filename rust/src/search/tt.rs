@@ -146,7 +146,7 @@ impl Table {
 /// dropped first, as in the Python engine) or the lock-free one shared by several threads.
 pub enum Tt {
     Local(Table),
-    Shared(std::sync::Arc<super::shared::SharedTable>),
+    Shared(std::sync::Arc<super::shared_tt::SharedTable>),
 }
 
 impl Tt {

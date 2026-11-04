@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use shakmaty::Move;
 
-use super::estimators;
+use super::iteration_time;
 use super::memory::*;
 use super::node::{alpha_beta, alpha_beta_window, SearchResult};
 use super::options::*;
 use super::ordering::{History, Killers};
-use super::shared::SharedTable;
+use super::shared_tt::SharedTable;
 use super::stats::*;
 use super::tt::Tt;
 use crate::board::{move_id, ordered_moves, GameState};
@@ -205,11 +205,11 @@ fn deepen(
     time_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats), String> {
-    let estimate = estimators::get(&options.estimator).ok_or_else(|| {
+    let estimate = iteration_time::get(&options.estimator).ok_or_else(|| {
         format!(
             "unknown estimator {:?}; available: {:?}",
             options.estimator,
-            estimators::NAMES
+            iteration_time::NAMES
         )
     })?;
     let clock = control.clock;
@@ -218,7 +218,7 @@ fn deepen(
     let (mut total_nodes, mut total_prunings, mut deepest_ply) = (0u64, 0u64, 0i32);
     let mut completed_depth = 0usize;
     let mut last_truncated = false;
-    let mut history: Vec<estimators::Iteration> = Vec::new();
+    let mut history: Vec<iteration_time::Iteration> = Vec::new();
     let mut iterations: Vec<IterationInfo> = Vec::new();
     let mut stop_reason = StopReason::MaxDepth;
     let mut stop_predicted = 0.0;

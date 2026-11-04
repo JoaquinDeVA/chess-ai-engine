@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use _core::board::GameState;
-use _core::eval::h1::{FEATURE_NAMES, H1};
+use _core::eval::classic_heuristic::{FEATURE_NAMES, H1};
 use _core::search::{alpha_beta, Control, Memory, Options, Techniques};
 use serde_json::Value;
 

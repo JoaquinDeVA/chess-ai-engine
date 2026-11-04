@@ -39,10 +39,10 @@ Dependencies, as the imports stand:
 | Package (`src/chess_engine/` unless noted) | Responsibility |
 |---|---|
 | `rust/src/board.rs` | The rules for the search: a position with the keys needed for repetitions, the terminal test of `board.outcome(claim_draw=True)`, legal moves in the order python-chess generates them, a key for the transposition table |
-| `rust/src/eval/` | The evaluations the search runs without Python: `h1.rs` (the heuristic), `features.rs` (sparse board features), `linear.rs` (the logistic models), `net.rs` (the sparse network `net4_pst`) |
-| `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, history, MVV-LVA ordering. `shared.rs`: the lock-free table of several threads. `estimators.rs`: the rules that predict the next iteration |
+| `rust/src/eval/` | The evaluations the search runs without Python: `classic_heuristic.rs` (the heuristic), `sparse_features.rs` (sparse board features), `logistic_model.rs` (the logistic models), `sparse_net.rs` (the sparse network `net4_pst`) |
+| `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, history, MVV-LVA ordering. `shared_tt.rs`: the lock-free table of several threads. `iteration_time.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
-| `rust/src/py.rs` | The Python module: `Evaluator`, `Book`, `Tablebase`, and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
+| `rust/src/python.rs` | The Python module: `Evaluator`, `Book`, `Tablebase`, and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
 | `uci.py` | `UciEngine` (one process of the UCI binary: `position fen … moves …`, `go`, `bestmove`), `UciBot` (the AI player of the window: the opening book and the tablebases first, then the engine; the clock or the fixed time become the `go` limits) |
 | `chess_lab/models/` | Everything about a model. `definitions.py`: `SparseModel`, `LinearEvalModel`, `NeuralEvalModel`, the table `MODELS` and `load_evaluator`, which turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) into the Rust `Evaluator`. `loader.py`: paths and tagged specs of the saved models, and `h1` (`h1_weights.json`). `cards.py`: model cards in `cards/`. `linear_features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `representation.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `linear_eval.py` and `neural_eval.py`: `new_model` and `fit_stream` for the linear models (Adam) and the network (Keras). |
 | `chess_lab/training/` | `lichess_raw.py`: the Lichess evaluation dump as raw Parquet shards, and the detection of its perspective. `sidecar.py`: split, quiet flag and seeded samplers over the shards. `dataset.py`: split and target scale. `effort.py`: training size per effort level. `train.py`: the training command |
@@ -148,7 +148,7 @@ The search runs in Rust, so a model plays at full speed only if its features are
 **name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
 `king_bucket` and `pst_slotted`. A model with another feature set is rejected by the core. To give a feature set its Rust version:
 
-1. add a variant to `FeatureSet` in `rust/src/eval/features.rs`, with its name in `FeatureSet::NAMES`,
+1. add a variant to `FeatureSet` in `rust/src/eval/sparse_features.rs`, with its name in `FeatureSet::NAMES`,
    its size in `size` and its `active` function, which must give the same indices and values, in the
    same order, as the Python `active` (the training encodes with the Python one, so a difference
    means training on one thing and playing with another);

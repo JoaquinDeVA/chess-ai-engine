@@ -2,10 +2,10 @@
 //! network. All return the expected score of a player in `[0.01, 0.99]`, like the Python
 //! `ModelEvaluator`.
 
-pub mod features;
-pub mod h1;
-pub mod linear;
-pub mod net;
+pub mod classic_heuristic;
+pub mod logistic_model;
+pub mod sparse_features;
+pub mod sparse_net;
 
 use shakmaty::{Chess, Color, Move};
 
@@ -57,9 +57,9 @@ pub fn sigmoid(z: f64) -> f64 {
 
 /// The evaluations the search can run natively.
 pub enum Eval {
-    H1(h1::H1),
-    Linear(linear::LinearModel),
-    Net(net::Net),
+    H1(classic_heuristic::H1),
+    Linear(logistic_model::LinearModel),
+    Net(sparse_net::Net),
 }
 
 impl Evaluator for Eval {

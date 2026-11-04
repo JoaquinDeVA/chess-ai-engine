@@ -35,7 +35,7 @@ finished depth 4 and part of 5 (mean 4.62); the Rust core finishes 7 (mean 7.13)
 
 ## Implementation
 
-`rust/src/lib.rs` (crate), `rust/src/py.rs` (Python bindings), `rust/src/bin/uci.rs` (UCI binary). Rules, book and
+`rust/src/lib.rs` (crate), `rust/src/python.rs` (Python bindings), `rust/src/bin/uci.rs` (UCI binary). Rules, book and
 tables are tested in `rust/tests/rules.rs` (perft, end of game) and `rust/tests/knowledge.rs`; the techniques in
 `rust/tests/techniques.rs`. Build: `pip install -e ".[dev]"` (module) and
 `cargo build --release --manifest-path rust/Cargo.toml --bin uci` (binary).

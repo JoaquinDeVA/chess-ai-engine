@@ -522,8 +522,8 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
 
 mod incremental {
     use crate::board::{position_from_fen, GameState};
-    use crate::eval::features::{FeatureSet, Perspective};
-    use crate::eval::net::{Layer, Net};
+    use crate::eval::sparse_features::{FeatureSet, Perspective};
+    use crate::eval::sparse_net::{Layer, Net};
     use crate::search::*;
 
     fn layer(fan_in: usize, fan_out: usize, seed: u64) -> Layer {

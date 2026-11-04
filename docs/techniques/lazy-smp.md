@@ -38,7 +38,7 @@ takes to reach depth 8, against 1.93 s for one thread (table below).
 
 ## Implementation
 
-`iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; `SharedTable` in `rust/src/search/shared.rs`,
+`iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; `SharedTable` in `rust/src/search/shared_tt.rs`,
 three atomic words per slot checked by XOR. `Memory::with_threads` (`rust/src/search/memory.rs`) builds the shared
 table only with more than one thread. UCI options `Threads` and `Hash` (megabytes of the shared table; with one
 thread `Hash` has no effect); in the window, Settings → Advanced. With more than one thread the search is not

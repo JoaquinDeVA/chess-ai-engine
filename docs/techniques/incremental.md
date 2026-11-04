@@ -29,10 +29,10 @@ another piece; none touches more than six rows.
 
 ## Implementation
 
-`NetState` in `rust/src/eval/net.rs`, behind the `EvalState` trait (`apply`, `apply_null`, `undo`, `evaluate`),
+`NetState` in `rust/src/eval/sparse_net.rs`, behind the `EvalState` trait (`apply`, `apply_null`, `undo`, `evaluate`),
 with a stack of snapshots so `undo` is a pop. The search keeps the state beside `GameState` (`Search::play` and
 `Search::unplay` in `rust/src/search/node.rs`). Switch: `incremental` (UCI option `Techniques`). Test:
-`incremental_equals_full` in `rust/src/eval/net.rs` (same values as the full evaluation up to rounding). It does
+`incremental_equals_full` in `rust/src/eval/sparse_net.rs` (same values as the full evaluation up to rounding). It does
 nothing for the logistic models, which are already cheap sums.
 
 ## Measured effect

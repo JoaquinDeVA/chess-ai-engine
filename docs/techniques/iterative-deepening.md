@@ -61,7 +61,7 @@ The constants are those of Ethereal's time management, taken as a starting point
 ## Implementation
 
 `iterative_deepening` in `rust/src/search/deepening.rs` (loop, `OVERSHOOT_FACTOR = 1.15`, discard of
-truncated iterations). The estimators are in `rust/src/search/estimators.rs`; `geometric_growth` is the
+truncated iterations). The estimators are in `rust/src/search/iteration_time.rs`; `geometric_growth` is the
 default; `fixed_factor` and `never_stop` remain for the tests. The other rules in the table below were
 removed after the comparison. The budget and the hard limit are `clock_budget` in `rust/src/bin/uci.rs`;
 `go movetime N` uses `N` as both. `TimeRules` is `time_rules` in `Options` (`TimeRules::scale` and the checks in `deepen`, `rust/src/search/deepening.rs`; the share `f` is `SearchResult::best_fraction`). Minimum depth: `DEFAULT_MIN_DEPTH = 1`; technical cap `MAX_DEPTH = 30`

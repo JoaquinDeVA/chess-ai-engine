@@ -11,8 +11,8 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 
 use _core::board::{ordered_moves, uci_string, GameState};
-use _core::eval::features::{FeatureSet, Perspective};
-use _core::eval::linear::LinearModel;
+use _core::eval::logistic_model::LinearModel;
+use _core::eval::sparse_features::{FeatureSet, Perspective};
 use _core::eval::Eval;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
 use _core::search::{self, Control, Memory, Options, Techniques, TimeRules, DEFAULT_TECHNIQUES};

@@ -72,6 +72,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "improvement; e.g. 0.5",
     )
     parser.add_argument(
+        "--patience",
+        type=int,
+        help="stop after this many epochs without validation improvement (with --lr-decay, "
+        "that many in a row; the rate is still cut on each of them)",
+    )
+    parser.add_argument(
         "--tag",
         help="train a variant: artifact <model>@<tag>, card <model>@<tag> (letters, digits, ._-)",
     )
@@ -85,6 +91,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
     if args.lr_decay is not None and not 0 < args.lr_decay < 1:
         parser.error(f"--lr-decay must be in (0, 1): {args.lr_decay}")
+    if args.patience is not None and args.patience < 1:
+        parser.error(f"--patience must be at least 1: {args.patience}")
     return args
 
 
@@ -189,7 +197,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         args.sidecar,
         validation,
         plan["positions"],
-        fit_config(plan, best["l2"], best["lr"], args.lr_decay),
+        fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=args.patience),
         quiet,
         seed=args.seed,
         use_cache=not args.no_cache,

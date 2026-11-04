@@ -216,7 +216,8 @@ def run_epochs(
 
     Each model supplies how an encoded frame is trained and how the validation loss is computed.
     With ``lr_decay`` in ``cfg`` an epoch without improvement multiplies the learning rate and the
-    run stops when it falls below ``min_lr``; otherwise it stops after more than ``patience``
+    run stops when it falls below ``min_lr`` (or, with ``decay_patience``, after ``patience``
+    epochs in a row without improvement); otherwise it stops after more than ``patience``
     epochs without improvement.
 
     :param cfg: Fit configuration (``max_epochs``, ``workers``, ``patience``, ``lr_decay``...).
@@ -262,8 +263,11 @@ def run_epochs(
                 best_loss, best_epoch, best_state = val_loss, epoch, snapshot()
                 bad_epochs = 0
             elif lr_decay is not None:
+                bad_epochs += 1
                 lr = get_lr() * float(lr_decay)
-                if lr < min_lr:
+                if lr < min_lr or (
+                    cfg.get("decay_patience") and bad_epochs >= int(cfg["patience"])
+                ):
                     break
                 set_lr(lr)
             else:

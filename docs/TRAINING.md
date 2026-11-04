@@ -41,8 +41,11 @@ After each epoch the model is scored on a validation sample of up to 50,000 posi
 - Default: stop after more than `patience` (2) epochs without improvement.
 - With `--lr-decay F` (a factor between 0 and 1, for example 0.5): each epoch without improvement multiplies the learning rate by F and training continues, until the rate falls below 1e-5 or the epochs run out.
 
+With `--patience N` as well, the run also stops after N epochs in a row without improvement (the rate is still cut on each of them); `--epochs` sets the cap. Without `--lr-decay`, `--patience N` replaces the default of 2 (the run stops after more than N epochs without improvement).
+
 ```bash
 python -m chess_lab.training.train --model linear_pst_terms --effort 30 --lr-decay 0.5
+python -m chess_lab.training.train --model linear_pst_terms --effort 30 --lr-decay 0.5 --patience 3 --epochs 40
 ```
 
 Training writes the model's card (`src/chess_lab/models/cards/`); retraining first empties the measurements of

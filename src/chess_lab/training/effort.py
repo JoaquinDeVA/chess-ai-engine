@@ -149,6 +149,7 @@ def fit_config(
     lr: float,
     lr_decay: Optional[float] = None,
     min_lr: float = 1e-5,
+    patience: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Keyword configuration of :func:`chess_lab.models.fit_stream` for a plan.
 
@@ -158,17 +159,21 @@ def fit_config(
     :param lr_decay: Factor applied to the rate on each epoch without improvement (None: stop by
         patience instead).
     :param min_lr: With ``lr_decay``, the run stops when the rate falls below this value.
-    :return: Keys ``l2, lr, batch_size, max_epochs, patience, workers, lr_decay, min_lr``.
+    :param patience: Epochs without improvement that stop the run; None keeps the plan's. With
+        ``lr_decay`` it also stops the run (``decay_patience``), after that many epochs in a row.
+    :return: Keys ``l2, lr, batch_size, max_epochs, patience, workers, lr_decay, min_lr,
+        decay_patience``.
     """
     return {
         "l2": l2,
         "lr": lr,
         "batch_size": plan["batch_size"],
         "max_epochs": plan["max_epochs"],
-        "patience": plan["patience"],
+        "patience": plan["patience"] if patience is None else patience,
         "workers": WORKERS,
         "lr_decay": lr_decay,
         "min_lr": min_lr,
+        "decay_patience": patience is not None,
     }
 
 

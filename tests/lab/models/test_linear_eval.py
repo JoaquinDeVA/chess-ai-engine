@@ -483,6 +483,19 @@ def test_lr_decay_keeps_training_with_a_smaller_rate_until_max_epochs():
             assert history[epoch + 1] == pytest.approx(history[epoch] * 0.5)
 
 
+def test_decay_patience_stops_after_that_many_epochs_in_a_row_without_improvement():
+    config = {
+        "max_epochs": 20,
+        "patience": 1,
+        "decay_patience": True,
+        "lr_decay": 0.5,
+        "min_lr": 1e-9,
+    }
+    _, _, summary = _decay_fit(config)
+
+    assert summary["epochs"] == 2  # epoch 2 does not improve: one in a row
+
+
 def test_lr_decay_stops_when_the_rate_falls_below_min_lr():
     _, _, summary = _decay_fit({"max_epochs": 20, "patience": 0, "lr_decay": 0.5, "min_lr": 0.06})
 

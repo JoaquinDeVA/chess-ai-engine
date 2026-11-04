@@ -271,6 +271,11 @@ class TestCommandLineWithDoubles:
         assert "representation" in training and "date" in training and "commit" in training
         assert "Effort 40" in capsys.readouterr().out
 
+    def test_patience_option_reaches_the_printed_plan_and_the_card(self, fake_training, capsys):
+        assert self.train("--patience", "3") == 0
+        assert "  patience: 3" in capsys.readouterr().out
+        assert cards.load_card("linear_pst_terms")["training"]["effort_config"]["patience"] == 3
+
     def test_tag_writes_artifact_and_card_without_touching_the_untagged_one(self, fake_training):
         cards.update_card("linear_pst_terms", status="current", parameters=99)
         assert self.train("--tag", "x") == 0

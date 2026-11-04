@@ -164,6 +164,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     plan = effort_config(args.effort, available)
     if args.epochs is not None:
         plan["max_epochs"] = args.epochs
+    if args.patience is not None:
+        plan["patience"] = args.patience
     print(f"Effort {args.effort}: {available:,} TRAIN rows available")
     for key, value in plan.items():
         print(f"  {key}: {value:,}")

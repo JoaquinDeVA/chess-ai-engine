@@ -30,7 +30,7 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Null move (`null_move`) | on; nodes to 446,129 | +205 with the five above (76.5 %, 100 games) | [null-move](null-move.md) |
 | Quiescence with the table (`qs_tt`) | implemented, off: no gain at fixed nodes | +0.7 ± 3.9 (SPRT, no verdict) | [qs-tt](qs-tt.md) |
 | Static exchange evaluation (`see`) | on | +56.4 ± 17.5 (SPRT at 20,000 nodes, H1) | [see](see.md) |
-| History malus | idea; not measured | not measured | - |
+| History malus (`history_malus`) | implemented, off: no measured gain | +3.9 ± 9.3 (SPRT at 20,000 nodes, no verdict) | [history-malus](history-malus.md) |
 | Futility pruning | idea; not measured | not measured | - |
 | Razoring | idea; not measured | not measured | - |
 | Check extensions | idea; not measured | not measured | - |

@@ -9,6 +9,7 @@ All notable changes. The newest are first.
 
 ### Added
 - A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
+- A move-ordering switch, off by default and measured at a fixed 20,000 nodes: [`history_malus`](docs/techniques/history-malus.md) (quiet moves tried before a cut lose history score; +3.9 ± 9.3 Elo, no verdict). Results in [RESULTS](docs/RESULTS.md).
 - Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +50.9 ± 38.6 in two SPRTs stopped by hand (no verdict).
 
 ### Changed

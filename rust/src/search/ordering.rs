@@ -173,9 +173,18 @@ impl History {
 
     /// A quiet move caused a cut-off with `depth` plies left.
     pub fn reward(&mut self, color: Color, m: &Move, depth: i32) {
+        self.add(color, m, depth * depth);
+    }
+
+    /// A quiet move was tried with `depth` plies left and a later move caused the cut-off.
+    pub fn penalise(&mut self, color: Color, m: &Move, depth: i32) {
+        self.add(color, m, -depth * depth);
+    }
+
+    fn add(&mut self, color: Color, m: &Move, amount: i32) {
         let slot = History::slot(color, m);
-        self.scores[slot] += depth * depth;
-        if self.scores[slot] > HISTORY_LIMIT {
+        self.scores[slot] += amount;
+        if self.scores[slot].abs() > HISTORY_LIMIT {
             for score in &mut self.scores {
                 *score /= 2;
             }

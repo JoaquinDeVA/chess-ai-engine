@@ -243,6 +243,8 @@ impl Search<'_> {
             f64::INFINITY
         };
         let mut best_move = None;
+        let malus = self.options.techniques.history && self.options.techniques.history_malus;
+        let mut failed_quiet: Vec<Move> = Vec::new();
         for (index, action) in ordered.into_iter().enumerate() {
             self.play(action);
             let child = self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing);
@@ -266,8 +268,14 @@ impl Search<'_> {
                 if self.options.techniques.history && !action.is_capture() && !action.is_promotion()
                 {
                     self.memory.history.reward(mover, &action, depth_remaining);
+                    for failed in &failed_quiet {
+                        self.memory.history.penalise(mover, failed, depth_remaining);
+                    }
                 }
                 break;
+            }
+            if malus && !action.is_capture() && !action.is_promotion() {
+                failed_quiet.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.

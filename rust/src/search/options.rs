@@ -58,11 +58,13 @@ pub struct Techniques {
     /// Static exchange evaluation: the quiescence search skips captures that lose material and the
     /// search tries them after the quiet moves.
     pub see: bool,
+    /// Penalise in the history the quiet moves tried before the one that cut.
+    pub history_malus: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 8] = [
+    pub const NAMES: [&'static str; 9] = [
         "incremental",
         "tt_move",
         "history",
@@ -71,6 +73,7 @@ impl Techniques {
         "null_move",
         "qs_tt",
         "see",
+        "history_malus",
     ];
 
     /// The techniques with the given names.
@@ -86,6 +89,7 @@ impl Techniques {
                 "null_move" => techniques.null_move = true,
                 "qs_tt" => techniques.qs_tt = true,
                 "see" => techniques.see = true,
+                "history_malus" => techniques.history_malus = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -108,6 +112,7 @@ impl Techniques {
             null_move: true,
             qs_tt: true,
             see: true,
+            history_malus: true,
         }
     }
 }

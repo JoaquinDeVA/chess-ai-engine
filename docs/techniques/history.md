@@ -39,4 +39,4 @@ in 100 %. In games, with `tt_move`: +92 Elo ([catalogue](README.md#how-the-switc
 
 ## Status
 
-Adopted, on by default; since 2026-10-25. A malus for quiet moves that failed to cut is an idea, not measured.
+Adopted, on by default; since 2026-10-25. A malus for quiet moves that failed to cut was measured without gain: [history malus](history-malus.md).

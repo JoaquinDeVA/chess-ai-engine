@@ -48,6 +48,7 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 | `lmr_nodes` | default + `lmr` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,244 | 48.76 % | −8.6 ± 6.1 | −2.94 | H0: regresses |
 | `qs_evasions` | default + `qs_evasions` against default | 20,000 nodes per move, SPRT [−5, 0] | 3,428 | 46.94 % | −21.3 ± 10.6 | −2.96 | H0: regresses |
 | `see_nodes` | default + `see` against default | 20,000 nodes per move, SPRT [0, 5] | 1,188 | 58.04 % | +56.4 ± 17.5 | +2.97 | H1: stronger (fixed nodes) |
+| `history_malus_nodes` | default + `history_malus` against default | 20,000 nodes per move, SPRT [0, 5] | 2,404 | 50.56 % | +3.9 ± 9.3 | +0.33 | no verdict (stopped by hand at 2,556 games; Elo as of the last report, 2,404 games) |
 | `qs_tt` | default + `qs_tt` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,000 | 50.10 % | +0.7 ± 3.9 | +1.55 | no verdict (round cap) |
 | `quiet_vs_actual` | `linear_pst_terms` trained on quiet positions against the same trained on all positions | 60 s + 1 s, SPRT [0, 5] | 362 | 83.70 % | +284 ± 43 | +2.96 | H1: stronger |
 | `q_k65_vs_quiet` | quiet model with `k` 0.0065 against the quiet model | 60 s + 1 s, SPRT [0, 5] | 280 | 48.93 % | −7 ± 35 | −0.13 | no verdict (round cap) |

@@ -115,6 +115,19 @@ fn the_history_does_not_change_the_value() {
     debug_assertions,
     ignore = "slow without optimisation: cargo test --release"
 )]
+fn the_history_malus_does_not_change_the_value() {
+    same_value_as_the_reference(Techniques {
+        history: true,
+        history_malus: true,
+        ..Techniques::default()
+    });
+}
+
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "slow without optimisation: cargo test --release"
+)]
 fn pvs_does_not_change_the_value() {
     same_value_as_the_reference(Techniques {
         pvs: true,

@@ -79,18 +79,12 @@ the 59.6 % with a neighbour in train and the rest, and each model is judged on b
 
 | model | Spearman with a neighbour | Spearman without | MAE with | MAE without |
 |---|---|---|---|---|
-| `linear_material` | 0.493 | 0.446 | 0.1541 | 0.1607 |
-| `linear_pst` | 0.643 | 0.599 | 0.1318 | 0.1406 |
-| `linear_king_bucket` | 0.629 | 0.588 | 0.1377 | 0.1452 |
 | `linear_pst_terms` | 0.665 | 0.623 | 0.1283 | 0.1372 |
-| `net4_pst` | 0.714 | 0.679 | 0.1168 | 0.1237 |
 
-Every model does better with a neighbour, including the material model, which has six weights and
-cannot memorize anything: the difference (0.035 to 0.047 in Spearman) comes from the kind of position
-that has neighbours, which are more ordinary, and not from copying. The network, the model with the
-most capacity, gains the least (0.035). Nothing here suggests that the accuracy of the models is
-inflated by the split. The training and validation losses agree as well (the gap is at most 0.003,
-`training` section of each model card).
+`linear_pst_terms` does better with a neighbour, but it has 791 weights and cannot memorize positions: the
+difference (0.042 in Spearman) comes from the kind of position that has neighbours, which are more ordinary, and
+not from copying. Nothing here suggests that its accuracy is inflated by the split. The training and validation
+losses agree as well (the gap is at most 0.003, `training` section of the model card).
 
 ## From centipawns to a target
 
@@ -104,9 +98,7 @@ With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the 
 
 Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_lab/models/defaults.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
 
-The evidence is one match, played once. `linear_pst_terms` trained with 10 % of the mates played 100 games against the same model trained with all of them: effort 15, 50 openings with colours swapped, 60 s + 1 s per move. The 10 % model scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1), which is +156 Elo (`docs/RESULTS.md`, section "Mates al 10 %"). It is a single pair of players at a single effort level, not a general law.
-
-The old 100 % model was retired from the repository; it lives in git commit `03169db` (`src/chess_engine/models/artifacts/linear_pst_terms.npz` and its card). To train the 100 % variant again:
+Evidence: `linear_pst_terms` trained with 10 % of the mates scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1, +156 Elo) in 100 games against the same model trained with all of them (effort 15, 50 openings with colours swapped, 60 s + 1 s per move, Python engine). To train the 100 % variant again:
 
 ```bash
 python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100

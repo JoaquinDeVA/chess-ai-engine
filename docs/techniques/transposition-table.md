@@ -75,18 +75,7 @@ does not use it. With several threads the table is the lock-free `SharedTable`
 
 ## Measured effect
 
-Measured with the Python engine, `linear_material` as evaluation, the table empty at the start of every
-position (`scripts/bench/compare_search_features.py`, removed in `6162db8`; in the git history):
-
-| sample | nodes per move, with / without | time per move, with / without | same move |
-|---|---|---|---|
-| 60 positions, depth 4 | 15,988 / 17,184 (−7.0 %) | 1.365 s / 1.474 s | 100 % |
-| 20 positions, depth 6 | 224,896 / 185,089 (+21.5 %) | 16.562 s / 14.619 s | 95 % |
-
-At depth 4 the table saves 7 % of the nodes. On the 20 positions at depth 6 the search with it
-visited *more* nodes; the sample is small and the cause was not found, so do not read either figure as
-a general rule. The saving inside one move is small because each position starts with an empty
-table; in a game the table is warm from the previous moves, which this measurement does not cover.
+Not measured with the Rust engine. Figures taken with the earlier Python engine have no reproducible source today and are not quoted. The table is warm from the previous moves in a game, which a per-position measurement does not cover.
 
 ## Status
 

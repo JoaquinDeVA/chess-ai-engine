@@ -11,6 +11,7 @@ All notable changes. The newest are first.
 - The UCI option `TimeRules` (`single`, `half`, `stab`, `nodes`), empty by default; `half`, `stab` and `nodes` lost in a 300-game screening ([Iterative deepening](docs/techniques/iterative-deepening.md)).
 
 ### Changed
+- Documentation reduced to what is current: the models page covers `linear_pst_terms`, `h1` and the light network candidates; figures of the earlier Python engine and of removed models are gone or marked "not measured"; the techniques index has an "Elo estimated" column.
 - The Rust search is 2.58x faster (304 k to 784 k nodes/s in `uci bench`, the same 565,744 nodes): packed move-order keys, pawn terms on bitboards, no allocation per node in the logistic model, one list in move ordering. +130.9 ± 39.8 Elo against the previous binary in 300 games at 10 s + 0.1 s. The Rust modules were renamed after what they hold (see [Architecture](docs/ARCHITECTURE.md)).
 - The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).
 - The clock of the UCI binary is again the share of the time left (15 %, between 1.5 and 40 s): the rule that spent the time left over the moves to go plus 75 % of the increment lost −64 ± 24 Elo at 60 s + 1 s in 720 games (SPRT stopped by hand), see [Results](docs/RESULTS.md).

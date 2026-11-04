@@ -41,9 +41,7 @@ stalemate, insufficient material, fifty moves and repetition). Always on.
 
 ## Measured effect
 
-Measured with the earlier Python engine, on its fixed benchmark at depth 3: the two changes together took the
-total time from 10.8 s to 3.7 s (2.9 times faster), with identical moves and node counts (commit messages of
-`ea86b20` and `ba3d5cb`; `git show ea86b20`). The terminal detection alone made the search 1.89 times faster.
+Not measured with the Rust engine.
 
 ## Status
 

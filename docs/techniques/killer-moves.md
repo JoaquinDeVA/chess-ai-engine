@@ -37,16 +37,7 @@ game. Always on (not a switch).
 
 ## Measured effect
 
-Measured with the earlier Python engine, `linear_material`, table empty at the start of every position
-(`scripts/bench/compare_search_features.py`, removed in `6162db8`; in the git history):
-
-| sample | nodes per move, with / without | time per move, with / without |
-|---|---|---|
-| 60 positions, depth 4 | 15,988 / 18,303 (−12.6 %) | 1.365 s / 1.482 s |
-| 20 positions, depth 6 | 224,896 / 175,520 (+28.1 %) | 16.562 s / 13.408 s |
-
-At depth 4 killers save 12.6 % of the nodes; on the 20 positions at depth 6 the search with them visited more.
-The sample is small and the cause was not found; read neither figure as a general rule.
+Not measured with the Rust engine. Figures taken with the earlier Python engine have no reproducible source today and are not quoted.
 
 ## Status
 

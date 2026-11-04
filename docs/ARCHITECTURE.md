@@ -39,7 +39,7 @@ Dependencies, as the imports stand:
 | Package (`src/chess_engine/` unless noted) | Responsibility |
 |---|---|
 | `rust/src/board.rs` | The rules for the search: a position with the keys needed for repetitions, the terminal test of `board.outcome(claim_draw=True)`, legal moves in the order python-chess generates them, a key for the transposition table |
-| `rust/src/eval/` | The evaluations the search runs without Python: `classic_heuristic.rs` (the heuristic), `sparse_features.rs` (sparse board features), `logistic_model.rs` (the logistic models), `sparse_net.rs` (the sparse network `net4_pst`) |
+| `rust/src/eval/` | The evaluations the search runs without Python: `classic_heuristic.rs` (the heuristic), `sparse_features.rs` (sparse board features), `logistic_model.rs` (the logistic models), `sparse_net.rs` (the sparse networks) |
 | `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, aspiration windows and the helper threads. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, history, MVV-LVA ordering. `shared_tt.rs`: the lock-free table of several threads. `iteration_time.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
 | `rust/src/python.rs` | The Python module: `Evaluator`, `Book`, `Tablebase`, and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
@@ -145,8 +145,8 @@ Python extractors by `tests/core/test_feature_parity.py`.
 
 The search runs in Rust, so a model plays at full speed only if its features are computed there too.
 `chess_lab/models/definitions.py` hands the saved weights of a model to the core by the
-**name** of its feature set; the core knows `material5`, `linear_pst`, `linear_pst_terms`,
-`king_bucket` and `pst_slotted`. A model with another feature set is rejected by the core. To give a feature set its Rust version:
+**name** of its feature set; the core knows `linear_pst`, `linear_pst_terms`
+and `pst_slotted`. A model with another feature set is rejected by the core. To give a feature set its Rust version:
 
 1. add a variant to `FeatureSet` in `rust/src/eval/sparse_features.rs`, with its name in `FeatureSet::NAMES`,
    its size in `size` and its `active` function, which must give the same indices and values, in the

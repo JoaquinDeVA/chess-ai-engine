@@ -52,11 +52,7 @@ results identical to the earlier Python engine). Always on (not a switch).
 
 ## Measured effect
 
-Measured with the earlier Python engine, `linear_material`, depth 4, 60 positions
-(`scripts/bench/compare_search_features.py`, removed in `6162db8`; in the git history): without ordering
-64,003 nodes per move instead of 15,988 (−75.0 %) and 5.408 s instead of 1.365 s. 11.7 % of the moves
-differ, and agreement with Stockfish's move drops from 0.317 to 0.283. The most effective technique of the
-reference search.
+Not measured with the Rust engine. Figures taken with the earlier Python engine have no reproducible source today and are not quoted.
 
 ## Status
 

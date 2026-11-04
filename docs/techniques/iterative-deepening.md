@@ -69,33 +69,9 @@ removed after the comparison. The budget and the hard limit are `clock_budget` i
 
 ## Measured effect
 
-All figures below were measured with the earlier Python engine.
+**The defect that chose the estimator.** The original rule predicted the next iteration as `last² / previous`. With a table warmed by the previous moves the depth-1 iteration can last microseconds, the ratio between the first two iterations reached 42,166, and its square predicted hours: the search stopped at depth 2. A rule that bounds the growth of the iteration time (`geometric_growth`) replaced it. Its effect in games is not measured.
 
-**The defect that chose the estimator.** In the per-move logs of a 10 min + 5 s tournament (1,051 moves
-of three models), 126 moves (12.0 %) ended below depth 3, all in under 2 s with a budget of 35-40 s. The
-original rule predicted `last² / previous`. With a table warmed by the previous moves the depth-1 iteration
-can last microseconds, the ratio between the first two iterations reached 42,166, and its square predicted
-hours: the search stopped at depth 2.
-
-**The estimators compared.** Iteration times of 85 moves from three games were recorded with the stopping
-rules off (`scripts/bench/record_iteration_times.py`, removed in `6162db8`; in the git history), and the loop
-was replayed on them with each rule (`scripts/bench/compare_time_estimators.py`, same). With a 40 s budget:
-
-| rule | mean depth | budget used | stopped though the next iteration fitted | iteration cut by the hard limit |
-|---|---|---|---|---|
-| `ratio_squared` (original) | 4.55 | 61 % | 21 % | 9 % |
-| `geometric_growth` (default) | 4.72 | 68 % | 8 % | 8 % |
-| `clamped_growth` | 4.72 | 79 % | 9 % | 16 % |
-| `node_growth` | 4.73 | 76 % | 7 % | 14 % |
-| `fixed_factor` (×4) | 4.80 | 85 % | 1 % | 16 % |
-
-All bounded rules are about 0.2 plies deeper than the original; the differences among them are within the
-noise of 85 moves. `geometric_growth` was chosen for the fewest wasted iterations at 40 s and the lowest
-overrun at 10 s (2 %). The replay was not confirmed in games.
-
-**Repeating iterations pays.** On a middlegame position the iterations up to depth 7 took 730,876 nodes in
-total against 1,083,355 for searching depth 7 directly (ad-hoc measurement, not versioned), because each
-iteration seeds the move ordering of the next.
+**Repeating iterations pays.** Not measured today.
 
 ## Status
 

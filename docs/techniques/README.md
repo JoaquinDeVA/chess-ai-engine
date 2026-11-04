@@ -10,34 +10,34 @@ The plain search is explained in [How the engine chooses a move](../SEARCH.md). 
 problem, idea, how it works, implementation, measured effect and status ([template](TEMPLATE.md)).
 Node counts are per move at depth 6 over 100 positions (reference: 672,800); the measurements are in the pages.
 
-| Technique | Status and effect | Page |
-|---|---|---|
-| Iterative deepening with a clock | reference, on | [iterative-deepening](iterative-deepening.md) |
-| Transposition table | reference, on | [transposition-table](transposition-table.md) |
-| Killer moves | reference, on | [killer-moves](killer-moves.md) |
-| MVV-LVA move ordering | reference, on | [mvv-lva](mvv-lva.md) |
-| Quiescence search | on (4 plies) | [quiescence](quiescence.md) |
-| Make/unmake, terminal detection | reference, on | [board-state](board-state.md) |
-| Opening book | on, in the window | [opening-book](opening-book.md) |
-| Endgame tablebases | on | [endgame-tablebases](endgame-tablebases.md) |
-| Search in Rust | since 2026-10-25; 8 to 35 times faster | [rust-core](rust-core.md) |
-| Several threads (Lazy SMP) | UCI option `Threads`, 1 by default | [lazy-smp](lazy-smp.md) |
-| Incremental network accumulator (`incremental`) | on; +15 % nodes/s for `net4_pst` | [incremental](incremental.md) |
-| Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | [tt-move](tt-move.md) |
-| History heuristic (`history`) | on; nodes to 391,130 | [history](history.md) |
-| Principal variation search (`pvs`) | on; nodes to 487,244 | [pvs](pvs.md) |
-| Aspiration windows (`aspiration`) | on; nodes to 440,213 | [aspiration](aspiration.md) |
-| Null move (`null_move`) | on; nodes to 446,129; +205 Elo with the set | [null-move](null-move.md) |
-| Late move reductions (`lmr`) | implemented, off: loses 8.6 ± 6.1 Elo at fixed nodes (SPRT) | [lmr](lmr.md) |
-| Quiescence evasions (`qs_evasions`) | implemented, off: loses 21.3 ± 10.6 Elo at fixed nodes (SPRT) | [qs-evasions](qs-evasions.md) |
-| Quiescence with the table (`qs_tt`) | implemented, off: +0.7 ± 3.9 Elo at fixed nodes, no verdict (SPRT) | [qs-tt](qs-tt.md) |
-| Static exchange evaluation (`see`) | implemented, off: screening +47.8 ± 34.3 Elo at 10 s + 0.1 s, +41.5 ± 46.1 at 60 s + 1 s (160 games, no verdict) | [see](see.md) |
-| History malus | idea; not measured | - |
-| Time rules (`TimeRules`: `single`, `half`, `stab`, `nodes`) | implemented, off: `half` −10.4, `stab` −25.5, `nodes` −80.1 Elo at 10 s + 0.1 s; `single` not measured | [iterative-deepening](iterative-deepening.md) |
-| Futility pruning | idea; not measured | - |
-| Razoring | idea; not measured | - |
-| Check extensions | idea; not measured | - |
-| Using the increment in the clock | pending: the UCI binary ignores `winc`/`binc` | - |
+| Technique | Status and effect | Elo estimated | Page |
+|---|---|---|---|
+| Iterative deepening with a clock | reference, on | not measured | [iterative-deepening](iterative-deepening.md) |
+| Transposition table | reference, on | not measured | [transposition-table](transposition-table.md) |
+| Killer moves | reference, on | not measured | [killer-moves](killer-moves.md) |
+| MVV-LVA move ordering | reference, on | not measured | [mvv-lva](mvv-lva.md) |
+| Quiescence search | on (4 plies) | not measured | [quiescence](quiescence.md) |
+| Make/unmake, terminal detection | reference, on | not measured | [board-state](board-state.md) |
+| Opening book | on, in the window | not measured | [opening-book](opening-book.md) |
+| Endgame tablebases | on | not measured | [endgame-tablebases](endgame-tablebases.md) |
+| Search in Rust | since 2026-10-25 | not measured | [rust-core](rust-core.md) |
+| Several threads (Lazy SMP) | UCI option `Threads`, 1 by default | not measured | [lazy-smp](lazy-smp.md) |
+| Incremental network accumulator (`incremental`) | on; effect with the light networks not measured | not measured | [incremental](incremental.md) |
+| Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | +92 with `history` (100 games, [RESULTS](../RESULTS.md#search-techniques-in-games)) | [tt-move](tt-move.md) |
+| History heuristic (`history`) | on; nodes to 391,130 | +92 with `tt_move` (same match) | [history](history.md) |
+| Principal variation search (`pvs`) | on; nodes to 487,244 | +104 with the two above and `aspiration` (same match series) | [pvs](pvs.md) |
+| Aspiration windows (`aspiration`) | on; nodes to 440,213 | +104 with `pvs` (same) | [aspiration](aspiration.md) |
+| Null move (`null_move`) | on; nodes to 446,129 | +205 with the five above (76.5 %, 100 games) | [null-move](null-move.md) |
+| Late move reductions (`lmr`) | implemented, off: loses at fixed nodes | −8.6 ± 6.1 (SPRT) | [lmr](lmr.md) |
+| Quiescence evasions (`qs_evasions`) | implemented, off: loses at fixed nodes | −21.3 ± 10.6 (SPRT) | [qs-evasions](qs-evasions.md) |
+| Quiescence with the table (`qs_tt`) | implemented, off: no gain at fixed nodes | +0.7 ± 3.9 (SPRT, no verdict) | [qs-tt](qs-tt.md) |
+| Static exchange evaluation (`see`) | implemented, off: promising, no verdict yet | +47.8 ± 34.3 (screening) | [see](see.md) |
+| History malus | idea; not measured | not measured | - |
+| Time rules (`TimeRules`: `single`, `half`, `stab`, `nodes`) | implemented, off; `single` not measured | `half` −10.4, `stab` −25.5, `nodes` −80.1 (screening) | [iterative-deepening](iterative-deepening.md) |
+| Futility pruning | idea; not measured | not measured | - |
+| Razoring | idea; not measured | not measured | - |
+| Check extensions | idea; not measured | not measured | - |
+| Using the increment in the clock | pending: the UCI binary ignores `winc`/`binc` | not measured | - |
 
 ## How the switches were judged
 

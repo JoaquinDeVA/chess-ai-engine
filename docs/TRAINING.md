@@ -24,7 +24,7 @@ The rows follow from the formulas above. For example, effort 30 trains four pass
 python -m chess_lab.training.train --model linear_pst_terms --effort 30
 ```
 
-The shipped `linear_pst_terms` is trained on quiet positions only, at effort 10 ([Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms)):
+The shipped `linear_pst_terms` is trained on quiet positions only, at effort 10; the filter is not the default of `Representation` (`"all"`, `src/chess_lab/models/representation.py`), so the command passes it ([Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms)):
 
 ```bash
 python -m chess_lab.training.train --model linear_pst_terms --effort 10 --representation '{"filter":"quiet"}'
@@ -89,7 +89,7 @@ python -m chess_lab.training.train --model linear_pst_terms --effort 15
 The split check and the opening book are run by hand:
 
 ```bash
-python src/chess_lab/scripts/data/check_split_leakage.py --models linear_material,linear_pst,linear_king_bucket,linear_pst_terms,net4_pst
+python src/chess_lab/scripts/data/check_split_leakage.py --models linear_pst_terms
 python src/chess_lab/scripts/data/build_opening_book.py --out data/opening_book.json
 ```
 

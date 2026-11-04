@@ -36,10 +36,6 @@ value counts. The other late quiet moves cost a 3- or 4-ply search instead of a 
 
 ## Measured effect
 
-A first test (100 games at 4 s + 0.05 s, 2026-10-25) already pointed this way: with `lmr` the search was half a
-ply deeper and scored 49.0 % (`scripts/bench/compare_engine_versions.py`, removed in `6162db8`; in the git
-history). The SPRT settled it:
-
 **SPRT at a fixed 20,000 nodes per move** (2026-11-01, `data/matches/lmr_nodes/match.log`). The default with
 `lmr` (A) against the default without it (B), with the same search effort for both, so the clock plays no part
 ([How a change is measured](../MEASUREMENT.md)):

@@ -8,7 +8,7 @@
 
 The project is a chess engine with an alpha-beta search written in Rust, played through UCI, that asks an
 evaluation function how good a position is. The functions range from a hand-written heuristic to logistic
-models and a small neural network trained to imitate Stockfish on 125 million positions. The window and the
+models and small neural networks to be trained to imitate Stockfish on 125 million positions. The window and the
 laboratory that trains and measures the models are in Python.
 
 ## To play

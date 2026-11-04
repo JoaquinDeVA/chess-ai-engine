@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know the technique that gained most in games, and when it is not tried.
 >
-> **Next:** [Late move reductions](lmr.md)
+> **Next:** [Quiescence with the table](qs-tt.md)
 
 ## Problem
 

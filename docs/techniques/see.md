@@ -18,7 +18,7 @@ Play out the exchange on the target square without searching: each side recaptur
 
 `see_ge(position, move, threshold)` answers whether the exchange started by the move gives at least `threshold`. It swaps attackers on the square, cheapest first (values P 1, N 3, B 3, R 5, Q 9, K 100), including the attackers uncovered behind a piece that has captured (a rook battery), and lets either side stop. With `see` on:
 
-- The quiescence search skips a capture with `see_ge(…, 0)` false, except when the side is in check and `qs_evasions` is on (without it the check gets no special treatment and SEE prunes there too). The test ignores pins.
+- The quiescence search skips a capture with `see_ge(…, 0)` false. The test ignores pins.
 - The main search orders captures that fail the test after the quiet moves.
 
 ## Implementation

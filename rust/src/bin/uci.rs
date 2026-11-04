@@ -15,7 +15,7 @@ use _core::eval::logistic_model::LinearModel;
 use _core::eval::sparse_features::{FeatureSet, Perspective};
 use _core::eval::Eval;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
-use _core::search::{self, Control, Memory, Options, Techniques, TimeRules, DEFAULT_TECHNIQUES};
+use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
 
 /// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
@@ -29,7 +29,6 @@ struct Settings {
     threads: usize,
     hash_mb: usize,
     techniques: Techniques,
-    time_rules: TimeRules,
 }
 
 /// The position as the GUI sent it: the root FEN and the moves played from it.
@@ -52,7 +51,6 @@ struct Job {
     position: Position,
     limits: Limits,
     techniques: Techniques,
-    time_rules: TimeRules,
     stop: Arc<AtomicBool>,
 }
 
@@ -140,7 +138,6 @@ fn run_search(memory: &mut Memory, eval: &Eval, job: Job) -> Result<String, Stri
     let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
     let options = Options {
         techniques: job.techniques,
-        time_rules: job.time_rules,
         node_limit: job.limits.nodes,
         ..Options::default()
     };
@@ -208,14 +205,6 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
         "Model" => {}
         "Techniques" => {
             settings.techniques = Techniques::from_names(
-                &value
-                    .split(',')
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>(),
-            )?
-        }
-        "TimeRules" => {
-            settings.time_rules = TimeRules::from_names(
                 &value
                     .split(',')
                     .filter(|s| !s.is_empty())
@@ -322,7 +311,6 @@ fn main() {
         threads: 1,
         hash_mb: DEFAULT_HASH_MB,
         techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques"),
-        time_rules: TimeRules::default(),
     };
     let mut memory = Some(new_memory(&settings));
     let mut position = Position {
@@ -347,7 +335,6 @@ fn main() {
                     "option name Techniques type string default {}",
                     DEFAULT_TECHNIQUES.join(",")
                 );
-                println!("option name TimeRules type string default");
                 println!("uciok");
             }
             "isready" => println!("readyok"),
@@ -380,7 +367,6 @@ fn main() {
                     position: position.clone(),
                     limits: go_limits(args, white),
                     techniques: settings.techniques,
-                    time_rules: settings.time_rules,
                     stop: Arc::new(AtomicBool::new(false)),
                 };
                 let stop = job.stop.clone();

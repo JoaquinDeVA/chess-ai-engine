@@ -9,7 +9,7 @@
 ## Why games
 
 Nodes and time per move show what a change costs, not whether the engine plays better. A change can search fewer
-nodes, reach more depth and still lose: [late move reductions](techniques/lmr.md) searched half a ply deeper and
+nodes, reach more depth and still lose: late move reductions (removed, [catalogue](techniques/README.md#how-the-switches-were-judged)) searched half a ply deeper and
 scored 49 % against the engine without them. So a change is kept on the evidence of games against the current
 engine, and the node and depth counts only explain the result.
 
@@ -60,7 +60,7 @@ under H0. With error rates alpha = beta = 0.05 the bounds are `ln(0.05 / 0.95) =
 regresses), above +2.94 H1 is accepted (it does not). A cap on rounds stops a match that crosses neither, which
 means the difference is smaller than the test can see in that many games.
 
-**Worked example**: the test of [late move reductions](techniques/lmr.md) at 20,000 nodes per move, `[−5, 0]`
+**Worked example**: the test of late move reductions (removed, [catalogue](techniques/README.md#how-the-switches-were-judged)) at 20,000 nodes per move, `[−5, 0]`
 (`data/matches/lmr_nodes/match.log`). A scored a little under 49 % from the start, and the LLR fell steadily:
 
 | games | 200 | 2,200 | 4,200 | 6,200 | 8,200 | 10,200 | 10,244 |
@@ -107,7 +107,7 @@ A test needs about 12,000 games to see ±5 Elo (above), so the cost of a test is
 | Reference | `tc=600+5` | the final engine against other engines, never one test per technique | not run yet (a game lasts tens of minutes: 12,000 games would take hundreds of hours even eight at a time, not measured) |
 
 **Fixed nodes favour a change that saves nodes.** With the same node budget such a change searches deeper, so the
-test is the best case for it. [Late move reductions](techniques/lmr.md) lost anyway (48.76 % at 20,000 nodes,
+test is the best case for it. Late move reductions lost anyway (48.76 % at 20,000 nodes,
 `data/matches/lmr_nodes/match.log`), and a change that loses at equal nodes does not win at equal time unless it
 also makes each node cheaper. A win at fixed nodes proves nothing about time: it has to be confirmed at a time
 control. Fixed nodes are therefore the first filter for a change that should not lose, never the last.
@@ -120,13 +120,13 @@ control. Fixed nodes are therefore the first filter for a change that should not
    silently becomes an A/A:
 
    ```bash
-   printf 'setoption name Techniques value incremental,tt_move,lmr\nquit\n' | rust/target/release/uci   # must print nothing
+   printf 'setoption name Techniques value incremental,tt_move,qs_tt\nquit\n' | rust/target/release/uci   # must print nothing
    ```
 
 3. Play an SPRT with the change in A only, for example:
 
    ```bash
-   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,lmr \
+   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,qs_tt \
        -engine cmd=rust/target/release/uci name=B option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move \
        -each proto=uci nodes=20000 option.Hash=16 -openings file=data/openings/openings.epd format=epd order=random \
        -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 6000 -games 2 -concurrency 8 -srand 21

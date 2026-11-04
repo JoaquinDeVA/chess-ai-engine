@@ -47,24 +47,13 @@ past 59.7 s, it would have been cut and thrown away, and the move of depth 5 pla
 > [!NOTE]
 > The UCI binary ignores the increment (`winc`/`binc`): the budget comes from the time left alone.
 
-### Rules on top of the budget (`TimeRules`)
-
-The UCI option `TimeRules` (a list of names, empty by default) adds four rules to the loop above:
-
-- `single`: a position with one legal move is played after the first iteration, also under `go depth N` and `go infinite`.
-- `half`: no iteration starts once half of the soft budget is spent.
-- `stab`: the budget is multiplied by `1.20 − 0.04 n` after `n` consecutive iterations with the same best move (`n` up to 10).
-- `nodes`: the budget is multiplied by `max(0.5, 2 (1 − f) + 0.4)`, where `f` is the share of the nodes of the last iteration that the best root move took.
-
-The constants are those of Ethereal's time management, taken as a starting point and not verified against its source.
-
 ## Implementation
 
 `iterative_deepening` in `rust/src/search/deepening.rs` (loop, `OVERSHOOT_FACTOR = 1.15`, discard of
 truncated iterations). The estimators are in `rust/src/search/iteration_time.rs`; `geometric_growth` is the
 default; `fixed_factor` and `never_stop` remain for the tests. The other rules in the table below were
 removed after the comparison. The budget and the hard limit are `clock_budget` in `rust/src/bin/uci.rs`;
-`go movetime N` uses `N` as both. `TimeRules` is `time_rules` in `Options` (`TimeRules::scale` and the checks in `deepen`, `rust/src/search/deepening.rs`; the share `f` is `SearchResult::best_fraction`). Minimum depth: `DEFAULT_MIN_DEPTH = 1`; technical cap `MAX_DEPTH = 30`
+`go movetime N` uses `N` as both. Minimum depth: `DEFAULT_MIN_DEPTH = 1`; technical cap `MAX_DEPTH = 30`
 (`rust/src/search/options.rs`). The elapsed time runs from the start of the move, not of each iteration.
 
 ## Measured effect
@@ -77,4 +66,4 @@ removed after the comparison. The budget and the hard limit are `clock_budget` i
 
 Adopted; part of the reference search since the first commit (2026-10-16). `geometric_growth` default since
 2026-10-21 (`d3e848c`). Minimum depth 3 from 2026-10-21 (`0cdf404`), 1 since 2026-10-31, with no default depth
-cap: only the clock decides. A rule that spent the time left over the moves to go plus 75 % of the increment (2026-11-02, `542e4e0`) lost −64 ± 24 Elo in 720 games at 60 s + 1 s against the rule above (SPRT [0, 5] stopped by hand without verdict, `data/matches/reloj_nuevo/match.log`) and was reverted on 2026-11-03. `TimeRules` (2026-11-03): implemented, off. Screening of each rule alone against the same binary, 300 games at 10 s + 0.1 s (`data/matches/{half,stab,nodes}_vs_base/match.log`, `~/worker/cribar.sh`): `half` −10.4 ± 30.6 Elo (48.50 %), `stab` −25.5 ± 33.6 (46.33 %), `nodes` −80.1 ± 37.2 (38.67 %); none passed, so none went to an SPRT. `single` changes no game and has only a unit test (`a_single_legal_move_is_played_after_the_first_iteration`); the other tests are `half_the_budget_stops_the_next_iteration` and `the_stability_and_node_factors_scale_the_budget`.
+cap: only the clock decides. A rule that spent the time left over the moves to go plus 75 % of the increment (2026-11-02, `542e4e0`) lost −64 ± 24 Elo in 720 games at 60 s + 1 s against the rule above (SPRT [0, 5] stopped by hand without verdict, `data/matches/reloj_nuevo/match.log`) and was reverted on 2026-11-03. Four clock rules (`TimeRules`, 2026-11-03) were removed on 2026-11-04: in a 300-game screening at 10 s + 0.1 s each lost to the plain clock (`half` −10.4 ± 30.6 Elo, `stab` −25.5 ± 33.6, `nodes` −80.1 ± 37.2; `data/matches/{half,stab,nodes}_vs_base/match.log`); `single` changed no game.

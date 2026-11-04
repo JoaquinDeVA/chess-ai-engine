@@ -11,11 +11,6 @@ use super::tt::Flag;
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
 
-/// Late quiet moves are reduced from this move on (counting from 0) and at least this deep.
-const LMR_FROM_MOVE: usize = 5;
-const LMR_FROM_DEPTH: i32 = 4;
-/// From this move on the reduction is two plies.
-const LMR_DEEPER_FROM_MOVE: usize = 15;
 /// The null move is tried from this depth on.
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
 /// Width of the window of the scouts of the principal variation search.
@@ -33,8 +28,6 @@ struct Search<'a> {
     prunings: u64,
     max_ply: i32,
     truncated: bool,
-    /// Nodes the best move of the root has taken so far.
-    root_best_nodes: u64,
     /// Evaluation that follows the moves, when the technique is on and the evaluator supports it.
     incremental: Option<Box<dyn EvalState + 'a>>,
 }
@@ -81,13 +74,12 @@ impl Search<'_> {
         (board.by_color(color) & !(board.pawns() | board.kings())).any()
     }
 
-    /// Value of the child just played, searched as the techniques say: late quiet moves with less
-    /// depth first, the moves after the first with a window of no width, and again with the whole
-    /// window and depth when the cheaper search says the move is better than the best so far.
+    /// Value of the child just played, searched as the techniques say: the moves after the first
+    /// with a window of no width, and again with the whole window when the cheaper search says the
+    /// move is better than the best so far.
     fn child_value(
         &mut self,
         index: usize,
-        late_quiet: bool,
         (alpha, beta): (f64, f64),
         depth_remaining: i32,
         ply: i32,
@@ -99,22 +91,6 @@ impl Search<'_> {
             (beta - SCOUT_EPSILON, beta)
         };
         let narrow = beta - alpha > SCOUT_EPSILON;
-        if late_quiet && narrow {
-            let reduction = if index >= LMR_DEEPER_FROM_MOVE && depth_remaining >= 5 {
-                2
-            } else {
-                1
-            };
-            let (value, _) = self.node(low, high, depth_remaining - 1 - reduction, ply + 1, true);
-            let better = if maximizing {
-                value > alpha
-            } else {
-                value < beta
-            };
-            if !better || self.truncated {
-                return value;
-            }
-        }
         if self.options.techniques.pvs && index > 0 && depth_remaining >= 2 && narrow {
             let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
             if scout > alpha && scout < beta && !self.truncated {
@@ -268,43 +244,19 @@ impl Search<'_> {
         };
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
-            let nodes_before = self.nodes;
             self.play(action);
-            // LMR only reduces moves unlikely to matter: not captures, promotions, killers or
-            // moves in or giving check, whose value can change a lot with depth.
-            let late_quiet = self.options.techniques.lmr
-                && index >= LMR_FROM_MOVE
-                && depth_remaining >= LMR_FROM_DEPTH
-                && !in_check
-                && !action.is_capture()
-                && !action.is_promotion()
-                && !killers.contains(&move_id(&action))
-                && !self.state.pos().is_check();
-            let child = self.child_value(
-                index,
-                late_quiet,
-                (alpha, beta),
-                depth_remaining,
-                ply,
-                maximizing,
-            );
+            let child = self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing);
             self.unplay();
             if maximizing {
                 if child > best_value {
                     best_value = child;
                     best_move = Some(move_id(&action));
                     alpha = alpha.max(best_value);
-                    if ply == 0 {
-                        self.root_best_nodes = self.nodes - nodes_before;
-                    }
                 }
             } else if child < best_value {
                 best_value = child;
                 best_move = Some(move_id(&action));
                 beta = beta.min(best_value);
-                if ply == 0 {
-                    self.root_best_nodes = self.nodes - nodes_before;
-                }
             }
             // Cutoff: quiet moves that cut are remembered (killers, history) to be tried earlier
             // in sibling nodes; captures are already ordered first.
@@ -332,8 +284,7 @@ impl Search<'_> {
         (best_value, best_move)
     }
 
-    /// Value of a horizon node searching only captures and promotions (stand pat, no table); with
-    /// `qs_evasions`, in check it searches every move and does not stand pat.
+    /// Value of a horizon node searching only captures and promotions (stand pat, no table).
     fn quiescence(
         &mut self,
         mut alpha: f64,
@@ -347,27 +298,17 @@ impl Search<'_> {
             return best_value;
         }
         let maximizing = self.state.turn() == self.root_player;
-        let evading = self.options.techniques.qs_evasions && self.state.pos().is_check();
-        if evading {
-            // In check the side must move: standing pat would hide a mate or a lost piece.
-            best_value = if maximizing {
-                f64::NEG_INFINITY
-            } else {
-                f64::INFINITY
-            };
+        if maximizing {
+            alpha = alpha.max(best_value);
         } else {
-            if maximizing {
-                alpha = alpha.max(best_value);
-            } else {
-                beta = beta.min(best_value);
-            }
-            if alpha >= beta {
-                self.prunings += 1;
-                return best_value;
-            }
+            beta = beta.min(best_value);
         }
-        let see = self.options.techniques.see && !evading;
-        for action in moves.into_iter().filter(|m| evading || is_noisy(m)) {
+        if alpha >= beta {
+            self.prunings += 1;
+            return best_value;
+        }
+        let see = self.options.techniques.see;
+        for action in moves.into_iter().filter(is_noisy) {
             if see && !see_ge(self.state.pos(), &action, 0) {
                 continue;
             }
@@ -408,8 +349,6 @@ pub struct SearchResult {
     pub max_ply: i32,
     /// Whether the clock or the stop flag cut the search.
     pub truncated: bool,
-    /// Share of the nodes that went to the best move of the root.
-    pub best_fraction: f64,
 }
 
 /// One alpha-beta search of exactly `max_depth` plies.
@@ -465,7 +404,6 @@ pub fn alpha_beta_window(
         prunings: 0,
         max_ply: 0,
         truncated: false,
-        root_best_nodes: 0,
         incremental,
     };
     let (value, best) = search.node(window.0, window.1, max_depth, 0, true);
@@ -477,6 +415,5 @@ pub fn alpha_beta_window(
         prunings: search.prunings,
         max_ply: search.max_ply,
         truncated: search.truncated,
-        best_fraction: search.root_best_nodes as f64 / search.nodes.max(1) as f64,
     }
 }

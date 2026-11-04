@@ -28,12 +28,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Principal variation search (`pvs`) | on; nodes to 487,244 | +104 with the two above and `aspiration` (same match series) | [pvs](pvs.md) |
 | Aspiration windows (`aspiration`) | on; nodes to 440,213 | +104 with `pvs` (same) | [aspiration](aspiration.md) |
 | Null move (`null_move`) | on; nodes to 446,129 | +205 with the five above (76.5 %, 100 games) | [null-move](null-move.md) |
-| Late move reductions (`lmr`) | implemented, off: loses at fixed nodes | −8.6 ± 6.1 (SPRT) | [lmr](lmr.md) |
-| Quiescence evasions (`qs_evasions`) | implemented, off: loses at fixed nodes | −21.3 ± 10.6 (SPRT) | [qs-evasions](qs-evasions.md) |
 | Quiescence with the table (`qs_tt`) | implemented, off: no gain at fixed nodes | +0.7 ± 3.9 (SPRT, no verdict) | [qs-tt](qs-tt.md) |
 | Static exchange evaluation (`see`) | implemented, off: promising, no verdict yet | +47.8 ± 34.3 (screening) | [see](see.md) |
 | History malus | idea; not measured | not measured | - |
-| Time rules (`TimeRules`: `single`, `half`, `stab`, `nodes`) | implemented, off; `single` not measured | `half` −10.4, `stab` −25.5, `nodes` −80.1 (screening) | [iterative-deepening](iterative-deepening.md) |
 | Futility pruning | idea; not measured | not measured | - |
 | Razoring | idea; not measured | not measured | - |
 | Check extensions | idea; not measured | not measured | - |
@@ -42,9 +39,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 ## How the switches were judged
 
 The classic techniques (the rows above `incremental` in the table) and the [Rust core](rust-core.md) form the
-*reference* search; the nine switches below them are off in it. Each switch is a field of `Techniques`
+*reference* search; the two switches below them are off in it. Each switch is a field of `Techniques`
 (`rust/src/search/options.rs`) and a name in the comma-separated UCI option `Techniques` of the binary (an empty
-value turns them all off). The binary and the window (Settings → Advanced) use all of them but `lmr`, `qs_evasions` and `qs_tt`: `DEFAULT_TECHNIQUES` in
+value turns them all off). The binary and the window (Settings → Advanced) use the six that are on in the table (all but `qs_tt` and `see`): `DEFAULT_TECHNIQUES` in
 `rust/src/search/options.rs`, which the window reads as `_core.DEFAULT_TECHNIQUES`.
 
 **The default set was adopted before the SPRT instrument existed.** These are standard techniques of alpha-beta
@@ -61,7 +58,16 @@ colours swapped, `linear_pst_terms`; `scripts/bench/compare_engine_versions.py -
 
 The steps show that the set gains; they do not separate techniques (100 games give intervals of about ±8 points)
 and none has its own SPRT. A technique added from now on, or a change to one of these, is judged by an SPRT
-against the current default, as [`lmr`](lmr.md) was.
+against the current default, as late move reductions were.
+
+**Removed after losing.** Three search changes were implemented, measured and deleted from the code and the docs
+(the code is in the git history before the commit that removed them):
+
+| change | measurement | command or file |
+|---|---|---|
+| Late move reductions (`lmr`) | −8.6 ± 6.1 Elo, SPRT [−5, 0] at 20,000 nodes, 10,244 games | `data/matches/lmr_nodes/match.log` |
+| Quiescence evasions (`qs_evasions`) | −21.3 ± 10.6 Elo, SPRT [−5, 0] at 20,000 nodes, 3,428 games | `data/matches/qs_evasions/match.log` |
+| Clock rules (`TimeRules`: `half`, `stab`, `nodes`; `single` changed no game) | −10.4 ± 30.6, −25.5 ± 33.6, −80.1 ± 37.2 Elo; 300 games at 10 s + 0.1 s each, screening | `data/matches/{half,stab,nodes}_vs_base/match.log` |
 
 ## How to add a technique
 

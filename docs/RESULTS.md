@@ -16,7 +16,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 - **The engine that plays is the Rust UCI binary** with six search techniques on by default (incremental
   accumulator, table move, history, PVS, aspiration windows, null move). Together they scored 76.5 % against the
   plain search in 100 games ("Search techniques in games" below); each one's own measurement is in the
-  [catalogue](techniques/README.md). Late move reductions are off: they lose 8.6 Elo at a fixed node count (next section).
+  [catalogue](techniques/README.md).
 - **The model that plays is the Piece-square-and-terms logistic model (`linear_pst_terms`)**, trained on quiet
   positions only (effort 10): it beat the same model trained on every
   position by +284 ± 43 Elo in 362 games at 60 s + 1 s (`quiet_vs_actual` below).
@@ -28,7 +28,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 |---|---|---|---|
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | The default techniques make the engine stronger | 100 games at 4 s + 0.05 s against the plain search, 76.5 % | Rust core through Python | Measured, one match; per technique only node counts and short matches ([catalogue](techniques/README.md)) |
-| Late move reductions make the engine weaker | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
+| Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |
 | Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo | Rust | Measured; H1 accepted |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |

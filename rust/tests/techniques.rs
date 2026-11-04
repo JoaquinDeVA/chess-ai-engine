@@ -250,7 +250,6 @@ fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(f64, O
 fn the_selective_techniques_keep_the_forced_results_and_most_moves() {
     let selective = Techniques {
         null_move: true,
-        lmr: true,
         ..Techniques::default()
     };
     let reference = plain_values(Techniques::default(), 5, 120);

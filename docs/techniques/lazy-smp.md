@@ -72,10 +72,17 @@ session). Seconds to depth 8, mean per position:
 | 6 | 0.871 | 0.627 |
 
 The earlier measurement on an idle machine (six threads no better than four: 1.211 s against 1.180 s) is in the git
-history of this page. Six threads are still no faster than four to depth 8 on this loaded machine; the effect in games
-(6 threads against 4) is not measured.
+history of this page. Six threads are still no faster than four to depth 8 on this loaded machine.
+
+**In games** (2026-11-04, `data/matches/smp_6v4/match.log`, desktop worker with four physical and eight logical cores, `fastchess`, one game at a time, 10 s + 0.1 s, `Hash` 256, SPRT [0, 10]): six threads (A) against four threads (B), `linear_pst_terms` for both:
+
+| test | games | score | Elo (95 %) | pentanomial | LLR | verdict |
+|---|---|---|---|---|---|---|
+| 6 threads vs 4 threads | 280 scored (317 played) | 50.71 % | +5.0 ± 37.5 | 22, 24, 48, 20, 26 | 0.01 of ±2.94 | stopped by hand, no verdict |
+
+Six threads do not beat four: the result is compatible with zero and the speed figures agree. Why was not isolated; the worker has only four physical cores, and whether the vote helps or hurts at six threads was not tested (it has no switch).
 
 ## Status
 
-Adopted as an option, off by default (one thread keeps matches reproducible and the clock fair); since 2026-10-25.
+Adopted as an option, off by default (one thread keeps matches reproducible and the clock fair); since 2026-10-25. Four threads are the recommended count to play with (the Lichess bot uses them): six gave no gain over four in 280 games.
 Helpers with their own deepening, the shared history, the aligned slots and the vote: 2026-11-04.

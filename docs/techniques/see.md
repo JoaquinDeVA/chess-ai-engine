@@ -39,7 +39,7 @@ fastchess -engine cmd=./uci_base name=A option.Techniques=incremental,tt_move,hi
 |---|---|---|---|---|
 | default + `see` vs default, 10 s + 0.1 s | 300 | 56.83 % | +47.8 ± 34.3 | 17, 12, 65, 25, 31 |
 
-A screening only decides whether a longer test is worth it; the interval is wide. An SPRT [0, 5] at 60 s + 1 s, stopped by hand after 160 games, gave +41.5 ± 46.1 Elo and an LLR of 0.30 of ±2.94 (no verdict): [0, 5] separates two close values and needs about a thousand games to settle an effect this size. An SPRT [0, 10] (same conditions), stopped by hand after 303 games, gave +50.9 ± 38.6 Elo (as of 282 games) and an LLR of 1.13 of ±2.94 (no verdict). 
+A screening only decides whether a longer test is worth it; the interval is wide. An SPRT [0, 5] at 60 s + 1 s, stopped by hand after 160 games, gave +41.5 ± 46.1 Elo and an LLR of 0.30 of ±2.94 (no verdict): [0, 5] separates two close values and needs about a thousand games to settle an effect this size. An SPRT [0, 10] at 60 s + 1 s (`data/matches/see_sprt10/match.log`, `fastchess`, 7 games at a time, `Hash` 16), stopped by hand after 399 games played (356 scored), gave +67.2 ± 34.5 Elo (59.55 %, pentanomial 21, 13, 74, 17, 53) and an LLR of 1.91 of ±2.94 (no verdict). It was paused once and resumed with a faster binary; both engines always ran the same binary.
 
 **SPRT at a fixed 20,000 nodes per move** (2026-11-04, `data/matches/see_nodes/match.log`, laptop, 4 games at a time, `fastchess` 1 thread, `Hash` 16). The default with `see` (A) against the default (B), `linear_pst_terms` for both, so the clock plays no part:
 
@@ -58,4 +58,4 @@ Fixed nodes favour a change that saves nodes ([How a change is measured](../MEAS
 
 ## Status
 
-Adopted, on by default since 2026-11-04. SPRT [0, 5] at 20,000 nodes per move accepted H1 (+56.4 ± 17.5 Elo, 1,188 games); the screening at 10 s + 0.1 s (+47.8 ± 34.3) and the two SPRTs at 60 s + 1 s (+41.5 ± 46.1, +50.9 ± 38.6, no verdict) have the same sign. The effect at a time control is not confirmed by a verdict.
+Adopted, on by default since 2026-11-04. SPRT [0, 5] at 20,000 nodes per move accepted H1 (+56.4 ± 17.5 Elo, 1,188 games); the screening at 10 s + 0.1 s (+47.8 ± 34.3) and the two SPRTs at 60 s + 1 s (+41.5 ± 46.1 and +67.2 ± 34.5, no verdict) have the same sign. The effect at a time control is not confirmed by a verdict, but all four measurements are positive and the decision to keep it stands.

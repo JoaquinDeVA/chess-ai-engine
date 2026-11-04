@@ -113,7 +113,7 @@ sequenceDiagram
     B-->>W: legal move
 ```
 
-Under a clock the binary spends a share of the time left and the increment; with `depth N` it searches
+Under a clock the binary spends a share of the time left (the increment is ignored); with `depth N` it searches
 to that depth; with `movetime` it spends that time. Without a clock or a fixed time the window sends
 `movetime 3000`. The search is iterative deepening with a hard limit inside the tree: an interrupted
 iteration is discarded unless it is the first one, so there is always a move. The algorithms themselves

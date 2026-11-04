@@ -51,7 +51,7 @@ past 59.7 s, it would have been cut and thrown away, and the move of depth 5 pla
 
 The UCI option `TimeRules` (a list of names, empty by default) adds four rules to the loop above:
 
-- `single`: a position with one legal move is played after the first iteration.
+- `single`: a position with one legal move is played after the first iteration, also under `go depth N` and `go infinite`.
 - `half`: no iteration starts once half of the soft budget is spent.
 - `stab`: the budget is multiplied by `1.20 − 0.04 n` after `n` consecutive iterations with the same best move (`n` up to 10).
 - `nodes`: the budget is multiplied by `max(0.5, 2 (1 − f) + 0.4)`, where `f` is the share of the nodes of the last iteration that the best root move took.

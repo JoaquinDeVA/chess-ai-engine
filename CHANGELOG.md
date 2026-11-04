@@ -9,7 +9,6 @@ All notable changes. The newest are first.
 
 ### Added
 - A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
-- Two models, not shipped: [`linear_pst_passed`](docs/MODELS.md) (passed pawns by rank and king distance) and [`linear_pst_king`](docs/MODELS.md) (plus king attack); Spearman 0.641 and 0.643 against 0.638; in a 300-game screening at 10 s + 0.1 s, +29.0 ± 35.2 and 0.0 ± 35.3 Elo against the shipped model.
 - Static exchange evaluation, [`see`](docs/techniques/see.md), off by default: +47.8 ± 34.3 Elo in a 300-game screening at 10 s + 0.1 s, +41.5 ± 46.1 in 160 games at 60 s + 1 s (no verdict); SPRT [0, 10] stopped by hand at 303 games, +50.9 ± 38.6, LLR 1.13 (no verdict).
 
 ### Changed

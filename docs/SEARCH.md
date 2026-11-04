@@ -79,7 +79,7 @@ flowchart TD
     C -- no --> NM{"null move cuts?"}
     NM -- yes --> R5["return beta"]
     NM -- no --> O["order moves: table move, killers,<br/>captures by MVV-LVA, quiet moves by history"]
-    O --> L["for each move: play it, search the child<br/>(PVS, LMR), take it back"]
+    O --> L["for each move: play it, search the child<br/>(PVS), take it back"]
     L --> P{"alpha ≥ beta?"}
     P -- yes --> K["remember a quiet move as killer and in the history; stop"]
     P -- no --> L
@@ -87,7 +87,7 @@ flowchart TD
     L --> S
 ```
 
-The switched techniques (null move, table move, history, PVS, LMR) only act when on; see the
+The switched techniques (null move, table move, history, PVS) only act when on; see the
 [catalogue](techniques/README.md) for which are on by default and what each one gained.
 
 See also [RESULTS.md](RESULTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md).

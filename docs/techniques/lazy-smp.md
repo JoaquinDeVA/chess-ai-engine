@@ -31,14 +31,22 @@ wait for each other and, blind to each other's results, prune less.
   gives its move a weight of its depth times (its value minus the lowest value among the voters plus 0.01). The move
   with most weight is played and the main thread's move wins a tie. With one thread there is no vote.
 
-**Worked example.** Four threads; the main thread is on depth 6. Helper 1 searches depth 6 with another root
-order, helper 2 depth 7 and helper 3 depth 8 (it skips 6 and 7). When helper 2 stores an exact value for a position
-at depth 5 from the root, the main thread, reaching that position with one ply left, finds an entry deep enough and
-returns without searching it.
+**Worked example.** Four threads; the main thread is on depth 6. Helper 1 skips odd depths, so it searches 6 and then 8; helper 3 skips depths 6 and 7 and searches 8. When helper 2 stores an exact value for a position at depth 5 from the root, the main thread, reaching that position with one ply left, finds an entry deep enough and returns without searching it.
+
+**Vote example.** The figure shows four threads that have finished depth 8 or more (the lowest value, 0.50, is helper 3's, so the margin is 0.50 − 0.01):
+
+| thread | move | depth | value | weight = depth × (value − 0.50 + 0.01) |
+|---|---|---|---|---|
+| main | e4 | 8 | 0.52 | 0.24 |
+| helper 1 | d4 | 8 | 0.55 | 0.48 |
+| helper 2 | d4 | 9 | 0.58 | 0.81 |
+| helper 3 | e4 | 8 | 0.50 | 0.08 |
+
+e4 gets 0.32 and d4 gets 1.29, so d4 is played although the main thread chose e4. A helper whose last finished iteration is shallower than the main thread's does not vote.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../img/threads-shared-table-dark.svg">
-  <img src="../img/threads-shared-table-light.svg" alt="Lazy SMP: a main thread and two helpers search the same root with different move orders and share one lock-free transposition table">
+  <img src="../img/threads-shared-table-light.svg" alt="Lazy SMP: the depths each thread searches, what the threads share and a vote among four threads">
 </picture>
 
 ## Implementation

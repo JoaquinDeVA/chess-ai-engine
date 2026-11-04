@@ -19,17 +19,22 @@ wait for each other and, blind to each other's results, prune less.
 
 ## How it works
 
-- The main thread runs [iterative deepening](iterative-deepening.md) as usual, with the clock, and its move is the
-  one played.
-- Each helper repeatedly searches one or two plies deeper than the main thread's current depth (helpers with an even
-  index one ply, odd two), so the table already holds what the main thread will need next.
-- The table is shared without locks; a slot written by two threads at once is detected and ignored.
+- The main thread runs [iterative deepening](iterative-deepening.md) as usual, with the clock.
+- Each helper runs its own iterative deepening, with aspiration windows, on its own copy of the position. It never
+  searches shallower than the main thread is, and it skips depths by a pattern that depends on its index (skip
+  size 1, 1, 2, 2, 2, 2 and phase 0, 1, 0, 1, 2, 3 for helpers 1 to 6), so the helpers do not all search the same depth.
+  It also rotates the moves of the root by its index.
+- The table and the history scores are shared without locks; a table slot written by two threads at once is detected
+  and ignored. Each thread keeps its own killer moves.
 - When the main thread finishes it raises a stop flag and the helpers abandon their search.
+- The move is chosen by a vote: every thread whose last finished iteration is at least as deep as the main thread's
+  gives its move a weight of its depth times (its value minus the lowest value among the voters plus 0.01). The move
+  with most weight is played and the main thread's move wins a tie. With one thread there is no vote.
 
-**Worked example.** Four threads; the main thread is on depth 6. Helpers 1 and 3 search depth 8, helper 2 depth 7.
-When helper 2 stores an exact value for a position at depth 5 from the root, the main thread, reaching that position
-with one ply left, finds an entry deep enough and returns without searching it. The four threads share the 1.18 s it
-takes to reach depth 8, against 1.93 s for one thread (table below).
+**Worked example.** Four threads; the main thread is on depth 6. Helper 1 searches depth 6 with another root
+order, helper 2 depth 7 and helper 3 depth 8 (it skips 6 and 7). When helper 2 stores an exact value for a position
+at depth 5 from the root, the main thread, reaching that position with one ply left, finds an entry deep enough and
+returns without searching it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../img/threads-shared-table-dark.svg">
@@ -38,29 +43,31 @@ takes to reach depth 8, against 1.93 s for one thread (table below).
 
 ## Implementation
 
-`iterative_deepening` and `helper` in `rust/src/search/deepening.rs`; `SharedTable` in `rust/src/search/shared_tt.rs`,
-three atomic words per slot checked by XOR. `Memory::with_threads` (`rust/src/search/memory.rs`) builds the shared
-table only with more than one thread. UCI options `Threads` and `Hash` (megabytes of the shared table; with one
-thread `Hash` has no effect); in the window, Settings → Advanced. With more than one thread the search is not
-deterministic.
+`iterative_deepening`, `helper` and `vote` in `rust/src/search/deepening.rs`; `SharedTable` in
+`rust/src/search/shared_tt.rs` (three atomic words per slot checked by XOR, in a 32-byte slot so that none straddles
+two cache lines); `History` in `rust/src/search/ordering.rs` (relaxed atomics, a clone is a handle to the same scores).
+`Memory::with_threads` (`rust/src/search/memory.rs`) builds the shared table only with more than one thread. UCI options
+`Threads` and `Hash` (megabytes of the shared table; with one thread `Hash` has no effect); in the window, Settings →
+Advanced. With more than one thread the search is not deterministic.
 
 ## Measured effect
 
-`scripts/bench/measure_search_speed.py --positions 60 --seconds 3 --depths 8 --players linear_pst_terms --threads 1,2,4,6 --workers 1 --techniques incremental,tt_move,history,pvs,aspiration,null_move`
-(removed in `6162db8`; in the git history), Rust core, 60 test positions, six-core machine otherwise idle; nodes per
-second count all threads:
+`python -m chess_lab.measure.search_speed --threads 1,2,4,6` (60 positions of `data/openings/openings.epd`, `go depth 8`,
+`Hash` 256, six-core laptop with a browser open, so the figures are noisy; both columns were measured in the same
+session). Seconds to depth 8, mean per position:
 
-| threads | nodes/s (3 s) | mean depth in 3 s | seconds to depth 8 |
-|---|---|---|---|
-| 1 | 483,810 | 9.08 | 1.930 |
-| 2 | 925,702 | 9.28 | 1.522 |
-| 4 | 1,605,067 | 9.50 | 1.180 |
-| 6 | 2,099,554 | 9.43 | 1.211 |
+| threads | before (helpers at fixed depth, one vote) | now |
+|---|---|---|
+| 1 | 1.174 | 1.109 |
+| 2 | 0.956 | 0.800 |
+| 4 | 0.788 | 0.638 |
+| 6 | 0.871 | 0.627 |
 
-Four threads reach depth 8 1.6 times faster and gain 0.4 plies in 3 s; six are no better than four on six cores.
-Without the techniques, six threads gave only 15 % less time to depth 6. A first version with helpers at depths 1
-to 3 was slower than helpers ahead of the main thread. Its effect in games is not measured.
+The earlier measurement on an idle machine (six threads no better than four: 1.211 s against 1.180 s) is in the git
+history of this page. Six threads are still no faster than four to depth 8 on this loaded machine; the effect in games
+(6 threads against 4) is not measured.
 
 ## Status
 
 Adopted as an option, off by default (one thread keeps matches reproducible and the clock fair); since 2026-10-25.
+Helpers with their own deepening, the shared history, the aligned slots and the vote: 2026-11-04.

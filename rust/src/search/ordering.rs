@@ -1,5 +1,8 @@
 //! Move ordering: table move, captures by MVV-LVA, killer moves and the history of cuts.
 
+use std::sync::atomic::{AtomicI32, Ordering::Relaxed};
+use std::sync::Arc;
+
 use shakmaty::{Chess, Color, Move, Position, Role, Square};
 
 use crate::board::move_id;
@@ -145,15 +148,18 @@ const MOVE_IDS: usize = 1 << 15;
 /// Value above which the history scores are halved.
 const HISTORY_LIMIT: i32 = 1 << 24;
 
-/// How often each quiet move (by mover and `move_id`) caused a cut-off, weighted by depth.
+/// How often each quiet move (by mover and `move_id`) caused a cut-off, weighted by depth. A clone
+/// is another handle to the same scores: the threads of a search share them, with relaxed atomics
+/// (a lost update only blurs a heuristic).
+#[derive(Clone)]
 pub struct History {
-    scores: Vec<i32>,
+    scores: Arc<[AtomicI32]>,
 }
 
 impl Default for History {
     fn default() -> History {
         History {
-            scores: vec![0; 2 * MOVE_IDS],
+            scores: (0..2 * MOVE_IDS).map(|_| AtomicI32::new(0)).collect(),
         }
     }
 }
@@ -163,30 +169,31 @@ impl History {
         usize::from(color == Color::Black) * MOVE_IDS + move_id(m) as usize
     }
 
-    pub fn clear(&mut self) {
-        self.scores.fill(0);
+    pub fn clear(&self) {
+        for score in self.scores.iter() {
+            score.store(0, Relaxed);
+        }
     }
 
     pub fn score(&self, color: Color, m: &Move) -> i32 {
-        self.scores[History::slot(color, m)]
+        self.scores[History::slot(color, m)].load(Relaxed)
     }
 
     /// A quiet move caused a cut-off with `depth` plies left.
-    pub fn reward(&mut self, color: Color, m: &Move, depth: i32) {
+    pub fn reward(&self, color: Color, m: &Move, depth: i32) {
         self.add(color, m, depth * depth);
     }
 
     /// A quiet move was tried with `depth` plies left and a later move caused the cut-off.
-    pub fn penalise(&mut self, color: Color, m: &Move, depth: i32) {
+    pub fn penalise(&self, color: Color, m: &Move, depth: i32) {
         self.add(color, m, -depth * depth);
     }
 
-    fn add(&mut self, color: Color, m: &Move, amount: i32) {
-        let slot = History::slot(color, m);
-        self.scores[slot] += amount;
-        if self.scores[slot].abs() > HISTORY_LIMIT {
-            for score in &mut self.scores {
-                *score /= 2;
+    fn add(&self, color: Color, m: &Move, amount: i32) {
+        let score = &self.scores[History::slot(color, m)];
+        if (score.fetch_add(amount, Relaxed) + amount).abs() > HISTORY_LIMIT {
+            for score in self.scores.iter() {
+                score.store(score.load(Relaxed) / 2, Relaxed);
             }
         }
     }
@@ -216,7 +223,7 @@ pub fn order(moves: Vec<Move>, killers: &[u32], history: Option<(&History, Color
     let others_start = ordered.len();
     ordered.extend(moves.iter().filter(|m| !m.is_capture() && !is_killer(m)));
     if let Some((history, color)) = history {
-        ordered[others_start..].sort_by_key(|m| std::cmp::Reverse(history.score(color, m)));
+        ordered[others_start..].sort_by_cached_key(|m| std::cmp::Reverse(history.score(color, m)));
     }
     ordered
 }
@@ -301,7 +308,7 @@ mod tests {
         let a = quiet(Square::B1, Square::C3);
         let b = quiet(Square::G1, Square::F3);
         let c = quiet(Square::A2, Square::A3);
-        let mut history = History::default();
+        let history = History::default();
         history.reward(Color::White, &c, 4);
         history.reward(Color::White, &b, 2);
         let ordered = order(

@@ -1,7 +1,7 @@
 //! Iterative deepening: aspiration windows, helper threads and the clock policy.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use shakmaty::Move;
 
@@ -71,44 +71,107 @@ fn iteration(
     }
 }
 
-/// The work of a helper thread: iterative deepening on its own copy of the position that only
-/// fills the shared table. It searches one or two plies deeper than the main thread is, rotates the moves
-/// of the root and stops when the flag is raised. Returns the nodes it visited.
+/// How many consecutive depths a helper skips and searches in turn, and where its pattern starts
+/// (the first six rows of Stockfish's tables), so that the helpers do not all search the same
+/// depths.
+const SKIP_SIZE: [usize; 6] = [1, 1, 2, 2, 2, 2];
+const SKIP_PHASE: [usize; 6] = [0, 1, 0, 1, 2, 3];
+
+/// The last finished iteration of a thread: depth, value and best move of the root.
+type Report = Mutex<Option<(usize, f64, Move)>>;
+
+/// The work of a helper thread: its own iterative deepening on its own copy of the position,
+/// sharing the table and the history. It never searches shallower than the main thread is, skips
+/// some depths by its index, rotates the moves of the root and stops when the flag is raised. It
+/// leaves the result of each finished iteration in `report` for the vote. Returns the nodes it
+/// visited.
+#[allow(clippy::too_many_arguments)]
 fn helper(
     index: usize,
     mut state: GameState,
     eval: &dyn Evaluator,
     table: Arc<SharedTable>,
+    history: History,
     options: &Options,
     max_depth: usize,
     control: &Control,
+    report: &Report,
 ) -> u64 {
     let mut memory = Memory {
         table: Tt::Shared(table),
         killers: Killers::default(),
-        history: History::default(),
+        history,
         threads: 1,
     };
-    let mut nodes = 0;
+    let (size, phase) = (
+        SKIP_SIZE[index % SKIP_SIZE.len()],
+        SKIP_PHASE[index % SKIP_PHASE.len()],
+    );
+    let (mut nodes, mut depth, mut value) = (0, 1, None);
     while !control.stop.is_some_and(|flag| flag.load(Relaxed)) {
-        // Stay ahead of the main thread: the table is useful with what it will need next.
-        let main_depth = control.progress.map_or(1, |p| p.load(Relaxed));
-        let depth = (main_depth + 1 + index % 2).min(max_depth).max(1);
-        let result = alpha_beta(
+        depth = depth.max(control.progress.map_or(1, |p| p.load(Relaxed)));
+        if depth > max_depth {
+            break;
+        }
+        if (depth + phase) / size % 2 == 1 {
+            depth += 1;
+            continue;
+        }
+        let result = iteration(
             &mut state,
             eval,
             &mut memory,
             options,
             depth as i32,
             control,
+            value,
         );
         nodes += result.nodes;
         if result.truncated {
             break;
         }
+        value = Some(result.value);
+        if let Some(best) = result.best {
+            *report.lock().unwrap() = Some((depth, result.value, best));
+        }
+        depth += 1;
     }
     nodes
 }
+
+/// The move the threads vote for. Each thread with a finished iteration at least as deep as the
+/// main thread's gives its move a weight of its depth times how far its value is above the lowest
+/// of the voters plus a small margin, so that deeper and better-valued threads count more; the
+/// move with most weight wins and the main thread's move wins a tie.
+fn vote(main: (usize, f64, Option<Move>), reports: &[Report]) -> Option<Move> {
+    let (main_depth, main_value, main_move) = main;
+    let mut voters: Vec<(usize, f64, Move)> = reports
+        .iter()
+        .filter_map(|report| *report.lock().unwrap())
+        .filter(|(depth, _, _)| *depth >= main_depth)
+        .collect();
+    let main_move = main_move?;
+    voters.insert(0, (main_depth, main_value, main_move));
+    let lowest = voters.iter().map(|v| v.1).fold(f64::INFINITY, f64::min);
+    let mut weights: Vec<(Move, f64)> = Vec::new();
+    for (depth, value, mv) in voters {
+        let weight = depth as f64 * (value - lowest + VOTE_MARGIN);
+        match weights.iter_mut().find(|(m, _)| *m == mv) {
+            Some((_, total)) => *total += weight,
+            None => weights.push((mv, weight)),
+        }
+    }
+    let mut best = 0;
+    for (index, (_, weight)) in weights.iter().enumerate() {
+        if *weight > weights[best].1 {
+            best = index;
+        }
+    }
+    Some(weights.swap_remove(best).0)
+}
+
+/// Margin of the vote, in expected score: keeps the thread with the lowest value from weighing zero.
+const VOTE_MARGIN: f64 = 0.01;
 
 /// Iterative deepening over [`alpha_beta`]: depth 1, 2, ... `max_depth`, returning the move of the
 /// deepest **completed** iteration.
@@ -135,7 +198,8 @@ pub fn iterative_deepening(
         _ => None,
     };
     let Some((table, extra)) = helpers else {
-        return deepen(state, eval, memory, options, max_depth, time_limit, control);
+        return deepen(state, eval, memory, options, max_depth, time_limit, control)
+            .map(|(best, stats, _)| (best, stats));
     };
     table.new_search();
     // Helpers only fill the shared table; the main thread alone decides the move, so the result
@@ -144,9 +208,12 @@ pub fn iterative_deepening(
     let helper_nodes = std::sync::atomic::AtomicU64::new(0);
     let progress = AtomicUsize::new(0);
     let copies: Vec<GameState> = (0..extra).map(|_| state.clone()).collect();
+    let reports: Vec<Report> = (0..extra).map(|_| Mutex::new(None)).collect();
+    let history = memory.history.clone();
     let result = std::thread::scope(|scope| {
         for (index, copy) in copies.into_iter().enumerate() {
             let (table, stop, nodes, progress) = (table.clone(), &stop, &helper_nodes, &progress);
+            let (history, report) = (history.clone(), &reports[index]);
             scope.spawn(move || {
                 let helper_control = Control {
                     start: control.start,
@@ -162,9 +229,11 @@ pub fn iterative_deepening(
                         copy,
                         eval,
                         table,
+                        history,
                         options,
                         max_depth,
                         &helper_control,
+                        report,
                     ),
                     Relaxed,
                 );
@@ -190,8 +259,12 @@ pub fn iterative_deepening(
         stop.store(true, Relaxed);
         result
     });
-    result.map(|(best, mut stats)| {
+    result.map(|(best, mut stats, value)| {
         stats.nodes_visited += helper_nodes.load(Relaxed);
+        let best = match value {
+            Some(value) => vote((stats.completed_depth, value, best), &reports),
+            None => best,
+        };
         (best, stats)
     })
 }
@@ -204,7 +277,7 @@ fn deepen(
     max_depth: usize,
     time_limit: f64,
     control: &Control,
-) -> Result<(Option<Move>, Stats), String> {
+) -> Result<(Option<Move>, Stats, Option<f64>), String> {
     let estimate = iteration_time::get(&options.estimator).ok_or_else(|| {
         format!(
             "unknown estimator {:?}; available: {:?}",
@@ -291,5 +364,46 @@ fn deepen(
         stop_reason,
         stop_predicted,
     };
-    Ok((best_move, stats))
+    Ok((best_move, stats, last_value))
+}
+
+#[cfg(test)]
+mod vote_tests {
+    use shakmaty::Position;
+
+    use super::*;
+    use crate::board::position_from_fen;
+
+    fn two_moves() -> (Move, Move) {
+        let start =
+            position_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+        let moves = start.legal_moves();
+        (moves[0], moves[1])
+    }
+
+    fn report(depth: usize, value: f64, best: Move) -> Report {
+        Mutex::new(Some((depth, value, best)))
+    }
+
+    #[test]
+    fn the_main_move_wins_when_nobody_else_is_deep_enough() {
+        let (a, b) = two_moves();
+        let reports = [report(5, 0.9, b), report(5, 0.9, b)];
+        assert_eq!(vote((6, 0.5, Some(a)), &reports), Some(a));
+    }
+
+    #[test]
+    fn deeper_threads_that_agree_outvote_the_main_move() {
+        let (a, b) = two_moves();
+        let reports = [report(7, 0.6, b), report(7, 0.6, b)];
+        assert_eq!(vote((6, 0.6, Some(a)), &reports), Some(b));
+    }
+
+    #[test]
+    fn a_thread_with_no_iteration_does_not_vote() {
+        let (a, _) = two_moves();
+        let reports = [Mutex::new(None)];
+        assert_eq!(vote((6, 0.6, Some(a)), &reports), Some(a));
+        assert_eq!(vote((0, 0.6, None), &reports), None);
+    }
 }

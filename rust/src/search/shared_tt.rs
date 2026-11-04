@@ -11,8 +11,8 @@ use std::sync::atomic::{AtomicU64, AtomicU8, Ordering::Relaxed};
 use super::tt::{Entry, Flag};
 use crate::board::Key;
 
-/// Bytes of one slot.
-const SLOT_BYTES: usize = 24;
+/// Bytes of one slot: three words and one of padding, so that a slot never straddles two cache lines.
+const SLOT_BYTES: usize = 32;
 const VALID: u64 = 1 << 63;
 
 fn hash(key: &Key) -> u64 {
@@ -29,9 +29,13 @@ fn flag_bits(flag: Flag) -> u64 {
     }
 }
 
+/// The three words of a slot, aligned to half a cache line.
+#[repr(align(32))]
+struct Slot([AtomicU64; 4]);
+
 /// Lock-free transposition table with one slot per index.
 pub struct SharedTable {
-    slots: Vec<[AtomicU64; 3]>,
+    slots: Vec<Slot>,
     age: AtomicU8,
 }
 
@@ -46,7 +50,7 @@ impl SharedTable {
         let count = count.max(1024);
         SharedTable {
             slots: (0..count)
-                .map(|_| [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)])
+                .map(|_| Slot([0; 4].map(AtomicU64::new)))
                 .collect(),
             age: AtomicU8::new(0),
         }
@@ -63,7 +67,7 @@ impl SharedTable {
 
     pub fn clear(&self) {
         for slot in &self.slots {
-            for word in slot {
+            for word in &slot.0 {
                 word.store(0, Relaxed);
             }
         }
@@ -73,7 +77,7 @@ impl SharedTable {
     pub fn len(&self) -> usize {
         self.slots
             .iter()
-            .filter(|s| s[2].load(Relaxed) & VALID != 0)
+            .filter(|s| s.0[2].load(Relaxed) & VALID != 0)
             .count()
     }
 
@@ -86,7 +90,7 @@ impl SharedTable {
     }
 
     fn read(&self, index: usize, hash: u64) -> Option<(Entry, u8)> {
-        let slot = &self.slots[index];
+        let slot = &self.slots[index].0;
         let (check, value, data) = (
             slot[0].load(Relaxed),
             slot[1].load(Relaxed),
@@ -147,7 +151,7 @@ impl SharedTable {
             | (flag_bits(flag) << 24)
             | ((age as u64) << 32);
         let value = value.to_bits();
-        let slot = &self.slots[index];
+        let slot = &self.slots[index].0;
         slot[1].store(value, Relaxed);
         slot[2].store(data, Relaxed);
         slot[0].store(hash ^ value ^ data, Relaxed);
@@ -155,7 +159,7 @@ impl SharedTable {
 
     /// The valid slot at `index` whatever its key: `(key hash, entry)` and its age.
     fn read_any(&self, index: usize) -> Option<((u64, Entry), u8)> {
-        let slot = &self.slots[index];
+        let slot = &self.slots[index].0;
         let (check, value, data) = (
             slot[0].load(Relaxed),
             slot[1].load(Relaxed),

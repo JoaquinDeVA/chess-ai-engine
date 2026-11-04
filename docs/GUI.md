@@ -55,7 +55,7 @@ quiescence depth of 4 plies, so neither is a setting.
 | Opening book | `opening_book` | none: read in Python before the engine | on |
 | Endgame tablebases (up to five pieces) | `tablebase` | none: read in Python before the engine | on |
 | Advanced: search techniques | `techniques` | `setoption name Techniques` | the seven default ones (all but `qs_tt`) |
-| Advanced: search threads | `threads` | `setoption name Threads` | up to 4 |
+| Advanced: search threads | `threads` | `setoption name Threads` | 1 by default; the window accepts up to 64 |
 
 With a clock and no fixed time, the window sends `wtime`, `btime`, `winc` and `binc`; the binary
 ignores the increment ([Iterative deepening with a clock](techniques/iterative-deepening.md)).

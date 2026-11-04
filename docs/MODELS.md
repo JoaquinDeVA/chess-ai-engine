@@ -10,7 +10,7 @@ An evaluation model answers one question: given a chess position, how likely is 
 
 ## The idea behind the linear models
 
-Four of the models are, underneath, the same machine: a logistic regression over sparse features. A position is turned into a short list of "active" features (for example "I have 2 more knights than my opponent", or "my rook stands on e1"), each with a value. The model keeps one weight per feature, adds up `weight * value` over the active ones, adds a single bias, and squeezes the total through a sigmoid to get a probability between 0 and 1. The slides of a university course on machine learning call exactly this "logistic regression", and `rust/src/eval/linear.rs` implements it as `sigmoid(w . x + b)`. Sparse input was chosen because depth per second matters more than
+Four of the models are, underneath, the same machine: a logistic regression over sparse features. A position is turned into a short list of "active" features (for example "I have 2 more knights than my opponent", or "my rook stands on e1"), each with a value. The model keeps one weight per feature, adds up `weight * value` over the active ones, adds a single bias, and squeezes the total through a sigmoid to get a probability between 0 and 1. The slides of a university course on machine learning call exactly this "logistic regression", and `rust/src/eval/logistic_model.rs` implements it as `sigmoid(w . x + b)`. Sparse input was chosen because depth per second matters more than
 accuracy per evaluation: a move changes few features, so the sum can be updated incrementally, while the
 convolutional networks tried first took about 13 ms per evaluation, some 100 times a linear model.
 
@@ -73,9 +73,9 @@ Every term is the side to move's value minus the opponent's, and is blended by g
 
 **What it does.** The terms model plus seven passed-pawn weights (804 in total): the number of passed pawns on each of the second to seventh ranks, and a sum over the passed pawns of their rank times the difference between the distance of the enemy king and that of the own king (`EXTRA_TERM_NAMES` in `src/chess_lab/models/linear_features.py`).
 
-**Implementation.** `PstPassedFeatures` in `src/chess_lab/models/linear_features.py`, the same terms in `rust/src/eval/features.rs`, trained like the shipped model: `python -m chess_lab.training.train --model linear_pst_passed --effort 10 --representation '{"filter":"quiet"}'`.
+**Implementation.** `PstPassedFeatures` in `src/chess_lab/models/linear_features.py`, the same terms in `rust/src/eval/sparse_features.rs`, trained like the shipped model: `python -m chess_lab.training.train --model linear_pst_passed --effort 10 --representation '{"filter":"quiet"}'`.
 
-**Measured effect.** Static: Spearman 0.641 and error 0.130 against 0.638 of `linear_pst_terms`, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_passed`, [Results](RESULTS.md)). In play: not measured.
+**Measured effect.** Static: Spearman 0.641 and error 0.130 against 0.638 of `linear_pst_terms`, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_passed`, [Results](RESULTS.md)). In play: +29.0 ± 35.2 Elo against the shipped model in a 300-game screening at 10 s + 0.1 s (`data/matches/passed_vs_base/match.log`); no longer test yet.
 
 **Status.** Implemented, not shipped.
 
@@ -85,9 +85,9 @@ Every term is the side to move's value minus the opponent's, and is blended by g
 
 **What it does.** The passed-pawn model plus two weights (808 in total): `king_attack`, the sum of 2, 2, 3 and 5 for every knight, bishop, rook and queen that attacks a square of the enemy king's zone (its square and the neighbours), and `king_open_files`, the files within one of the enemy king without an enemy pawn.
 
-**Implementation.** `PstKingFeatures` in `src/chess_lab/models/linear_features.py` and `rust/src/eval/features.rs`; trained with `python -m chess_lab.training.train --model linear_pst_king --effort 10 --representation '{"filter":"quiet"}'`.
+**Implementation.** `PstKingFeatures` in `src/chess_lab/models/linear_features.py` and `rust/src/eval/sparse_features.rs`; trained with `python -m chess_lab.training.train --model linear_pst_king --effort 10 --representation '{"filter":"quiet"}'`.
 
-**Measured effect.** Static: Spearman 0.643 and error 0.129, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_king`). In play: not measured.
+**Measured effect.** Static: Spearman 0.643 and error 0.129, 3.3 µs per evaluation (`python -m chess_lab.measure.evaluate --model linear_pst_king`). In play: 0.0 ± 35.3 Elo against the shipped model in a 300-game screening at 10 s + 0.1 s (`data/matches/king_vs_base/match.log`), no gain over the passed-pawn model.
 
 **Status.** Implemented, not shipped.
 
@@ -118,11 +118,11 @@ This is the only model that can combine features. It reads the same kind of piec
 | Meaning of the parameters | The first layer holds 256 numbers for each of the 768 piece-square inputs; the later layers mix those 256 numbers into 32, then 32, then one score |
 | Output | A single logit, passed through the same sigmoid: win probability of the side to move |
 
-A position activates at most 32 inputs (one per piece). The first layer, the accumulator, simply adds up the 256-number rows of the active inputs and clips the result to the range 0 to 1. The remaining hidden layers use ReLU activations, and the last layer is linear. Because the second and third layers receive all 256 accumulated values at once, a hidden unit can respond to "king exposed and queens present" and stay silent otherwise, which is precisely the combination the linear models are blind to. Evaluation at play time runs in the Rust core (`rust/src/eval/net.rs`), with no deep-learning framework, so it stays fast enough to run inside the search; Keras is used only to train the weights.
+A position activates at most 32 inputs (one per piece). The first layer, the accumulator, simply adds up the 256-number rows of the active inputs and clips the result to the range 0 to 1. The remaining hidden layers use ReLU activations, and the last layer is linear. Because the second and third layers receive all 256 accumulated values at once, a hidden unit can respond to "king exposed and queens present" and stay silent otherwise, which is precisely the combination the linear models are blind to. Evaluation at play time runs in the Rust core (`rust/src/eval/sparse_net.rs`), with no deep-learning framework, so it stays fast enough to run inside the search; Keras is used only to train the weights.
 
 ## The hand-written heuristic (`h1`)
 
-A classical evaluation written by hand (`rust/src/eval/h1.rs`), not a model file: six differences between White and
+A classical evaluation written by hand (`rust/src/eval/classic_heuristic.rs`), not a model file: six differences between White and
 Black (material, hand-written piece-square tables, mobility, centre control, king safety and development), each
 normalised to 0–1, combined as `0.5 + sum(weight * (feature - 0.5))` and clipped to 0.01–0.99 so it is never taken
 for a decided game. The six weights were fitted to Stockfish (`src/chess_lab/models/h1_weights.json`). It is the

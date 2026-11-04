@@ -39,8 +39,8 @@ fastchess -engine cmd=./uci_base name=A option.Techniques=incremental,tt_move,hi
 |---|---|---|---|---|
 | default + `see` vs default, 10 s + 0.1 s | 300 | 56.83 % | +47.8 ± 34.3 | 17, 12, 65, 25, 31 |
 
-A screening only decides whether a longer test is worth it; the interval is wide. The SPRT [0, 5] at 60 s + 1 s is queued (`data/matches/see_sprt/match.log` once fetched); nodes saved and node counts at depth 6 were not recorded.
+A screening only decides whether a longer test is worth it; the interval is wide. An SPRT [0, 5] at 60 s + 1 s, stopped by hand after 160 games, gave +41.5 ± 46.1 Elo and an LLR of 0.30 of ±2.94 (no verdict): [0, 5] separates two close values and needs about a thousand games to settle an effect this size. An SPRT [0, 10] (same conditions), stopped by hand after 303 games, gave +50.9 ± 38.6 Elo (as of 282 games) and an LLR of 1.13 of ±2.94 (no verdict). Nodes saved and node counts at depth 6 were not recorded.
 
 ## Status
 
-Implemented, off by default. Screening passed (+47.8 ± 34.3 Elo); SPRT at 60 s + 1 s pending.
+Implemented, off by default. Screening passed (+47.8 ± 34.3 Elo); SPRT [0, 5] at 60 s + 1 s without verdict (+41.5 ± 46.1 in 160 games); SPRT [0, 10] without verdict (+50.9 ± 38.6, LLR 1.13). Consistent positive sign in three tests; not enough to switch it on.

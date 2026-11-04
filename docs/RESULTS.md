@@ -60,6 +60,12 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 | `q_m05_vs_quiet` | quiet model with 0.5 % of the mates against the quiet model | 60 s + 1 s, SPRT [0, 5] | 280 | 43.75 % | −44 ± 36 | −0.59 | no verdict (round cap) |
 | `q30_vs_quiet` | quiet model with 30 M positions against the quiet model | 60 s + 1 s, SPRT [0, 5] | 240 | 53.33 % | +23 ± 41 | +0.22 | no verdict (stopped by hand) |
 | `reloj_nuevo` | new clock against the old clock, same model and techniques | 60 s + 1 s, SPRT [0, 5] | 720 | 40.83 % | −64 ± 24 | −2.06 | no verdict (stopped by hand); the new clock is worse |
+| `see_vs_base` | default + `see` against default | 10 s + 0.1 s, 300 games (screening) | 300 | 56.83 % | +47.8 ± 34.3 | - | screening only |
+| `see_sprt` | default + `see` against default | 60 s + 1 s, SPRT [0, 5] | 160 | 55.94 % | +41.5 ± 46.1 | +0.30 | no verdict (stopped by hand) |
+| `see_sprt10` | default + `see` against default | 60 s + 1 s, SPRT [0, 10] | 282 | 57.27 % | +50.9 ± 38.6 | +1.13 | no verdict (stopped by hand at 303 games; Elo as of the last report, 282 games) |
+| `passed_vs_base` | `linear_pst_passed` against the shipped model | 10 s + 0.1 s, 300 games (screening) | 300 | 54.17 % | +29.0 ± 35.2 | - | screening only |
+| `king_vs_base` | `linear_pst_king` against the shipped model | 10 s + 0.1 s, 300 games (screening) | 300 | 50.00 % | 0.0 ± 35.3 | - | screening only |
+| `e30_vs_base` | quiet model with 30 M positions (`linear_pst_terms@e30`) against the shipped model | 10 s + 0.1 s, 300 games (screening) | 300 | 55.67 % | +39.6 ± 33.8 | - | screening only |
 
 ## How the models were measured
 
@@ -192,6 +198,7 @@ engine are in the sections above (the model cards carried them until 2026-11-01)
 | `linear_pst_king` | 809 | winprob-k0.00368-stm-quiet | 10 | 0.643 | 0.129 | 20.7% / 55.9% | 3.3 |
 | `linear_pst_passed` | 805 | winprob-k0.00368-stm-quiet | 10 | 0.641 | 0.130 | 20.6% / 55.9% | 3.3 |
 | `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 10 | 0.638 | 0.131 | 20.4% / 55.9% | 2.9 |
+| `linear_pst_terms@e30` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.9 |
 | `net4_pst` | 206,177 | winprob-k0.00368-stm-all | 30 | 0.700 | 0.120 | 20.5% / 51.1% | 5.8 |
 <!-- END GENERATED TABLES -->
 

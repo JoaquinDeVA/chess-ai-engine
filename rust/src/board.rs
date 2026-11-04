@@ -86,7 +86,7 @@ pub fn is_noisy(m: &Move) -> bool {
 /// single pushes, double pushes and en passant. Promotions go queen, rook, bishop, knight.
 ///
 /// Sorting by this key reproduces the move order of `python-chess`.
-pub fn generation_order(m: &Move, in_check: bool) -> (u8, i32, i32, i32) {
+fn generation_order(m: &Move, in_check: bool) -> (u8, i32, i32, i32) {
     let square = |s: shakmaty::Square| u32::from(s) as i32;
     match *m {
         Move::Normal {
@@ -125,12 +125,30 @@ fn promotion_order(p: Option<Role>) -> i32 {
     }
 }
 
+/// `generation_order` packed into 19 bits that compare like the tuple: 3 bits for the class and,
+/// offset by 64 so that they are not negative, 7 bits for each square key and 2 for the promotion.
+fn packed_generation_order(m: &Move, in_check: bool) -> u32 {
+    let (class, first, second, promotion) = generation_order(m, in_check);
+    (u32::from(class) << 16)
+        | (((first + 64) as u32) << 9)
+        | (((second + 64) as u32) << 2)
+        | promotion as u32
+}
+
 /// Legal moves of a position in the order `python-chess` generates them.
+///
+/// The sort runs on `u32` keys (packed order, then index in the generated list, which keeps it
+/// stable) in a stack array: the only allocation is the returned vector.
 pub fn ordered_moves(pos: &Chess) -> Vec<Move> {
     let in_check = pos.is_check();
-    let mut moves: Vec<Move> = pos.legal_moves().into_iter().collect();
-    moves.sort_by_key(|m| generation_order(m, in_check));
-    moves
+    let legal = pos.legal_moves();
+    let mut keys = [0u32; 256];
+    let keys = &mut keys[..legal.len()];
+    for (index, m) in legal.iter().enumerate() {
+        keys[index] = (packed_generation_order(m, in_check) << 8) | index as u32;
+    }
+    keys.sort_unstable();
+    keys.iter().map(|k| legal[(k & 0xff) as usize]).collect()
 }
 
 /// Position of a FEN string.

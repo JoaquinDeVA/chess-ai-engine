@@ -3,10 +3,17 @@
 //! It scores a position as `bias + sum(weights[index] * value)` and the logistic function turns
 //! the score into the expected score.
 
+use std::cell::RefCell;
+
 use shakmaty::{Chess, Color, Position};
 
 use super::features::{FeatureSet, Perspective};
 use super::{for_player, sigmoid, Evaluator};
+
+thread_local! {
+    /// Active indices and values of the last position, reused so that scoring does not allocate.
+    static ACTIVE: RefCell<(Vec<usize>, Vec<f64>)> = const { RefCell::new((Vec::new(), Vec::new())) };
+}
 
 /// A logistic model: `sigmoid(bias + sum(weights[index] * value))`.
 pub struct LinearModel {
@@ -46,14 +53,14 @@ impl LinearModel {
 
     /// Linear score of a position, before the logistic function.
     pub fn logit(&self, pos: &Chess) -> f64 {
-        let (mut indices, mut values) = (Vec::with_capacity(70), Vec::with_capacity(70));
-        self.features
-            .active(pos, self.perspective, &mut indices, &mut values);
-        let mut total = self.bias;
-        for (index, value) in indices.iter().zip(&values) {
-            total += self.weights[*index] * value;
-        }
-        total
+        ACTIVE.with_borrow_mut(|(indices, values)| {
+            self.features.active(pos, self.perspective, indices, values);
+            let mut total = self.bias;
+            for (index, value) in indices.iter().zip(values.iter()) {
+                total += self.weights[*index] * value;
+            }
+            total
+        })
     }
 
     /// Expected score of White in `[0, 1]`.

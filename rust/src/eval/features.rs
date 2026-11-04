@@ -204,14 +204,28 @@ fn pst(
     }
 }
 
+/// Whether `enemy_pawns` has a pawn ahead of `square`, on its file or a neighbouring one, from the
+/// point of view of `color` (the pawn is then not passed).
+fn pawn_ahead(enemy_pawns: Bitboard, color: Color, square: Square) -> bool {
+    let file = u32::from(square.file());
+    let rank = u32::from(square.rank());
+    let files = Bitboard::from_file(square.file())
+        | Bitboard(0x0101_0101_0101_0101 << file.saturating_sub(1))
+        | Bitboard(0x0101_0101_0101_0101 << (file + 1).min(7));
+    let ahead = if color == Color::White {
+        // Ranks above `rank`; none when it is the last one.
+        u64::MAX.checked_shl(8 * (rank + 1)).unwrap_or(0)
+    } else {
+        (1u64 << (8 * rank)) - 1
+    };
+    (enemy_pawns & files & Bitboard(ahead)).any()
+}
+
 /// Passed, doubled and isolated pawns of one colour.
 fn pawn_counts(pos: &Chess, color: Color) -> (i32, i32, i32) {
     let board = pos.board();
     let own = board.pawns() & board.by_color(color);
-    let enemy: Vec<(i32, i32)> = (board.pawns() & board.by_color(!color))
-        .into_iter()
-        .map(|s| (u32::from(s.file()) as i32, u32::from(s.rank()) as i32))
-        .collect();
+    let enemy = board.pawns() & board.by_color(!color);
     let mut files = [0i32; 8];
     for square in own {
         files[u32::from(square.file()) as usize] += 1;
@@ -220,21 +234,13 @@ fn pawn_counts(pos: &Chess, color: Color) -> (i32, i32, i32) {
     let (mut passed, mut isolated) = (0, 0);
     for square in own {
         let file = u32::from(square.file()) as i32;
-        let rank = u32::from(square.rank()) as i32;
         let neighbours = [file - 1, file + 1]
             .iter()
             .any(|&f| (0..8).contains(&f) && files[f as usize] > 0);
         if !neighbours {
             isolated += 1;
         }
-        let blocked = enemy.iter().any(|&(f, r)| {
-            (f - file).abs() <= 1
-                && if color == Color::White {
-                    r > rank
-                } else {
-                    r < rank
-                }
-        });
+        let blocked = pawn_ahead(enemy, color, square);
         if !blocked {
             passed += 1;
         }
@@ -325,23 +331,12 @@ fn king_distance(a: Square, b: Square) -> i32 {
 fn extra_terms(pos: &Chess, color: Color) -> [f64; KING_EXTRA] {
     let board = pos.board();
     let (own_king, enemy_king) = (board.king_of(color), board.king_of(!color));
-    let enemy: Vec<(i32, i32)> = (board.pawns() & board.by_color(!color))
-        .into_iter()
-        .map(|s| (u32::from(s.file()) as i32, u32::from(s.rank()) as i32))
-        .collect();
+    let enemy = board.pawns() & board.by_color(!color);
     let mut terms = [0.0f64; KING_EXTRA];
     let mut distance = 0.0f64;
     for square in board.pawns() & board.by_color(color) {
-        let file = u32::from(square.file()) as i32;
         let rank = u32::from(square.rank()) as i32;
-        let blocked = enemy.iter().any(|&(f, r)| {
-            (f - file).abs() <= 1
-                && if color == Color::White {
-                    r > rank
-                } else {
-                    r < rank
-                }
-        });
+        let blocked = pawn_ahead(enemy, color, square);
         if blocked {
             continue;
         }

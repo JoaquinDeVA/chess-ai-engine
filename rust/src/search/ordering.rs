@@ -196,31 +196,20 @@ pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
 /// and then the quiet moves, each group keeping its incoming order. With a history the quiet moves
 /// that are not killers come by their score instead, best first.
 pub fn order(moves: Vec<Move>, killers: &[u32], history: Option<(&History, Color)>) -> Vec<Move> {
-    let mut front: Vec<Move> = Vec::with_capacity(moves.len());
-    let mut rest: Vec<Move> = Vec::new();
-    for m in moves {
-        if killers.contains(&move_id(&m)) {
-            front.push(m);
-        } else {
-            rest.push(m);
-        }
+    let is_killer = |m: &Move| killers.contains(&move_id(m));
+    let mut ordered: Vec<Move> = Vec::with_capacity(moves.len());
+    // Captures: killers first, then the rest, and the whole group sorted by a stable sort.
+    ordered.extend(moves.iter().filter(|m| m.is_capture() && is_killer(m)));
+    ordered.extend(moves.iter().filter(|m| m.is_capture() && !is_killer(m)));
+    ordered.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
+    // Quiet moves: killers first, then the others (by history score when there is one).
+    ordered.extend(moves.iter().filter(|m| !m.is_capture() && is_killer(m)));
+    let others_start = ordered.len();
+    ordered.extend(moves.iter().filter(|m| !m.is_capture() && !is_killer(m)));
+    if let Some((history, color)) = history {
+        ordered[others_start..].sort_by_key(|m| std::cmp::Reverse(history.score(color, m)));
     }
-    front.extend(rest);
-    let (mut captures, quiets): (Vec<Move>, Vec<Move>) =
-        front.into_iter().partition(|m| m.is_capture());
-    captures.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
-    match history {
-        None => captures.extend(quiets),
-        Some((history, color)) => {
-            let (killer_moves, mut others): (Vec<Move>, Vec<Move>) = quiets
-                .into_iter()
-                .partition(|m| killers.contains(&move_id(m)));
-            others.sort_by_key(|m| std::cmp::Reverse(history.score(color, m)));
-            captures.extend(killer_moves);
-            captures.extend(others);
-        }
-    }
-    captures
+    ordered
 }
 
 #[cfg(test)]

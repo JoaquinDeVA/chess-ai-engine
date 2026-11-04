@@ -238,9 +238,28 @@ const BENCH_FENS: [&str; 6] = [
 ];
 const BENCH_DEPTH: usize = 6;
 
-/// Searches the fixed positions one by one with fresh memory and a fixed depth. The node counts go
-/// to stdout (the same on every run); the time to stderr.
-fn bench(eval: &Eval) {
+/// Runs `bench_once` `repetitions` times: the node counts (stdout) come from the first run, the
+/// times and the nodes per second (stderr) from all of them, with their median.
+fn bench(eval: &Eval, repetitions: usize) {
+    let mut seconds: Vec<f64> = Vec::new();
+    let mut total_nodes = 0;
+    for run in 0..repetitions {
+        let (nodes, elapsed) = bench_once(eval, run == 0);
+        total_nodes = nodes;
+        seconds.push(elapsed);
+    }
+    seconds.sort_by(f64::total_cmp);
+    let median = seconds[seconds.len() / 2];
+    eprintln!(
+        "runs {repetitions} min {:.3} s median {median:.3} s nps(median) {:.0}",
+        seconds[0],
+        total_nodes as f64 / median
+    );
+}
+
+/// Searches the fixed positions one by one with fresh memory and a fixed depth. When `print` is
+/// set, the node counts go to stdout (the same on every run). Returns the total nodes and the time.
+fn bench_once(eval: &Eval, print: bool) -> (u64, f64) {
     let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
     let started = Instant::now();
     let mut total_nodes = 0;
@@ -272,23 +291,31 @@ fn bench(eval: &Eval) {
         )
         .expect("bench search");
         let best = best.as_ref().map_or("0000".to_string(), uci_string);
-        println!("{fen} nodes {} bestmove {best}", stats.nodes_visited);
+        if print {
+            println!("{fen} nodes {} bestmove {best}", stats.nodes_visited);
+        }
         total_nodes += stats.nodes_visited;
         for iteration in &stats.iterations {
             nodes_by_depth[iteration.depth] += iteration.nodes;
         }
     }
-    println!("total nodes {total_nodes}");
-    for (depth, nodes) in nodes_by_depth.iter().enumerate().skip(1) {
-        println!("depth {depth} nodes {nodes}");
+    if print {
+        println!("total nodes {total_nodes}");
+        for (depth, nodes) in nodes_by_depth.iter().enumerate().skip(1) {
+            println!("depth {depth} nodes {nodes}");
+        }
     }
-    eprintln!("time {:.3} s", started.elapsed().as_secs_f64());
+    (total_nodes, started.elapsed().as_secs_f64())
 }
 
 fn main() {
     let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
     if std::env::args().nth(1).as_deref() == Some("bench") {
-        bench(&eval);
+        let repetitions = std::env::args()
+            .nth(2)
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(5);
+        bench(&eval, repetitions);
         return;
     }
     let mut settings = Settings {

@@ -13,9 +13,10 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 
 ## The short answer
 
-- **The engine that plays is the Rust UCI binary** with six search techniques on by default (incremental
-  accumulator, table move, history, PVS, aspiration windows, null move). Together they scored 76.5 % against the
-  plain search in 100 games ("Search techniques in games" below); each one's own measurement is in the
+- **The engine that plays is the Rust UCI binary** with seven search techniques on by default (incremental
+  accumulator, table move, history, PVS, aspiration windows, null move, static exchange evaluation). The first six
+  together scored 76.5 % against the plain search in 100 games ("Search techniques in games" below); the seventh
+  won an SPRT at 20,000 nodes per move (`see_nodes`); each one's own measurement is in the
   [catalogue](techniques/README.md).
 - **The model that plays is the Piece-square-and-terms logistic model (`linear_pst_terms`)**, trained on quiet
   positions only (effort 10): it beat the same model trained on every
@@ -29,6 +30,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | The default techniques make the engine stronger | 100 games at 4 s + 0.05 s against the plain search, 76.5 % | Rust core through Python | Measured, one match; per technique only node counts and short matches ([catalogue](techniques/README.md)) |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
+| Static exchange evaluation makes the engine stronger | SPRT [0, 5] of 1,188 games at 20,000 nodes per move: 58.04 %, +56.4 ± 17.5 Elo | Rust | Measured; H1 accepted at fixed nodes, not yet confirmed at a time control |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |
 | Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo | Rust | Measured; H1 accepted |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |
@@ -45,6 +47,7 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 | `aa_s13` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 500 | 50.7 % | +4.9 ± 23.9 | +0.18 | no bias |
 | `lmr_nodes` | default + `lmr` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,244 | 48.76 % | −8.6 ± 6.1 | −2.94 | H0: regresses |
 | `qs_evasions` | default + `qs_evasions` against default | 20,000 nodes per move, SPRT [−5, 0] | 3,428 | 46.94 % | −21.3 ± 10.6 | −2.96 | H0: regresses |
+| `see_nodes` | default + `see` against default | 20,000 nodes per move, SPRT [0, 5] | 1,188 | 58.04 % | +56.4 ± 17.5 | +2.97 | H1: stronger (fixed nodes) |
 | `qs_tt` | default + `qs_tt` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,000 | 50.10 % | +0.7 ± 3.9 | +1.55 | no verdict (round cap) |
 | `quiet_vs_actual` | `linear_pst_terms` trained on quiet positions against the same trained on all positions | 60 s + 1 s, SPRT [0, 5] | 362 | 83.70 % | +284 ± 43 | +2.96 | H1: stronger |
 | `q_k65_vs_quiet` | quiet model with `k` 0.0065 against the quiet model | 60 s + 1 s, SPRT [0, 5] | 280 | 48.93 % | −7 ± 35 | −0.13 | no verdict (round cap) |

@@ -54,7 +54,7 @@ quiescence depth of 4 plies, so neither is a setting.
 | Fixed time per move; unchecked, the engine spends a share of its clock | `move_time` | `go movetime ms` | 3 s |
 | Opening book | `opening_book` | none: read in Python before the engine | on |
 | Endgame tablebases (up to five pieces) | `tablebase` | none: read in Python before the engine | on |
-| Advanced: search techniques | `techniques` | `setoption name Techniques` | the six default ones (all but `qs_tt` and `see`) |
+| Advanced: search techniques | `techniques` | `setoption name Techniques` | the seven default ones (all but `qs_tt`) |
 | Advanced: search threads | `threads` | `setoption name Threads` | up to 4 |
 
 With a clock and no fixed time, the window sends `wtime`, `btime`, `winc` and `binc`; the binary

@@ -9,7 +9,7 @@ All notable changes. The newest are first.
 
 ### Added
 - A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
-- Static exchange evaluation, [`see`](docs/techniques/see.md), off by default: +47.8 ± 34.3 Elo in a 300-game screening at 10 s + 0.1 s, +41.5 ± 46.1 in 160 games at 60 s + 1 s (no verdict); SPRT [0, 10] stopped by hand at 303 games, +50.9 ± 38.6, LLR 1.13 (no verdict).
+- Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +50.9 ± 38.6 in two SPRTs stopped by hand (no verdict).
 
 ### Changed
 - Documentation reduced to what is current: the models page covers `linear_pst_terms`, `h1` and the light network candidates; figures of the earlier Python engine and of removed models are gone or marked "not measured"; the techniques index has an "Elo estimated" column.

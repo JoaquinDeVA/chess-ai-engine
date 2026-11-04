@@ -13,13 +13,14 @@ pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games
 /// against the reference search (`docs/techniques/README.md`).
-pub const DEFAULT_TECHNIQUES: [&str; 6] = [
+pub const DEFAULT_TECHNIQUES: [&str; 7] = [
     "incremental",
     "tt_move",
     "history",
     "pvs",
     "aspiration",
     "null_move",
+    "see",
 ];
 
 /// Settings of a search.

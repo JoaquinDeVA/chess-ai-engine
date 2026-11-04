@@ -15,7 +15,7 @@ Every figure and its command are in [Results](docs/RESULTS.md#the-short-answer).
 
 - **Search.** Moving the search to Rust made it 8 to 35 times faster to a given depth
   ([the search in Rust](docs/techniques/rust-core.md)). Six pruning and ordering techniques on top of it scored
-  76.5 % (+205 Elo) against the plain search ([search techniques](docs/techniques/README.md)).
+  76.5 % (+205 Elo) against the plain search; a seventh, static exchange evaluation, won an SPRT at a fixed node count (+56 ± 17 Elo) ([search techniques](docs/techniques/README.md)).
 - **Measurement.** Changes are kept or dropped by SPRT matches with fastchess
   ([how a change is measured](docs/MEASUREMENT.md)). Late move reductions searched deeper but lost 8.6 ± 6.1 Elo
   over 10,244 games, so they are off.
@@ -62,7 +62,7 @@ id name chess_core
 option name Hash type spin default 64 min 1 max 65536
 option name Threads type spin default 1 min 1 max 64
 option name Model type string default linear_pst_terms
-option name Techniques type string default incremental,tt_move,history,pvs,aspiration,null_move
+option name Techniques type string default incremental,tt_move,history,pvs,aspiration,null_move,see
 uciok
 readyok
 info depth 7 nodes 287757 time 788
@@ -77,7 +77,7 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
 
 ## Status
 
-- Working: the Rust search with six techniques on, the UCI binary, the window, the training and measurement
+- Working: the Rust search with seven techniques on, the UCI binary, the window, the training and measurement
   pipeline (`DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` prints every command without running it).
 - Engine matches are played with fastchess on a separate machine ([Measurement](docs/MEASUREMENT.md)); the model
   tournaments in [Results](docs/RESULTS.md) predate the Rust engine and are kept as history.

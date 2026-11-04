@@ -29,7 +29,7 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Aspiration windows (`aspiration`) | on; nodes to 440,213 | +104 with `pvs` (same) | [aspiration](aspiration.md) |
 | Null move (`null_move`) | on; nodes to 446,129 | +205 with the five above (76.5 %, 100 games) | [null-move](null-move.md) |
 | Quiescence with the table (`qs_tt`) | implemented, off: no gain at fixed nodes | +0.7 ± 3.9 (SPRT, no verdict) | [qs-tt](qs-tt.md) |
-| Static exchange evaluation (`see`) | implemented, off: promising, no verdict yet | +47.8 ± 34.3 (screening) | [see](see.md) |
+| Static exchange evaluation (`see`) | on | +56.4 ± 17.5 (SPRT at 20,000 nodes, H1) | [see](see.md) |
 | History malus | idea; not measured | not measured | - |
 | Futility pruning | idea; not measured | not measured | - |
 | Razoring | idea; not measured | not measured | - |
@@ -39,9 +39,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 ## How the switches were judged
 
 The classic techniques (the rows above `incremental` in the table) and the [Rust core](rust-core.md) form the
-*reference* search; the two switches below them are off in it. Each switch is a field of `Techniques`
+*reference* search; the switches below them are off in it. Each switch is a field of `Techniques`
 (`rust/src/search/options.rs`) and a name in the comma-separated UCI option `Techniques` of the binary (an empty
-value turns them all off). The binary and the window (Settings → Advanced) use the six that are on in the table (all but `qs_tt` and `see`): `DEFAULT_TECHNIQUES` in
+value turns them all off). The binary and the window (Settings → Advanced) use the seven that are on in the table (all but `qs_tt`): `DEFAULT_TECHNIQUES` in
 `rust/src/search/options.rs`, which the window reads as `_core.DEFAULT_TECHNIQUES`.
 
 **The default set was adopted before the SPRT instrument existed.** These are standard techniques of alpha-beta

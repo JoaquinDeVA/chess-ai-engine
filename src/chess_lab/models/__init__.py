@@ -16,7 +16,7 @@ from .representation import Representation
 def new_model(model_class: type, rep: Optional[Representation] = None) -> SparseModel:
     """An untrained model of a class: zero weights for a linear one, random for a network.
 
-    :param model_class: A concrete model class, e.g. ``get_model_class("linear_pst")``.
+    :param model_class: A concrete model class, e.g. ``get_model_class("linear_pst_terms")``.
     :param rep: Representation of the target; defaults to :class:`Representation`.
     :return: The model, with ``rep`` saved as a dictionary.
     """

@@ -102,7 +102,7 @@ class TestCardsAndReport:
     def test_report_renders_the_columns(self, isolated_cards):
         representation = Representation().to_dict()
         cards.update_card(
-            "linear_pst",
+            "linear_pst_terms",
             status="current",
             architecture="PST",
             parameters=1234,
@@ -116,7 +116,7 @@ class TestCardsAndReport:
             "Best move, all / non-quiet | µs per eval |"
         )
         row = (
-            f"| `linear_pst` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
+            f"| `linear_pst_terms` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
             "34.5% / 28.0% | 12.5 |"
         )
         assert header in text and row in text
@@ -151,7 +151,7 @@ class TestEffortCommandLine:
     def test_unknown_representation_field_exits_cleanly(self, isolated_cards, tmp_path, capsys):
         code = train_cli.main(
             [
-                "--model", "linear_pst", "--effort", "0",
+                "--model", "linear_pst_terms", "--effort", "0",
                 "--raw", str(tmp_path), "--sidecar", str(tmp_path),
                 "--representation", '{"bogus": 1}',
             ]
@@ -204,17 +204,17 @@ class TestMateKeepGuards:
         write_mate_shards(raw, side)
         shards = ["--raw", str(raw), "--sidecar", str(side)]
 
-        flag = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "0.05", *shards]
+        flag = ["--model", "linear_pst_terms", "--effort", "0", "--mate-keep", "0.05", *shards]
         assert train_cli.main(flag) == 2
-        full = ["--model", "linear_pst", "--effort", "0", "--mate-keep", "1.0", *shards]
+        full = ["--model", "linear_pst_terms", "--effort", "0", "--mate-keep", "1.0", *shards]
         assert train_cli.main(full) == 2  # 100 % also requires --tag
         representation = [
-            "--model", "linear_pst", "--effort", "0", "--representation",
+            "--model", "linear_pst_terms", "--effort", "0", "--representation",
             '{"mate_keep": 0.05}', *shards,
         ]  # fmt: skip
         assert train_cli.main(representation) == 2
-        assert not list(tmp_path.glob("linear_pst*.npz"))
-        assert cards.load_card("linear_pst") == {"name": "linear_pst"}
+        assert not list(tmp_path.glob("linear_pst_terms*.npz"))
+        assert cards.load_card("linear_pst_terms") == {"name": "linear_pst_terms"}
 
 
 class FakeLinearModel:
@@ -248,12 +248,22 @@ class TestCommandLineWithDoubles:
     """Training and evaluation CLIs with stand-ins: nothing is trained and no metrics are computed."""
 
     def train(self, *extra):
-        argv = ["--model", "linear_pst", "--effort", "40", "--raw", "r", "--sidecar", "s", *extra]
+        argv = [
+            "--model",
+            "linear_pst_terms",
+            "--effort",
+            "40",
+            "--raw",
+            "r",
+            "--sidecar",
+            "s",
+            *extra,
+        ]
         return train_cli.main(argv)
 
     def test_training_writes_the_card_with_its_training_section(self, fake_training, capsys):
         assert self.train() == 0
-        card = cards.load_card("linear_pst")
+        card = cards.load_card("linear_pst_terms")
         assert card["status"] == "current" and card["parameters"] == 7
         training = card["training"]
         assert training["effort"] == 40 and training["train_samples"] == 900
@@ -262,12 +272,12 @@ class TestCommandLineWithDoubles:
         assert "Effort 40" in capsys.readouterr().out
 
     def test_tag_writes_artifact_and_card_without_touching_the_untagged_one(self, fake_training):
-        cards.update_card("linear_pst", status="current", parameters=99)
+        cards.update_card("linear_pst_terms", status="current", parameters=99)
         assert self.train("--tag", "x") == 0
-        assert (fake_training / "artifacts" / "linear_pst@x.npz").exists()
-        assert cards.load_card("linear_pst@x")["training"]["effort"] == 40
-        assert cards.load_card("linear_pst") == {
-            "name": "linear_pst", "status": "current", "parameters": 99
+        assert (fake_training / "artifacts" / "linear_pst_terms@x.npz").exists()
+        assert cards.load_card("linear_pst_terms@x")["training"]["effort"] == 40
+        assert cards.load_card("linear_pst_terms") == {
+            "name": "linear_pst_terms", "status": "current", "parameters": 99
         }  # fmt: skip
 
     def test_evaluation_with_a_tag_writes_the_tagged_card(
@@ -280,20 +290,20 @@ class TestCommandLineWithDoubles:
         monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
         monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
         monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
-        assert evaluate_cli.main(["--model", "linear_pst@x"]) == 0
-        assert cards.load_card("linear_pst@x")["accuracy"]["all"]["spearman"] == 0.912
-        assert cards.load_card("linear_pst") == {"name": "linear_pst"}
+        assert evaluate_cli.main(["--model", "linear_pst_terms@x"]) == 0
+        assert cards.load_card("linear_pst_terms@x")["accuracy"]["all"]["spearman"] == 0.912
+        assert cards.load_card("linear_pst_terms") == {"name": "linear_pst_terms"}
 
     def test_retraining_drops_the_measurements_of_the_previous_model(self, fake_training):
         cards.update_card(
-            "linear_pst",
+            "linear_pst_terms",
             status="current",
             training={"effort": 15, "old_key": 1},
             accuracy=ACCURACY,
             cost={"us_per_eval": 5.0},
         )
         assert self.train() == 0
-        card = cards.load_card("linear_pst")
+        card = cards.load_card("linear_pst_terms")
         assert not {"accuracy", "cost"} & set(card)
         assert card["training"]["effort"] == 40 and "old_key" not in card["training"]
         assert card["parameters"] == 7
@@ -330,5 +340,5 @@ class TestHeuristicEvaluation:
 @pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])
 def test_lr_decay_outside_zero_one_exits_with_code_2(value):
     with pytest.raises(SystemExit) as exit_info:
-        train_cli.parse_args(["--model", "linear_pst", "--effort", "0", "--lr-decay", value])
+        train_cli.parse_args(["--model", "linear_pst_terms", "--effort", "0", "--lr-decay", value])
     assert exit_info.value.code == 2

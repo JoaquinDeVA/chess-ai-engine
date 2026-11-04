@@ -94,7 +94,7 @@ impl TimeRules {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Techniques {
     /// Update the evaluation move by move instead of from the board at every leaf (same values up
-    /// to rounding; only the evaluations that support it, `net4_pst`).
+    /// to rounding; only the evaluations that support it: the networks).
     pub incremental: bool,
     /// Try the best move stored in the table first.
     pub tt_move: bool,

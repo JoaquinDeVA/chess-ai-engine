@@ -266,14 +266,6 @@ class NeuralEvalModel(SparseModel):
         return path
 
 
-class PstTaperedModel(LinearEvalModel):
-    """Tapered piece-square tables (768 weights) with a logistic output."""
-
-    name = "linear_pst"
-    feature_set = "linear_pst"
-    architecture = "Tapered piece-square tables (768 weights), logistic"
-
-
 class PstTermsModel(LinearEvalModel):
     """Tapered piece-square tables plus eleven classical terms (790 weights), logistic."""
 
@@ -282,60 +274,41 @@ class PstTermsModel(LinearEvalModel):
     architecture = "Tapered piece-square tables plus 11 classical terms (790 weights), logistic"
 
 
-class PstPassedModel(LinearEvalModel):
-    """The terms model plus seven passed-pawn terms (804 weights), logistic."""
+class NnW32Model(NeuralEvalModel):
+    """768 slotted piece-square inputs, a 32 accumulator and one output (2 layers)."""
 
-    name = "linear_pst_passed"
-    feature_set = "linear_pst_passed"
-    architecture = (
-        "Piece-square tables, 11 classical terms and 7 passed-pawn terms (804 weights), logistic"
-    )
-
-
-class PstKingModel(LinearEvalModel):
-    """The passed-pawn model plus two king-attack terms (808 weights), logistic."""
-
-    name = "linear_pst_king"
-    feature_set = "linear_pst_king"
-    architecture = "Piece-square tables, 11 classical terms, 7 passed-pawn and 2 king-attack terms (808 weights), logistic"
-
-
-class MaterialLinearModel(LinearEvalModel):
-    """Logistic regression on five piece-count differences (and the turn under ``"white"``)."""
-
-    name = "linear_material"
-    feature_set = "material5"
-    architecture = "Logistic regression on 5 material counts (own minus opponent)"
-
-
-class KingBucketModel(LinearEvalModel):
-    """King-bucketed piece-square features (10,368 weights), logistic."""
-
-    name = "linear_king_bucket"
-    feature_set = "king_bucket"
-    architecture = "King-bucketed piece-square features (10,368 weights), logistic"
-
-
-class Nn4Model(NeuralEvalModel):
-    """768 slotted piece-square inputs, a 256 accumulator, 32, 32 and one output (4 layers)."""
-
-    name = "net4_pst"
+    name = "net_pst_w32"
     feature_set = "pst_slotted"
-    hidden = (256, 32, 32)
-    architecture = "Sparse network: 768 slotted piece-square inputs, 256-32-32-1 (4 layers)"
+    hidden = (32,)
+    architecture = "Sparse network: 768 slotted piece-square inputs, 32-1 (2 layers)"
+
+
+class NnW64Model(NeuralEvalModel):
+    """768 slotted piece-square inputs, a 64 accumulator and one output (2 layers)."""
+
+    name = "net_pst_w64"
+    feature_set = "pst_slotted"
+    hidden = (64,)
+    architecture = "Sparse network: 768 slotted piece-square inputs, 64-1 (2 layers)"
+
+
+class NnW64x16Model(NeuralEvalModel):
+    """768 slotted piece-square inputs, a 64 accumulator, 16 and one output (3 layers)."""
+
+    name = "net_pst_w64x16"
+    feature_set = "pst_slotted"
+    hidden = (64, 16)
+    architecture = "Sparse network: 768 slotted piece-square inputs, 64-16-1 (3 layers)"
 
 
 #: The models of the project by name.
 MODELS: Dict[str, Type[SparseModel]] = {
     cls.name: cls
     for cls in (
-        PstTaperedModel,
         PstTermsModel,
-        PstPassedModel,
-        PstKingModel,
-        MaterialLinearModel,
-        KingBucketModel,
-        Nn4Model,
+        NnW32Model,
+        NnW64Model,
+        NnW64x16Model,
     )
 }
 

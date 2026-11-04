@@ -31,11 +31,6 @@ impl LinearModel {
         weights: Vec<f64>,
         bias: f64,
     ) -> Result<LinearModel, String> {
-        if perspective == Perspective::White && features == FeatureSet::KingBucket {
-            return Err(
-                "king_bucket features are defined for the side_to_move perspective only".into(),
-            );
-        }
         let expected = features.size(perspective);
         if weights.len() != expected {
             return Err(format!(

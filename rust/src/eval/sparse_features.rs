@@ -2,9 +2,7 @@
 //! from a perspective. The linear model and the network score them. The features and their order
 //! are those of `chess_lab/models/linear_features.py`.
 
-use shakmaty::attacks::{
-    bishop_attacks, king_attacks, knight_attacks, queen_attacks, rook_attacks,
-};
+use shakmaty::attacks::{bishop_attacks, knight_attacks, queen_attacks, rook_attacks};
 use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 
 /// Phase of the start position (sum of the phase weights of all pieces).
@@ -15,12 +13,6 @@ const TERM_COUNT: usize = 11;
 const PAWN_SCALE: f64 = 4.0;
 const MOBILITY_SCALE: f64 = 10.0;
 const SHIELD_SCALE: f64 = 3.0;
-const KING_ATTACK_SCALE: f64 = 10.0;
-const KING_OPEN_SCALE: f64 = 3.0;
-/// Extra terms after the eleven classical ones: passed pawns by rank, their king distances,
-/// king attack and open files near the king.
-const PASSED_EXTRA: usize = 7;
-const KING_EXTRA: usize = 9;
 
 /// Where the features are seen from.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -32,43 +24,23 @@ pub enum Perspective {
 /// The families of features.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FeatureSet {
-    /// `material5`: piece-count differences.
-    Material,
     /// `linear_pst`: tapered piece-square tables.
     Pst,
     /// `linear_pst_terms`: tables plus classical terms.
     PstTerms,
-    /// `linear_pst_passed`: the terms plus passed pawns by rank and king distance.
-    PstPassed,
-    /// `linear_pst_king`: the passed-pawn terms plus king attack.
-    PstKing,
-    /// `king_bucket`: king-bucketed one-hot piece squares.
-    KingBucket,
     /// `pst_slotted`: one-hot piece squares (the network's inputs).
     Slotted,
 }
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 7] = [
-        "material5",
-        "linear_pst",
-        "linear_pst_terms",
-        "linear_pst_passed",
-        "linear_pst_king",
-        "king_bucket",
-        "pst_slotted",
-    ];
+    pub const NAMES: [&'static str; 3] = ["linear_pst", "linear_pst_terms", "pst_slotted"];
 
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
         Some(match name {
-            "material5" => FeatureSet::Material,
             "linear_pst" => FeatureSet::Pst,
             "linear_pst_terms" => FeatureSet::PstTerms,
-            "linear_pst_passed" => FeatureSet::PstPassed,
-            "linear_pst_king" => FeatureSet::PstKing,
-            "king_bucket" => FeatureSet::KingBucket,
             "pst_slotted" => FeatureSet::Slotted,
             _ => return None,
         })
@@ -78,12 +50,8 @@ impl FeatureSet {
     pub fn size(self, perspective: Perspective) -> usize {
         let turn = usize::from(perspective == Perspective::White);
         match self {
-            FeatureSet::Material => 5 + turn,
             FeatureSet::Pst => 2 * BLOCK_SIZE + turn,
             FeatureSet::PstTerms => 2 * BLOCK_SIZE + 2 * TERM_COUNT + turn,
-            FeatureSet::PstPassed => 2 * BLOCK_SIZE + 2 * (TERM_COUNT + PASSED_EXTRA) + turn,
-            FeatureSet::PstKing => 2 * BLOCK_SIZE + 2 * (TERM_COUNT + KING_EXTRA) + turn,
-            FeatureSet::KingBucket => KB_SIZE,
             FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK + turn,
         }
     }
@@ -99,12 +67,8 @@ impl FeatureSet {
         indices.clear();
         values.clear();
         match self {
-            FeatureSet::Material => material(pos, perspective, indices, values),
             FeatureSet::Pst => pst(pos, perspective, indices, values, true),
-            FeatureSet::PstTerms => pst_terms(pos, perspective, indices, values, 0),
-            FeatureSet::PstPassed => pst_terms(pos, perspective, indices, values, PASSED_EXTRA),
-            FeatureSet::PstKing => pst_terms(pos, perspective, indices, values, KING_EXTRA),
-            FeatureSet::KingBucket => king_bucket(pos, indices, values),
+            FeatureSet::PstTerms => pst_terms(pos, perspective, indices, values),
             FeatureSet::Slotted => slotted(pos, perspective, indices, values),
         }
     }
@@ -148,30 +112,6 @@ fn sign_of(piece: Piece, mover: Color, perspective: Perspective) -> f64 {
                 -1.0
             }
         }
-    }
-}
-
-fn material(
-    pos: &Chess,
-    perspective: Perspective,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-) {
-    let mover = pos.turn();
-    let mut counts = [0.0f64; 5];
-    for (_, piece) in pieces(pos) {
-        if piece.role == Role::King {
-            continue;
-        }
-        counts[piece.role as usize - 1] += sign_of(piece, mover, perspective);
-    }
-    for (index, count) in counts.iter().enumerate() {
-        indices.push(index);
-        values.push(*count);
-    }
-    if perspective == Perspective::White {
-        indices.push(5);
-        values.push(if mover == Color::White { 1.0 } else { -1.0 });
     }
 }
 
@@ -319,88 +259,17 @@ fn piece_terms(pos: &Chess, color: Color) -> [f64; 8] {
     terms
 }
 
-/// Distance in king moves between two squares.
-fn king_distance(a: Square, b: Square) -> i32 {
-    let file = (u32::from(a.file()) as i32 - u32::from(b.file()) as i32).abs();
-    let rank = (u32::from(a.rank()) as i32 - u32::from(b.rank()) as i32).abs();
-    file.max(rank)
-}
-
-/// Passed pawns by rank, their king distances and the pressure on the enemy king, of one colour
-/// (9 values; see `_extra_terms` in `linear_features.py`).
-fn extra_terms(pos: &Chess, color: Color) -> [f64; KING_EXTRA] {
-    let board = pos.board();
-    let (own_king, enemy_king) = (board.king_of(color), board.king_of(!color));
-    let enemy = board.pawns() & board.by_color(!color);
-    let mut terms = [0.0f64; KING_EXTRA];
-    let mut distance = 0.0f64;
-    for square in board.pawns() & board.by_color(color) {
-        let rank = u32::from(square.rank()) as i32;
-        let blocked = pawn_ahead(enemy, color, square);
-        if blocked {
-            continue;
-        }
-        let relative = if color == Color::White {
-            rank
-        } else {
-            7 - rank
-        };
-        terms[(relative - 1) as usize] += 1.0;
-        if let (Some(own), Some(enemy_king)) = (own_king, enemy_king) {
-            let gap = king_distance(enemy_king, square) - king_distance(own, square);
-            distance += relative as f64 / 6.0 * gap as f64 / 4.0;
-        }
-    }
-    terms[6] = distance;
-
-    if let Some(enemy_king) = enemy_king {
-        let zone = king_attacks(enemy_king) | Bitboard::from_square(enemy_king);
-        let occupied = board.occupied();
-        let mut attack = 0i32;
-        for (role, units) in [
-            (Role::Knight, 2),
-            (Role::Bishop, 2),
-            (Role::Rook, 3),
-            (Role::Queen, 5),
-        ] {
-            for square in board.by_role(role) & board.by_color(color) {
-                let attacks = match role {
-                    Role::Knight => knight_attacks(square),
-                    Role::Bishop => bishop_attacks(square, occupied),
-                    Role::Rook => rook_attacks(square, occupied),
-                    _ => queen_attacks(square, occupied),
-                };
-                if (attacks & zone).any() {
-                    attack += units;
-                }
-            }
-        }
-        let enemy_pawns = board.pawns() & board.by_color(!color);
-        let king_file = u32::from(enemy_king.file()) as i32;
-        let mut open_files = 0i32;
-        for file in (king_file - 1).max(0)..=(king_file + 1).min(7) {
-            if (enemy_pawns & Bitboard::from_file(File::new(file as u32))).is_empty() {
-                open_files += 1;
-            }
-        }
-        terms[7] = attack as f64 / KING_ATTACK_SCALE;
-        terms[8] = open_files as f64 / KING_OPEN_SCALE;
-    }
-    terms
-}
-
 fn pst_terms(
     pos: &Chess,
     perspective: Perspective,
     indices: &mut Vec<usize>,
     values: &mut Vec<f64>,
-    extra: usize,
 ) {
     pst(pos, perspective, indices, values, false);
     let tapered = phase(pos);
     let white = pawn_counts(pos, Color::White);
     let black = pawn_counts(pos, Color::Black);
-    let mut terms = [0.0f64; TERM_COUNT + KING_EXTRA];
+    let mut terms = [0.0f64; TERM_COUNT];
     terms[0] = (white.0 - black.0) as f64 / PAWN_SCALE;
     terms[1] = (white.1 - black.1) as f64 / PAWN_SCALE;
     terms[2] = (white.2 - black.2) as f64 / PAWN_SCALE;
@@ -411,21 +280,12 @@ fn pst_terms(
     for i in 0..8 {
         terms[3 + i] = w[i] - b[i];
     }
-    if extra > 0 {
-        let (w, b) = (
-            extra_terms(pos, Color::White),
-            extra_terms(pos, Color::Black),
-        );
-        for i in 0..extra {
-            terms[TERM_COUNT + i] = w[i] - b[i];
-        }
-    }
     let sign = if perspective == Perspective::White || pos.turn() == Color::White {
         1.0
     } else {
         -1.0
     };
-    for (term, value) in terms.iter().take(TERM_COUNT + extra).enumerate() {
+    for (term, value) in terms.iter().enumerate() {
         let index = 2 * BLOCK_SIZE + 2 * term;
         indices.push(index);
         indices.push(index + 1);
@@ -433,7 +293,7 @@ fn pst_terms(
         values.push(sign * value * (1.0 - tapered));
     }
     if perspective == Perspective::White {
-        indices.push(2 * BLOCK_SIZE + 2 * (TERM_COUNT + extra));
+        indices.push(2 * BLOCK_SIZE + 2 * TERM_COUNT);
         values.push(if pos.turn() == Color::White {
             1.0
         } else {
@@ -468,56 +328,4 @@ fn slotted(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, valu
         indices.push(2 * OPPONENT_PIECE_BLOCK);
         values.push(if mover == Color::White { 1.0 } else { 0.0 });
     }
-}
-
-const KB_BUCKETS: usize = 8;
-const KB_BLOCK: usize = 10 * 64;
-const KB_KING_BASE: usize = 2 * KB_BUCKETS * KB_BLOCK;
-const KB_SIZE: usize = KB_KING_BASE + 2 * 64;
-
-/// Square seen from the home rank of the colour (`black`), mirrored in file when `flip`.
-fn kb_square(sq: usize, black: bool, flip: bool) -> usize {
-    (if black { sq ^ 56 } else { sq }) ^ if flip { 7 } else { 0 }
-}
-
-fn kb_bucket(sq: usize, black: bool) -> usize {
-    let oriented = if black { sq ^ 56 } else { sq };
-    let file = sq & 7;
-    2 * file.min(7 - file) + usize::from(oriented >> 3 >= 2)
-}
-
-fn king_bucket(pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-    let mover = pos.turn();
-    let board = pos.board();
-    let mut flips = [false; 2];
-    let mut bases = [0usize; 2];
-    let mut blacks = [false; 2];
-    for (slot, color) in [mover, !mover].into_iter().enumerate() {
-        let black = color == Color::Black;
-        let king = u32::from(board.king_of(color).expect("both kings are on the board")) as usize;
-        let flip = king & 7 >= 4;
-        flips[slot] = flip;
-        blacks[slot] = black;
-        bases[slot] = (slot * KB_BUCKETS + kb_bucket(king, black)) * KB_BLOCK;
-        indices.push(KB_KING_BASE + slot * 64 + kb_square(king, black, flip));
-    }
-    for (square, piece) in pieces(pos) {
-        if piece.role == Role::King {
-            continue;
-        }
-        let kind = piece.role as usize - 1;
-        let sq = u32::from(square) as usize;
-        let (mover_sq, opponent_sq) = (
-            kb_square(sq, blacks[0], flips[0]),
-            kb_square(sq, blacks[1], flips[1]),
-        );
-        if piece.color == mover {
-            indices.push(bases[0] + kind * 64 + mover_sq);
-            indices.push(bases[1] + (kind + 5) * 64 + opponent_sq);
-        } else {
-            indices.push(bases[0] + (kind + 5) * 64 + mover_sq);
-            indices.push(bases[1] + kind * 64 + opponent_sq);
-        }
-    }
-    values.resize(indices.len(), 1.0);
 }

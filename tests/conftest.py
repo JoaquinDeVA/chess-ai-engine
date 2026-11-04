@@ -88,7 +88,7 @@ MATE_IN_ONE = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"  # 1.Ra8#
 
 
 #: Shipped model artifacts that no test may overwrite.
-PROTECTED_ARTIFACTS = ("linear_pst_terms.npz", "net4_pst.npz")
+PROTECTED_ARTIFACTS = ("linear_pst_terms.npz",)
 _PROTECTED_HASHES: dict = {}
 
 

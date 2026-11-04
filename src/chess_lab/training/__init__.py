@@ -9,7 +9,7 @@ Typical flow::
 
     python src/chess_lab/scripts/data/build_raw_shards.py --input data/lichess/lichess_db_eval.jsonl.zst
     python src/chess_lab/scripts/data/build_sidecars.py
-    python -m chess_lab.training.train --model linear_pst --effort 40
-    python -m chess_lab.measure.evaluate --model linear_pst
+    python -m chess_lab.training.train --model linear_pst_terms --effort 40
+    python -m chess_lab.measure.evaluate --model linear_pst_terms
 
 """

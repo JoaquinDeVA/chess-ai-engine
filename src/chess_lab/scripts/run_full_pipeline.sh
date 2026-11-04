@@ -5,8 +5,7 @@
 # Steps (STEPS, in this order): sidecars train evaluate report.
 # Each step runs once and writes $STATE_DIR/<step>.done; a step with a .done file is skipped
 # unless FORCE=1. A failing step is logged and stops the pipeline (non-zero exit), except model
-# training: a failed model is logged and the loop continues. If the failed model is net4_pst its
-# artifact and card are deleted ("DISCARDED net4_pst"). Per-model training logs go to
+# training: a failed model is logged and the loop continues. Per-model training logs go to
 # $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
 #
 # h1 is fixed (src/chess_lab/models/h1_weights.json): changing it would change the anchor, so every result
@@ -77,10 +76,6 @@ step_train() {
     elif ! "$PYTHON" -m chess_lab.training.train --model "$model" --effort "$EFFORT" \
         --raw "$RAW" --sidecar "$SIDECAR" > "$STATE_DIR/logs/train_$model.log" 2>&1; then
       log "FAILED train $model (log: $STATE_DIR/logs/train_$model.log); the other models continue"
-      if [ "$model" = net4_pst ]; then
-        rm -f "$ARTIFACTS/net4_pst.npz" "$CARDS/net4_pst.json"
-        log "DISCARDED net4_pst"
-      fi
     fi
   done
 }

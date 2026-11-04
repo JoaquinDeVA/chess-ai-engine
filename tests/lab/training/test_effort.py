@@ -6,7 +6,7 @@ import chess
 import pandas as pd
 import pytest
 
-from chess_lab.models.definitions import PstTaperedModel
+from chess_lab.models.definitions import PstTermsModel
 from chess_lab.models.representation import Representation
 from chess_lab.training import effort
 from chess_lab.training.dataset import TRAIN, VALIDATION, assign_split
@@ -117,7 +117,7 @@ def test_search_keeps_the_trial_with_the_lowest_validation_loss(monkeypatch):
 
     monkeypatch.setattr(effort, "fit", fake_fit)
     plan = {"positions": 1000, "max_epochs": 1, "patience": 2, "trials": 3, "batch_size": 4096}
-    best = search(PstTaperedModel, Representation(), Path("."), Path("."), None, plan,
+    best = search(PstTermsModel, Representation(), Path("."), Path("."), None, plan,
                   log=lambda line: None)  # fmt: skip
     assert len(calls) == 3
     assert best == {"l2": calls[1]["l2"], "lr": calls[1]["lr"]}
@@ -140,7 +140,7 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
 
     monkeypatch.setattr(effort, "iter_batches", recording_iter_batches)
     lines = []
-    search(PstTaperedModel, Representation(), raw, side, validation, plan, log=lines.append)
+    search(PstTermsModel, Representation(), raw, side, validation, plan, log=lines.append)
     assert splits and set(splits) == {TRAIN}
     assert len(lines) == 1 and lines[0].startswith("trial 1/1")
 
@@ -174,7 +174,7 @@ def test_available_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
 
 
 def test_cache_path_changes_with_every_input():
-    base = {"model_class": PstTaperedModel, "rep": Representation(mate_keep=0.10)}
+    base = {"model_class": PstTermsModel, "rep": Representation(mate_keep=0.10)}
     args = {"positions": 1000, "seed": 42, "quiet_only": False, "batch_size": 4096}
     reference = cache_path(**base, **args)
 
@@ -184,7 +184,7 @@ def test_cache_path_changes_with_every_input():
     assert cache_path(**base, **{**args, "quiet_only": True}) != reference
     assert cache_path(**base, **{**args, "batch_size": 2048}) != reference
     assert (
-        cache_path(model_class=PstTaperedModel, rep=Representation(mate_keep=0.5), **args)
+        cache_path(model_class=PstTermsModel, rep=Representation(mate_keep=0.5), **args)
         != reference
     )
-    assert cache_path(model_class=PstTaperedModel, rep=Representation(k=0.01), **args) != reference
+    assert cache_path(model_class=PstTermsModel, rep=Representation(k=0.01), **args) != reference

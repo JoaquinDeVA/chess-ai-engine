@@ -1,4 +1,4 @@
-//! The sparse network `net4_pst`: slotted inputs, an accumulator of clipped sums and dense layers.
+//! The sparse network: slotted inputs, an accumulator of clipped sums and dense layers.
 
 use shakmaty::{Chess, Color, Move, Piece, Position, Role, Square};
 

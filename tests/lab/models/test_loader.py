@@ -22,15 +22,15 @@ def save_linear(path, features, size, bias=0.0, weight=0.0, rep=None):
 
 
 def test_shipped_models_are_installed():
-    assert {"linear_material", "linear_pst_terms", "net4_pst"} <= set(installed_models())
+    assert {"linear_pst_terms"} <= set(installed_models())
 
 
 def test_missing_artifact_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        load_evaluator("linear_material", tmp_path / "missing.npz")
+        load_evaluator("linear_pst_terms", tmp_path / "missing.npz")
 
 
-@pytest.mark.parametrize("name", ["linear_material", "linear_pst_terms", "net4_pst"])
+@pytest.mark.parametrize("name", ["linear_pst_terms"])
 def test_core_scores_white_point_of_view(name):
     evaluator = load_evaluator(name)
     assert evaluator.evaluate(WHITE_UP_A_QUEEN, True) > evaluator.evaluate(BLACK_UP_A_QUEEN, True)
@@ -38,21 +38,21 @@ def test_core_scores_white_point_of_view(name):
 
 def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
-    save_linear(tmp_path / "linear_pst.npz", "linear_pst", 768)
-    save_linear(tmp_path / "linear_pst@x.npz", "linear_pst", 768, bias=1.0)
+    save_linear(tmp_path / "linear_pst_terms.npz", "linear_pst_terms", 790)
+    save_linear(tmp_path / "linear_pst_terms@x.npz", "linear_pst_terms", 790, bias=1.0)
 
-    assert split_spec("linear_pst@x") == ("linear_pst", "x")
-    assert split_spec("linear_pst") == ("linear_pst", None)
+    assert split_spec("linear_pst_terms@x") == ("linear_pst_terms", "x")
+    assert split_spec("linear_pst_terms") == ("linear_pst_terms", None)
     with pytest.raises(ValueError):
-        split_spec("linear_pst@")
-    assert installed_models() == ["linear_pst"]
-    assert load_evaluator("linear_pst@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
-    assert load_evaluator("linear_pst").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
+        split_spec("linear_pst_terms@")
+    assert installed_models() == ["linear_pst_terms"]
+    assert load_evaluator("linear_pst_terms@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
+    assert load_evaluator("linear_pst_terms").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
     with pytest.raises(FileNotFoundError):
-        load_evaluator("linear_pst@missing")
+        load_evaluator("linear_pst_terms@missing")
 
 
 def test_a_feature_set_without_rust_version_is_rejected(tmp_path):
     save_linear(tmp_path / "unported.npz", "unported_test_features", 1)
     with pytest.raises(ValueError):
-        load_evaluator("linear_pst", tmp_path / "unported.npz")
+        load_evaluator("linear_pst_terms", tmp_path / "unported.npz")

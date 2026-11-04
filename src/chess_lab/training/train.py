@@ -56,7 +56,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--representation",
         help='linear models: "default", or a JSON object with the fields of Representation '
-        "(scale, k, perspective, filter)",
+        "(scale, k, perspective, mate_keep)",
     )
     parser.add_argument(
         "--mate-keep",
@@ -155,9 +155,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             "--mate-keep 1.0 --tag mates100): without it the untagged model would be overwritten"
         )
         return 2
-    quiet = rep.filter == "quiet"
     available = available_rows(
-        args.sidecar, quiet_only=quiet, raw_dir=args.raw, mate_keep=rep.mate_keep
+        args.sidecar, quiet_only=True, raw_dir=args.raw, mate_keep=rep.mate_keep
     )
     if available == 0:
         print(f"no TRAIN rows found in {args.sidecar}")
@@ -176,10 +175,10 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         VALIDATION,
         MAX_VALIDATION_ROWS,
         seed=SAMPLE_SEED,
-        quiet_only=quiet,
+        quiet_only=True,
         mate_keep=rep.mate_keep,
     )
-    timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
+    timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, True)
     estimate = estimated_seconds(plan, timing, cached=not args.no_cache)
     print(
         f"Timed: {timing.seconds_per_position * 1e6:.1f} us per position, "
@@ -188,7 +187,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     )
     print(f"Estimated duration: {format_duration(estimate)}")
 
-    best = search(model_class, rep, args.raw, args.sidecar, validation, plan, quiet)
+    best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
     print(f"Final fit with l2={best['l2']:.2e}, lr={best['lr']:.2e}")
     model, summary = fit(
         model_class,
@@ -198,7 +197,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         validation,
         plan["positions"],
         fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=args.patience),
-        quiet,
+        True,
         seed=args.seed,
         use_cache=not args.no_cache,
     )

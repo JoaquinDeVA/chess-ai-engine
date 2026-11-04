@@ -82,7 +82,7 @@ def test_fit_stream_rejects_empty_validation():
 
 
 def test_save_load_round_trip_gives_identical_scores(tmp_path):
-    rep = Representation(scale="cp_linear", perspective="white", filter="quiet")
+    rep = Representation(scale="cp_linear", perspective="white")
     model = random_net(seed=4, rep=rep)
     path = model.save(tmp_path / "net_pst_w64x16.npz")
 

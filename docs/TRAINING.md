@@ -24,10 +24,10 @@ The rows follow from the formulas above. For example, effort 30 trains four pass
 python -m chess_lab.training.train --model linear_pst_terms --effort 30
 ```
 
-The shipped `linear_pst_terms` is trained on quiet positions only, at effort 10; the filter is not the default of `Representation` (`"all"`, `src/chess_lab/models/representation.py`), so the command passes it ([Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms)):
+The shipped `linear_pst_terms` is trained on quiet positions only, at effort 10 (training always uses quiet positions; [Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms)):
 
 ```bash
-python -m chess_lab.training.train --model linear_pst_terms --effort 10 --representation '{"filter":"quiet"}'
+python -m chess_lab.training.train --model linear_pst_terms --effort 10
 ```
 
 Before training, the command prints the configuration and an estimated duration, based on a short timed run on 50,000 positions.

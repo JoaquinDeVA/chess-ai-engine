@@ -18,7 +18,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
   plain search in 100 games ("Search techniques in games" below); each one's own measurement is in the
   [catalogue](techniques/README.md). Late move reductions are off: they lose 8.6 Elo at a fixed node count (next section).
 - **The model that plays is the Piece-square-and-terms logistic model (`linear_pst_terms`)**, trained on quiet
-  positions only (`--representation '{"filter":"quiet"}'`, effort 10): it beat the same model trained on every
+  positions only (effort 10): it beat the same model trained on every
   position by +284 ± 43 Elo in 362 games at 60 s + 1 s (`quiet_vs_actual` below).
 - **The networks are not measured yet**: the candidates of [Models](MODELS.md) are registered but not trained.
 

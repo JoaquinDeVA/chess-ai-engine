@@ -21,7 +21,6 @@ LICHESS_K = 0.00368208
 
 _SCALES = ("winprob", "cp_linear")
 _PERSPECTIVES = ("white", "side_to_move")
-_FILTERS = ("all", "quiet")
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
@@ -39,12 +38,11 @@ def validate_mate_keep(mate_keep: float) -> None:
 
 @dataclass(frozen=True)
 class Representation:
-    """Choice of target scale, point of view and position filter.
+    """Choice of target scale and point of view. Training always uses the quiet positions (see :func:`is_quiet`).
 
     :param scale: ``"winprob"`` (logistic of centipawns) or ``"cp_linear"`` (clipped linear).
     :param k: Slope of the logistic curve (only used by ``"winprob"``).
     :param perspective: ``"white"`` or ``"side_to_move"`` (score of the player to move).
-    :param filter: ``"all"`` positions or only ``"quiet"`` ones (see :func:`is_quiet`).
     :param mate_keep: Share of the mate positions kept in the training data, in ``(0, 1]``
         (see :func:`keep_mate_rows`); 1 keeps them all. Defaults to :data:`DEFAULT_MATE_KEEP`.
     """
@@ -52,7 +50,6 @@ class Representation:
     scale: str = "winprob"
     k: float = LICHESS_K
     perspective: str = "side_to_move"
-    filter: str = "all"
     mate_keep: float = DEFAULT_MATE_KEEP
 
     def __post_init__(self) -> None:
@@ -60,24 +57,22 @@ class Representation:
             raise ValueError(f"unknown scale: {self.scale!r}")
         if self.perspective not in _PERSPECTIVES:
             raise ValueError(f"unknown perspective: {self.perspective!r}")
-        if self.filter not in _FILTERS:
-            raise ValueError(f"unknown filter: {self.filter!r}")
         validate_mate_keep(self.mate_keep)
 
     @property
     def name(self) -> str:
-        """Short identifier, e.g. ``"winprob-k0.00368-stm-all"`` (the default mate share).
+        """Short identifier, e.g. ``"winprob-k0.00368-stm-quiet"`` (the default mate share).
 
         Another mate share adds a suffix: ``-mates5`` for 5 %, ``-mates100`` for all of them.
         """
         scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
         persp = "stm" if self.perspective == "side_to_move" else "white"
-        return f"{scale}-{persp}-{self.filter}{mates_suffix(self.mate_keep)}"
+        return f"{scale}-{persp}-quiet{mates_suffix(self.mate_keep)}"
 
     def to_dict(self) -> dict:
         """Fields as a plain dictionary.
 
-        :return: ``{"scale": ..., "k": ..., "perspective": ..., "filter": ..., "mate_keep": ...}``.
+        :return: ``{"scale": ..., "k": ..., "perspective": ..., "mate_keep": ...}``.
         """
         return asdict(self)
 
@@ -85,10 +80,15 @@ class Representation:
     def from_dict(cls, d: dict) -> "Representation":
         """Build a representation from a dictionary.
 
-        :param d: Dictionary produced by :meth:`to_dict`.
+        :param d: Dictionary produced by :meth:`to_dict`. A ``"filter": "quiet"`` entry, written
+            by earlier versions, is ignored.
         :return: The equivalent representation.
+        :raises ValueError: If ``"filter"`` is anything but ``"quiet"``.
         """
-        return cls(**d)
+        fields = dict(d)
+        if fields.pop("filter", "quiet") != "quiet":
+            raise ValueError("only the quiet filter exists")
+        return cls(**fields)
 
 
 def white_score(cp: np.ndarray, mate: np.ndarray, rep: Representation) -> np.ndarray:

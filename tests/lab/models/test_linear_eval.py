@@ -75,7 +75,7 @@ def test_fit_learns_material():
 
 
 def test_save_load_round_trip_keeps_scores_and_representation(tmp_path):
-    rep = Representation(scale="cp_linear", perspective="white", filter="quiet")
+    rep = Representation(scale="cp_linear", perspective="white")
     model = random_model(seed=4, rep=rep)
     path = model.save(tmp_path / "model.npz")
 

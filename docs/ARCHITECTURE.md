@@ -113,16 +113,15 @@ sequenceDiagram
     B-->>W: legal move
 ```
 
-Under a clock the binary spends a share of the time left (the increment is ignored); with `depth N` it searches
-to that depth; with `movetime` it spends that time. Without a clock or a fixed time the window sends
+How much time a move gets (clock, `depth N`, `movetime`, the increment) is described in one page,
+[Iterative deepening with a clock](techniques/iterative-deepening.md). Without a clock or a fixed time the window sends
 `movetime 3000`. The search is iterative deepening with a hard limit inside the tree: an interrupted
 iteration is discarded unless it is the first one, so there is always a move. The algorithms themselves
 are in [How the engine chooses a move](SEARCH.md) and the [catalogue of techniques](techniques/README.md).
 
 The binary takes its options by `setoption`: `Threads`, `Hash`, `Techniques` (a list of names, as in
-`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. Known gap: the binary reads
-the clock fields but ignores `winc`/`binc`, so the increment has no effect on the search until the
-selective-search work of the plan fixes it.
+`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. The clock rules, including
+the ignored increment, are in [Iterative deepening with a clock](techniques/iterative-deepening.md).
 
 ## Building and testing
 

@@ -46,6 +46,8 @@ when the core replaced the Python engine, against records that no longer exist (
 
 **Speed.** Not measured today: the figures taken when the core replaced the Python engine (8 to 35 times faster to depth 4, 2.0 to 2.8 plies deeper in 10 s) came from scripts that were removed in `6162db8` and from an earlier version of the core. The core has since been sped up to 928 k nodes per second (`uci bench`, laptop, median of 5 runs; see the [CHANGELOG](../../CHANGELOG.md)). On 60 other positions at depth 8 (a one-off harness, not kept) the speed-up of `67f413a` was 2.2 times (302 k to 661 k nodes/s), not the 2.58 of `uci bench`.
 
+**Target CPU.** `.cargo/config.toml` builds for x86-64-v3 (AVX2, BMI2): 750 k to 788 k nodes/s (+5 %), 274,145 nodes before and after (`uci bench`, median of 5 runs, laptop, 2026-11-04). The binary does not run on CPUs older than 2013 (Haswell) or Zen 1.
+
 **Tried without gain** (2026-11-04, `uci bench`, same session): `lto = "fat"`, `panic = "abort"` and the shared lock-free table for one thread (834 k against 921 k nodes/s) did not speed the search up; none is kept.
 
 ## Status

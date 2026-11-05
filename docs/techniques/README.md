@@ -20,9 +20,9 @@ Node counts are per move at depth 6 over 100 positions (reference: 672,800); the
 | Make/unmake, terminal detection | reference, on | not measured | [board-state](board-state.md) |
 | Opening book | on, in the window | not measured | [opening-book](opening-book.md) |
 | Endgame tablebases | on | not measured | [endgame-tablebases](endgame-tablebases.md) |
-| Search in Rust | since 2026-10-25 | not measured | [rust-core](rust-core.md) |
+| Search in Rust | since 2026-10-25; 304 k to 928 k nodes/s in `uci bench` | +130.9 for the 2.58x speed-up of `67f413a`, +180 with the two later ones (300 games each, 10 s + 0.1 s, [CHANGELOG](../../CHANGELOG.md)) | [rust-core](rust-core.md) |
 | Several threads (Lazy SMP) | UCI option `Threads`, 1 by default | not measured | [lazy-smp](lazy-smp.md) |
-| Incremental network accumulator (`incremental`) | on; effect with the light networks not measured | not measured | [incremental](incremental.md) |
+| Incremental network accumulator (`incremental`) | on; `linear_pst_terms` +17 % nodes/s (788 k to 928 k), light networks not measured | not measured in games on its own | [incremental](incremental.md) |
 | Table move first (`tt_move`) | on; nodes 672,800 to 256,693 | +92 with `history` (100 games, [RESULTS](../RESULTS.md#search-techniques-in-games)) | [tt-move](tt-move.md) |
 | History heuristic (`history`) | on; nodes to 391,130 | +92 with `tt_move` (same match) | [history](history.md) |
 | Principal variation search (`pvs`) | on; nodes to 487,244 | +104 with the two above and `aspiration` (same match series) | [pvs](pvs.md) |

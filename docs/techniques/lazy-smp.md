@@ -74,7 +74,7 @@ session). Seconds to depth 8, mean per position:
 The earlier measurement on an idle machine (six threads no better than four: 1.211 s against 1.180 s) is in the git
 history of this page. Six threads are still no faster than four to depth 8 on this loaded machine.
 
-**In games** (2026-11-04, `data/matches/smp_6v4/match.log`, desktop worker with four physical and eight logical cores, `fastchess`, one game at a time, 10 s + 0.1 s, `Hash` 256, SPRT [0, 10]): six threads (A) against four threads (B), `linear_pst_terms` for both:
+**In games** (2026-11-04, `data/results/matches/smp_6v4/match.log`, desktop worker with four physical and eight logical cores, `fastchess`, one game at a time, 10 s + 0.1 s, `Hash` 256, SPRT [0, 10]): six threads (A) against four threads (B), `linear_pst_terms` for both:
 
 | test | games | score | Elo (95 %) | pentanomial | LLR | verdict |
 |---|---|---|---|---|---|---|
@@ -82,7 +82,7 @@ history of this page. Six threads are still no faster than four to depth 8 on th
 
 Six threads do not beat four: the result is compatible with zero and the speed figures agree. Why was not isolated; the worker has only four physical cores.
 
-**Vote or no vote at six threads** (2026-11-05, `data/matches/smp_vote/match.log`, same setup but `Hash` 256 and a fixed 300 games, no SPRT): the default binary (A) against the same code returning the main thread's move (B, a throwaway build with the vote bypassed; it has no switch), six threads each:
+**Vote or no vote at six threads** (2026-11-05, `data/results/matches/smp_vote/match.log`, same setup but `Hash` 256 and a fixed 300 games, no SPRT): the default binary (A) against the same code returning the main thread's move (B, a throwaway build with the vote bypassed; it has no switch), six threads each:
 
 | test | games | score | Elo (95 %) | pentanomial |
 |---|---|---|---|---|

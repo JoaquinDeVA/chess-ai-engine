@@ -5,7 +5,6 @@ estimate the duration; :func:`search` runs the random hyper-parameter trials; :f
 the TRAIN split of the raw shards through :func:`chess_lab.models.fit_stream`.
 """
 
-import hashlib
 import math
 import os
 import time
@@ -20,21 +19,19 @@ import pyarrow.parquet as pq
 from chess_lab.models import fit_stream, new_model
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import NeuralEvalModel, SparseModel
-from chess_lab.models.linear_eval import DEFAULT_FIT_CONFIG, encode_frame, losses, scores
-from chess_lab.models.linear_features import features_of
-from chess_lab.models.representation import (
+from chess_lab.models.features import features_of
+from chess_lab.models.fitting.linear import DEFAULT_FIT_CONFIG, encode_frame, losses, scores
+from chess_lab.models.target import (
     Representation,
     keep_mate_rows,
     validate_mate_keep,
 )
 
-from .dataset import TRAIN
-from .sidecar import iter_batches
+from .cache import cache_path
+from .data.sidecar import iter_batches
+from .data.split import TRAIN
 
 MAX_EFFORT = 100
-#: Version of the encoded-batch cache; bump it when the encoding changes without a visible key.
-CACHE_VERSION = 1
-CACHE_ROOT = Path("data/cache/linear")
 #: Positions per effort point: effort 30 trains on 30 M positions, effort 70 on 70 M.
 POSITIONS_PER_EFFORT = 1_000_000
 #: Floor of the positions, so that effort 0 still trains on a meaningful sample.
@@ -177,35 +174,6 @@ def fit_config(
     }
 
 
-def cache_path(
-    model_class: type,
-    rep: Representation,
-    positions: int,
-    seed: int,
-    quiet_only: bool,
-    batch_size: int,
-    root: Path = CACHE_ROOT,
-) -> Path:
-    """Directory of the encoded batches: a short hash of everything that shapes them.
-
-    :return: ``root/<hash>``.
-    """
-    key = "|".join(
-        str(part)
-        for part in (
-            model_class.__name__,
-            rep.name,
-            positions,
-            seed,
-            quiet_only,
-            rep.mate_keep,
-            batch_size,
-            CACHE_VERSION,
-        )
-    )
-    return root / hashlib.sha256(key.encode()).hexdigest()[:16]
-
-
 def fit(
     model_class: type,
     rep: Representation,
@@ -229,7 +197,7 @@ def fit(
     :param config: Fit configuration (see :func:`fit_config`).
     :param quiet_only: Train on quiet positions only.
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
-    :param use_cache: Keep the encoded batches in ``data/cache/linear`` and reuse them.
+    :param use_cache: Keep the encoded batches in ``data/cache`` and reuse them.
     :return: The fitted model and the summary of :func:`chess_lab.models.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """

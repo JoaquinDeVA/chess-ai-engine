@@ -81,9 +81,9 @@
     }
   },
   "cost": {
-    "us_per_eval": 2.86,
+    "us_per_eval": 2.37,
     "samples": 1000,
-    "date": "2026-11-03",
-    "commit": "b558005+dirty"
+    "date": "2026-11-05",
+    "commit": "65eca04+dirty"
   }
 }

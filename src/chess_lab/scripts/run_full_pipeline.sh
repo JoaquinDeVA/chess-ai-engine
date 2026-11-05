@@ -8,35 +8,35 @@
 # training: a failed model is logged and the loop continues. Per-model training logs go to
 # $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
 #
-# h1 is fixed (src/chess_lab/models/h1_weights.json): changing it would change the anchor, so every result
+# h1 is fixed (src/chess_lab/models/store/h1_weights.json): changing it would change the anchor, so every result
 # measured against the old h1 would stop being comparable.
 #
-# Variables (defaults): RAW (data/lichess/raw), SIDECAR (data/lichess/sidecar), EFFORT (30),
+# Variables (defaults): RAW (data/LichessPositions/raw), SIDECAR (data/LichessPositions/sidecar), EFFORT (30),
 # AGREEMENT_N (20000), MODELS (every registered model, from chess_lab.models.definitions),
-# STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/pipeline),
+# STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/results/pipeline),
 # PYTHON (.venv/bin/python if it exists, else python).
 #
 #   Dry run:   DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh
-#   Real run:  nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/pipeline.log 2>&1 &
+#   Real run:  nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
-RAW="${RAW:-data/lichess/raw}"
-SIDECAR="${SIDECAR:-data/lichess/sidecar}"
+RAW="${RAW:-data/LichessPositions/raw}"
+SIDECAR="${SIDECAR:-data/LichessPositions/sidecar}"
 EFFORT="${EFFORT:-30}"
 AGREEMENT_N="${AGREEMENT_N:-20000}"
 STEPS="${STEPS:-sidecars train evaluate report}"
 FORCE="${FORCE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
-STATE_DIR="${STATE_DIR:-data/pipeline}"
+STATE_DIR="${STATE_DIR:-data/results/pipeline}"
 if [ -z "${PYTHON:-}" ]; then
   if [ -x .venv/bin/python ]; then PYTHON=.venv/bin/python; else PYTHON=python; fi
 fi
 
 # The model list and the folders come from the registry, not from copies here.
 MODELS="${MODELS:-$("$PYTHON" -c "from chess_lab.models.definitions import available_models as a; print(' '.join(a()))")}"
-ARTIFACTS=$("$PYTHON" -c "from chess_lab.models.loader import ARTIFACTS_DIR; print(ARTIFACTS_DIR)")
-CARDS=$("$PYTHON" -c "from chess_lab.models.cards import CARDS_DIR; print(CARDS_DIR)")
+ARTIFACTS=$("$PYTHON" -c "from chess_lab.models.store.loader import ARTIFACTS_DIR; print(ARTIFACTS_DIR)")
+CARDS=$("$PYTHON" -c "from chess_lab.models.store.cards import CARDS_DIR; print(CARDS_DIR)")
 
 log() { echo "=== $*"; }
 
@@ -105,4 +105,4 @@ for step in $STEPS; do
   fi
   [ "$DRY_RUN" = 1 ] || touch "$done_file"
 done
-log "Done. Review docs/RESULTS.md, data/reports/ and the cards in $CARDS and commit."
+log "Done. Review docs/RESULTS.md, data/results/reports/ and the cards in $CARDS and commit."

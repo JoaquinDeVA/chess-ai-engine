@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from chess_lab.training.dataset import TEST, TRAIN, VALIDATION
+from chess_lab.training.data.split import TEST, TRAIN, VALIDATION
 from tests.paths import ROOT
 
 

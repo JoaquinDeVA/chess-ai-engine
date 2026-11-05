@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from chess_engine.paths import ROOT
-from chess_lab.models.cards import load_all_cards
-from chess_lab.models.representation import Representation
+from chess_lab.models.store.cards import load_all_cards
+from chess_lab.models.target import Representation
 
 HISTORY_FILE = ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"

@@ -21,7 +21,7 @@ from chess_engine import _core
 from chess_engine.paths import ROOT
 
 #: Default location of the tables.
-DEFAULT_TABLEBASE_DIR = ROOT / "data" / "knowledge" / "endgame"
+DEFAULT_TABLEBASE_DIR = ROOT / "data" / "knowledge" / "endgame_tablebase"
 
 
 class EndgameTablebase:
@@ -52,7 +52,7 @@ class EndgameTablebase:
     @classmethod
     @lru_cache(maxsize=1)
     def shipped(cls) -> Optional["EndgameTablebase"]:
-        """The tables of ``data/knowledge/endgame``, opened once and shared.
+        """The tables of ``data/knowledge/endgame_tablebase``, opened once and shared.
 
         :return: The tablebase, or ``None`` when the folder is missing (a fresh clone).
         """

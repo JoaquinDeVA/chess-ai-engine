@@ -44,9 +44,9 @@ The terms, in the order of `TERM_NAMES`, are:
 
 Every term is the side to move's value minus the opponent's, and is blended by game phase exactly like the piece squares. What it learns is how much each of these ideas is worth, and that the answer differs between middlegame and endgame (a passed pawn matters much more late).
 
-**Trained on quiet positions only.** A sum of weights cannot represent an exchange in progress, so positions where the side to move is in check or the best move is a capture or a promotion (see [Data](DATA.md)) only distort what it learns; the search resolves those with quiescence. The shipped model is trained on the quiet ones (effort 10 or 30, `python -m chess_lab.training.train --model linear_pst_terms --effort 10`). Trained on quiet positions it plays +284 ± 43 Elo better than trained on every position (362 games at 60 s + 1 s, `data/matches/quiet_vs_actual/match.log`, [Results](RESULTS.md)). Three variants did not beat it: a steeper target (`k` 0.0065), keeping 0.5 % of the mates instead of 10 %, and 30 M positions (all within the error of 280 games).
+**Trained on quiet positions only.** A sum of weights cannot represent an exchange in progress, so positions where the side to move is in check or the best move is a capture or a promotion (see [Data](DATA.md)) only distort what it learns; the search resolves those with quiescence. The shipped model is trained on the quiet ones (effort 10 or 30, `python -m chess_lab.training.train --model linear_pst_terms --effort 10`). Trained on quiet positions it plays +284 ± 43 Elo better than trained on every position (362 games at 60 s + 1 s, `data/results/matches/quiet_vs_actual/match.log`, [Results](RESULTS.md)). Three variants did not beat it: a steeper target (`k` 0.0065), keeping 0.5 % of the mates instead of 10 %, and 30 M positions (all within the error of 280 games).
 
-**Limit.** Adding more features to it (passed pawns by rank, king attack, king-relative piece squares) gave no gain in play (+29.0 ± 35.2 and 0.0 ± 35.3 Elo in 300-game screenings, `data/matches/{passed,king}_vs_base/match.log`), so the logistic regression is at its limit here. Training on 30 M positions (`linear_pst_terms@e30`) raised Spearman from 0.638 to 0.646 and scored +39.6 ± 33.8 Elo in a 300-game screening (`data/matches/e30_vs_base/match.log`). Status: shipped.
+**Limit.** Adding more features to it (passed pawns by rank, king attack, king-relative piece squares) gave no gain in play (+29.0 ± 35.2 and 0.0 ± 35.3 Elo in 300-game screenings, `data/results/matches/{passed,king}_vs_base/match.log`), so the logistic regression is at its limit here. Training on 30 M positions (`linear_pst_terms@e30`) raised Spearman from 0.638 to 0.646 and scored +39.6 ± 33.8 Elo in a 300-game screening (`data/results/matches/e30_vs_base/match.log`). Status: shipped.
 
 ## Light network candidates (`net_pst_w32`, `net_pst_w64`, `net_pst_w64x16`)
 
@@ -66,12 +66,28 @@ Every term is the side to move's value minus the opponent's, and is blended by g
 
 **Status.** Registered, not trained, not shipped. The parameter range is to be fixed after measuring the cost per evaluation; the engine binary embeds only the logistic model.
 
+## Hybrid network (`net_hybrid_w64`)
+
+**Problem.** The logistic model cannot combine its features, and a network on the 768 piece-square inputs alone has to learn from the board what the eleven classical terms already say.
+
+**What it does.** The same sparse network as the light candidates, with 790 inputs: the 768 slotted piece-square inputs plus the 22 values of the eleven classical terms (each weighted by the game phase and by its complement). One hidden layer of 64 units and one logit through the same sigmoid.
+
+| Id | Layers | Parameters |
+|---|---|---:|
+| `net_hybrid_w64` | 790 → 64 → 1 | 50,689 |
+
+**Implementation.** `NnHybridW64Model` in `src/chess_lab/models/definitions.py`; the `pst_hybrid` feature set in `src/chess_lab/models/features.py` and `rust/src/eval/sparse_features.rs`; evaluation in `rust/src/eval/sparse_net.rs`, which sums the whole first layer at each leaf for this feature set (the incremental accumulator covers only the slotted features).
+
+**Measured effect.** Trained at effort 30 on quiet positions (40 epochs, validation loss 0.63208). On 200,000 validation rows (`python -m chess_lab.measure.evaluate --model net_hybrid_w64`): Spearman 0.718 against 0.646 for `linear_pst_terms@e30`, MAE 0.111 against 0.128, 3.8 µs per evaluation against 2.4 (both measured on the same laptop, idle) (model table in [Results](RESULTS.md#model-table)). Not played: the network is not exported to the engine binary, so there is no Elo figure.
+
+**Status.** Trained, not shipped. The engine binary embeds only the logistic model.
+
 ## The hand-written heuristic (`h1`)
 
 A classical evaluation written by hand (`rust/src/eval/classic_heuristic.rs`), not a model file: six differences between White and
 Black (material, hand-written piece-square tables, mobility, centre control, king safety and development), each
 normalised to 0–1, combined as `0.5 + sum(weight * (feature - 0.5))` and clipped to 0.01–0.99 so it is never taken
-for a decided game. The six weights were fitted to Stockfish (`src/chess_lab/models/h1_weights.json`). It is the
+for a decided game. The six weights were fitted to Stockfish (`src/chess_lab/models/store/h1_weights.json`). It is the
 anchor of the timed tournaments in [Results](RESULTS.md).
 
 For accuracy, speed and match numbers of every model above, see [Results](RESULTS.md).

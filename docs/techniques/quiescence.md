@@ -47,7 +47,7 @@ used by the UCI binary; the Python bindings take `quiescence_plies`, where 0 swi
 
 Measured with the earlier Python engine on 1,000 test positions (seed 42), depth 3
 (`scripts/bench/compare_quiescence.py --players h1,linear_pst_terms`, removed in `6162db8`; in the git history;
-report `data/reports/QUIESCENCE.md`). Agreement is the share of positions where the move is Stockfish's:
+report `data/results/reports/QUIESCENCE.md`). Agreement is the share of positions where the move is Stockfish's:
 
 | player | quiescence | agreement | nodes per move | s per move |
 |---|---|---|---|---|

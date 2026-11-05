@@ -7,20 +7,19 @@ import pandas as pd
 import pytest
 
 from chess_lab.models.definitions import PstTermsModel
-from chess_lab.models.representation import Representation
+from chess_lab.models.target import Representation
 from chess_lab.training import effort
-from chess_lab.training.dataset import TRAIN, VALIDATION, assign_split
+from chess_lab.training.data.raw_shards import shard_path, write_shard
+from chess_lab.training.data.sidecar import build_sidecar, load_sample
+from chess_lab.training.data.split import TRAIN, VALIDATION, assign_split
 from chess_lab.training.effort import (
     MIN_POSITIONS,
     Timing,
     available_rows,
-    cache_path,
     effort_config,
     estimated_seconds,
     search,
 )
-from chess_lab.training.lichess_raw import shard_path, write_shard
-from chess_lab.training.sidecar import build_sidecar, load_sample
 from tests.conftest import material_cp, random_positions
 
 
@@ -171,20 +170,3 @@ def test_available_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
     assert available_rows(side, raw_dir=raw, mate_keep=1.0) == full
     with pytest.raises(ValueError):
         available_rows(side, mate_keep=0.2)
-
-
-def test_cache_path_changes_with_every_input():
-    base = {"model_class": PstTermsModel, "rep": Representation(mate_keep=0.10)}
-    args = {"positions": 1000, "seed": 42, "quiet_only": False, "batch_size": 4096}
-    reference = cache_path(**base, **args)
-
-    assert cache_path(**base, **args) == reference
-    assert cache_path(**base, **{**args, "positions": 2000}) != reference
-    assert cache_path(**base, **{**args, "seed": 7}) != reference
-    assert cache_path(**base, **{**args, "quiet_only": True}) != reference
-    assert cache_path(**base, **{**args, "batch_size": 2048}) != reference
-    assert (
-        cache_path(model_class=PstTermsModel, rep=Representation(mate_keep=0.5), **args)
-        != reference
-    )
-    assert cache_path(model_class=PstTermsModel, rep=Representation(k=0.01), **args) != reference

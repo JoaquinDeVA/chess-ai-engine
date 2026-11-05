@@ -5,7 +5,7 @@ import json
 import pyarrow.parquet as pq
 import pytest
 
-from chess_lab.training.lichess_raw import (
+from chess_lab.training.data.raw_shards import (
     RAW_COLUMNS,
     is_legal_position,
     parse_raw_record,

@@ -19,9 +19,9 @@ import chess
 import numpy as np
 import pandas as pd
 
-from .definitions import LinearEvalModel
-from .linear_features import LinearFeatures, features_of
-from .representation import Representation, target
+from ..definitions import LinearEvalModel
+from ..features import LinearFeatures, features_of
+from ..target import Representation, target
 
 #: Hyper-parameters used when the training configuration leaves a key out.
 DEFAULT_FIT_CONFIG: Dict[str, Any] = {

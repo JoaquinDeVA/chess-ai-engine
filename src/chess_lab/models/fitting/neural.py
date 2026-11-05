@@ -14,8 +14,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from .definitions import Layer, NeuralEvalModel
-from .linear_eval import (
+from ..definitions import Layer, NeuralEvalModel
+from ..features import features_of
+from ..target import Representation
+from .linear import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,
     encode_frame,
@@ -23,8 +25,6 @@ from .linear_eval import (
     losses,
     run_epochs,
 )
-from .linear_features import features_of
-from .representation import Representation
 
 #: Standard deviation of the initial accumulator weights (He-normal is used for dense layers).
 _ACCUMULATOR_STD = 0.05
@@ -214,7 +214,7 @@ def fit_stream(
     losses include the ``l2`` penalty of the accumulator (negligible at the default ``l2``).
 
     With ``workers > 1`` frames are featurized in a process pool, as in
-    :func:`chess_lab.models.linear_eval.fit_stream`.
+    :func:`chess_lab.models.fitting.linear.fit_stream`.
 
     :param model: The network to train; its layers are replaced by the best epoch.
     :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.

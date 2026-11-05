@@ -1,6 +1,6 @@
 """Model cards: small JSON files with everything known about a model.
 
-Cards live in ``chess_lab/models/cards/<name>.json``. ``chess_lab.training.train`` and ``measure.evaluate`` fill
+Cards live in ``chess_lab/models/store/cards/<name>.json``. ``chess_lab.training.train`` and ``measure.evaluate`` fill
 them in; ``measure.report`` renders them into ``RESULTS.md``.
 """
 
@@ -21,7 +21,7 @@ def card_path(name: str) -> Path:
     """Path of the card of model ``name``.
 
     :param name: Model name.
-    :return: ``chess_lab/models/cards/<name>.json``.
+    :return: ``chess_lab/models/store/cards/<name>.json``.
     """
     return CARDS_DIR / f"{name}.json"
 

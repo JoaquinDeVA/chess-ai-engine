@@ -18,7 +18,7 @@ fn read(path: PathBuf) -> Value {
 }
 
 fn h1() -> H1 {
-    let file = read(root().join("src/chess_lab/models/h1_weights.json"));
+    let file = read(root().join("src/chess_lab/models/store/h1_weights.json"));
     let mut weights = [0.0; 6];
     for (slot, name) in FEATURE_NAMES.iter().enumerate() {
         weights[slot] = file["weights"][name].as_f64().unwrap();

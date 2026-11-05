@@ -12,7 +12,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-from chess_lab.models.cards import clear_measurements, current_commit, today, update_card
 from chess_lab.models.defaults import (
     DEFAULT_MATE_KEEP,
     RAW_DIR,
@@ -21,10 +20,12 @@ from chess_lab.models.defaults import (
     format_duration,
 )
 from chess_lab.models.definitions import available_models, get_model_class
-from chess_lab.models.loader import artifact_path
-from chess_lab.models.representation import Representation
+from chess_lab.models.store.cards import clear_measurements, current_commit, today, update_card
+from chess_lab.models.store.loader import artifact_path
+from chess_lab.models.target import Representation
 
-from .dataset import VALIDATION
+from .data.sidecar import load_sample
+from .data.split import VALIDATION
 from .effort import (
     available_rows,
     calibrate,
@@ -34,7 +35,6 @@ from .effort import (
     fit_config,
     search,
 )
-from .sidecar import load_sample
 
 MAX_VALIDATION_ROWS = 50_000
 
@@ -48,7 +48,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
     parser.add_argument(
-        "--output", type=Path, help="where to save (default: src/chess_lab/models/artifacts)"
+        "--output", type=Path, help="where to save (default: src/chess_lab/models/store/artifacts)"
     )
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--effort", type=int, help="models: effort level 0-100")

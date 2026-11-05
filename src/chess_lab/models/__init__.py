@@ -8,9 +8,9 @@ from typing import Any, Dict, Iterable, Optional
 
 import pandas as pd
 
-from . import linear_eval, neural_eval
 from .definitions import NeuralEvalModel, SparseModel
-from .representation import Representation
+from .fitting import linear, neural
+from .target import Representation
 
 
 def new_model(model_class: type, rep: Optional[Representation] = None) -> SparseModel:
@@ -21,8 +21,8 @@ def new_model(model_class: type, rep: Optional[Representation] = None) -> Sparse
     :return: The model, with ``rep`` saved as a dictionary.
     """
     if issubclass(model_class, NeuralEvalModel):
-        return neural_eval.new_network_model(model_class, rep)
-    return linear_eval.new_linear_model(model_class, rep)
+        return neural.new_network_model(model_class, rep)
+    return linear.new_linear_model(model_class, rep)
 
 
 def fit_stream(
@@ -37,9 +37,9 @@ def fit_stream(
     :param model: The model to train; it keeps the best epoch.
     :param batches: Re-iterable frames with columns ``fen, cp, mate, white_to_move``.
     :param validation: Same columns, used for early stopping.
-    :param config: Hyper-parameters; see :func:`chess_lab.models.linear_eval.fit_stream`.
+    :param config: Hyper-parameters; see :func:`chess_lab.models.fitting.linear.fit_stream`.
     :param cache_dir: Directory of the encoded frames, or None for no cache.
     :return: Summary of the run.
     """
-    module = neural_eval if isinstance(model, NeuralEvalModel) else linear_eval
+    module = neural if isinstance(model, NeuralEvalModel) else linear
     return module.fit_stream(model, batches, validation, config, cache_dir)

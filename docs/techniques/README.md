@@ -65,9 +65,9 @@ against the current default, as late move reductions were.
 
 | change | measurement | command or file |
 |---|---|---|
-| Late move reductions (`lmr`) | −8.6 ± 6.1 Elo, SPRT [−5, 0] at 20,000 nodes, 10,244 games | `data/matches/lmr_nodes/match.log` |
-| Quiescence evasions (`qs_evasions`) | −21.3 ± 10.6 Elo, SPRT [−5, 0] at 20,000 nodes, 3,428 games | `data/matches/qs_evasions/match.log` |
-| Clock rules (`TimeRules`: `half`, `stab`, `nodes`; `single` changed no game) | −10.4 ± 30.6, −25.5 ± 33.6, −80.1 ± 37.2 Elo; 300 games at 10 s + 0.1 s each, screening | `data/matches/{half,stab,nodes}_vs_base/match.log` |
+| Late move reductions (`lmr`) | −8.6 ± 6.1 Elo, SPRT [−5, 0] at 20,000 nodes, 10,244 games | `data/results/matches/lmr_nodes/match.log` |
+| Quiescence evasions (`qs_evasions`) | −21.3 ± 10.6 Elo, SPRT [−5, 0] at 20,000 nodes, 3,428 games | `data/results/matches/qs_evasions/match.log` |
+| Clock rules (`TimeRules`: `half`, `stab`, `nodes`; `single` changed no game) | −10.4 ± 30.6, −25.5 ± 33.6, −80.1 ± 37.2 Elo; 300 games at 10 s + 0.1 s each, screening | `data/results/matches/{half,stab,nodes}_vs_base/match.log` |
 
 ## How to add a technique
 

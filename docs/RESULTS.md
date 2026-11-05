@@ -38,7 +38,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 ## Engine matches (Rust engine, fastchess)
 
 Matches of the UCI binary against itself, one change at a time, as explained in
-[How a change is measured](MEASUREMENT.md). Logs in `data/matches/<name>/match.log`.
+[How a change is measured](MEASUREMENT.md). Logs in `data/results/matches/<name>/match.log`.
 
 | match | A against B | conditions | games | score | Elo (95 %) | LLR | verdict |
 |---|---|---|---|---|---|---|---|
@@ -81,7 +81,7 @@ incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --in
 | Question | Answer | Where it comes from |
 |---|---|---|
 | Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, Python engine). Keeping 0.5 % instead did not differ beyond the error (−44 ± 36 Elo, `q_m05_vs_quiet`). | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100` and a match against the default model |
-| Train on quiet positions only? | Yes: +284 ± 43 Elo against the all-positions model (362 games, SPRT [0, 5] accepted). Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not differ from it beyond the error (−7 ± 35, −44 ± 36, +23 ± 41 Elo). | `data/matches/quiet_vs_actual/match.log`, `q_k65_vs_quiet`, `q_m05_vs_quiet`, `q30_vs_quiet`; [Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms) |
+| Train on quiet positions only? | Yes: +284 ± 43 Elo against the all-positions model (362 games, SPRT [0, 5] accepted). Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not differ from it beyond the error (−7 ± 35, −44 ± 36, +23 ± 41 Elo). | `data/results/matches/quiet_vs_actual/match.log`, `q_k65_vs_quiet`, `q_m05_vs_quiet`, `q30_vs_quiet`; [Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms) |
 | Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` (removed in `6162db8`); [Quiescence](techniques/quiescence.md) |
 | Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `scripts/bench/compare_time_estimators.py` (removed in `6162db8`); [Iterative deepening](techniques/iterative-deepening.md) |
 | Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5` (removed in `6162db8`); [Endgame tablebases](techniques/endgame-tablebases.md) |
@@ -107,8 +107,9 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
 | `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.9 |
-| `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 10 | 0.638 | 0.131 | 20.4% / 55.9% | 2.9 |
-| `linear_pst_terms@e30` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.9 |
+| `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 10 | 0.638 | 0.131 | 20.4% / 55.9% | 2.4 |
+| `linear_pst_terms@e30` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
+| `net_hybrid_w64` | 50,689 | winprob-k0.00368-stm-quiet | 30 | 0.718 | 0.111 | 21.7% / 56.5% | 3.8 |
 <!-- END GENERATED TABLES -->
 
 ## Reproduce
@@ -118,5 +119,5 @@ games (games are played with fastchess, [Measurement](MEASUREMENT.md)).
 
 ```bash
 DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh   # prints every command
-nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/pipeline/pipeline.log 2>&1 &
+nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
 ```

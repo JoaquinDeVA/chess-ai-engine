@@ -95,7 +95,7 @@ _PROTECTED_HASHES: dict = {}
 def _artifact_hashes() -> dict:
     import hashlib
 
-    from chess_lab.models.loader import ARTIFACTS_DIR
+    from chess_lab.models.store.loader import ARTIFACTS_DIR
 
     hashes = {}
     for name in PROTECTED_ARTIFACTS:

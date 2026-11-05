@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the opening book from the Lichess evaluations.
 
-python src/chess_lab/scripts/data/build_opening_book.py --raw data/lichess/raw --out data/opening_book.json
+python src/chess_lab/scripts/data/build_opening_book.py --raw data/LichessPositions/raw --out data/knowledge/opening_book/opening_book.json
 
 The raw shards hold a Stockfish evaluation for each of 125 million positions; most opening
 positions are among them. The book is a walk through that data: from the starting position the
@@ -156,7 +156,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=Path, default=RAW_DIR)
-    parser.add_argument("--out", type=Path, default=Path("data/opening_book.json"))
+    parser.add_argument(
+        "--out", type=Path, default=Path("data/knowledge/opening_book/opening_book.json")
+    )
     parser.add_argument("--plies", type=int, default=16, help="half-moves followed")
     parser.add_argument("--margin", type=float, default=30.0, help="centipawns within the best")
     parser.add_argument("--top", type=int, default=3, help="moves followed from a position")

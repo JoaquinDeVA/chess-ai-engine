@@ -14,7 +14,7 @@ from chess_engine import _core
 from chess_engine.paths import ROOT
 
 #: Default location of the book shipped with the project.
-DEFAULT_BOOK_PATH = ROOT / "data" / "opening_book.json"
+DEFAULT_BOOK_PATH = ROOT / "data" / "knowledge" / "opening_book" / "opening_book.json"
 
 
 def position_key(board: chess.Board) -> str:
@@ -60,7 +60,7 @@ class OpeningBook:
     def shipped(cls) -> "OpeningBook":
         """The book shipped with the project, loaded once and shared.
 
-        :return: The book of ``data/opening_book.json``; an empty book if the file is missing.
+        :return: The book of ``data/knowledge/opening_book/opening_book.json``; an empty book if the file is missing.
         """
         return cls.load() if DEFAULT_BOOK_PATH.exists() else cls({})
 

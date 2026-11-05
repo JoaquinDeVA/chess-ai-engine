@@ -32,7 +32,7 @@ positions of the feature-parity and technique tests), `data/syzygy/` (five 3-pie
 
 - **After touching `rust/`, run `pip install -e ".[dev]"` again.** Otherwise `pytest` tests the old compiled core.
   `cargo test` does not build the bindings (the `python` feature is off).
-- **The features exist twice.** Training encodes with `src/chess_lab/models/linear_features.py`, the core plays
+- **The features exist twice.** Training encodes with `src/chess_lab/models/features.py`, the core plays
   with `rust/src/eval/sparse_features.rs`; if they differ, one thing is trained and another played, with no error.
   `core/test_feature_parity.py` compares them on 300 positions per feature family: keep it green.
 - **The models table of `docs/RESULTS.md` is generated** (`python -m chess_lab.measure.report`); a hand edit is

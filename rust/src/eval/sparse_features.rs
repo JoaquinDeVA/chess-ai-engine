@@ -1,6 +1,6 @@
 //! Sparse board features: a position becomes a list of active feature indices and values, seen
 //! from a perspective. The linear model and the network score them. The features and their order
-//! are those of `chess_lab/models/linear_features.py`.
+//! are those of `chess_lab/models/features.py`.
 
 use shakmaty::attacks::{bishop_attacks, knight_attacks, queen_attacks, rook_attacks};
 use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};

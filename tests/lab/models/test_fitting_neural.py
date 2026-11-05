@@ -15,8 +15,8 @@ from chess_lab.models.definitions import (
     get_model_class,
     load_evaluator,
 )
-from chess_lab.models.linear_features import features_of
-from chess_lab.models.representation import Representation
+from chess_lab.models.features import features_of
+from chess_lab.models.target import Representation
 from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 

@@ -17,7 +17,7 @@ The project does not use all of it. The file is not shuffled: the deepest and mo
 ```bash
 python -c "
 import glob, pyarrow.parquet as pq
-meta = [pq.ParquetFile(p).metadata.metadata for p in glob.glob('data/lichess/raw/part-*.parquet')]
+meta = [pq.ParquetFile(p).metadata.metadata for p in glob.glob('data/LichessPositions/raw/part-*.parquet')]
 print(sum(int(m[b'lines']) for m in meta), sum(int(m[b'illegal']) for m in meta))
 "
 ```
@@ -26,7 +26,7 @@ It prints `126000000 1076973`; the difference is the 124,923,027 kept rows (`doc
 
 ## Raw shards
 
-`src/chess_lab/scripts/data/build_raw_shards.py` converts the `.zst` file into 126 Parquet shards of 1,000,000 lines each (`data/lichess/raw/part-NNNNN.parquet`, ignored by git). Parquet is a columnar file format that reads quickly and compresses well. Each row keeps the deepest evaluation of the position, with ties broken by node count; nothing is rewritten, so the shard is a lossless copy of what Stockfish said (`src/chess_lab/training/lichess_raw.py`, `RAW_SCHEMA`).
+`src/chess_lab/scripts/data/build_raw_shards.py` converts the `.zst` file into 126 Parquet shards of 1,000,000 lines each (`data/LichessPositions/raw/part-NNNNN.parquet`, ignored by git). Parquet is a columnar file format that reads quickly and compresses well. Each row keeps the deepest evaluation of the position, with ties broken by node count; nothing is rewritten, so the shard is a lossless copy of what Stockfish said (`src/chess_lab/training/data/raw_shards.py`, `RAW_SCHEMA`).
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -38,13 +38,13 @@ It prints `126000000 1076973`; the difference is the 124,923,027 kept rows (`doc
 | `best_move` | string | First move of the best line, in UCI notation |
 | `n_evals`, `n_pvs` | uint8 | Evaluations of the line, and variations of the chosen one |
 
-The sign convention matters. In the shards, `cp` and `mate` are always from White's point of view: positive is good for White, and `mate > 0` means White delivers mate, whoever is to move. The code measures this instead of assuming it (`detect_perspective` in `src/chess_lab/training/lichess.py`) and writes it in each shard's metadata under the `perspective` key. Training converts the target to the side to move: the score of a position is `1 - s` when Black is to move (`target` in `src/chess_lab/models/representation.py`). One model therefore serves both colours.
+The sign convention matters. In the shards, `cp` and `mate` are always from White's point of view: positive is good for White, and `mate > 0` means White delivers mate, whoever is to move. The code measures this instead of assuming it (`detect_perspective` in `src/chess_lab/training/lichess.py`) and writes it in each shard's metadata under the `perspective` key. Training converts the target to the side to move: the score of a position is `1 - s` when Black is to move (`target` in `src/chess_lab/models/target.py`). One model therefore serves both colours.
 
 ## Sidecars
 
-Next to each shard sits a small file, `data/lichess/sidecar/part-NNNNN.sidecar.parquet`, with the same rows in the same order and the same row groups. It stores three things per position (`src/chess_lab/training/sidecar.py`):
+Next to each shard sits a small file, `data/LichessPositions/sidecar/part-NNNNN.sidecar.parquet`, with the same rows in the same order and the same row groups. It stores three things per position (`src/chess_lab/training/data/sidecar.py`):
 
-- `split`: train, validation or test. It is the CRC32 hash of the seed (42) and the FEN, modulo 10,000, so 80 % goes to train, 10 % to validation and 10 % to test (`assign_split` in `src/chess_lab/training/dataset.py`). The split depends only on the position, never on row order or on how many rows you load, so a model can never be tested on a position it trained on.
+- `split`: train, validation or test. It is the CRC32 hash of the seed (42) and the FEN, modulo 10,000, so 80 % goes to train, 10 % to validation and 10 % to test (`assign_split` in `src/chess_lab/training/data/split.py`). The split depends only on the position, never on row order or on how many rows you load, so a model can never be tested on a position it trained on.
 - `quiet`: true when the side to move is not in check and the best move is neither a capture nor a promotion (`is_quiet`). Quiet positions are the ones where a static evaluation is least distorted by an exchange in progress.
 - `white_to_move`: whose turn it is, so the sampler does not need to parse the FEN again.
 
@@ -92,7 +92,7 @@ Stockfish speaks in centipawns, but a model that learns to predict centipawns di
 
     target = 1 / (1 + exp(-k * cp)),   k = 0.00368208
 
-With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the scale is bounded and saturates. Forced mates become exactly 1 (White mates) or 0 (Black mates). Both come from `white_score` in `src/chess_lab/models/representation.py`, with `LICHESS_K = 0.00368208`; the two values quoted above come from evaluating that formula.
+With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the scale is bounded and saturates. Forced mates become exactly 1 (White mates) or 0 (Black mates). Both come from `white_score` in `src/chess_lab/models/target.py`, with `LICHESS_K = 0.00368208`; the two values quoted above come from evaluating that formula.
 
 ### Why only 10 % of the mates
 

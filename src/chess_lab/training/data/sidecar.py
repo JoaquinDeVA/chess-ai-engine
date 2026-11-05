@@ -16,9 +16,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from chess_lab.models.defaults import SAMPLE_SEED
-from chess_lab.models.representation import is_quiet, keep_mate_rows, validate_mate_keep
+from chess_lab.models.target import is_quiet, keep_mate_rows, validate_mate_keep
 
-from .dataset import assign_split
+from .split import assign_split
 
 SIDECAR_SCHEMA = pa.schema(
     [("split", pa.int8()), ("quiet", pa.bool_()), ("white_to_move", pa.bool_())]

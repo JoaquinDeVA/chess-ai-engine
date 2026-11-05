@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from chess_engine import _core
-from chess_lab.models.linear_features import FEATURE_SETS
+from chess_lab.models.features import FEATURE_SETS
 from tests.paths import POSITIONS
 
 

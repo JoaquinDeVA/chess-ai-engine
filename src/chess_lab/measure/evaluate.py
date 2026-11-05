@@ -17,12 +17,12 @@ from typing import Any, Dict, List, Optional
 from chess_engine import _core
 from chess_lab.measure.judge import judge
 from chess_lab.measure.report import update_history_file
-from chess_lab.models.cards import current_commit, load_card, today, update_card
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
-from chess_lab.models.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
-from chess_lab.training.dataset import TEST
-from chess_lab.training.sidecar import load_sample
+from chess_lab.models.store.cards import current_commit, load_card, today, update_card
+from chess_lab.models.store.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
+from chess_lab.training.data.sidecar import load_sample
+from chess_lab.training.data.split import TEST
 
 #: Evaluations that are not saved models: the hand-written heuristic.
 HEURISTICS = ("h1",)
@@ -106,7 +106,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--model", required=True, type=model_spec_arg, help="model name, or name@tag"
     )
-    parser.add_argument("--path", type=Path, help="saved model file (default: models/artifacts)")
+    parser.add_argument(
+        "--path", type=Path, help="saved model file (default: models/store/artifacts)"
+    )
     parser.add_argument("--raw", type=Path, default=RAW_DIR, help="raw shards directory")
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR, help="sidecar directory")
     parser.add_argument(

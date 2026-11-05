@@ -24,7 +24,7 @@ manifest-path = "rust/Cargo.toml"
 features = ["python"]
 profile = "release"
 include = [
-    { path = "src/chess_lab/models/h1_weights.json", format = "sdist" },
+    { path = "src/chess_lab/models/store/h1_weights.json", format = "sdist" },
 ]
 
 [tool.pytest.ini_options]

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_lab.models.representation import (
+from chess_lab.models.target import (
     LICHESS_K,
     Representation,
     is_quiet,

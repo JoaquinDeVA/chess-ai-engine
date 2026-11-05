@@ -7,14 +7,14 @@ import chess
 import numpy as np
 import pytest
 
-from chess_lab.models import fit_stream, linear_eval, new_model
+from chess_lab.models import fit_stream, new_model
 from chess_lab.models.definitions import (
     LinearEvalModel,
     available_models,
     get_model_class,
     load_evaluator,
 )
-from chess_lab.models.linear_features import (
+from chess_lab.models.features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
     FEATURE_SETS,
@@ -27,7 +27,8 @@ from chess_lab.models.linear_features import (
     features_of,
     phase,
 )
-from chess_lab.models.representation import Representation
+from chess_lab.models.fitting import linear as linear_eval
+from chess_lab.models.target import Representation
 from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import BLACK_UP_A_QUEEN, WHITE_UP_A_QUEEN, frame
 

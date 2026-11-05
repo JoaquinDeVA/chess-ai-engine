@@ -31,7 +31,7 @@ engine, and the node and depth counts only explain the result.
 ## Reading a result
 
 fastchess reports, every few pairs and at the end, a block like this one, from the A/A match `aa_s12` below
-(`data/matches/aa_s12/match.log`):
+(`data/results/matches/aa_s12/match.log`):
 
 ```text
 Elo: 9.04 +/- 25.04, nElo: 11.01 +/- 30.45
@@ -61,7 +61,7 @@ regresses), above +2.94 H1 is accepted (it does not). A cap on rounds stops a ma
 means the difference is smaller than the test can see in that many games.
 
 **Worked example**: the test of late move reductions (removed, [catalogue](techniques/README.md#how-the-switches-were-judged)) at 20,000 nodes per move, `[−5, 0]`
-(`data/matches/lmr_nodes/match.log`). A scored a little under 49 % from the start, and the LLR fell steadily:
+(`data/results/matches/lmr_nodes/match.log`). A scored a little under 49 % from the start, and the LLR fell steadily:
 
 | games | 200 | 2,200 | 4,200 | 6,200 | 8,200 | 10,200 | 10,244 |
 |---|---|---|---|---|---|---|---|
@@ -82,7 +82,7 @@ would mean the openings, the pairing or the machine bias the result.
 
 Three A/A matches at 10 s + 0.1 s, `Hash` 16, SPRT `[−5, 0]`, default techniques, 3 games at a time on the worker
 (`match.sh start aa_s12 -each tc=10+0.1 proto=uci option.Hash=16 -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 250 -games 2 -concurrency 3 -ratinginterval 20 -srand 12`;
-`aa_s11` and `aa_s13` with seeds 11 and 13; logs in `data/matches/<name>/match.log`):
+`aa_s11` and `aa_s13` with seeds 11 and 13; logs in `data/results/matches/<name>/match.log`):
 
 | match | games | score | Elo (95 %) | LLR | verdict |
 |---|---|---|---|---|---|
@@ -92,7 +92,7 @@ Three A/A matches at 10 s + 0.1 s, `Hash` 16, SPRT `[−5, 0]`, default techniqu
 
 All three intervals contain 0 and none came near −2.94: the instrument shows no bias at this size. At a fixed node
 count an A/A match says nothing: the engine is deterministic, so both games of a pair are the same game with the
-colours exchanged and every pair scores exactly 1–1 (`data/matches/aa_probe*/match.log`: Elo 0.00 ± 0.00 over 16
+colours exchanged and every pair scores exactly 1–1 (`data/results/matches/aa_probe*/match.log`: Elo 0.00 ± 0.00 over 16
 and 32 games). A fixed-node test has variance only because A and B differ.
 
 ## Which time control
@@ -108,7 +108,7 @@ A test needs about 12,000 games to see ±5 Elo (above), so the cost of a test is
 
 **Fixed nodes favour a change that saves nodes.** With the same node budget such a change searches deeper, so the
 test is the best case for it. Late move reductions lost anyway (48.76 % at 20,000 nodes,
-`data/matches/lmr_nodes/match.log`), and a change that loses at equal nodes does not win at equal time unless it
+`data/results/matches/lmr_nodes/match.log`), and a change that loses at equal nodes does not win at equal time unless it
 also makes each node cheaper. A win at fixed nodes proves nothing about time: it has to be confirmed at a time
 control. Fixed nodes are therefore the first filter for a change that should not lose, never the last.
 

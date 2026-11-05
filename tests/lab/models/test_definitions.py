@@ -3,13 +3,14 @@
 import numpy as np
 import pytest
 
-from chess_lab.models import loader, new_model
+from chess_lab.models import new_model
 from chess_lab.models.definitions import (
     available_models,
     get_model_class,
     load_model,
 )
-from chess_lab.models.representation import Representation
+from chess_lab.models.store import loader
+from chess_lab.models.target import Representation
 
 
 def test_every_model_is_in_the_table():

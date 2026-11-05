@@ -9,17 +9,18 @@ import pytest
 
 from chess_lab.measure import evaluate as evaluate_cli
 from chess_lab.measure import report
-from chess_lab.models import cards, definitions, loader
-from chess_lab.models.representation import Representation
+from chess_lab.models import definitions
+from chess_lab.models.store import cards, loader
+from chess_lab.models.target import Representation
 from chess_lab.training import train as train_cli
-from chess_lab.training.dataset import (
+from chess_lab.training.data.raw_shards import shard_path, write_shard
+from chess_lab.training.data.sidecar import build_sidecar
+from chess_lab.training.data.split import (
     TEST,
     TRAIN,
     VALIDATION,
     assign_split,
 )
-from chess_lab.training.lichess_raw import shard_path, write_shard
-from chess_lab.training.sidecar import build_sidecar
 from tests.conftest import material_cp, random_positions
 
 

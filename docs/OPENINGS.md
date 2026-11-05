@@ -22,7 +22,7 @@ must not decide the result by itself: a suite of balanced positions a few moves 
    equality.
 3. Pick the requested number from the balanced ones, with the same seed.
 
-The Lichess evaluation shards (`data/lichess/raw`) are not the source: their FENs carry no move counters, so the
+The Lichess evaluation shards (`data/LichessPositions/raw`) are not the source: their FENs carry no move counters, so the
 distance from the start cannot be read from them.
 
 ```bash

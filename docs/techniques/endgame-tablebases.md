@@ -45,13 +45,13 @@ With five pieces or fewer (kings included) and no castling rights:
 only at the root: the search never probes the tables inside the tree. Switch: the window's Settings → Endgame
 tablebases (`AISettings.tablebase`); used only if the tables are present.
 
-The tables (3-4-5 pieces, 290 files, 939 MB) live in `data/knowledge/endgame`. They are not versioned and this
+The tables (3-4-5 pieces, 290 files, 939 MB) live in `data/knowledge/endgame_tablebase`. They are not versioned and this
 project cannot rebuild them: they come from `tablebase.lichess.ovh` or any Syzygy 3-4-5 set.
 
 ## Measured effect
 
 Measured with the earlier Python engine (`scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5`,
-removed in `6162db8`; in the git history; report `data/reports/ENDGAME_TABLEBASE.md`): 60 random won positions of
+removed in `6162db8`; in the git history; report `data/results/reports/ENDGAME_TABLEBASE.md`): 60 random won positions of
 three to five pieces, the defender plays the tablebase move, the winner has 0.5 s per move and 100 moves. With the
 tables the winner mates in 52 of 60 (mean 14.2 moves); without them, in 8 of 60 (20.6 moves).
 

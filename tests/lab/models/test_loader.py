@@ -5,9 +5,9 @@ import json
 import numpy as np
 import pytest
 
-from chess_lab.models import loader
 from chess_lab.models.definitions import load_evaluator
-from chess_lab.models.loader import installed_models, split_spec
+from chess_lab.models.store import loader
+from chess_lab.models.store.loader import installed_models, split_spec
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"

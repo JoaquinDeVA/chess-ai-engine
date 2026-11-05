@@ -36,7 +36,7 @@ positions).
 
 ## Measured effect
 
-**SPRT at a fixed 20,000 nodes per move** (2026-11-02, `data/matches/qs_tt/match.log`). The default with `qs_tt`
+**SPRT at a fixed 20,000 nodes per move** (2026-11-02, `data/results/matches/qs_tt/match.log`). The default with `qs_tt`
 (A) against the default (B), with the same search effort for both, so the clock plays no part
 ([How a change is measured](../MEASUREMENT.md)):
 

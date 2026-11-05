@@ -13,8 +13,8 @@ SAMPLE_SEED = 42
 SPLIT_SEED = 42
 
 #: Raw Lichess shards and their sidecars, absolute so that any working directory finds them.
-RAW_DIR = ROOT / "data" / "lichess" / "raw"
-SIDECAR_DIR = ROOT / "data" / "lichess" / "sidecar"
+RAW_DIR = ROOT / "data" / "LichessPositions" / "raw"
+SIDECAR_DIR = ROOT / "data" / "LichessPositions" / "sidecar"
 
 #: Default share of the mate positions kept in training (the 100 % variant needs ``--tag``).
 DEFAULT_MATE_KEEP = 0.10

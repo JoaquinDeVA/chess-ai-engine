@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from chess_engine import _core
-from chess_lab.models.representation import Representation, white_score
+from chess_lab.models.target import Representation, white_score
 
 
 def _average_ranks(values: np.ndarray) -> np.ndarray:

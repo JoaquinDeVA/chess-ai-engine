@@ -9,7 +9,7 @@ skipped (their lines are still decompressed, not parsed), so an interrupted run 
 with the same options. Only legal standard-chess positions are kept (``chess.Board.is_valid``);
 parsing and the legality check run in ``--workers`` processes.
 
-    python src/chess_lab/scripts/data/build_raw_shards.py --input data/lichess/lichess_db_eval.jsonl.zst
+    python src/chess_lab/scripts/data/build_raw_shards.py --input data/LichessPositions/lichess_db_eval.jsonl.zst
 """
 
 import argparse
@@ -27,7 +27,7 @@ import pyarrow as pa
 import zstandard
 
 from chess_lab.models.defaults import RAW_DIR, format_duration
-from chess_lab.training.lichess_raw import (
+from chess_lab.training.data.raw_shards import (
     DETECTION_SAMPLE,
     ROW_GROUP_SIZE,
     ShardWriter,
@@ -106,7 +106,7 @@ def parse_in_order(pool, chunks, window: int):
     :param pool: Process pool, or None to parse in this process.
     :param chunks: Iterable of lists of lines.
     :param window: Maximum number of chunks being parsed (bounds the memory).
-    :return: Generator of :func:`~chess_lab.training.lichess_raw.parse_chunk` results.
+    :return: Generator of :func:`~chess_lab.training.data.raw_shards.parse_chunk` results.
     """
     pending = deque()
     for chunk in chunks:

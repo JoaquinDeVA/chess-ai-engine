@@ -48,12 +48,12 @@ flowchart TD
 
 `OpeningBook` in `rust/src/knowledge/book.rs`, with `src/chess_engine/knowledge/opening_book.py` as its Python face;
 consulted by `UciBot.get_move` in `src/chess_engine/uci.py` before the UCI binary (the binary itself has no book).
-Switch: the window's Settings → Opening book (`AISettings.opening_book`). Data: `data/opening_book.json` (versioned,
+Switch: the window's Settings → Opening book (`AISettings.opening_book`). Data: `data/knowledge/opening_book/opening_book.json` (versioned,
 9.0 MB, 121,868 positions), the only opening book of the project.
 
 ```bash
 python src/chess_lab/scripts/data/build_opening_book.py
-python src/chess_lab/scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16
+python src/chess_lab/scripts/data/check_opening_book.py data/knowledge/opening_book/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16
 ```
 
 The build indexes 39.6 million positions (about half an hour). The book is not used in engine matches: fastchess
@@ -70,4 +70,4 @@ measured.
 ## Status
 
 Adopted in the window; a book was part of the coursework base (2026-10-16), replaced by the one built from the Lichess shards on 2026-10-21 (`19c859e`). The UCI binary has no book. The book
-(`data/opening_book.json`) is permanent data, kept when the training data is deleted.
+(`data/knowledge/opening_book/opening_book.json`) is permanent data, kept when the training data is deleted.

@@ -2,7 +2,7 @@
 # Lanza matches de fastchess en el trabajador sin depender de esta conexión.
 # Uso: match.sh start NOMBRE [opciones de fastchess...]   lanza (o reanuda si ya hay estado) y vuelve
 #      match.sh status NOMBRE                              ¿corre?, y resumen del log
-#      match.sh fetch NOMBRE                               trae match.pgn y match.log a data/matches/NOMBRE/
+#      match.sh fetch NOMBRE                               trae match.pgn y match.log a data/results/matches/NOMBRE/
 #      match.sh stop NOMBRE                                para fastchess (el estado queda guardado para reanudar)
 # A_ARGS y B_ARGS añaden opciones solo a un motor (p. ej. A_ARGS='nodes=20000 option.Techniques=qs_tt').
 # Reanudar = repetir el mismo `start NOMBRE`: carga results/NOMBRE/config.json, que fastchess guarda solo.
@@ -51,8 +51,8 @@ grep -v '^Warning' "$dir/match.log" | sed 's/\x1b\[[0-9;]*m//g' | grep -E 'Elo:|
 REMOTE
     ;;
 fetch)
-    mkdir -p "$ROOT/data/matches/$NAME"
-    scp -P "$PORT" "$HOST:$REMOTE_DIR/match.*" "$HOST:$REMOTE_DIR/config.json" "$ROOT/data/matches/$NAME/"
+    mkdir -p "$ROOT/data/results/matches/$NAME"
+    scp -P "$PORT" "$HOST:$REMOTE_DIR/match.*" "$HOST:$REMOTE_DIR/config.json" "$ROOT/data/results/matches/$NAME/"
     ;;
 stop)
     ssh -p "$PORT" "$HOST" "pkill -INT -f '[r]esults/$NAME/' || echo 'no corría'"

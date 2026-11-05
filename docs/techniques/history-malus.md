@@ -26,7 +26,7 @@ At a cut-off with `d` plies left, the cutting quiet move gains `d²` (as in `his
 
 ## Measured effect
 
-SPRT [0, 5] at a fixed 20,000 nodes per move, `incremental,tt_move,history,pvs,aspiration,null_move,see,history_malus` against the same list without it (`data/matches/history_malus_nodes/match.log`, 4 games at a time): stopped by hand at 2,404 reported games (of 2,556 played), +3.9 ± 9.3 Elo, 50.56 % of the points, LLR +0.33 of ±2.94. No verdict; the estimate fell from +31 ± 33 at 202 games to nearly zero, so any effect is small. Not measured with the clock.
+SPRT [0, 5] at a fixed 20,000 nodes per move, `incremental,tt_move,history,pvs,aspiration,null_move,see,history_malus` against the same list without it (`data/results/matches/history_malus_nodes/match.log`, 4 games at a time): stopped by hand at 2,404 reported games (of 2,556 played), +3.9 ± 9.3 Elo, 50.56 % of the points, LLR +0.33 of ±2.94. No verdict; the estimate fell from +31 ± 33 at 202 games to nearly zero, so any effect is small. Not measured with the clock.
 
 ## Status
 

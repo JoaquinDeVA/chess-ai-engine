@@ -1,7 +1,7 @@
 """The trained models as the laboratory defines them: weights, feature set and saved file.
 
 A model is its weights plus the name of the feature set the Rust core computes. The laboratory
-trains it, saves it as a ``.npz`` file in :data:`chess_lab.models.loader.ARTIFACTS_DIR` and reads it
+trains it, saves it as a ``.npz`` file in :data:`chess_lab.models.store.loader.ARTIFACTS_DIR` and reads it
 back here, the only reader of that format; :meth:`SparseModel.evaluator` hands it to the core.
 """
 
@@ -14,7 +14,7 @@ import numpy as np
 
 from chess_engine import _core
 
-from .loader import DEFAULT_PERSPECTIVE, artifact_path, split_spec
+from .store.loader import DEFAULT_PERSPECTIVE, artifact_path, split_spec
 
 #: Centipawns that correspond to a normalized target of ``1.0``. It is the 0.5% quantile of the
 #: course dataset: evaluations beyond it are clipped, so the target covers ~99% of the data.
@@ -404,7 +404,7 @@ def load_model(spec: str, path: Optional[Path] = None) -> SparseModel:
     """Load the saved model named by ``spec``.
 
     :param spec: Model name, or ``name@tag`` for a tagged artifact.
-    :param path: Saved file; defaults to :func:`chess_lab.models.loader.artifact_path`.
+    :param path: Saved file; defaults to :func:`chess_lab.models.store.loader.artifact_path`.
     :return: The loaded model.
     :raises KeyError: If the name is unknown.
     :raises FileNotFoundError: If the model file does not exist (train it first).
@@ -417,7 +417,7 @@ def load_evaluator(spec: str, path: Optional[Path] = None) -> "_core.Evaluator":
     """The core evaluation of the saved model named by ``spec``.
 
     :param spec: Model name, or ``name@tag`` for a tagged artifact.
-    :param path: Saved file; defaults to :func:`chess_lab.models.loader.artifact_path`.
+    :param path: Saved file; defaults to :func:`chess_lab.models.store.loader.artifact_path`.
     :return: Evaluator that runs inside the core.
     :raises KeyError: If the name is unknown.
     :raises FileNotFoundError: If the model file does not exist (train it first).

@@ -27,7 +27,7 @@ Play out the exchange on the target square without searching: each side recaptur
 
 ## Measured effect
 
-**Screening, 300 games at 10 s + 0.1 s** (2026-11-04, `data/matches/see_vs_base/match.log`, command `~/worker/cribar.sh`, 7 games at a time): the default with `see` (A) against the same binary without it (B), `linear_pst_terms` for both:
+**Screening, 300 games at 10 s + 0.1 s** (2026-11-04, `data/results/matches/see_vs_base/match.log`, command `~/worker/cribar.sh`, 7 games at a time): the default with `see` (A) against the same binary without it (B), `linear_pst_terms` for both:
 
 ```bash
 fastchess -engine cmd=./uci_base name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see \
@@ -39,9 +39,9 @@ fastchess -engine cmd=./uci_base name=A option.Techniques=incremental,tt_move,hi
 |---|---|---|---|---|
 | default + `see` vs default, 10 s + 0.1 s | 300 | 56.83 % | +47.8 ± 34.3 | 17, 12, 65, 25, 31 |
 
-A screening only decides whether a longer test is worth it; the interval is wide. An SPRT [0, 5] at 60 s + 1 s, stopped by hand after 160 games, gave +41.5 ± 46.1 Elo and an LLR of 0.30 of ±2.94 (no verdict): [0, 5] separates two close values and needs about a thousand games to settle an effect this size. An SPRT [0, 10] at 60 s + 1 s (`data/matches/see_sprt10/match.log`, `fastchess`, 7 games at a time, `Hash` 16), stopped by hand after 399 games played (356 scored), gave +67.2 ± 34.5 Elo (59.55 %, pentanomial 21, 13, 74, 17, 53) and an LLR of 1.91 of ±2.94 (no verdict). It was paused once and resumed with a faster binary; both engines always ran the same binary.
+A screening only decides whether a longer test is worth it; the interval is wide. An SPRT [0, 5] at 60 s + 1 s, stopped by hand after 160 games, gave +41.5 ± 46.1 Elo and an LLR of 0.30 of ±2.94 (no verdict): [0, 5] separates two close values and needs about a thousand games to settle an effect this size. An SPRT [0, 10] at 60 s + 1 s (`data/results/matches/see_sprt10/match.log`, `fastchess`, 7 games at a time, `Hash` 16), stopped by hand after 399 games played (356 scored), gave +67.2 ± 34.5 Elo (59.55 %, pentanomial 21, 13, 74, 17, 53) and an LLR of 1.91 of ±2.94 (no verdict). It was paused once and resumed with a faster binary; both engines always ran the same binary.
 
-**SPRT at a fixed 20,000 nodes per move** (2026-11-04, `data/matches/see_nodes/match.log`, laptop, 4 games at a time, `fastchess` 1 thread, `Hash` 16). The default with `see` (A) against the default (B), `linear_pst_terms` for both, so the clock plays no part:
+**SPRT at a fixed 20,000 nodes per move** (2026-11-04, `data/results/matches/see_nodes/match.log`, laptop, 4 games at a time, `fastchess` 1 thread, `Hash` 16). The default with `see` (A) against the default (B), `linear_pst_terms` for both, so the clock plays no part:
 
 ```bash
 fastchess -engine cmd=./uci name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see \

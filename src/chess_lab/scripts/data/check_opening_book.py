@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a sample of the opening book against Stockfish, through the Lichess cloud evaluation.
 
-python src/chess_lab/scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02
+python src/chess_lab/scripts/data/check_opening_book.py data/knowledge/opening_book/opening_book.json --fraction 0.02
 
 A random share of the book entries (fixed seed) is judged by the public ``cloud-eval`` API of
 Lichess (Stockfish). For each entry the script asks for the best lines of the position and takes the
@@ -10,7 +10,7 @@ passes when it is within ``--margin`` centipawns of the best line. Positions tha
 not hold are counted apart and do not pass or fail. With ``--prune`` the failing entries are removed
 and the book is written to ``--out``.
 
-Writes ``data/reports/OPENING_BOOK_CHECK.md``.
+Writes ``data/results/reports/OPENING_BOOK_CHECK.md``.
 """
 
 import argparse
@@ -212,10 +212,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--cache",
         type=Path,
-        default=Path("data/reports/opening_book_check_cache.jsonl"),
+        default=Path("data/results/reports/opening_book_check_cache.jsonl"),
         help="answers already received (the check resumes from them)",
     )
-    parser.add_argument("--report", type=Path, default=Path("data/reports/OPENING_BOOK_CHECK.md"))
+    parser.add_argument(
+        "--report", type=Path, default=Path("data/results/reports/OPENING_BOOK_CHECK.md")
+    )
     return parser.parse_args(argv)
 
 

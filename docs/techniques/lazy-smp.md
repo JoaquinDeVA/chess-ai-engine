@@ -80,7 +80,15 @@ history of this page. Six threads are still no faster than four to depth 8 on th
 |---|---|---|---|---|---|---|
 | 6 threads vs 4 threads | 280 scored (317 played) | 50.71 % | +5.0 ± 37.5 | 22, 24, 48, 20, 26 | 0.01 of ±2.94 | stopped by hand, no verdict |
 
-Six threads do not beat four: the result is compatible with zero and the speed figures agree. Why was not isolated; the worker has only four physical cores, and whether the vote helps or hurts at six threads was not tested (it has no switch).
+Six threads do not beat four: the result is compatible with zero and the speed figures agree. Why was not isolated; the worker has only four physical cores.
+
+**Vote or no vote at six threads** (2026-11-05, `data/matches/smp_vote/match.log`, same setup but `Hash` 256 and a fixed 300 games, no SPRT): the default binary (A) against the same code returning the main thread's move (B, a throwaway build with the vote bypassed; it has no switch), six threads each:
+
+| test | games | score | Elo (95 %) | pentanomial |
+|---|---|---|---|---|
+| 6 threads with vote vs without, 10 s + 0.1 s | 300 | 44.83 % | -36.0 ± 37.9 (last rating, 280 games) | 37, 23, 44, 26, 20 |
+
+The vote did not help: the point estimate is negative and the interval just reaches zero, so it is not proven to hurt either. It is kept as is until a larger run says otherwise.
 
 ## Status
 

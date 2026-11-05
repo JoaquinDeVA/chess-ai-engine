@@ -17,6 +17,7 @@ from chess_lab.models.definitions import (
 from chess_lab.models.linear_features import (
     _PAWN_CACHE,
     BLOCK_SIZE,
+    FEATURE_SETS,
     TERM_NAMES,
     KingSlottedPstFeatures,
     PstFeatures,
@@ -413,3 +414,46 @@ def test_king_slotted_features_move_the_slotted_indices_into_the_own_king_block(
     white_view, white_values = features.active(board, "white")
     assert white_view[-1] == 64 * 768
     assert white_values[-1] == 0.0
+
+
+def test_hybrid_features_put_the_pieces_in_the_king_bucket_and_the_terms_after_them():
+    plain = SlottedPstFeatures()
+    terms = PstTermsFeatures()
+    board = chess.Board()
+    sizes = {}
+    for name, buckets in (("pst_hybrid", 1), ("pst_hybrid_k4", 4), ("pst_hybrid_k8", 8)):
+        features = FEATURE_SETS[name]
+        sizes[name] = features.size("side_to_move")
+        assert sizes[name] == 768 * buckets + 22
+        assert features.size("white") == sizes[name] + 1
+        assert features.max_entries("side_to_move") == 54
+        indices, values = features.active(board, "side_to_move")
+        assert len(indices) == len(values) == 54
+        pieces = plain.active(board, "side_to_move")[0]
+        # King on e1: file group 2 of 4 (or group 1 of 2), rank group 0.
+        bucket = {1: 0, 4: 2, 8: 4}[buckets]
+        assert indices[:32] == [index + 768 * bucket for index in pieces]
+        assert values[:32] == [1.0] * 32
+        # The term entries equal those of linear_pst_terms, moved behind the buckets.
+        expected = terms.active(board, "side_to_move")
+        assert indices[32:] == list(range(768 * buckets, 768 * buckets + 22))
+        assert values[32:] == expected[1][-22:]
+    white_indices, white_values = FEATURE_SETS["pst_hybrid_k4"].active(board, "white")
+    assert white_indices[-1] == 768 * 4 + 22
+    assert white_values[-1] == 1.0
+    board.turn = chess.BLACK
+    # Black to move: the bucket is read on the colour-mirrored king square (e8 -> e1).
+    black = FEATURE_SETS["pst_hybrid_k8"].active(board, "side_to_move")[0]
+    assert max(black[:32]) < 768 * 8
+    assert black[:32] == [index + 768 * 4 for index in plain.active(board, "side_to_move")[0]]
+
+
+def test_hybrid_king_buckets_split_files_in_groups_and_ranks_at_the_third():
+    features = FEATURE_SETS["pst_hybrid_k8"]
+    assert features.bucket(chess.E1) == 4
+    assert features.bucket(chess.E3) == 5
+    assert features.bucket(chess.A2) == 0
+    assert features.bucket(chess.H8) == 7
+    assert FEATURE_SETS["pst_hybrid_k4"].bucket(chess.D1) == 0
+    assert FEATURE_SETS["pst_hybrid_k4"].bucket(chess.E4) == 3
+    assert FEATURE_SETS["pst_hybrid"].bucket(chess.E4) == 0

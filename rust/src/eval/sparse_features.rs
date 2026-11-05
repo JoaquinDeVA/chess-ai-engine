@@ -32,12 +32,22 @@ pub enum FeatureSet {
     Slotted,
     /// `pst_kings`: the slotted inputs once per square of the own king.
     Kings,
+    /// `pst_hybrid`, `pst_hybrid_k4`, `pst_hybrid_k8`: slotted inputs per king bucket (`file_groups`
+    /// file groups by two rank groups; none means a single bucket) plus the classical terms.
+    Hybrid { file_groups: usize },
 }
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 4] =
-        ["linear_pst", "linear_pst_terms", "pst_slotted", "pst_kings"];
+    pub const NAMES: [&'static str; 7] = [
+        "linear_pst",
+        "linear_pst_terms",
+        "pst_slotted",
+        "pst_kings",
+        "pst_hybrid",
+        "pst_hybrid_k4",
+        "pst_hybrid_k8",
+    ];
 
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
@@ -46,6 +56,9 @@ impl FeatureSet {
             "linear_pst_terms" => FeatureSet::PstTerms,
             "pst_slotted" => FeatureSet::Slotted,
             "pst_kings" => FeatureSet::Kings,
+            "pst_hybrid" => FeatureSet::Hybrid { file_groups: 0 },
+            "pst_hybrid_k4" => FeatureSet::Hybrid { file_groups: 2 },
+            "pst_hybrid_k8" => FeatureSet::Hybrid { file_groups: 4 },
             _ => return None,
         })
     }
@@ -58,6 +71,9 @@ impl FeatureSet {
             FeatureSet::PstTerms => 2 * BLOCK_SIZE + 2 * TERM_COUNT + turn,
             FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK + turn,
             FeatureSet::Kings => 64 * 2 * OPPONENT_PIECE_BLOCK + turn,
+            FeatureSet::Hybrid { file_groups } => {
+                buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK + 2 * TERM_COUNT + turn
+            }
         }
     }
 
@@ -76,6 +92,9 @@ impl FeatureSet {
             FeatureSet::PstTerms => pst_terms(pos, perspective, indices, values),
             FeatureSet::Slotted => slotted(pos, perspective, indices, values),
             FeatureSet::Kings => kings(pos, perspective, indices, values),
+            FeatureSet::Hybrid { file_groups } => {
+                hybrid(pos, perspective, file_groups, indices, values)
+            }
         }
     }
 }
@@ -373,5 +392,68 @@ fn kings(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, values
     }
     if perspective == Perspective::White {
         indices[pieces] = 64 * 2 * OPPONENT_PIECE_BLOCK;
+    }
+}
+
+/// Number of king buckets: two rank groups per file group, or one without file groups.
+fn buckets(file_groups: usize) -> usize {
+    if file_groups == 0 {
+        1
+    } else {
+        2 * file_groups
+    }
+}
+
+/// The slotted indices moved into the block of the own king's bucket, then the term entries and
+/// the turn entry (`1.0` White to move, `0.0` otherwise, under the White perspective).
+fn hybrid(
+    pos: &Chess,
+    perspective: Perspective,
+    file_groups: usize,
+    indices: &mut Vec<usize>,
+    values: &mut Vec<f64>,
+) {
+    slotted(pos, perspective, indices, values);
+    if perspective == Perspective::White {
+        indices.pop();
+        values.pop();
+    }
+    let owner = if perspective == Perspective::White {
+        Color::White
+    } else {
+        pos.turn()
+    };
+    let king = pos.board().king_of(owner).expect("a king per side");
+    let king = if owner == Color::Black {
+        mirror(king)
+    } else {
+        u32::from(king) as usize
+    };
+    let bucket = match 8usize.checked_div(file_groups) {
+        None => 0,
+        Some(width) => 2 * ((king % 8) / width) + usize::from(king / 8 >= 2),
+    };
+    let shift = bucket * 2 * OPPONENT_PIECE_BLOCK;
+    for index in indices.iter_mut() {
+        *index += shift;
+    }
+    let term_base = buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK;
+    let mut term_indices = Vec::new();
+    let mut term_values = Vec::new();
+    terms(pos, perspective, &mut term_indices, &mut term_values);
+    if perspective == Perspective::White {
+        // `terms` ends with its own turn entry.
+        term_indices.pop();
+        term_values.pop();
+    }
+    indices.extend(
+        term_indices
+            .iter()
+            .map(|index| index - 2 * BLOCK_SIZE + term_base),
+    );
+    values.extend(term_values);
+    if perspective == Perspective::White {
+        indices.push(term_base + 2 * TERM_COUNT);
+        values.push(if pos.turn() == Color::White { 1.0 } else { 0.0 });
     }
 }

@@ -243,6 +243,28 @@ def _piece_terms(board: chess.Board, color: chess.Color) -> List[float]:
     return terms
 
 
+def _term_entries(board: chess.Board, perspective: str, base: int) -> Tuple[List[int], List[float]]:
+    """Middlegame and endgame entries of the eleven classical terms, from ``base`` on.
+
+    :param board: The position.
+    :param perspective: ``"white"`` or ``"side_to_move"``.
+    :param base: Index of the first term entry.
+    :return: Two parallel lists of ``2 * len(TERM_NAMES)`` entries; zero values are kept.
+    """
+    tapered = phase(board)
+    white = _piece_terms(board, chess.WHITE)
+    black = _piece_terms(board, chess.BLACK)
+    terms = list(_pawn_terms(board)) + [w - b for w, b in zip(white, black, strict=True)]
+    sign = 1.0 if perspective == "white" or board.turn == chess.WHITE else -1.0
+    indices: List[int] = []
+    values: List[float] = []
+    for term, value in enumerate(terms):
+        index = base + 2 * term
+        indices.extend((index, index + 1))
+        values.extend((sign * value * tapered, sign * value * (1.0 - tapered)))
+    return indices, values
+
+
 class PstTermsFeatures(LinearFeatures):
     """Tapered piece-square tables plus classical terms, one middlegame and one endgame weight each.
 
@@ -282,15 +304,9 @@ class PstTermsFeatures(LinearFeatures):
             # PstFeatures ends with its own turn entry; this class appends a later one.
             indices.pop()
             values.pop()
-        tapered = phase(board)
-        white = _piece_terms(board, chess.WHITE)
-        black = _piece_terms(board, chess.BLACK)
-        terms = list(_pawn_terms(board)) + [w - b for w, b in zip(white, black, strict=True)]
-        sign = 1.0 if perspective == "white" or board.turn == chess.WHITE else -1.0
-        for term, value in enumerate(terms):
-            index = self._TERM_BASE + 2 * term
-            indices.extend((index, index + 1))
-            values.extend((sign * value * tapered, sign * value * (1.0 - tapered)))
+        term_indices, term_values = _term_entries(board, perspective, self._TERM_BASE)
+        indices.extend(term_indices)
+        values.extend(term_values)
         if perspective == "white":
             indices.append(self._TURN_INDEX)
             values.append(1.0 if board.turn == chess.WHITE else -1.0)
@@ -408,6 +424,110 @@ class KingSlottedPstFeatures(SlottedPstFeatures):
         return shifted, values
 
 
+class HybridPstFeatures(SlottedPstFeatures):
+    """One-hot piece squares, per king bucket, plus the eleven classical terms as dense inputs.
+
+    The slotted entries of :class:`SlottedPstFeatures` are shifted by ``768 * bucket``, where
+    ``bucket`` depends on the square of the own king (the mover's, or White's under ``"white"``;
+    mirrored by rank when it is Black): the file group (``8 / file_groups`` files wide) and whether
+    the king stands on rank 3 or beyond. The terms of :data:`TERM_NAMES` follow, two entries each
+    as in :class:`PstTermsFeatures`, and under ``"white"`` the turn entry (``1.0`` White to move,
+    ``0.0`` otherwise) closes the vector. With one bucket the king is ignored.
+
+    :cvar name: ``"pst_hybrid"``.
+    :cvar file_groups: King file groups; the buckets are ``2 * file_groups``, or ``1`` when ``0``.
+    """
+
+    name = "pst_hybrid"
+    file_groups = 0
+
+    @property
+    def buckets(self) -> int:
+        """Number of king buckets.
+
+        :return: ``2 * file_groups``, or ``1`` without king buckets.
+        """
+        return 2 * self.file_groups if self.file_groups else 1
+
+    @property
+    def _term_base(self) -> int:
+        """Index of the first term entry (after every bucket of piece squares)."""
+        return self.buckets * 2 * _OPPONENT_PIECE_BLOCK
+
+    def bucket(self, king: int) -> int:
+        """Bucket of an own king.
+
+        :param king: Square of the king, as seen from the home rank of its colour.
+        :return: Bucket in ``[0, buckets)``.
+        """
+        if not self.file_groups:
+            return 0
+        group = chess.square_file(king) // (8 // self.file_groups)
+        return 2 * group + (1 if chess.square_rank(king) >= 2 else 0)
+
+    def max_entries(self, perspective: str) -> int:
+        """Pieces, the term entries and, under ``"white"``, the turn entry.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``32 + 22`` or ``32 + 22 + 1``.
+        """
+        return self.max_active + 2 * len(TERM_NAMES) + (1 if perspective == "white" else 0)
+
+    def size(self, perspective: str) -> int:
+        """Bucketed piece squares, two entries per term and the turn weight under ``"white"``.
+
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: ``790 + 768 * (buckets - 1)``, plus one under ``"white"``.
+        """
+        return self._term_base + 2 * len(TERM_NAMES) + (1 if perspective == "white" else 0)
+
+    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
+        """Shifted piece entries, then the term entries, then the turn entry.
+
+        :param board: The position.
+        :param perspective: ``"white"`` or ``"side_to_move"``.
+        :return: Two parallel lists.
+        """
+        indices, values = super().active(board, perspective)
+        if perspective == "white":
+            # The slotted turn entry sits at 768; this class puts its own after the terms.
+            indices.pop()
+            values.pop()
+        owner = chess.WHITE if perspective == "white" else board.turn
+        king = board.king(owner)
+        if owner == chess.BLACK:
+            king = chess.square_mirror(king)
+        shift = self.bucket(king) * 2 * _OPPONENT_PIECE_BLOCK
+        indices = [index + shift for index in indices]
+        term_indices, term_values = _term_entries(board, perspective, self._term_base)
+        indices.extend(term_indices)
+        values.extend(term_values)
+        if perspective == "white":
+            indices.append(self._term_base + 2 * len(TERM_NAMES))
+            values.append(1.0 if board.turn == chess.WHITE else 0.0)
+        return indices, values
+
+
+class HybridKings4PstFeatures(HybridPstFeatures):
+    """:class:`HybridPstFeatures` with 4 king buckets (2 file groups by 2 rank groups).
+
+    :cvar name: ``"pst_hybrid_k4"``.
+    """
+
+    name = "pst_hybrid_k4"
+    file_groups = 2
+
+
+class HybridKings8PstFeatures(HybridPstFeatures):
+    """:class:`HybridPstFeatures` with 8 king buckets (4 file groups by 2 rank groups).
+
+    :cvar name: ``"pst_hybrid_k8"``.
+    """
+
+    name = "pst_hybrid_k8"
+    file_groups = 4
+
+
 #: Every feature set by its name, the one the saved models and the core refer to.
 FEATURE_SETS: Dict[str, LinearFeatures] = {
     features.name: features
@@ -416,6 +536,9 @@ FEATURE_SETS: Dict[str, LinearFeatures] = {
         PstTermsFeatures(),
         SlottedPstFeatures(),
         KingSlottedPstFeatures(),
+        HybridPstFeatures(),
+        HybridKings4PstFeatures(),
+        HybridKings8PstFeatures(),
     )
 }
 

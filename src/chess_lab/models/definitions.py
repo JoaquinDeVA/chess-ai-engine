@@ -310,6 +310,55 @@ class NnKingsW32Model(NeuralEvalModel):
     architecture = "Sparse network: 49,152 king-relative piece-square inputs, 32-1 (2 layers)"
 
 
+class NnHybridW32Model(NeuralEvalModel):
+    """768 piece-square plus 22 term inputs, a 32 accumulator, one output."""
+
+    name = "net_hybrid_w32"
+    feature_set = "pst_hybrid"
+    hidden = (32,)
+    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 32-1 (2 layers)"
+
+
+class NnHybridW64Model(NeuralEvalModel):
+    """768 piece-square plus 22 term inputs, a 64 accumulator, one output."""
+
+    name = "net_hybrid_w64"
+    feature_set = "pst_hybrid"
+    hidden = (64,)
+    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 64-1 (2 layers)"
+
+
+class NnHybridW128Model(NeuralEvalModel):
+    """768 piece-square plus 22 term inputs, a 128 accumulator, one output."""
+
+    name = "net_hybrid_w128"
+    feature_set = "pst_hybrid"
+    hidden = (128,)
+    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 128-1 (2 layers)"
+
+
+class NnHybridK4W64Model(NeuralEvalModel):
+    """Hybrid inputs in 4 king buckets, a 64 accumulator, one output."""
+
+    name = "net_hybrid_k4_w64"
+    feature_set = "pst_hybrid_k4"
+    hidden = (64,)
+    architecture = (
+        "Sparse network: 4 king buckets of 768 piece-square inputs plus 22 term inputs, 64-1"
+    )
+
+
+class NnHybridK8W64Model(NeuralEvalModel):
+    """Hybrid inputs in 8 king buckets, a 64 accumulator, one output."""
+
+    name = "net_hybrid_k8_w64"
+    feature_set = "pst_hybrid_k8"
+    hidden = (64,)
+    architecture = (
+        "Sparse network: 8 king buckets of 768 piece-square inputs plus 22 term inputs, 64-1"
+    )
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[SparseModel]] = {
     cls.name: cls
@@ -319,6 +368,11 @@ MODELS: Dict[str, Type[SparseModel]] = {
         NnW64Model,
         NnW64x16Model,
         NnKingsW32Model,
+        NnHybridW32Model,
+        NnHybridW64Model,
+        NnHybridW128Model,
+        NnHybridK4W64Model,
+        NnHybridK8W64Model,
     )
 }
 

@@ -98,6 +98,60 @@
    ],
    "elo0": -5,
    "elo1": 0
+  },
+  {
+   "name": "model_net_pst_w32",
+   "a": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "model_net_hybrid_w32",
+   "a": [
+    "option.Model=models/net_hybrid_w32.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "model_net_hybrid_w64",
+   "a": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "model_net_hybrid_k4_w64",
+   "a": [
+    "option.Model=models/net_hybrid_k4_w64.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "model_net_hybrid_k8_w64",
+   "a": [
+    "option.Model=models/net_hybrid_k8_w64.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "model_linear_pst_terms_e30",
+   "a": [
+    "option.Model=models/linear_pst_terms_e30.json"
+   ],
+   "b": [],
+   "elo0": 0,
+   "elo1": 5
   }
  ]
 }

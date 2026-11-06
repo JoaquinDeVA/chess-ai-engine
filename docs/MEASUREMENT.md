@@ -142,7 +142,17 @@ A queue of SPRTs on one worker is played in turns by `src/chess_lab/scripts/work
 saves, and so on until every match is closed. After each turn it appends the games, LLR, Elo and error to
 `results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
 it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
-can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue of the technique tests is
-`src/chess_lab/scripts/worker/queue_techniques.json`: the removal of each default technique and the two techniques off by
-default, all at the screening level. Only models whose evaluation is compiled into `uci` can be played this way
-(today `linear_pst_terms`).
+can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/scripts/worker/queue.json`: the removal of each default technique and the two techniques off
+by default (screening, `[−5, 0]`), and each trained model against the compiled-in `linear_pst_terms` (`[0, 5]`, since the
+question is whether it is better).
+
+### Playing a model that is not compiled in
+
+`uci` embeds `linear_pst_terms` and loads any other model from a JSON file with
+`setoption name Model value <file>.json` (`setoption name Model value linear_pst_terms` goes back to the embedded one).
+The file is written by `python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64@e30 --out <folder>`; linear
+models and networks are accepted. The command `eval` prints the evaluation of the current position, which equals the
+Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). A network is played without
+an incremental accumulator unless its features are the slotted ones, so it reaches fewer nodes per second than the
+linear model (about 400,000 against 910,000 with `net_hybrid_w64`, one thread, `go movetime 3000`, not a controlled
+benchmark): the SPRT at a time control includes that cost.

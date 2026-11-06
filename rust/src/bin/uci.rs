@@ -13,7 +13,8 @@ use std::time::Instant;
 use _core::board::{ordered_moves, uci_string, GameState};
 use _core::eval::logistic_model::LinearModel;
 use _core::eval::sparse_features::{FeatureSet, Perspective};
-use _core::eval::Eval;
+use _core::eval::sparse_net::{Layer, Net};
+use _core::eval::{Eval, Evaluator};
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
 use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
@@ -29,6 +30,7 @@ struct Settings {
     threads: usize,
     hash_mb: usize,
     techniques: Techniques,
+    eval: Arc<Eval>,
 }
 
 /// The position as the GUI sent it: the root FEN and the moves played from it.
@@ -58,7 +60,13 @@ struct Job {
 type Running = (JoinHandle<Memory>, Arc<AtomicBool>);
 
 fn load_model() -> Result<Eval, String> {
-    let value: serde_json::Value = serde_json::from_str(MODEL_JSON).map_err(|e| e.to_string())?;
+    model_from_json(MODEL_JSON)
+}
+
+/// An evaluation from the JSON of `export_uci_model`: a linear model (`weights`, `bias`) or a
+/// network (`layers`, each with `fan_in`, `fan_out`, row-major `weights` and `bias`).
+fn model_from_json(text: &str) -> Result<Eval, String> {
+    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     let features = value["features"]
         .as_str()
         .and_then(FeatureSet::from_name)
@@ -68,12 +76,10 @@ fn load_model() -> Result<Eval, String> {
         Some("side_to_move") => Perspective::SideToMove,
         _ => return Err("model: unknown perspective".into()),
     };
-    let weights = value["weights"]
-        .as_array()
-        .ok_or("model: no weights")?
-        .iter()
-        .map(|w| w.as_f64().ok_or("model: weight is not a number"))
-        .collect::<Result<Vec<f64>, _>>()?;
+    if value.get("layers").is_some() {
+        return network_from_json(&value, features, perspective);
+    }
+    let weights = number_list(&value["weights"])?;
     let bias = value["bias"].as_f64().ok_or("model: no bias")?;
     Ok(Eval::Linear(LinearModel::new(
         features,
@@ -81,6 +87,45 @@ fn load_model() -> Result<Eval, String> {
         weights,
         bias,
     )?))
+}
+
+fn number_list(value: &serde_json::Value) -> Result<Vec<f64>, String> {
+    value
+        .as_array()
+        .ok_or("model: no weights")?
+        .iter()
+        .map(|w| {
+            w.as_f64()
+                .ok_or("model: weight is not a number".to_string())
+        })
+        .collect()
+}
+
+fn network_from_json(
+    value: &serde_json::Value,
+    features: FeatureSet,
+    perspective: Perspective,
+) -> Result<Eval, String> {
+    let layers = value["layers"]
+        .as_array()
+        .ok_or("model: layers is not a list")?
+        .iter()
+        .map(|layer| {
+            let size = |key: &str| {
+                layer[key]
+                    .as_u64()
+                    .map(|n| n as usize)
+                    .ok_or(format!("model: layer has no {key}"))
+            };
+            Ok(Layer {
+                fan_in: size("fan_in")?,
+                fan_out: size("fan_out")?,
+                weights: number_list(&layer["weights"])?,
+                bias: number_list(&layer["bias"])?,
+            })
+        })
+        .collect::<Result<Vec<Layer>, String>>()?;
+    Ok(Eval::Net(Net::new(features, perspective, layers)?))
 }
 
 /// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
@@ -201,8 +246,12 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
                 .map_err(|_| "Threads needs a number")?
                 .max(1)
         }
-        "Model" if value != MODEL_NAME => return Err(format!("only {MODEL_NAME} is compiled in")),
-        "Model" => {}
+        "Model" if value == MODEL_NAME => settings.eval = Arc::new(load_model()?),
+        "Model" => {
+            let text = std::fs::read_to_string(value)
+                .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;
+            settings.eval = Arc::new(model_from_json(&text)?);
+        }
         "Techniques" => {
             settings.techniques = Techniques::from_names(
                 &value
@@ -311,6 +360,7 @@ fn main() {
         threads: 1,
         hash_mb: DEFAULT_HASH_MB,
         techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques"),
+        eval: eval.clone(),
     };
     let mut memory = Some(new_memory(&settings));
     let mut position = Position {
@@ -352,6 +402,13 @@ fn main() {
                     Err(error) => println!("info string {error}"),
                 }
             }
+            "eval" => match GameState::from_moves(&position.fen, &position.moves) {
+                Ok(state) => println!(
+                    "info string eval {:.6}",
+                    settings.eval.evaluate(state.pos(), Color::White)
+                ),
+                Err(error) => println!("info string {error}"),
+            },
             "position" => match args.first() {
                 Some(&"startpos") => position = parse_position(START_FEN.into(), &args[1..]),
                 Some(&"fen") if args.len() >= 7 => {
@@ -371,7 +428,7 @@ fn main() {
                 };
                 let stop = job.stop.clone();
                 let memory_for_thread = memory.take().expect("memory is back after finish");
-                let eval = eval.clone();
+                let eval = settings.eval.clone();
                 let handle = std::thread::spawn(move || think(memory_for_thread, eval, job));
                 running = Some((handle, stop));
             }
@@ -403,4 +460,35 @@ fn parse_position(fen: String, rest: &[&str]) -> Position {
         .map(|word| word.to_string())
         .collect();
     Position { fen, moves }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn net_json(fan_in: usize) -> String {
+        let first = format!(
+            r#"{{"fan_in":{fan_in},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
+            vec![0.0; fan_in * 2]
+        );
+        let last = r#"{"fan_in":2,"fan_out":1,"weights":[1.0,1.0],"bias":[0.0]}"#;
+        format!(
+            r#"{{"features":"pst_slotted","perspective":"side_to_move","layers":[{first},{last}]}}"#
+        )
+    }
+
+    #[test]
+    fn a_network_file_is_loaded() {
+        assert!(matches!(model_from_json(&net_json(768)), Ok(Eval::Net(_))));
+    }
+
+    #[test]
+    fn a_network_with_the_wrong_input_size_is_rejected() {
+        assert!(model_from_json(&net_json(10)).is_err());
+    }
+
+    #[test]
+    fn the_compiled_in_model_is_linear() {
+        assert!(matches!(load_model(), Ok(Eval::Linear(_))));
+    }
 }

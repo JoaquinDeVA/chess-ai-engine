@@ -1,0 +1,103 @@
+{
+ "jobs": [
+  {
+   "name": "abl_incremental",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_tt_move",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,history,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_history",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_pvs",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_aspiration",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,pvs,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_null_move",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "abl_see",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "add_history_malus",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see,history_malus"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  },
+  {
+   "name": "add_qs_tt",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see,qs_tt"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0
+  }
+ ]
+}

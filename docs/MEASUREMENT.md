@@ -134,3 +134,15 @@ control. Fixed nodes are therefore the first filter for a change that should not
 
 4. Write the final block of fastchess, the command and the verdict in the technique's page; if it changes the
    default, also in [Results](RESULTS.md) and the [changelog](../CHANGELOG.md).
+
+## Several SPRTs in turns
+
+A queue of SPRTs on one worker is played in turns by `src/chess_lab/scripts/worker/roundrobin.py`: each match advances
+`--chunk-rounds` rounds (two games each, default 100), then the next one resumes from the `config.json` that fastchess
+saves, and so on until every match is closed. After each turn it appends the games, LLR, Elo and error to
+`results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
+it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
+can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue of the technique tests is
+`src/chess_lab/scripts/worker/queue_techniques.json`: the removal of each default technique and the two techniques off by
+default, all at the screening level. Only models whose evaluation is compiled into `uci` can be played this way
+(today `linear_pst_terms`).

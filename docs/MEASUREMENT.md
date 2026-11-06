@@ -146,7 +146,8 @@ can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. Th
 by default (screening, `[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the
 question is whether each addition is better): a network against `linear_pst_terms@e30`, the classical terms in the
 network, width 64 against 32, four king buckets against none, eight against four, and `linear_pst_terms@e30` against
-the shipped one. A step that ends at the round cap without a verdict says the addition is too small for this budget.
+the shipped one. The two networks with the best Spearman at a similar cost (`net_hybrid_k4_w64`, `net_hybrid_w64`) also play
+`linear_pst_terms@e30` directly, to tell whether better models pay off even if the plainest network does not. A step that ends at the round cap without a verdict says the addition is too small for this budget.
 
 ### Playing a model that is not compiled in
 

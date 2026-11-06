@@ -162,6 +162,28 @@
    "b": [],
    "elo0": 0,
    "elo1": 5
+  },
+  {
+   "name": "best_net_hybrid_k4_w64_vs_linear",
+   "a": [
+    "option.Model=models/net_hybrid_k4_w64.json"
+   ],
+   "b": [
+    "option.Model=models/linear_pst_terms_e30.json"
+   ],
+   "elo0": 0,
+   "elo1": 5
+  },
+  {
+   "name": "best_net_hybrid_w64_vs_linear",
+   "a": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
+   "b": [
+    "option.Model=models/linear_pst_terms_e30.json"
+   ],
+   "elo0": 0,
+   "elo1": 5
   }
  ]
 }

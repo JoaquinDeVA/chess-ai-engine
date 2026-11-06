@@ -1,0 +1,51 @@
+{
+  "name": "net_hybrid_k8_w64@e30",
+  "architecture": "Sparse network: 8 king buckets of 768 piece-square inputs plus 22 term inputs, 64-1",
+  "features": "pst_hybrid_k8",
+  "parameters": 394753,
+  "accuracy": {
+    "all": {
+      "spearman": 0.7187962365649831,
+      "mae": 0.11102738746002601,
+      "n": 200000,
+      "best_move_agreement": 0.219,
+      "agreement_n": 20000
+    },
+    "quiet": {
+      "spearman": 0.7949801322370389,
+      "mae": 0.08782368083485245,
+      "n": 138657,
+      "best_move_agreement": 0.06444846292947559,
+      "agreement_n": 13825
+    },
+    "non_quiet": {
+      "spearman": 0.584668374267598,
+      "mae": 0.16347601810291412,
+      "n": 61343,
+      "best_move_agreement": 0.5650202429149798,
+      "agreement_n": 6175
+    },
+    "sample": {
+      "rows": 200000,
+      "seed": 42,
+      "agreement_n": 20000
+    }
+  },
+  "cost": {
+    "us_per_eval": 3.91,
+    "samples": 1000,
+    "date": "2026-11-06",
+    "commit": "ec58665+dirty"
+  },
+  "size_kb": 3085.7,
+  "status": "current",
+  "training": {
+    "effort": 30,
+    "representation": {
+      "scale": "winprob",
+      "k": 0.00368208,
+      "perspective": "side_to_move",
+      "mate_keep": 0.1
+    }
+  }
+}

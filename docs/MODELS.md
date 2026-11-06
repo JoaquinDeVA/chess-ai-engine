@@ -66,19 +66,33 @@ Every term is the side to move's value minus the opponent's, and is blended by g
 
 **Status.** Registered, not trained, not shipped. The parameter range is to be fixed after measuring the cost per evaluation; the engine binary embeds only the logistic model.
 
-## Hybrid network (`net_hybrid_w64`)
+## Hybrid networks (`net_hybrid_w32`, `net_hybrid_w64`, `net_hybrid_k4_w64`, `net_hybrid_k8_w64`)
 
 **Problem.** The logistic model cannot combine its features, and a network on the 768 piece-square inputs alone has to learn from the board what the eleven classical terms already say.
 
-**What it does.** The same sparse network as the light candidates, with 790 inputs: the 768 slotted piece-square inputs plus the 22 values of the eleven classical terms (each weighted by the game phase and by its complement). One hidden layer of 64 units and one logit through the same sigmoid.
+**What it does.** The same sparse network as the light candidates, with the 768 slotted piece-square inputs plus the 22 values of the eleven classical terms (each weighted by the game phase and by its complement), 790 inputs. One hidden layer and one logit through the same sigmoid. The `k4` and `k8` variants repeat the 768 piece-square inputs once per king bucket of the side to move (the bucket follows the square of its own king): 4 buckets are 2 file groups by 2 rank groups, 8 buckets are 4 file groups by 2 rank groups.
 
-| Id | Layers | Parameters |
+| Id | Inputs → layers | Parameters |
 |---|---|---:|
+| `net_hybrid_w32` | 790 → 32 → 1 | 25,345 |
 | `net_hybrid_w64` | 790 → 64 → 1 | 50,689 |
+| `net_hybrid_k4_w64` | 4 × 768 + 22 → 64 → 1 | 198,145 |
+| `net_hybrid_k8_w64` | 8 × 768 + 22 → 64 → 1 | 394,753 |
 
-**Implementation.** `NnHybridW64Model` in `src/chess_lab/models/definitions.py`; the `pst_hybrid` feature set in `src/chess_lab/models/features.py` and `rust/src/eval/sparse_features.rs`; evaluation in `rust/src/eval/sparse_net.rs`, which sums the whole first layer at each leaf for this feature set (the incremental accumulator covers only the slotted features).
+**Implementation.** `NnHybridW32Model`, `NnHybridW64Model`, `NnHybridK4W64Model` and `NnHybridK8W64Model` in `src/chess_lab/models/definitions.py`; the `pst_hybrid`, `pst_hybrid_k4` and `pst_hybrid_k8` feature sets in `src/chess_lab/models/features.py` and `rust/src/eval/sparse_features.rs`; evaluation in `rust/src/eval/sparse_net.rs`, which sums the whole first layer at each leaf for these feature sets (the incremental accumulator covers only the slotted features).
 
-**Measured effect.** Trained at effort 30 on quiet positions (40 epochs, validation loss 0.63208). On 200,000 validation rows (`python -m chess_lab.measure.evaluate --model net_hybrid_w64`): Spearman 0.718 against 0.646 for `linear_pst_terms@e30`, MAE 0.111 against 0.128, 3.8 µs per evaluation against 2.4 (both measured on the same laptop, idle) (model table in [Results](RESULTS.md#model-table)). Not played: the network is not exported to the engine binary, so there is no Elo figure.
+**Measured effect.** All trained at effort 30 on quiet positions and measured on the same laptop, idle, on 200,000 validation rows (`python -m chess_lab.measure.evaluate --model <id>`; the table in [Results](RESULTS.md#model-table) is generated from those runs):
+
+| Model | Spearman | MAE | µs per evaluation |
+|---|---:|---:|---:|
+| `linear_pst_terms` | 0.646 | 0.128 | 2.4 |
+| `net_pst_w32` | 0.693 | 0.118 | 2.4 |
+| `net_hybrid_w32` | 0.702 | 0.115 | 3.4 |
+| `net_hybrid_w64` | 0.718 | 0.111 | 3.8 |
+| `net_hybrid_k8_w64` | 0.719 | 0.111 | 3.9 |
+| `net_hybrid_k4_w64` | 0.722 | 0.110 | 3.8 |
+
+The classical terms add 0.009 of Spearman to the 768 inputs at width 32 and 1.0 µs; doubling the width adds 0.016 and 0.4 µs; the king buckets add about 0.003 (4 buckets) and nothing with 8, for four to eight times the parameters. Validation loss of `net_hybrid_w64`: 0.63208 (its card in `src/chess_lab/models/store/cards/`). Not played: the networks are not exported to the engine binary, so there is no Elo figure.
 
 **Status.** Trained, not shipped. The engine binary embeds only the logistic model.
 

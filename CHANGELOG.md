@@ -8,6 +8,7 @@ All notable changes. The newest are first.
 - The switches `lmr`, `qs_evasions` and the UCI option `TimeRules`, all measured and rejected ([Search techniques](docs/techniques/README.md#how-the-switches-were-judged)).
 
 ### Added
+- Trained hybrid networks (768 piece-square inputs plus the eleven classical terms, optionally with 4 or 8 king buckets) at effort 30: Spearman 0.702 to 0.722 against 0.646 for the logistic model, 3.4 to 3.9 µs per evaluation against 2.4, all measured on one laptop (`python -m chess_lab.measure.evaluate`). Not played yet. See [Models](docs/MODELS.md#hybrid-networks-net_hybrid_w32-net_hybrid_w64-net_hybrid_k4_w64-net_hybrid_k8_w64).
 - A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
 - A move-ordering switch, off by default and measured at a fixed 20,000 nodes: [`history_malus`](docs/techniques/history-malus.md) (quiet moves tried before a cut lose history score; +3.9 ± 9.3 Elo, no verdict). Results in [RESULTS](docs/RESULTS.md).
 - Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/results/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +67.2 ± 34.5 in two SPRTs stopped by hand (no verdict).

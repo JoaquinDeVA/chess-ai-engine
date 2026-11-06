@@ -1,0 +1,51 @@
+{
+  "name": "net_hybrid_w32@e30",
+  "architecture": "Sparse network: 768 piece-square plus 22 term inputs, 32-1 (2 layers)",
+  "features": "pst_hybrid",
+  "parameters": 25345,
+  "accuracy": {
+    "all": {
+      "spearman": 0.7015375498646944,
+      "mae": 0.11514171897204102,
+      "n": 200000,
+      "best_move_agreement": 0.2145,
+      "agreement_n": 20000
+    },
+    "quiet": {
+      "spearman": 0.7740604767500354,
+      "mae": 0.09220648183442855,
+      "n": 138657,
+      "best_move_agreement": 0.0593128390596745,
+      "agreement_n": 13825
+    },
+    "non_quiet": {
+      "spearman": 0.5733470991383457,
+      "mae": 0.16698351307715378,
+      "n": 61343,
+      "best_move_agreement": 0.5619433198380567,
+      "agreement_n": 6175
+    },
+    "sample": {
+      "rows": 200000,
+      "seed": 42,
+      "agreement_n": 20000
+    }
+  },
+  "cost": {
+    "us_per_eval": 3.35,
+    "samples": 1000,
+    "date": "2026-11-06",
+    "commit": "ec58665+dirty"
+  },
+  "size_kb": 199.7,
+  "status": "current",
+  "training": {
+    "effort": 30,
+    "representation": {
+      "scale": "winprob",
+      "k": 0.00368208,
+      "perspective": "side_to_move",
+      "mate_keep": 0.1
+    }
+  }
+}

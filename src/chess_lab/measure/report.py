@@ -64,7 +64,7 @@ def _row(card: Dict[str, Any]) -> str:
     :param card: Model card.
     :return: Markdown table row.
     """
-    name = card["name"]
+    name = card["name"].split("@")[0]
     accuracy = _dig(card, "accuracy", "all") or {}
     non_quiet = _dig(card, "accuracy", "non_quiet") or {}
     best_move = (
@@ -100,7 +100,7 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
         for card in (load_all_cards() if cards is None else cards)
         if card.get("status") in _STATUS_ORDER
     ]
-    rows.sort(key=lambda card: card["name"])
+    rows.sort(key=lambda card: card["name"].split("@")[0])
     return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
 
 

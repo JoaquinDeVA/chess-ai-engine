@@ -107,8 +107,12 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
 | `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.9 |
-| `linear_pst_terms@e30` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
+| `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
+| `net_hybrid_k4_w64` | 198,145 | winprob-k0.00368-stm-quiet | 30 | 0.722 | 0.110 | 22.0% / 56.8% | 3.8 |
+| `net_hybrid_k8_w64` | 394,753 | winprob-k0.00368-stm-quiet | 30 | 0.719 | 0.111 | 21.9% / 56.5% | 3.9 |
+| `net_hybrid_w32` | 25,345 | winprob-k0.00368-stm-quiet | 30 | 0.702 | 0.115 | 21.4% / 56.2% | 3.4 |
 | `net_hybrid_w64` | 50,689 | winprob-k0.00368-stm-quiet | 30 | 0.718 | 0.111 | 21.7% / 56.5% | 3.8 |
+| `net_pst_w32` | 24,641 | winprob-k0.00368-stm-quiet | 30 | 0.693 | 0.118 | 21.3% / 56.2% | 2.4 |
 <!-- END GENERATED TABLES -->
 
 ## Reproduce

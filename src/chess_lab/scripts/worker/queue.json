@@ -100,52 +100,62 @@
    "elo1": 0
   },
   {
-   "name": "model_net_pst_w32",
+   "name": "model_net_vs_linear",
    "a": [
     "option.Model=models/net_pst_w32.json"
    ],
-   "b": [],
+   "b": [
+    "option.Model=models/linear_pst_terms_e30.json"
+   ],
    "elo0": 0,
    "elo1": 5
   },
   {
-   "name": "model_net_hybrid_w32",
+   "name": "model_terms_in_net",
    "a": [
     "option.Model=models/net_hybrid_w32.json"
    ],
-   "b": [],
+   "b": [
+    "option.Model=models/net_pst_w32.json"
+   ],
    "elo0": 0,
    "elo1": 5
   },
   {
-   "name": "model_net_hybrid_w64",
+   "name": "model_width_64_vs_32",
    "a": [
     "option.Model=models/net_hybrid_w64.json"
    ],
-   "b": [],
+   "b": [
+    "option.Model=models/net_hybrid_w32.json"
+   ],
    "elo0": 0,
    "elo1": 5
   },
   {
-   "name": "model_net_hybrid_k4_w64",
+   "name": "model_buckets_k4",
    "a": [
     "option.Model=models/net_hybrid_k4_w64.json"
    ],
-   "b": [],
+   "b": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
    "elo0": 0,
    "elo1": 5
   },
   {
-   "name": "model_net_hybrid_k8_w64",
+   "name": "model_buckets_k8_vs_k4",
    "a": [
     "option.Model=models/net_hybrid_k8_w64.json"
    ],
-   "b": [],
+   "b": [
+    "option.Model=models/net_hybrid_k4_w64.json"
+   ],
    "elo0": 0,
    "elo1": 5
   },
   {
-   "name": "model_linear_pst_terms_e30",
+   "name": "model_linear_e30_vs_shipped",
    "a": [
     "option.Model=models/linear_pst_terms_e30.json"
    ],

@@ -143,8 +143,10 @@ saves, and so on until every match is closed. After each turn it appends the gam
 `results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
 it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
 can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/scripts/worker/queue.json`: the removal of each default technique and the two techniques off
-by default (screening, `[−5, 0]`), and each trained model against the compiled-in `linear_pst_terms` (`[0, 5]`, since the
-question is whether it is better).
+by default (screening, `[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the
+question is whether each addition is better): a network against `linear_pst_terms@e30`, the classical terms in the
+network, width 64 against 32, four king buckets against none, eight against four, and `linear_pst_terms@e30` against
+the shipped one. A step that ends at the round cap without a verdict says the addition is too small for this budget.
 
 ### Playing a model that is not compiled in
 

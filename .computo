@@ -1,12 +1,32 @@
-{"tareas": {
-  "subir": {
-    "sync": ["rust/target/release/uci", "data/results/uci_models/", "data/openings/openings.epd", "src/chess_lab/scripts/worker/roundrobin.py", "src/chess_lab/scripts/worker/queue.json", "src/chess_lab/scripts/worker/instalar.sh"],
-    "cmd": "bash src/chess_lab/scripts/worker/instalar.sh",
-    "fetch": []
-  },
-  "reunir": {
-    "sync": ["src/chess_lab/scripts/worker/reunir.sh"],
-    "cmd": "bash src/chess_lab/scripts/worker/reunir.sh",
-    "fetch": ["data/results/roundrobin/"]
+{
+  "tareas": {
+    "subir": {
+      "sync": [
+        "rust/target/release/uci",
+        "data/results/uci_models/",
+        "data/openings/openings.epd",
+        "src/chess_lab/scripts/worker/roundrobin.py",
+        "src/chess_lab/scripts/worker/queue.json",
+        "src/chess_lab/scripts/worker/instalar.sh"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/instalar.sh",
+      "fetch": []
+    },
+    "reunir": {
+      "sync": [
+        "src/chess_lab/scripts/worker/reunir.sh"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/reunir.sh",
+      "fetch": [
+        "data/results/roundrobin/"
+      ]
+    },
+    "arrancar": {
+      "sync": [
+        "src/chess_lab/scripts/worker/arrancar.sh"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/arrancar.sh",
+      "fetch": []
+    }
   }
-}}
+}

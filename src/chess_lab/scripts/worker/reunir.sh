@@ -5,7 +5,7 @@ set -euo pipefail
 W="$HOME/worker"
 D=data/results/roundrobin
 rm -rf "$D" && mkdir -p "$D"
-cp "$W/roundrobin.log" "$D/"
+cp "$W/roundrobin.log" "$D/" 2>/dev/null || true
 for dir in "$W"/results/*/; do
     name=$(basename "$dir")
     mkdir -p "$D/$name"

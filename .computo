@@ -27,6 +27,13 @@
       ],
       "cmd": "bash src/chess_lab/scripts/worker/arrancar.sh",
       "fetch": []
+    },
+    "parar": {
+      "sync": [
+        "src/chess_lab/scripts/worker/parar.sh"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/parar.sh",
+      "fetch": []
     }
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala en ~/worker del nodo lo que sube la tarea «subir» de .computo (se ejecuta allí, desde la copia del repo).
+# Instala en ~/worker del nodo lo que se sube al nodo (ver `.computo/tareas.json`) (se ejecuta allí, desde la copia del repo).
 # Cada binario va a ~/worker/bin/<hash>/uci, con <hash> = los 12 primeros caracteres de su sha256 (en local:
 # `sha256sum rust/target/release/uci | cut -c1-12`); cada trabajo de queue.json nombra el suyo en «uci».
 # Trampas: un binario instalado no se sobrescribe, así que un SPRT largo sigue con el suyo aunque llegue otro;
@@ -14,7 +14,9 @@ mkdir -p "$W/models" "$W/bin/$H"
 [ -f "$W/bin/$H/uci" ] || { cp rust/target/release/uci "$W/bin/$H/uci.new" && mv "$W/bin/$H/uci.new" "$W/bin/$H/uci"; }
 cp data/results/uci_models/*.json "$W/models/"
 cp data/openings/openings.epd "$W/"
-cp src/chess_lab/scripts/worker/queue.json "$W/queue.json"
+cp src/chess_lab/scripts/worker/queue_despues.json src/chess_lab/scripts/worker/queue_10min.json src/chess_lab/scripts/worker/despues.sh "$W/"
+# queue.json solo si no hay round robin: en marcha, despues.sh le añade trabajos y copiarlo encima los borraría.
+[ -f "$W/queue.json" ] && pgrep -f "[r]oundrobin.py queue.json" >/dev/null || cp src/chess_lab/scripts/worker/queue.json "$W/queue.json"
 if pgrep -f "[r]oundrobin.py queue.json" >/dev/null; then
     cmp src/chess_lab/scripts/worker/roundrobin.py "$W/roundrobin.py" || echo "AVISO: roundrobin.py cambió; se aplica al reiniciarlo"
 else

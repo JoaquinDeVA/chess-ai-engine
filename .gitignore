@@ -83,3 +83,6 @@ rust/target/
 # Puente con Lichess (clon externo y estado local)
 lichess/lichess-bot/
 lichess/*.log
+
+# Registro privado del nodo de cómputo
+.computo/

@@ -1,0 +1,23 @@
+{
+ "jobs": [
+  {
+   "name": "model_net_vs_linear_10min",
+   "uci": "bin/1fa18f0aab94/uci",
+   "a": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "b": [
+    "option.Model=models/linear_pst_terms_e30.json"
+   ],
+   "each": [
+    "tc=600+5",
+    "proto=uci",
+    "option.Hash=16"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 300,
+   "chunk_rounds": 50
+  }
+ ]
+}

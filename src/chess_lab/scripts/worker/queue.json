@@ -1,25 +1,6 @@
 {
  "jobs": [
   {
-   "name": "model_net_vs_linear_10min",
-   "uci": "bin/1fa18f0aab94/uci",
-   "a": [
-    "option.Model=models/net_pst_w32.json"
-   ],
-   "b": [
-    "option.Model=models/linear_pst_terms_e30.json"
-   ],
-   "each": [
-    "tc=600+5",
-    "proto=uci",
-    "option.Hash=16"
-   ],
-   "elo0": 0,
-   "elo1": 5,
-   "max_rounds": 300,
-   "chunk_rounds": 10
-  },
-  {
    "name": "model_terms_in_net_nodes",
    "uci": "bin/1fa18f0aab94/uci",
    "a": [
@@ -36,6 +17,60 @@
    ],
    "elo0": 0,
    "elo1": 5,
+   "max_rounds": 6000
+  },
+  {
+   "name": "acc_hybrid_w64_vs_pst_w32",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "acc_hybrid_k4_vs_w64",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_hybrid_k4_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "abl_pvs",
+   "uci": "bin/c47a5233e0f7/uci",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,history,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "abl_history",
+   "uci": "bin/c47a5233e0f7/uci",
+   "a": [
+    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
+   ],
+   "b": [
+    "option.Techniques=incremental,tt_move,pvs,aspiration,null_move,see"
+   ],
+   "elo0": -5,
+   "elo1": 0,
    "max_rounds": 6000
   }
  ]

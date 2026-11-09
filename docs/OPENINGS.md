@@ -26,7 +26,8 @@ The Lichess evaluation shards (`data/LichessPositions/raw`) are not the source: 
 distance from the start cannot be read from them.
 
 ```bash
-python src/chess_lab/scripts/data/build_openings.py --out data/openings/openings.epd   # seed 1, depth 12, 6000 playouts, 1000 kept
+python src/chess_lab/scripts/data/build_openings.py --out data/openings/openings.epd   # defaults: seed 1, depth 12, 6000 playouts, 1000 kept
+python src/chess_lab/scripts/data/build_openings.py --out data/openings/openings.epd --pool 45000 --count 10000   # the suite in use
 ```
 
 ## How a match uses it
@@ -37,10 +38,11 @@ fastchess reads the file with `-openings file=data/openings/openings.epd format=
 
 ## What was checked
 
-The command above, run on 2026-10-31 with Stockfish 16, kept 1,431 of 6,000 playouts as balanced and wrote 1,000
-openings (`sha256sum data/openings/openings.epd` = `27b6362df23485bbec341a06d7b385ee25775304e6c257c513205f13c3daecd9`).
+The second command above, run on 2026-11-09 with Stockfish 16, kept 10,922 of 45,000 playouts as balanced and wrote
+10,000 openings (`sha256sum data/openings/openings.epd` = `59bfa548e04c33f716aa8ae8ec9fe383929fbd7a6450a658ee6a48b59cd9ce80`).
+The earlier 1,000-opening suite (default arguments, 2026-10-31) is the one the A/A matches below used.
 The same arguments give the same file; `tests/lab/scripts/test_build_openings.py` checks the draw and the filter
-with a fake engine. The three A/A matches of [Measurement](MEASUREMENT.md#the-aa-check) found no bias with this
-suite; its effect against another suite is not measured.
+with a fake engine. The three A/A matches of [Measurement](MEASUREMENT.md#the-aa-check) found no bias with the 1,000-opening suite;
+the effect of the 10,000-opening suite on the A/A check is not measured.
 
-The file is not versioned (`data/` is ignored); rebuild it with the command above.
+The file is not versioned (`data/` is ignored); rebuild it with the commands above.

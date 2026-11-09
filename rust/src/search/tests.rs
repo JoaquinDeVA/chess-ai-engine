@@ -245,6 +245,31 @@ fn quiescent(fen: &str, depth: i32, techniques: Techniques) -> SearchResult {
 }
 
 #[test]
+fn the_horizon_table_entries_do_not_change_the_value() {
+    for fen in [
+        START,
+        "4k3/8/3p4/4p3/8/8/4Q3/4K3 w - - 0 1",
+        "r3k2r/8/8/3pP3/8/8/8/R3K2R w KQkq d6 0 1",
+    ] {
+        let plain = quiescent(fen, 3, Techniques::default());
+        let with = quiescent(
+            fen,
+            3,
+            Techniques {
+                qs_tt: true,
+                ..Techniques::default()
+            },
+        );
+        assert!(
+            (plain.value - with.value).abs() < 1e-9,
+            "{fen}: {} {}",
+            plain.value,
+            with.value
+        );
+    }
+}
+
+#[test]
 fn see_keeps_the_obvious_capture() {
     // A queen hangs: with or without SEE the search takes it.
     let fen = "4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1";

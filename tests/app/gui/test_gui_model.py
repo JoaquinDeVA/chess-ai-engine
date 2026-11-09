@@ -138,7 +138,7 @@ def test_pgn_has_the_names_and_the_result():
 
 
 def test_setup_names_and_defaults():
-    assert AISettings().techniques == DEFAULT_TECHNIQUES
+    assert AISettings().techniques == DEFAULT_TECHNIQUES and "qs_tt" not in AISettings().techniques
     setup = MatchSetup()
     assert setup.white.is_human and setup.has_humans() and setup.white.label == "You"
     assert not MatchSetup(PlayerSetup(AISettings()), PlayerSetup(AISettings())).has_humans()

@@ -31,31 +31,31 @@ fn clamp(value: f64) -> f64 {
 }
 
 /// Ratios of consecutive durations that are long enough to measure.
-fn growths(iterations: &[Iteration]) -> Vec<f64> {
-    iterations
+fn growths(history: &[Iteration]) -> Vec<f64> {
+    history
         .windows(2)
         .filter(|w| w[0].0 > MIN_MEASURABLE && w[1].0 > MIN_MEASURABLE)
         .map(|w| w[1].0 / w[0].0)
         .collect()
 }
 
-fn last_seconds(iterations: &[Iteration]) -> f64 {
-    iterations[iterations.len() - 1].0
+fn last_seconds(history: &[Iteration]) -> f64 {
+    history[history.len() - 1].0
 }
 
 /// Last duration times a constant growth.
-pub fn fixed_factor(iterations: &[Iteration]) -> f64 {
-    last_seconds(iterations) * DEFAULT_GROWTH
+pub fn fixed_factor(history: &[Iteration]) -> f64 {
+    last_seconds(history) * DEFAULT_GROWTH
 }
 
 /// Last duration times the geometric mean of all the measurable growths, kept between 2 and 8.
-pub fn geometric_growth(iterations: &[Iteration]) -> f64 {
-    let growths = growths(iterations);
+pub fn geometric_growth(history: &[Iteration]) -> f64 {
+    let growths = growths(history);
     if growths.is_empty() {
-        return last_seconds(iterations) * DEFAULT_GROWTH;
+        return last_seconds(history) * DEFAULT_GROWTH;
     }
     let mean_log = growths.iter().map(|g| g.ln()).sum::<f64>() / growths.len() as f64;
-    last_seconds(iterations) * clamp(mean_log.exp())
+    last_seconds(history) * clamp(mean_log.exp())
 }
 
 /// Predicts zero seconds, so the estimate never stops the deepening.

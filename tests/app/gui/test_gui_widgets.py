@@ -124,9 +124,9 @@ def test_settings_dialog_round_trip(app):
     dialog = AISettingsDialog(original)
     assert dialog.settings() == original
     dialog.depth.setValue(7)
-    dialog.techniques["see"].setChecked(False)
+    dialog.techniques["qs_tt"].setChecked(True)
     changed = dialog.settings()
-    assert changed.max_depth == 7 and "see" not in changed.techniques
+    assert changed.max_depth == 7 and "qs_tt" in changed.techniques
 
 
 def test_main_window_starts_and_drops_a_game(app):

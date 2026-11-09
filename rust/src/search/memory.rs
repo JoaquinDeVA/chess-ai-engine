@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
-use super::ordering::Killers;
+use super::ordering::{History, Killers};
 use super::shared_tt::SharedTable;
 use super::tt::{Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
@@ -12,6 +12,7 @@ use super::tt::{Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 pub struct Memory {
     pub table: Tt,
     pub killers: Killers,
+    pub history: History,
     pub threads: usize,
 }
 
@@ -21,6 +22,7 @@ impl Memory {
         Memory {
             table: Tt::Local(Table::new(max_tt_entries)),
             killers: Killers::default(),
+            history: History::default(),
             threads: 1,
         }
     }
@@ -34,6 +36,7 @@ impl Memory {
         Memory {
             table: Tt::Shared(Arc::new(SharedTable::with_megabytes(hash_megabytes))),
             killers: Killers::default(),
+            history: History::default(),
             threads,
         }
     }
@@ -41,6 +44,7 @@ impl Memory {
     pub fn clear(&mut self) {
         self.table.clear();
         self.killers.clear();
+        self.history.clear();
     }
 }
 

@@ -16,9 +16,8 @@ the application never imports the laboratory. The window talks to the UCI binary
 
 ```mermaid
 flowchart TB
-    WIN["main.py → gui/<br/>window"] --> UCIB["uci.py: UciBot<br/>book and tablebase first"]
+    WIN["main.py → gui/<br/>window"] --> UCIB["uci.py: UciBot<br/>limits and data paths"]
     UCIB -->|"UCI: position, go, bestmove"| BIN["rust/ uci binary<br/>search · evaluations · table"]
-    UCIB --> BOOK["knowledge/<br/>opening book · endgame tables"]
     BIN --> CORE["rust/ (chess_engine._core)<br/>same crate, for Python"]
     TRAIN["chess_lab/training/<br/>targets, sampling, fitting"] --> EVAL["chess_lab/models/<br/>h1 and the learned models"]
     MEAS["chess_lab/measure/<br/>judge · evaluate · report"] --> TRAIN
@@ -30,8 +29,8 @@ Dependencies, as the imports stand:
 
 - `rust/` imports nothing from Python except the weights it is given (`chess_lab/models/` builds the evaluators).
 - `chess_lab/models/` holds everything about a model: its classes, the saved files, the feature extractors, the target representation and fitting. `chess_lab/training/` imports it.
-- `chess_engine/uci.py` imports `knowledge/`; it talks to the UCI binary through pipes and imports nothing from the Rust core.
-- `gui/` imports `uci.py` and `knowledge/`; Qt only in its widgets. Nothing else imports it.
+- `chess_engine/uci.py` talks to the UCI binary through pipes and imports nothing from the Rust core.
+- `gui/` imports `uci.py`; Qt only in its widgets. Nothing else imports it.
 - `chess_lab/measure/` is the top layer: it imports `chess_lab/models/`, `chess_lab/training/` and the Rust core. Nothing else imports it.
 
 ## Packages
@@ -42,12 +41,11 @@ Dependencies, as the imports stand:
 | `rust/src/eval/` | The evaluations the search runs without Python: `classic_heuristic.rs` (the heuristic), `sparse_features.rs` (sparse board features), `sparse_net.rs` (the sparse networks and their incremental accumulator) |
 | `rust/src/search/` | `node.rs`: alpha-beta and quiescence. `deepening.rs`: iterative deepening, the helper threads and their vote. `options.rs`: `Options`, the `Techniques` switches and the defaults. `memory.rs`: `Memory` (what a game keeps), `Control` (clock and stop switches). `stats.rs`: the counters and the stop reason. `mod.rs` re-exports them. `tt.rs`: transposition table. `ordering.rs`: killer moves, MVV-LVA ordering, static exchange evaluation (SEE). `shared_tt.rs`: the lock-free table of several threads. `iteration_time.rs`: the rules that predict the next iteration |
 | `rust/src/knowledge/` | `book.rs`: the opening book. `tablebase.rs`: the Syzygy endgame tables |
-| `rust/src/python.rs` | The Python module: `Evaluator`, `Book`, `Tablebase`, and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
+| `rust/src/python.rs` | The Python module: `Evaluator` and the search defaults `DEFAULT_TECHNIQUES`, `MAX_DEPTH` the window reads |
 | `uci.py` | `UciEngine` (one process of the UCI binary: `position fen … moves …`, `go`, `bestmove`), `UciBot` (the AI player of the window: the opening book and the tablebases first, then the engine; the clock or the fixed time become the `go` limits) |
 | `chess_lab/models/` | Everything about a model. `definitions.py`: `NeuralEvalModel` and its subclasses, the table `MODELS` and `load_evaluator`, which turns a saved model (`artifacts/<name>.npz`, or `<name>@<tag>`) into the Rust `Evaluator`. `store/`: what a model leaves on disk: `loader.py` (paths and tagged specs of the saved models in `store/artifacts/`, and `h1` with `h1_weights.json`) and `cards.py` (model cards in `store/cards/`). `features.py`: the sparse feature sets in Python (`FEATURE_SETS`). `target.py`: target scale and point of view. `defaults.py`: the defaults shared by the training and the measurements (sample seed, share of mates kept). `fitting/epochs.py`: encoding of the frames, their cache and the epoch loop with early stopping; `fitting/neural.py`: `new_network_model` and `fit_stream` for the networks (Keras). |
 | `chess_lab/training/` | `data/raw_shards.py`: the Lichess evaluation dump as raw Parquet shards, and the detection of its perspective. `data/sidecar.py`: split, quiet flag and seeded samplers over the shards. `data/split.py`: the train, validation and test split. `cache.py`: directory of the encoded batches. `effort.py`: training size per effort level. `train.py`: the training command |
 | `chess_lab/measure/` | `judge.py` (accuracy and best-move agreement against Stockfish, with the core's `Evaluator`), `evaluate.py` (judge plus cost of one model in the core), `report.py` (model cards into the models table of `RESULTS.md`) |
-| `knowledge/` | `opening_book.py` and `endgame_tablebase.py`: the Python faces of the book and the tables, which delegate to the Rust core |
 | `gui/` | The window (PySide6, optional): `game_model.py` (position, clocks, result; no Qt), `settings.py` (AI settings; no Qt), `board_widget.py`, `game_window.py`, `setup_dialog.py`, `settings_dialog.py`, `app.py`, `theme.py`, `pieces.py` and the piece images in `assets/` |
 
 Data scripts live in `src/chess_lab/scripts/data/` (`build_raw_shards.py`, `build_sidecars.py`,
@@ -99,16 +97,14 @@ indexed by. The repetition history is rebuilt on every call from the root FEN an
 sequenceDiagram
     participant W as Window
     participant B as UciBot
-    participant K as Book and tables (Python)
     participant U as uci binary (Rust)
     W->>B: get_move(board, clocks, increment)
-    B->>K: book move? tablebase move?
-    alt known position
-        K-->>B: move
+    B->>U: position fen <root> moves …
+    B->>U: go wtime … btime … winc … binc …
+    alt the book or the tablebases know the position
+        U-->>B: bestmove (info string book / tablebase)
     else
-        B->>U: position fen <root> moves …
-        B->>U: go wtime … btime … winc … binc …
-        U-->>B: bestmove
+        U-->>B: bestmove (search)
     end
     B-->>W: legal move
 ```
@@ -120,7 +116,7 @@ iteration is discarded unless it is the first one, so there is always a move. Th
 are in [How the engine chooses a move](SEARCH.md) and the [catalogue of techniques](techniques/README.md).
 
 The binary takes its options by `setoption`: `Threads`, `Hash`, `Techniques` (a list of names, as in
-`_core.TECHNIQUES`) and `Model`. `ucinewgame` clears the table between games. The clock rules, including
+`_core.TECHNIQUES`), `Model`, `Book` (JSON file of the opening book) and `Tablebase` (folder of the Syzygy tables); the last two are off until they name a path, so the matches and tournaments play without them. `ucinewgame` clears the table between games and makes the engine follow the book again. The clock rules, including
 the ignored increment, are in [Iterative deepening with a clock](techniques/iterative-deepening.md).
 
 ## Building and testing

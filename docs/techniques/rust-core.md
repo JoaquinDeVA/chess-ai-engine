@@ -33,7 +33,7 @@ To keep the results identical, the legal moves are listed in the order python-ch
 
 ## Implementation
 
-`rust/src/lib.rs` (crate), `rust/src/python.rs` (Python bindings), `rust/src/bin/uci.rs` (UCI binary). Rules, book and
+`rust/src/lib.rs` (crate), `rust/src/python.rs` (Python bindings: the evaluations), `rust/src/bin/uci.rs` (UCI binary: search, book and tables). Rules, book and
 tables are tested in `rust/tests/rules.rs` (perft, end of game) and `rust/tests/knowledge.rs`; the techniques in
 `rust/tests/techniques.rs`. Build: `pip install -e ".[dev]"` (module) and
 `cargo build --release --manifest-path rust/Cargo.toml --bin uci` (binary).

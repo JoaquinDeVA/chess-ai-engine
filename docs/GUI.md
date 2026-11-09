@@ -52,8 +52,8 @@ quiescence depth of 4 plies, so neither is a setting.
 |---|---|---|---|
 | Maximum depth (0 = no limit: the time decides) | `max_depth` | `go depth N` | no limit |
 | Fixed time per move; unchecked, the engine spends a share of its clock | `move_time` | `go movetime ms` | 3 s |
-| Opening book | `opening_book` | none: read in Python before the engine | on |
-| Endgame tablebases (up to five pieces) | `tablebase` | none: read in Python before the engine | on |
+| Opening book | `opening_book` | `setoption name Book` (the shipped JSON) | on |
+| Endgame tablebases (up to five pieces) | `tablebase` | `setoption name Tablebase` (the shipped folder) | on |
 | Advanced: search techniques | `techniques` | `setoption name Techniques` | the four default ones (`incremental,tt_move,null_move,see`) |
 | Advanced: search threads | `threads` | `setoption name Threads` | 1 by default, 4 recommended for play (6 was no better); the window accepts up to 64 |
 

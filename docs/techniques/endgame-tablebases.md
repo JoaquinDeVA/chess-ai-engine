@@ -40,10 +40,9 @@ With five pieces or fewer (kings included) and no castling rights:
 ## Implementation
 
 `EndgameTablebase` in `rust/src/knowledge/tablebase.rs` (`covers`, `best_move`, the ranking), on top of the
-`shakmaty-syzygy` crate, with `src/chess_engine/knowledge/endgame_tablebase.py` as its Python face. Consulted by
-`UciBot.get_move` in `src/chess_engine/uci.py` after the [opening book](opening-book.md) and before the UCI binary,
-only at the root: the search never probes the tables inside the tree. Switch: the window's Settings → Endgame
-tablebases (`AISettings.tablebase`); used only if the tables are present.
+`shakmaty-syzygy` crate. Consulted by `rust/src/bin/uci.rs` on each `go`, after the [opening book](opening-book.md)
+and before the search, only at the root: the search never probes the tables inside the tree. Switch: the window's Settings → Endgame
+tablebases (`AISettings.tablebase`), which sets the UCI option `Tablebase` to the folder; without that option the binary does not use the tables, and the window sets it only if the tables are present.
 
 The tables (3-4-5 pieces, 290 files, 939 MB) live in `data/knowledge/endgame_tablebase`. They are not versioned and this
 project cannot rebuild them: they come from `tablebase.lichess.ovh` or any Syzygy 3-4-5 set.

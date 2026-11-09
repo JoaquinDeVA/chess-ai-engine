@@ -46,9 +46,10 @@ flowchart TD
 
 ## Implementation
 
-`OpeningBook` in `rust/src/knowledge/book.rs`, with `src/chess_engine/knowledge/opening_book.py` as its Python face;
-consulted by `UciBot.get_move` in `src/chess_engine/uci.py` before the UCI binary (the binary itself has no book).
-Switch: the window's Settings → Opening book (`AISettings.opening_book`). Data: `data/knowledge/opening_book/opening_book.json` (versioned,
+`OpeningBook` in `rust/src/knowledge/book.rs`, consulted by `rust/src/bin/uci.rs` on each `go`, before the
+tablebases and the search, while the game follows the book (the first missing position ends it; `ucinewgame` starts
+it again). The binary uses the book only when the UCI option `Book` names the JSON file, so the matches and
+tournaments play without it. Switch: the window's Settings → Opening book (`AISettings.opening_book`), which sets that option. Data: `data/knowledge/opening_book/opening_book.json` (versioned,
 9.0 MB, 121,868 positions), the only opening book of the project.
 
 ```bash

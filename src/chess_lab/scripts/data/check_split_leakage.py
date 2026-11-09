@@ -30,8 +30,8 @@ import chess
 import numpy as np
 import pyarrow.parquet as pq
 
-from chess_engine.knowledge.opening_book import position_key
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
+from chess_lab.scripts.data.build_opening_book import position_key
 from chess_lab.training.data.split import TEST, TRAIN, VALIDATION
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}

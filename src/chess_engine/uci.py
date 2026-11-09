@@ -1,16 +1,18 @@
 """Client of the UCI engine (``rust/target/release/uci``): the AI players of the game page."""
 
 import subprocess
+from pathlib import Path
 from typing import Dict, Optional, Sequence
 
 import chess
 
-from chess_engine.knowledge.endgame_tablebase import EndgameTablebase
-from chess_engine.knowledge.opening_book import OpeningBook
 from chess_engine.paths import ROOT
 
 #: The engine binary, built with ``cargo build --release --bin uci`` in ``rust/``.
 ENGINE = ROOT / "rust" / "target" / "release" / "uci"
+#: The opening book and the endgame tablebases shipped with the project.
+BOOK = ROOT / "data" / "knowledge" / "opening_book" / "opening_book.json"
+TABLEBASE = ROOT / "data" / "knowledge" / "endgame_tablebase"
 #: Seconds per move when there is no clock and no fixed time.
 NO_CLOCK_MOVE_TIME = 3.0
 
@@ -24,9 +26,17 @@ class UciEngine:
 
     :param techniques: Techniques of selective search to switch on.
     :param threads: Threads that search.
+    :param book: Opening book the engine follows, or None for none.
+    :param tablebase: Folder of the endgame tablebases the engine plays, or None for none.
     """
 
-    def __init__(self, techniques: Sequence[str], threads: int):
+    def __init__(
+        self,
+        techniques: Sequence[str],
+        threads: int,
+        book: Optional[Path] = None,
+        tablebase: Optional[Path] = None,
+    ):
         if not ENGINE.exists():
             raise FileNotFoundError(
                 f"{ENGINE} is missing: build it with `cargo build --release --bin uci` in rust/"
@@ -38,6 +48,10 @@ class UciEngine:
         self._wait_for("uciok")
         self._send(f"setoption name Threads value {threads}")
         self._send(f"setoption name Techniques value {','.join(techniques)}")
+        if book is not None:
+            self._send(f"setoption name Book value {book}")
+        if tablebase is not None:
+            self._send(f"setoption name Tablebase value {tablebase}")
         self._send("isready")
         self._wait_for("readyok")
 
@@ -77,22 +91,23 @@ class UciEngine:
 
 
 class UciBot:
-    """An AI player: the opening book and the tablebases first, then the engine.
+    """An AI player: the engine, with the opening book and the tablebases it consults first.
 
     :param settings: How the AI thinks (an :class:`~chess_engine.gui.settings.AISettings`).
     """
 
     def __init__(self, settings):
         self.settings = settings
-        self.engine = UciEngine(settings.techniques, settings.threads)
-        self.book = OpeningBook.shipped() if settings.opening_book else None
-        self.tablebase = EndgameTablebase.shipped() if settings.tablebase else None
-        self.in_book = self.book is not None
+        self.engine = UciEngine(
+            settings.techniques,
+            settings.threads,
+            book=BOOK if settings.opening_book and BOOK.exists() else None,
+            tablebase=TABLEBASE if settings.tablebase and TABLEBASE.exists() else None,
+        )
 
     def on_game_start(self) -> None:
-        """Start a game: the engine forgets the last one and the book is followed again."""
+        """Start a game: the engine forgets the last one and follows the book again."""
         self.engine.new_game()
-        self.in_book = self.book is not None
 
     def get_move(
         self,
@@ -107,15 +122,6 @@ class UciBot:
         :param increment: Seconds added after each move.
         :return: The move, or None if the engine found none.
         """
-        if self.in_book:
-            book_move = self.book.lookup(board)
-            if book_move is not None:
-                return book_move
-            self.in_book = False
-        if self.tablebase is not None:
-            move = self.tablebase.best_move(board)
-            if move is not None:
-                return move
         return self.engine.bestmove(board, self._limits(clocks, increment))
 
     def close(self) -> None:

@@ -1,10 +1,12 @@
 """The UCI client: the limits it sends and the moves the engine binary answers with."""
 
+import json
+
 import chess
 import pytest
 
 from chess_engine.gui.settings import AISettings
-from chess_engine.uci import ENGINE, UciBot
+from chess_engine.uci import ENGINE, UciBot, UciEngine
 
 pytestmark = pytest.mark.skipif(not ENGINE.exists(), reason="the uci binary is not built")
 
@@ -36,3 +38,13 @@ def test_limits_fixed_time_or_clock(bot):
     bot.settings = AISettings(move_time=None)
     assert bot._limits(clocks, 0.1) == "wtime 60000 btime 58500 winc 100 binc 100"
     assert bot._limits(None, 0.0) == "movetime 3000"
+
+
+def test_the_engine_plays_the_book_it_is_given(tmp_path):
+    book = tmp_path / "book.json"
+    book.write_text(json.dumps({chess.STARTING_FEN: "d2d4"}))
+    engine = UciEngine([], 1, book=book)
+    try:
+        assert engine.bestmove(chess.Board(), "movetime 200") == chess.Move.from_uci("d2d4")
+    finally:
+        engine.close()

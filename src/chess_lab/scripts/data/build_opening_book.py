@@ -13,7 +13,7 @@ followed, and each level keeps at most ``--cap-per-ply`` positions (the most bal
 bounds the size of the book.
 
 Writes ``{fen: uci}`` (the first four FEN fields) to ``--out``; this is the one opening book of the
-project (``knowledge/opening_book.py`` reads it).
+project (the ``Book`` option of the ``uci`` binary reads it).
 """
 
 import argparse
@@ -26,13 +26,25 @@ import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from chess_engine.knowledge.opening_book import position_key
 from chess_lab.models.defaults import RAW_DIR
 
 #: Score of a forced mate, minus the moves it takes (a faster mate is worth more).
 MATE_SCORE = 100_000.0
 
 Lookup = Callable[[str], Optional[float]]
+
+
+def position_key(board: chess.Board) -> str:
+    """Key identifying a position independently of how it was reached.
+
+    The halfmove clock and the fullmove number of the FEN are dropped so that transpositions
+    (the same position reached through a different move order) hit the same entry, as in the
+    ``uci`` binary.
+
+    :param board: Position to identify.
+    :return: The first four FEN fields (placement, side to move, castling, en passant).
+    """
+    return " ".join(board.fen().split()[:4])
 
 
 def ranking_scores(cp: np.ndarray, mate: np.ndarray) -> np.ndarray:

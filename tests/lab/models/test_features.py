@@ -152,3 +152,17 @@ def test_hybrid_king_buckets_split_files_in_groups_and_ranks_at_the_third():
     assert FEATURE_SETS["pst_hybrid_k4"].bucket(chess.D1) == 0
     assert FEATURE_SETS["pst_hybrid_k4"].bucket(chess.E4) == 3
     assert FEATURE_SETS["pst_hybrid"].bucket(chess.E4) == 0
+
+
+def test_king_bucket_features_have_the_pieces_in_the_king_bucket_and_no_terms():
+    plain = SlottedPstFeatures()
+    board = chess.Board()
+    features = FEATURE_SETS["pst_k4"]
+    assert features.size() == 4 * 768
+    assert features.max_entries() == 32
+    indices, values = features.active(board)
+    # King on e1: file group 1 of 2, rank group 0, so bucket 2.
+    assert indices == [index + 768 * 2 for index in plain.active(board)[0]]
+    assert values == [1.0] * 32
+    assert features.bucket(chess.D1) == 0
+    assert features.bucket(chess.E4) == 3

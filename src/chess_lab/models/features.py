@@ -239,10 +239,12 @@ class HybridPstFeatures(SlottedPstFeatures):
 
     :cvar name: ``"pst_hybrid"``.
     :cvar file_groups: King file groups; the buckets are ``2 * file_groups``, or ``1`` when ``0``.
+    :cvar terms: Whether the term entries follow the piece squares.
     """
 
     name = "pst_hybrid"
     file_groups = 0
+    terms = True
 
     @property
     def buckets(self) -> int:
@@ -268,19 +270,24 @@ class HybridPstFeatures(SlottedPstFeatures):
         group = chess.square_file(king) // (8 // self.file_groups)
         return 2 * group + (1 if chess.square_rank(king) >= 2 else 0)
 
+    @property
+    def _term_count(self) -> int:
+        """Number of term entries: two per term, or none without terms."""
+        return 2 * len(TERM_NAMES) if self.terms else 0
+
     def max_entries(self) -> int:
         """Pieces and the term entries.
 
-        :return: ``32 + 22``.
+        :return: ``32 + 22``, or ``32`` without terms.
         """
-        return self.max_active + 2 * len(TERM_NAMES)
+        return self.max_active + self._term_count
 
     def size(self) -> int:
         """Bucketed piece squares and two entries per term.
 
-        :return: ``790 + 768 * (buckets - 1)``.
+        :return: ``768 * buckets + 22``, or ``768 * buckets`` without terms.
         """
-        return self._term_base + 2 * len(TERM_NAMES)
+        return self._term_base + self._term_count
 
     def active(self, board: chess.Board) -> Tuple[List[int], List[float]]:
         """Shifted piece entries, then the term entries.
@@ -294,6 +301,8 @@ class HybridPstFeatures(SlottedPstFeatures):
             king = chess.square_mirror(king)
         shift = self.bucket(king) * 2 * _OPPONENT_PIECE_BLOCK
         indices = [index + shift for index in indices]
+        if not self.terms:
+            return indices, values
         term_indices, term_values = _term_entries(board, self._term_base)
         indices.extend(term_indices)
         values.extend(term_values)
@@ -320,6 +329,17 @@ class HybridKings8PstFeatures(HybridPstFeatures):
     file_groups = 4
 
 
+class Kings4PstFeatures(HybridPstFeatures):
+    """Piece squares in 4 king buckets (2 file groups by 2 rank groups), without the terms.
+
+    :cvar name: ``"pst_k4"``.
+    """
+
+    name = "pst_k4"
+    file_groups = 2
+    terms = False
+
+
 #: Every feature set by its name, the one the saved models and the core refer to.
 FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
     features.name: features
@@ -328,6 +348,7 @@ FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
         HybridPstFeatures(),
         HybridKings4PstFeatures(),
         HybridKings8PstFeatures(),
+        Kings4PstFeatures(),
     )
 }
 

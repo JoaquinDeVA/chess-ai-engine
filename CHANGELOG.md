@@ -10,6 +10,7 @@ All notable changes. The newest are first.
 - The switches `lmr`, `qs_evasions` and the UCI option `TimeRules`, all measured and rejected ([Search techniques](docs/techniques/README.md#how-the-switches-were-judged)).
 
 ### Added
+- The `pst_k4` feature set (piece squares in 4 king buckets, without the classical terms) and its network, King-bucket piece-square network (`net_pst_k4_w64`), registered and not trained ([Models](docs/MODELS.md#king-bucket-piece-square-network-net_pst_k4_w64)).
 - Round robin of SPRTs on the compute node (fastchess, 10 s + 0.1 s, 2026-11-06 to 2026-11-09): the removal of each default technique and the models in steps; 17 jobs in [Results](docs/RESULTS.md#round-robin-rust-engine-fastchess). Removing `null_move` (−97.4 ± 24.5), `see`, `tt_move` or `incremental` loses; `net_pst_w32` beats `linear_pst_terms@e30` by +165.1 ± 32.9; the hybrid networks, without an incremental accumulator, lose to it.
 - The worker installs each engine build in its own path (`bin/<hash>/uci`) and each queue job names its binary, so a long SPRT keeps its build (`a1bdf60`).
 - Trained hybrid networks (768 piece-square inputs plus the eleven classical terms, optionally with 4 or 8 king buckets) at effort 30: Spearman 0.702 to 0.722 against 0.646 for the logistic model, 3.4 to 3.9 µs per evaluation against 2.4, all measured on one laptop (`python -m chess_lab.measure.evaluate`). Not played yet. See [Models](docs/MODELS.md#hybrid-networks-net_hybrid_w32-net_hybrid_w64-net_hybrid_k4_w64-net_hybrid_k8_w64).

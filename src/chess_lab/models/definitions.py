@@ -206,6 +206,15 @@ class NnHybridK8W64Model(NeuralEvalModel):
     )
 
 
+class NnK4W64Model(NeuralEvalModel):
+    """Piece squares in 4 king buckets, no terms, a 64 accumulator, one output."""
+
+    name = "net_pst_k4_w64"
+    feature_set = "pst_k4"
+    hidden = (64,)
+    architecture = "Sparse network: 4 king buckets of 768 piece-square inputs, 64-1 (2 layers)"
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
     cls.name: cls
@@ -218,6 +227,7 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnHybridW128Model,
         NnHybridK4W64Model,
         NnHybridK8W64Model,
+        NnK4W64Model,
     )
 }
 

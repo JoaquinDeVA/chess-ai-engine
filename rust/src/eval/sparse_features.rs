@@ -23,15 +23,18 @@ pub enum FeatureSet {
     /// `pst_hybrid`, `pst_hybrid_k4`, `pst_hybrid_k8`: slotted inputs per king bucket (`file_groups`
     /// file groups by two rank groups; none means a single bucket) plus the classical terms.
     Hybrid { file_groups: usize },
+    /// `pst_k4`: slotted inputs per king bucket, without the classical terms.
+    Bucketed { file_groups: usize },
 }
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 4] = [
+    pub const NAMES: [&'static str; 5] = [
         "pst_slotted",
         "pst_hybrid",
         "pst_hybrid_k4",
         "pst_hybrid_k8",
+        "pst_k4",
     ];
 
     /// The feature set called `name` in the saved models.
@@ -41,6 +44,7 @@ impl FeatureSet {
             "pst_hybrid" => FeatureSet::Hybrid { file_groups: 0 },
             "pst_hybrid_k4" => FeatureSet::Hybrid { file_groups: 2 },
             "pst_hybrid_k8" => FeatureSet::Hybrid { file_groups: 4 },
+            "pst_k4" => FeatureSet::Bucketed { file_groups: 2 },
             _ => return None,
         })
     }
@@ -52,12 +56,14 @@ impl FeatureSet {
             FeatureSet::Hybrid { file_groups } => {
                 buckets(file_groups) * PIECE_INPUTS + 2 * TERM_COUNT
             }
+            FeatureSet::Bucketed { file_groups } => buckets(file_groups) * PIECE_INPUTS,
         }
     }
 
     /// Bucket of the inputs when `owner` moves with its king on `king` (always 0 without buckets).
     pub fn king_bucket(self, owner: Color, king: Square) -> usize {
-        let FeatureSet::Hybrid { file_groups } = self else {
+        let (FeatureSet::Hybrid { file_groups } | FeatureSet::Bucketed { file_groups }) = self
+        else {
             return 0;
         };
         let king = if owner == Color::Black {
@@ -89,7 +95,9 @@ impl FeatureSet {
         values.clear();
         match self {
             FeatureSet::Slotted => slotted(pos, indices, values),
-            FeatureSet::Hybrid { file_groups } => hybrid(pos, file_groups, indices, values),
+            FeatureSet::Hybrid { .. } | FeatureSet::Bucketed { .. } => {
+                bucketed(pos, self, indices, values)
+            }
         }
     }
 }
@@ -290,12 +298,12 @@ fn buckets(file_groups: usize) -> usize {
     }
 }
 
-/// The slotted indices moved into the block of the mover's king bucket, then the term entries.
-fn hybrid(pos: &Chess, file_groups: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+/// The slotted indices moved into the block of the mover's king bucket, then the term entries
+/// (if the set has them).
+fn bucketed(pos: &Chess, set: FeatureSet, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     slotted(pos, indices, values);
     let owner = pos.turn();
     let king = pos.board().king_of(owner).expect("a king per side");
-    let set = FeatureSet::Hybrid { file_groups };
     let shift = set.king_bucket(owner, king) * PIECE_INPUTS;
     for index in indices.iter_mut() {
         *index += shift;

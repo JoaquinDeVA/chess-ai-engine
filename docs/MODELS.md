@@ -74,6 +74,29 @@ Quality and playing strength: not measured.
 
 **Status.** Registered, not trained.
 
+## King-bucket piece-square network (`net_pst_k4_w64`)
+
+**Problem.** One table of piece squares for every king position cannot say that a pawn on g2 matters more when the
+own king is on g1 than when it is on c1; the hybrid networks add king buckets, but together with the classical terms,
+which cost a computation at every leaf.
+
+**What it does.** The 768 piece-square inputs of `net_pst_w32`, repeated in 4 blocks, one per bucket of the mover's
+king: files a–d or e–h, by ranks 1–2 or 3–8, each side seen from its own home rank. Only the block of the current
+bucket is active, so a position still has one entry per piece; no classical terms.
+
+| Id | Layers | Parameters |
+|---|---|---:|
+| `net_pst_k4_w64` | 4 × 768 → 64 → 1 | 196,737 |
+
+**Implementation.** `NnK4W64Model` in `src/chess_lab/models/definitions.py`; the `pst_k4` feature set,
+`Kings4PstFeatures` in `src/chess_lab/models/features.py` and `FeatureSet::Bucketed` in
+`rust/src/eval/sparse_features.rs` (parity: `tests/core/test_feature_parity.py`). The accumulator follows the moves and
+is rebuilt when the king changes bucket ([incremental](techniques/incremental.md#how-it-works)).
+
+**Measured effect.** Not measured.
+
+**Status.** Registered, not trained.
+
 ## Hybrid networks (`net_hybrid_w32`, `net_hybrid_w64`, `net_hybrid_k4_w64`, `net_hybrid_k8_w64`)
 
 **Problem.** A network on the 768 piece-square inputs alone has to learn from the board what eleven classical

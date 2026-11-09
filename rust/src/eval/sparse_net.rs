@@ -457,6 +457,12 @@ mod tests {
         assert!(bucket_changes > 100, "{bucket_changes}");
     }
 
+    #[test]
+    fn incremental_equals_full_buckets_k4() {
+        let (_, bucket_changes, _) = check_incremental(FeatureSet::Bucketed { file_groups: 2 });
+        assert!(bucket_changes > 100, "{bucket_changes}");
+    }
+
     /// A king that castles into another bucket rebuilds its accumulator, and undo restores the
     /// old one with its bucket.
     #[test]

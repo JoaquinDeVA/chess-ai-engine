@@ -12,8 +12,7 @@ use shakmaty::Color;
 
 use crate::board::{position_from_fen, uci_string};
 use crate::eval::classic_heuristic::H1;
-use crate::eval::logistic_model::LinearModel;
-use crate::eval::sparse_features::{FeatureSet, Perspective};
+use crate::eval::sparse_features::FeatureSet;
 use crate::eval::sparse_net::{Layer, Net};
 use crate::eval::{Eval, Evaluator};
 use crate::knowledge::book::OpeningBook;
@@ -21,14 +20,6 @@ use crate::knowledge::tablebase::EndgameTablebase;
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
-}
-
-fn parse_perspective(name: &str) -> PyResult<Perspective> {
-    match name {
-        "white" => Ok(Perspective::White),
-        "side_to_move" => Ok(Perspective::SideToMove),
-        other => Err(value_error(format!("unknown perspective {other:?}"))),
-    }
 }
 
 fn parse_features(name: &str) -> PyResult<FeatureSet> {
@@ -39,7 +30,7 @@ fn parse_features(name: &str) -> PyResult<FeatureSet> {
 #[pyclass(name = "Evaluator", frozen)]
 struct PyEvaluator {
     eval: Eval,
-    features: Option<(FeatureSet, Perspective)>,
+    features: Option<FeatureSet>,
 }
 
 #[pymethods]
@@ -56,31 +47,13 @@ impl PyEvaluator {
         })
     }
 
-    /// A logistic model over sparse features.
-    #[staticmethod]
-    fn linear(
-        features: &str,
-        perspective: &str,
-        weights: PyReadonlyArray1<f64>,
-        bias: f64,
-    ) -> PyResult<PyEvaluator> {
-        let (set, view) = (parse_features(features)?, parse_perspective(perspective)?);
-        let model =
-            LinearModel::new(set, view, weights.as_array().to_vec(), bias).map_err(value_error)?;
-        Ok(PyEvaluator {
-            eval: Eval::Linear(model),
-            features: Some((set, view)),
-        })
-    }
-
     /// A network over sparse features: `layers` are `(weights, bias)` pairs, accumulator first.
     #[staticmethod]
     fn network(
         features: &str,
-        perspective: &str,
         layers: Vec<(PyReadonlyArray2<f64>, PyReadonlyArray1<f64>)>,
     ) -> PyResult<PyEvaluator> {
-        let (set, view) = (parse_features(features)?, parse_perspective(perspective)?);
+        let set = parse_features(features)?;
         let layers = layers
             .iter()
             .map(|(weights, bias)| {
@@ -93,10 +66,10 @@ impl PyEvaluator {
                 }
             })
             .collect();
-        let net = Net::new(set, view, layers).map_err(value_error)?;
+        let net = Net::new(set, layers).map_err(value_error)?;
         Ok(PyEvaluator {
             eval: Eval::Net(net),
-            features: Some((set, view)),
+            features: Some(set),
         })
     }
 
@@ -108,14 +81,14 @@ impl PyEvaluator {
             .evaluate(&pos, if white { Color::White } else { Color::Black }))
     }
 
-    /// Active feature indices and values of a position (models over sparse features only).
+    /// Active feature indices and values of a position (networks only).
     fn features(&self, fen: &str) -> PyResult<(Vec<usize>, Vec<f64>)> {
-        let (set, view) = self
+        let set = self
             .features
             .ok_or_else(|| value_error("this evaluator has no sparse features"))?;
         let pos = position_from_fen(fen).map_err(value_error)?;
         let (mut indices, mut values) = (Vec::new(), Vec::new());
-        set.active(&pos, view, &mut indices, &mut values);
+        set.active(&pos, &mut indices, &mut values);
         Ok((indices, values))
     }
 }

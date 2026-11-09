@@ -1,7 +1,7 @@
 """Cache of the encoded training batches: where it lives and which directory a run uses.
 
 Encoding half a million rows takes minutes and reading them back from the cache takes seconds, so
-the batches of a run are kept in data/cache/<hash>. Linear models and networks share it.
+the batches of a run are kept in data/cache/<hash>. Every network shares it.
 """
 
 import hashlib

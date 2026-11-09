@@ -1,37 +1,23 @@
 //! Sparse board features: a position becomes a list of active feature indices and values, seen
-//! from a perspective. The linear model and the network score them. The features and their order
-//! are those of `chess_lab/models/features.py`.
+//! from the side to move. The network scores them. The features and their order are those of
+//! `chess_lab/models/features.py`.
 
 use shakmaty::attacks::{bishop_attacks, knight_attacks, queen_attacks, rook_attacks};
 use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 
 /// Phase of the start position (sum of the phase weights of all pieces).
 const MAX_PHASE: usize = 24;
-pub(crate) const BLOCK_SIZE: usize = 6 * 64;
 const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 const TERM_COUNT: usize = 11;
 const PAWN_SCALE: f64 = 4.0;
 const MOBILITY_SCALE: f64 = 10.0;
 const SHIELD_SCALE: f64 = 3.0;
 
-/// Where the features are seen from.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Perspective {
-    White,
-    SideToMove,
-}
-
 /// The families of features.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FeatureSet {
-    /// `linear_pst`: tapered piece-square tables.
-    Pst,
-    /// `linear_pst_terms`: tables plus classical terms.
-    PstTerms,
-    /// `pst_slotted`: one-hot piece squares (the network's inputs).
+    /// `pst_slotted`: one-hot piece squares, the mover's pieces first.
     Slotted,
-    /// `pst_kings`: the slotted inputs once per square of the own king.
-    Kings,
     /// `pst_hybrid`, `pst_hybrid_k4`, `pst_hybrid_k8`: slotted inputs per king bucket (`file_groups`
     /// file groups by two rank groups; none means a single bucket) plus the classical terms.
     Hybrid { file_groups: usize },
@@ -39,11 +25,8 @@ pub enum FeatureSet {
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 7] = [
-        "linear_pst",
-        "linear_pst_terms",
+    pub const NAMES: [&'static str; 4] = [
         "pst_slotted",
-        "pst_kings",
         "pst_hybrid",
         "pst_hybrid_k4",
         "pst_hybrid_k8",
@@ -52,10 +35,7 @@ impl FeatureSet {
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
         Some(match name {
-            "linear_pst" => FeatureSet::Pst,
-            "linear_pst_terms" => FeatureSet::PstTerms,
             "pst_slotted" => FeatureSet::Slotted,
-            "pst_kings" => FeatureSet::Kings,
             "pst_hybrid" => FeatureSet::Hybrid { file_groups: 0 },
             "pst_hybrid_k4" => FeatureSet::Hybrid { file_groups: 2 },
             "pst_hybrid_k8" => FeatureSet::Hybrid { file_groups: 4 },
@@ -63,38 +43,23 @@ impl FeatureSet {
         })
     }
 
-    /// Number of weights under `perspective`.
-    pub fn size(self, perspective: Perspective) -> usize {
-        let turn = usize::from(perspective == Perspective::White);
+    /// Number of inputs.
+    pub fn size(self) -> usize {
         match self {
-            FeatureSet::Pst => 2 * BLOCK_SIZE + turn,
-            FeatureSet::PstTerms => 2 * BLOCK_SIZE + 2 * TERM_COUNT + turn,
-            FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK + turn,
-            FeatureSet::Kings => 64 * 2 * OPPONENT_PIECE_BLOCK + turn,
+            FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK,
             FeatureSet::Hybrid { file_groups } => {
-                buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK + 2 * TERM_COUNT + turn
+                buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK + 2 * TERM_COUNT
             }
         }
     }
 
     /// Active indices and values of a position, appended to the (cleared) vectors.
-    pub fn active(
-        self,
-        pos: &Chess,
-        perspective: Perspective,
-        indices: &mut Vec<usize>,
-        values: &mut Vec<f64>,
-    ) {
+    pub fn active(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
         indices.clear();
         values.clear();
         match self {
-            FeatureSet::Pst => pst(pos, perspective, indices, values, true),
-            FeatureSet::PstTerms => pst_terms(pos, perspective, indices, values),
-            FeatureSet::Slotted => slotted(pos, perspective, indices, values),
-            FeatureSet::Kings => kings(pos, perspective, indices, values),
-            FeatureSet::Hybrid { file_groups } => {
-                hybrid(pos, perspective, file_groups, indices, values)
-            }
+            FeatureSet::Slotted => slotted(pos, indices, values),
+            FeatureSet::Hybrid { file_groups } => hybrid(pos, file_groups, indices, values),
         }
     }
 }
@@ -114,64 +79,11 @@ fn mirror(sq: Square) -> usize {
 }
 
 /// Game phase: 1 in the opening, 0 in a bare-kings ending.
-pub fn phase(pos: &Chess) -> f64 {
+fn phase(pos: &Chess) -> f64 {
     let board = pos.board();
     let minors = (board.knights() | board.bishops()).count();
     let total = minors + 2 * board.rooks().count() + 4 * board.queens().count();
     total.min(MAX_PHASE) as f64 / MAX_PHASE as f64
-}
-
-pub(crate) fn sign_of(piece: Piece, mover: Color, perspective: Perspective) -> f64 {
-    match perspective {
-        Perspective::White => {
-            if piece.color == Color::White {
-                1.0
-            } else {
-                -1.0
-            }
-        }
-        Perspective::SideToMove => {
-            if piece.color == mover {
-                1.0
-            } else {
-                -1.0
-            }
-        }
-    }
-}
-
-/// Index of the table entry of `piece` on `square` in the first (opening) block.
-pub(crate) fn pst_index(perspective: Perspective, piece: Piece, square: Square) -> usize {
-    let type_offset = (piece.role as usize - 1) * 64;
-    let oriented = if perspective == Perspective::SideToMove && piece.color == Color::Black {
-        mirror(square)
-    } else {
-        u32::from(square) as usize
-    };
-    type_offset + oriented
-}
-
-fn pst(
-    pos: &Chess,
-    perspective: Perspective,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-    with_turn: bool,
-) {
-    let tapered = phase(pos);
-    let mover = pos.turn();
-    for (square, piece) in pieces(pos) {
-        let sign = sign_of(piece, mover, perspective);
-        let index = pst_index(perspective, piece, square);
-        indices.push(index);
-        indices.push(BLOCK_SIZE + index);
-        values.push(sign * tapered);
-        values.push(sign * (1.0 - tapered));
-    }
-    if perspective == Perspective::White && with_turn {
-        indices.push(2 * BLOCK_SIZE);
-        values.push(if mover == Color::White { 1.0 } else { -1.0 });
-    }
 }
 
 /// Whether `enemy_pawns` has a pawn ahead of `square`, on its file or a neighbouring one, from the
@@ -289,23 +201,9 @@ fn piece_terms(pos: &Chess, color: Color) -> [f64; 8] {
     terms
 }
 
-fn pst_terms(
-    pos: &Chess,
-    perspective: Perspective,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-) {
-    pst(pos, perspective, indices, values, false);
-    terms(pos, perspective, indices, values);
-}
-
-/// The classical terms of `linear_pst_terms` (and its turn feature), after the table entries.
-pub(crate) fn terms(
-    pos: &Chess,
-    perspective: Perspective,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-) {
+/// The classical terms (mover minus opponent), each as an opening and an endgame entry from
+/// `base` on.
+fn terms(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let tapered = phase(pos);
     let white = pawn_counts(pos, Color::White);
     let black = pawn_counts(pos, Color::Black);
@@ -320,39 +218,26 @@ pub(crate) fn terms(
     for i in 0..8 {
         terms[3 + i] = w[i] - b[i];
     }
-    let sign = if perspective == Perspective::White || pos.turn() == Color::White {
+    let sign = if pos.turn() == Color::White {
         1.0
     } else {
         -1.0
     };
     for (term, value) in terms.iter().enumerate() {
-        let index = 2 * BLOCK_SIZE + 2 * term;
+        let index = base + 2 * term;
         indices.push(index);
         indices.push(index + 1);
         values.push(sign * value * tapered);
         values.push(sign * value * (1.0 - tapered));
     }
-    if perspective == Perspective::White {
-        indices.push(2 * BLOCK_SIZE + 2 * TERM_COUNT);
-        values.push(if pos.turn() == Color::White {
-            1.0
-        } else {
-            -1.0
-        });
-    }
 }
 
-fn slotted(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+/// One entry per piece: the mover's pieces in the first block, the opponent's in the second, each
+/// colour seen from its own home rank.
+fn slotted(pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let mover = pos.turn();
     for (square, piece) in pieces(pos) {
         let mut offset = (piece.role as usize - 1) * 64;
-        if perspective == Perspective::White {
-            if piece.color == Color::Black {
-                offset += OPPONENT_PIECE_BLOCK;
-            }
-            indices.push(offset + u32::from(square) as usize);
-            continue;
-        }
         if piece.color != mover {
             offset += OPPONENT_PIECE_BLOCK;
         }
@@ -364,35 +249,6 @@ fn slotted(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, valu
         indices.push(offset + oriented);
     }
     values.resize(indices.len(), 1.0);
-    if perspective == Perspective::White {
-        indices.push(2 * OPPONENT_PIECE_BLOCK);
-        values.push(if mover == Color::White { 1.0 } else { 0.0 });
-    }
-}
-
-/// The slotted indices moved into the block of the own king (the mover's, or White's under the
-/// White perspective).
-fn kings(pos: &Chess, perspective: Perspective, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-    slotted(pos, perspective, indices, values);
-    let owner = if perspective == Perspective::White {
-        Color::White
-    } else {
-        pos.turn()
-    };
-    let king = pos.board().king_of(owner).expect("a king per side");
-    let king = if owner == Color::Black {
-        mirror(king)
-    } else {
-        u32::from(king) as usize
-    };
-    let shift = king * 2 * OPPONENT_PIECE_BLOCK;
-    let pieces = indices.len() - usize::from(perspective == Perspective::White);
-    for index in &mut indices[..pieces] {
-        *index += shift;
-    }
-    if perspective == Perspective::White {
-        indices[pieces] = 64 * 2 * OPPONENT_PIECE_BLOCK;
-    }
 }
 
 /// Number of king buckets: two rank groups per file group, or one without file groups.
@@ -404,25 +260,10 @@ fn buckets(file_groups: usize) -> usize {
     }
 }
 
-/// The slotted indices moved into the block of the own king's bucket, then the term entries and
-/// the turn entry (`1.0` White to move, `0.0` otherwise, under the White perspective).
-fn hybrid(
-    pos: &Chess,
-    perspective: Perspective,
-    file_groups: usize,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-) {
-    slotted(pos, perspective, indices, values);
-    if perspective == Perspective::White {
-        indices.pop();
-        values.pop();
-    }
-    let owner = if perspective == Perspective::White {
-        Color::White
-    } else {
-        pos.turn()
-    };
+/// The slotted indices moved into the block of the mover's king bucket, then the term entries.
+fn hybrid(pos: &Chess, file_groups: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+    slotted(pos, indices, values);
+    let owner = pos.turn();
     let king = pos.board().king_of(owner).expect("a king per side");
     let king = if owner == Color::Black {
         mirror(king)
@@ -437,23 +278,10 @@ fn hybrid(
     for index in indices.iter_mut() {
         *index += shift;
     }
-    let term_base = buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK;
-    let mut term_indices = Vec::new();
-    let mut term_values = Vec::new();
-    terms(pos, perspective, &mut term_indices, &mut term_values);
-    if perspective == Perspective::White {
-        // `terms` ends with its own turn entry.
-        term_indices.pop();
-        term_values.pop();
-    }
-    indices.extend(
-        term_indices
-            .iter()
-            .map(|index| index - 2 * BLOCK_SIZE + term_base),
+    terms(
+        pos,
+        buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK,
+        indices,
+        values,
     );
-    values.extend(term_values);
-    if perspective == Perspective::White {
-        indices.push(term_base + 2 * TERM_COUNT);
-        values.push(if pos.turn() == Color::White { 1.0 } else { 0.0 });
-    }
 }

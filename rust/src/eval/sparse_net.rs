@@ -2,7 +2,7 @@
 
 use shakmaty::{Chess, Color, Move, Piece, Position, Role, Square};
 
-use super::sparse_features::{FeatureSet, Perspective};
+use super::sparse_features::FeatureSet;
 use super::{for_player, sigmoid, EvalState, Evaluator};
 
 /// One dense layer: `weights` is row-major `(fan_in, fan_out)`.
@@ -16,25 +16,20 @@ pub struct Layer {
 /// A feed-forward network over sparse inputs; the first layer is the accumulator.
 pub struct Net {
     features: FeatureSet,
-    perspective: Perspective,
     layers: Vec<Layer>,
 }
 
 impl Net {
     /// A network, checking the shapes of its layers.
-    pub fn new(
-        features: FeatureSet,
-        perspective: Perspective,
-        layers: Vec<Layer>,
-    ) -> Result<Net, String> {
+    pub fn new(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
         if layers.len() < 2 {
             return Err("a network needs an accumulator and an output layer".into());
         }
-        if layers[0].fan_in != features.size(perspective) {
+        if layers[0].fan_in != features.size() {
             return Err(format!(
                 "the first layer has {} inputs, the features give {}",
                 layers[0].fan_in,
-                features.size(perspective)
+                features.size()
             ));
         }
         for pair in layers.windows(2) {
@@ -52,18 +47,13 @@ impl Net {
         if layers.last().map(|l| l.fan_out) != Some(1) {
             return Err("the output layer must have one unit".into());
         }
-        Ok(Net {
-            features,
-            perspective,
-            layers,
-        })
+        Ok(Net { features, layers })
     }
 
-    /// Network output before the logistic function.
+    /// Network output before the logistic function, for the side to move.
     pub fn logit(&self, pos: &Chess) -> f64 {
         let (mut indices, mut values) = (Vec::with_capacity(40), Vec::with_capacity(40));
-        self.features
-            .active(pos, self.perspective, &mut indices, &mut values);
+        self.features.active(pos, &mut indices, &mut values);
         let first = &self.layers[0];
         let mut hidden = first.bias.clone();
         for (index, value) in indices.iter().zip(&values) {
@@ -90,7 +80,7 @@ impl Net {
     /// Expected score of White in `[0, 1]`.
     pub fn expected_score(&self, pos: &Chess) -> f64 {
         let score = sigmoid(self.logit(pos));
-        if self.perspective == Perspective::SideToMove && pos.turn() == Color::Black {
+        if pos.turn() == Color::Black {
             1.0 - score
         } else {
             score
@@ -120,7 +110,7 @@ impl Evaluator for Net {
     }
 
     fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
-        if self.features == FeatureSet::Slotted && self.perspective == Perspective::SideToMove {
+        if self.features == FeatureSet::Slotted {
             Some(Box::new(NetState::new(self, pos)))
         } else {
             None
@@ -304,7 +294,6 @@ mod tests {
     fn net() -> Net {
         Net::new(
             FeatureSet::Slotted,
-            Perspective::SideToMove,
             vec![layer(768, 16, 1), layer(16, 8, 2), layer(8, 1, 3)],
         )
         .unwrap()

@@ -1,1 +1,1 @@
-"""Fitting of the models: Adam for the linear ones, Keras for the networks."""
+"""Fitting of the networks: shared encoding and epoch loop, and the Keras fit."""

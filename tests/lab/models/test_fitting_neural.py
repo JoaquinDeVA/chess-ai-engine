@@ -34,8 +34,8 @@ def random_net(seed: int = 0, rep: Representation | None = None) -> NeuralEvalMo
 
 def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     """Reference forward pass on a dense 768- (or 769-) vector, same weights as ``model``."""
-    indices, values = features_of(model).active(board, model.perspective)
-    x = np.zeros(features_of(model).size(model.perspective))
+    indices, values = features_of(model).active(board)
+    x = np.zeros(features_of(model).size())
     for index, value in zip(indices, values, strict=True):
         x[index] += value
     (w0, b0), *rest = model.layers
@@ -82,7 +82,7 @@ def test_fit_stream_rejects_empty_validation():
 
 
 def test_save_load_round_trip_gives_identical_scores(tmp_path):
-    rep = Representation(scale="cp_linear", perspective="white")
+    rep = Representation(scale="cp_linear")
     model = random_net(seed=4, rep=rep)
     path = model.save(tmp_path / "net_pst_w64x16.npz")
 

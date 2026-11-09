@@ -4,7 +4,9 @@
 # `sha256sum rust/target/release/uci | cut -c1-12`); cada trabajo de queue.json nombra el suyo en «uci».
 # Trampas: un binario instalado no se sobrescribe, así que un SPRT largo sigue con el suyo aunque llegue otro;
 # roundrobin.py solo se sustituye si no está en marcha (si no, avisa) y relee queue.json en cada turno, así que los
-# trabajos nuevos entran solos.
+# trabajos nuevos entran solos. Los binarios anteriores a la retirada de los modelos lineales (p. ej.
+# bin/1fa18f0aab94) exigen "perspective": "side_to_move" en los JSON de modelo; no reexportar
+# data/results/uci_models/ sin ese campo mientras sigan en marcha.
 set -euo pipefail
 W="$HOME/worker"
 H=$(sha256sum rust/target/release/uci | cut -c1-12)

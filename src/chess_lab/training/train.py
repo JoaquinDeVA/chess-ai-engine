@@ -1,7 +1,7 @@
 """Train a registered model.
 
 Every model is trained from the raw shards and their sidecars, sized by effort:
-``python -m chess_lab.training.train --model linear_pst_terms --effort <0-100>``.
+``python -m chess_lab.training.train --model net_pst_w32 --effort <0-100>``.
 """
 
 import argparse
@@ -55,8 +55,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
     parser.add_argument(
         "--representation",
-        help='linear models: "default", or a JSON object with the fields of Representation '
-        "(scale, k, perspective, mate_keep)",
+        help='"default", or a JSON object with the fields of Representation (scale, k, mate_keep)',
     )
     parser.add_argument(
         "--mate-keep",
@@ -139,12 +138,12 @@ def effort_representation(args: argparse.Namespace) -> Representation:
 
 
 def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
-    """Train a linear model from the raw shards, sized by ``--effort``.
+    """Train a network from the raw shards, sized by ``--effort``.
 
     Prints the configuration and a duration estimate, then runs the trials and the final fit.
 
     :param args: Parsed arguments (``effort``, ``representation``, ``raw``, ``sidecar``, ...).
-    :param model_class: A concrete :class:`LinearEvalModel` subclass.
+    :param model_class: A concrete :class:`NeuralEvalModel` subclass.
     :return: Process exit code.
     """
     started = time.perf_counter()

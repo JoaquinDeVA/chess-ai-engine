@@ -1,9 +1,7 @@
-//! Evaluations: the hand-written heuristic `h1`, the linear (logistic) models and the sparse
-//! network. All return the expected score of a player in `[0.01, 0.99]`, like the Python
+//! Evaluations: the hand-written heuristic `h1` and the sparse network. Both return the expected score of a player in `[0.01, 0.99]`, like the Python
 //! `ModelEvaluator`.
 
 pub mod classic_heuristic;
-pub mod logistic_model;
 pub mod sparse_features;
 pub mod sparse_net;
 
@@ -58,7 +56,6 @@ pub fn sigmoid(z: f64) -> f64 {
 /// The evaluations the search can run natively.
 pub enum Eval {
     H1(classic_heuristic::H1),
-    Linear(logistic_model::LinearModel),
     Net(sparse_net::Net),
 }
 
@@ -66,7 +63,6 @@ impl Evaluator for Eval {
     fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
         match self {
             Eval::H1(e) => e.evaluate(pos, player),
-            Eval::Linear(e) => e.evaluate(pos, player),
             Eval::Net(e) => e.evaluate(pos, player),
         }
     }
@@ -74,7 +70,6 @@ impl Evaluator for Eval {
     fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
         match self {
             Eval::Net(e) => e.new_state(pos),
-            Eval::Linear(e) => e.new_state(pos),
             Eval::H1(_) => None,
         }
     }

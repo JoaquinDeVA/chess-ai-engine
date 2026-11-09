@@ -13,9 +13,6 @@ from chess_engine import _core
 #: Folder of the trained model files.
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 
-#: Point of view of the score when the saved representation does not say.
-DEFAULT_PERSPECTIVE = "side_to_move"
-
 #: Names of the features of ``h1``, in the order the core takes their weights.
 FEATURE_NAMES = (
     "material_diff_normalized",

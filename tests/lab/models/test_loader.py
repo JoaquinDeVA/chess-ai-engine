@@ -1,11 +1,10 @@
 """Tests of the saved models through the core: tagged specs and the shipped artifacts."""
 
-import json
-
 import numpy as np
 import pytest
 
-from chess_lab.models.definitions import load_evaluator
+from chess_lab.models import new_model
+from chess_lab.models.definitions import get_model_class, load_evaluator
 from chess_lab.models.store import loader
 from chess_lab.models.store.loader import installed_models, split_spec
 
@@ -13,46 +12,39 @@ WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
 
 
-def save_linear(path, features, size, bias=0.0, weight=0.0, rep=None):
-    """A linear model file as the laboratory writes it."""
-    meta = json.dumps({"features": features, "rep": rep or {}})
-    np.savez(
-        open(path, "wb"), weights=np.full(size, weight), bias=np.float64(bias), meta=np.array(meta)
-    )
+def save_network(path, output_bias=0.0):
+    """An untrained ``net_pst_w32`` file whose output bias is ``output_bias``."""
+    model = new_model(get_model_class("net_pst_w32"))
+    weights, _ = model.layers[-1]
+    model.layers[-1] = (np.zeros_like(weights), np.full(1, output_bias))
+    return model.save(path)
 
 
 def test_shipped_models_are_installed():
-    assert {"linear_pst_terms"} <= set(installed_models())
+    assert {"net_hybrid_w64"} <= set(installed_models())
 
 
 def test_missing_artifact_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        load_evaluator("linear_pst_terms", tmp_path / "missing.npz")
+        load_evaluator("net_pst_w32", tmp_path / "missing.npz")
 
 
-@pytest.mark.parametrize("name", ["linear_pst_terms"])
-def test_core_scores_white_point_of_view(name):
-    evaluator = load_evaluator(name)
+def test_core_scores_white_point_of_view():
+    evaluator = load_evaluator("net_pst_w32@e30")
     assert evaluator.evaluate(WHITE_UP_A_QUEEN, True) > evaluator.evaluate(BLACK_UP_A_QUEEN, True)
 
 
 def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
-    save_linear(tmp_path / "linear_pst_terms.npz", "linear_pst_terms", 790)
-    save_linear(tmp_path / "linear_pst_terms@x.npz", "linear_pst_terms", 790, bias=1.0)
+    save_network(tmp_path / "net_pst_w32.npz")
+    save_network(tmp_path / "net_pst_w32@x.npz", output_bias=1.0)
 
-    assert split_spec("linear_pst_terms@x") == ("linear_pst_terms", "x")
-    assert split_spec("linear_pst_terms") == ("linear_pst_terms", None)
+    assert split_spec("net_pst_w32@x") == ("net_pst_w32", "x")
+    assert split_spec("net_pst_w32") == ("net_pst_w32", None)
     with pytest.raises(ValueError):
-        split_spec("linear_pst_terms@")
-    assert installed_models() == ["linear_pst_terms"]
-    assert load_evaluator("linear_pst_terms@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
-    assert load_evaluator("linear_pst_terms").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
+        split_spec("net_pst_w32@")
+    assert installed_models() == ["net_pst_w32"]
+    assert load_evaluator("net_pst_w32@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
+    assert load_evaluator("net_pst_w32").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
     with pytest.raises(FileNotFoundError):
-        load_evaluator("linear_pst_terms@missing")
-
-
-def test_a_feature_set_without_rust_version_is_rejected(tmp_path):
-    save_linear(tmp_path / "unported.npz", "unported_test_features", 1)
-    with pytest.raises(ValueError):
-        load_evaluator("linear_pst_terms", tmp_path / "unported.npz")
+        load_evaluator("net_pst_w32@missing")

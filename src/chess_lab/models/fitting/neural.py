@@ -17,7 +17,7 @@ import pandas as pd
 from ..definitions import Layer, NeuralEvalModel
 from ..features import features_of
 from ..target import Representation
-from .linear import (
+from .epochs import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,
     encode_frame,
@@ -44,7 +44,7 @@ def new_network_model(model_class: type, rep: Optional[Representation] = None) -
     :return: The model, with ``rep`` saved as a dictionary.
     """
     rep = rep if rep is not None else Representation()
-    sizes = (features_of(model_class).size(rep.perspective), *model_class.hidden, 1)
+    sizes = (features_of(model_class).size(), *model_class.hidden, 1)
     shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
     return model_class(layers=_initial_layers(shapes), rep=rep.to_dict())
 
@@ -213,8 +213,8 @@ def fit_stream(
     re-iterable. The layers of the epoch with the lowest validation loss are kept. The train
     losses include the ``l2`` penalty of the accumulator (negligible at the default ``l2``).
 
-    With ``workers > 1`` frames are featurized in a process pool, as in
-    :func:`chess_lab.models.fitting.linear.fit_stream`.
+    With ``workers > 1`` the frames are featurized in a process pool, in order, while the
+    main process trains; the result is the same as with one worker.
 
     :param model: The network to train; its layers are replaced by the best epoch.
     :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.
@@ -233,7 +233,7 @@ def fit_stream(
         raise ValueError("validation set is empty; early stopping needs validation rows")
     features, rep = features_of(model), Representation.from_dict(model.rep)
     keras = _training_keras()
-    width = features.max_entries(rep.perspective)
+    width = features.max_entries()
     batch_size = int(cfg["batch_size"])
     network, parts = _keras_network(
         keras, [w.shape for w, _ in model.layers], width, float(cfg["l2"])

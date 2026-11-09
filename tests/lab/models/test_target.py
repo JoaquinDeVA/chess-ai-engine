@@ -49,13 +49,6 @@ def test_side_to_move_flips_for_black():
     assert t[1] == pytest.approx(1 - white_pov[1])
 
 
-def test_white_perspective_never_flips():
-    rep = Representation(perspective="white")
-    cp, mate = np.array([200.0, 200.0]), np.full(2, np.nan)
-    t = target(cp, mate, np.array([True, False]), rep)
-    assert t[0] == t[1] == white_score(cp, mate, rep)[0]
-
-
 @pytest.mark.parametrize("scale", ["winprob", "cp_linear"])
 def test_score_to_cp_inverts_white_score(scale):
     rep = Representation(scale=scale)
@@ -77,8 +70,11 @@ def test_is_quiet():
 
 
 def test_representation_round_trips_through_dict():
-    rep = Representation(scale="cp_linear", perspective="white")
+    rep = Representation(scale="cp_linear")
     assert Representation.from_dict(rep.to_dict()) == rep
+    assert Representation.from_dict({**rep.to_dict(), "perspective": "side_to_move"}) == rep
+    with pytest.raises(ValueError):
+        Representation.from_dict({**rep.to_dict(), "perspective": "white"})
     assert Representation().name == "winprob-k0.00368-stm-quiet"
     assert LICHESS_K == 0.00368208
 

@@ -1,22 +1,15 @@
-"""Sparse board features for the linear evaluation models.
+"""Sparse board features for the network inputs, seen from the side to move.
 
-A position becomes a list of active feature indices and their values; a linear model scores it
-as the sum of ``weights[index] * value`` over those entries. Features are tapered: the same piece
-on the same square contributes to a middlegame block and to an endgame block, weighted by the
-game phase.
+A position becomes a list of active feature indices and their values; the first layer of the
+network adds ``weights[index] * value`` over those entries.
 """
 
-from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import chess
 
 #: Phase of the start position (sum of the phase weights of all pieces).
 MAX_PHASE = 24
-#: Size of one block: 6 piece types times 64 squares.
-BLOCK_SIZE = 6 * 64
-_MIDDLEGAME_BLOCK = 0
-_ENDGAME_BLOCK = BLOCK_SIZE
 
 
 def phase(board: chess.Board) -> float:
@@ -36,88 +29,7 @@ def phase(board: chess.Board) -> float:
     return min(MAX_PHASE, minors + 2 * rooks + 4 * queens) / MAX_PHASE
 
 
-class LinearFeatures(ABC):
-    """Sparse encoding of a position for a linear model.
-
-    :cvar name: Identifier stored in the saved model.
-    """
-
-    name: ClassVar[str]
-
-    @abstractmethod
-    def size(self, perspective: str) -> int:
-        """Number of weights needed under ``perspective``.
-
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Weight count (without the bias).
-        """
-
-    @abstractmethod
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """Active feature indices and values of a position.
-
-        :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Parallel lists of indices and values.
-        """
-
-
-class PstFeatures(LinearFeatures):
-    """Tapered piece-square tables: one weight per (piece type, square, phase block).
-
-    Under ``"side_to_move"`` every piece of the player to move adds ``+1`` at its square seen from
-    rank 1 (the board is mirrored by rank when Black moves), and every piece of the opponent adds
-    ``-1`` at the square seen from its own home rank. The features are therefore antisymmetric:
-    a position and its colour-mirror produce the same entries.
-
-    Under ``"white"`` no mirroring is applied: White pieces add ``+1``, Black pieces ``-1``, and
-    one extra entry ``+1`` (White to move) or ``-1`` (Black to move) is added at index 768.
-
-    :cvar name: ``"linear_pst"``.
-    """
-
-    name = "linear_pst"
-    _TURN_INDEX = 2 * BLOCK_SIZE
-
-    def size(self, perspective: str) -> int:
-        """Weights per block pair, plus one turn weight under ``"white"``.
-
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``768`` or ``769``.
-        """
-        return 2 * BLOCK_SIZE + (1 if perspective == "white" else 0)
-
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """Index and value of every piece, in both phase blocks, plus the turn feature.
-
-        :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Two parallel lists; each piece gives two entries (middlegame, endgame).
-        """
-        tapered = phase(board)
-        mover = board.turn
-        indices: List[int] = []
-        values: List[float] = []
-        for square, piece in board.piece_map().items():
-            type_offset = (piece.piece_type - 1) * 64
-            oriented = square
-            if perspective == "side_to_move" and piece.color == chess.BLACK:
-                # Each colour is seen from its own home rank.
-                oriented = chess.square_mirror(square)
-            if perspective == "white":
-                sign = 1.0 if piece.color == chess.WHITE else -1.0
-            else:
-                sign = 1.0 if piece.color == mover else -1.0
-            index = type_offset + oriented
-            indices.extend((_MIDDLEGAME_BLOCK + index, _ENDGAME_BLOCK + index))
-            values.extend((sign * tapered, sign * (1.0 - tapered)))
-        if perspective == "white":
-            indices.append(self._TURN_INDEX)
-            values.append(1.0 if mover == chess.WHITE else -1.0)
-        return indices, values
-
-
-#: Names of the classical terms of :class:`PstTermsFeatures`, in weight order (two weights each).
+#: Names of the classical terms of :class:`HybridPstFeatures`, in input order (two entries each).
 TERM_NAMES = (
     "passed",
     "doubled",
@@ -243,11 +155,13 @@ def _piece_terms(board: chess.Board, color: chess.Color) -> List[float]:
     return terms
 
 
-def _term_entries(board: chess.Board, perspective: str, base: int) -> Tuple[List[int], List[float]]:
+def _term_entries(board: chess.Board, base: int) -> Tuple[List[int], List[float]]:
     """Middlegame and endgame entries of the eleven classical terms, from ``base`` on.
 
+    Each term is the mover's value minus the opponent's; it adds ``value * phase`` to its
+    middlegame entry and ``value * (1 - phase)`` to its endgame entry.
+
     :param board: The position.
-    :param perspective: ``"white"`` or ``"side_to_move"``.
     :param base: Index of the first term entry.
     :return: Two parallel lists of ``2 * len(TERM_NAMES)`` entries; zero values are kept.
     """
@@ -255,7 +169,7 @@ def _term_entries(board: chess.Board, perspective: str, base: int) -> Tuple[List
     white = _piece_terms(board, chess.WHITE)
     black = _piece_terms(board, chess.BLACK)
     terms = list(_pawn_terms(board)) + [w - b for w, b in zip(white, black, strict=True)]
-    sign = 1.0 if perspective == "white" or board.turn == chess.WHITE else -1.0
+    sign = 1.0 if board.turn == chess.WHITE else -1.0
     indices: List[int] = []
     values: List[float] = []
     for term, value in enumerate(terms):
@@ -265,174 +179,63 @@ def _term_entries(board: chess.Board, perspective: str, base: int) -> Tuple[List
     return indices, values
 
 
-class PstTermsFeatures(LinearFeatures):
-    """Tapered piece-square tables plus classical terms, one middlegame and one endgame weight each.
-
-    The 768 piece-square entries are those of :class:`PstFeatures`. The terms of
-    :data:`TERM_NAMES` follow: each is the White value minus the Black value (passed, doubled
-    and isolated pawns, bishop pair, rooks on open and half-open files, king shield, and the
-    mobility of each minor and major piece), oriented by perspective exactly as the piece
-    values are. Each term adds ``value * phase`` to its middlegame weight and
-    ``value * (1 - phase)`` to its endgame weight. Under ``"white"`` one turn entry (``+1``
-    White to move, ``-1`` Black) follows the terms.
-
-    :cvar name: ``"linear_pst_terms"``.
-    """
-
-    name = "linear_pst_terms"
-    _TERM_BASE = 2 * BLOCK_SIZE
-    _TURN_INDEX = _TERM_BASE + 2 * len(TERM_NAMES)
-    _pst = PstFeatures()
-
-    def size(self, perspective: str) -> int:
-        """PST weights, two weights per term, plus one turn weight under ``"white"``.
-
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``790`` or ``791``.
-        """
-        return self._TURN_INDEX + (1 if perspective == "white" else 0)
-
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """Entries of the piece-square tables, of every term, and the turn feature.
-
-        :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Two parallel lists; every term gives two entries, even when its value is zero.
-        """
-        indices, values = self._pst.active(board, perspective)
-        if perspective == "white":
-            # PstFeatures ends with its own turn entry; this class appends a later one.
-            indices.pop()
-            values.pop()
-        term_indices, term_values = _term_entries(board, perspective, self._TERM_BASE)
-        indices.extend(term_indices)
-        values.extend(term_values)
-        if perspective == "white":
-            indices.append(self._TURN_INDEX)
-            values.append(1.0 if board.turn == chess.WHITE else -1.0)
-        return indices, values
-
-
 #: Offset of the opponent's piece block in :class:`SlottedPstFeatures`.
 _OPPONENT_PIECE_BLOCK = 6 * 64
 
 
-class SlottedPstFeatures(LinearFeatures):
-    """One-hot piece-square features with one entry per piece, for neural inputs.
+class SlottedPstFeatures:
+    """One-hot piece-square features with one entry per piece.
 
-    Under ``"side_to_move"`` a piece of the player to move gets index ``type * 64 + square`` and a
-    piece of the opponent gets ``384 + type * 64 + square``, the square seen from the home rank of
-    its colour (mirrored by rank for Black). Every value is ``1.0``, so the vector has at most
-    :attr:`max_active` non-zero entries.
+    A piece of the player to move gets index ``type * 64 + square`` and a piece of the opponent
+    gets ``384 + type * 64 + square``, the square seen from the home rank of its colour (mirrored
+    by rank for Black). Every value is ``1.0``, so the vector has at most :attr:`max_active`
+    non-zero entries.
 
-    Under ``"white"`` no mirroring is applied: White pieces use the first block, Black pieces the
-    second, and one turn entry at index 768 follows: ``1.0`` when White is to move, ``0.0`` when
-    Black is to move.
-
-    :cvar name: ``"pst_slotted"``.
-    :cvar max_active: Most entries under ``"side_to_move"`` (one per piece, 32 at most).
+    :cvar name: Identifier stored in the saved model, ``"pst_slotted"``.
+    :cvar max_active: Most entries (one per piece, 32 at most).
     """
 
     name = "pst_slotted"
     max_active = 32
-    _TURN_INDEX = 2 * _OPPONENT_PIECE_BLOCK
 
-    def max_entries(self, perspective: str) -> int:
-        """Most non-zero entries a position can have under ``perspective``.
+    def max_entries(self) -> int:
+        """Most non-zero entries a position can have.
 
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``32`` under ``"side_to_move"`` (one per piece), ``33`` under ``"white"`` (plus
-            the turn entry).
+        :return: ``32`` (one per piece).
         """
-        return self.max_active + (1 if perspective == "white" else 0)
+        return self.max_active
 
-    def size(self, perspective: str) -> int:
-        """Two blocks of 384 piece-square weights, plus one turn weight under ``"white"``.
+    def size(self) -> int:
+        """Two blocks of 384 piece-square inputs.
 
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``768`` or ``769``.
+        :return: ``768``.
         """
-        return self._TURN_INDEX + (1 if perspective == "white" else 0)
+        return 2 * _OPPONENT_PIECE_BLOCK
 
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """Index of every piece, all values ``1.0``, plus the turn entry under ``"white"``.
+    def active(self, board: chess.Board) -> Tuple[List[int], List[float]]:
+        """Index of every piece, all values ``1.0``.
 
         :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Two parallel lists; one entry per piece (plus the turn entry under ``"white"``).
+        :return: Two parallel lists, one entry per piece.
         """
         mover = board.turn
         indices: List[int] = []
         for square, piece in board.piece_map().items():
             offset = (piece.piece_type - 1) * 64
-            if perspective == "white":
-                if piece.color == chess.BLACK:
-                    offset += _OPPONENT_PIECE_BLOCK
-                indices.append(offset + square)
-                continue
             if piece.color != mover:
                 offset += _OPPONENT_PIECE_BLOCK
             oriented = chess.square_mirror(square) if piece.color == chess.BLACK else square
             indices.append(offset + oriented)
-        values = [1.0] * len(indices)
-        if perspective == "white":
-            indices.append(self._TURN_INDEX)
-            values.append(1.0 if mover == chess.WHITE else 0.0)
-        return indices, values
-
-
-class KingSlottedPstFeatures(SlottedPstFeatures):
-    """One-hot piece-square features per square of the king of the player to move.
-
-    Every entry of :class:`SlottedPstFeatures` is shifted by ``768 * king``, where ``king`` is the
-    square of the king of the player to move (mirrored by rank when it is Black), so each of the 64
-    king squares has its own copy of the 768 piece-square inputs and a neuron can detect patterns
-    that depend on where the own king is. Under ``"white"`` the king is White's, squares are not
-    mirrored, and the turn entry follows at index ``64 * 768``.
-
-    :cvar name: ``"pst_kings"``.
-    """
-
-    name = "pst_kings"
-    _TURN_INDEX = 64 * 2 * _OPPONENT_PIECE_BLOCK
-
-    def size(self, perspective: str) -> int:
-        """64 copies of the 768 piece-square weights, plus one turn weight under ``"white"``.
-
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``49152`` or ``49153``.
-        """
-        return self._TURN_INDEX + (1 if perspective == "white" else 0)
-
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """The slotted indices moved into the block of the own king, in the same order.
-
-        :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: Two parallel lists; one entry per piece (plus the turn entry under ``"white"``).
-        """
-        indices, values = super().active(board, perspective)
-        owner = chess.WHITE if perspective == "white" else board.turn
-        king = board.king(owner)
-        if owner == chess.BLACK:
-            king = chess.square_mirror(king)
-        shift = king * 2 * _OPPONENT_PIECE_BLOCK
-        pieces = len(indices) - (1 if perspective == "white" else 0)
-        shifted = [index + shift for index in indices[:pieces]]
-        if perspective == "white":
-            shifted.append(self._TURN_INDEX)
-        return shifted, values
+        return indices, [1.0] * len(indices)
 
 
 class HybridPstFeatures(SlottedPstFeatures):
     """One-hot piece squares, per king bucket, plus the eleven classical terms as dense inputs.
 
     The slotted entries of :class:`SlottedPstFeatures` are shifted by ``768 * bucket``, where
-    ``bucket`` depends on the square of the own king (the mover's, or White's under ``"white"``;
-    mirrored by rank when it is Black): the file group (``8 / file_groups`` files wide) and whether
-    the king stands on rank 3 or beyond. The terms of :data:`TERM_NAMES` follow, two entries each
-    as in :class:`PstTermsFeatures`, and under ``"white"`` the turn entry (``1.0`` White to move,
-    ``0.0`` otherwise) closes the vector. With one bucket the king is ignored.
+    ``bucket`` depends on the square of the mover's king (mirrored by rank when it is Black): the
+    file group (``8 / file_groups`` files wide) and whether the king stands on rank 3 or beyond.
+    The terms of :data:`TERM_NAMES` follow, two entries each. With one bucket the king is ignored.
 
     :cvar name: ``"pst_hybrid"``.
     :cvar file_groups: King file groups; the buckets are ``2 * file_groups``, or ``1`` when ``0``.
@@ -465,46 +268,35 @@ class HybridPstFeatures(SlottedPstFeatures):
         group = chess.square_file(king) // (8 // self.file_groups)
         return 2 * group + (1 if chess.square_rank(king) >= 2 else 0)
 
-    def max_entries(self, perspective: str) -> int:
-        """Pieces, the term entries and, under ``"white"``, the turn entry.
+    def max_entries(self) -> int:
+        """Pieces and the term entries.
 
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``32 + 22`` or ``32 + 22 + 1``.
+        :return: ``32 + 22``.
         """
-        return self.max_active + 2 * len(TERM_NAMES) + (1 if perspective == "white" else 0)
+        return self.max_active + 2 * len(TERM_NAMES)
 
-    def size(self, perspective: str) -> int:
-        """Bucketed piece squares, two entries per term and the turn weight under ``"white"``.
+    def size(self) -> int:
+        """Bucketed piece squares and two entries per term.
 
-        :param perspective: ``"white"`` or ``"side_to_move"``.
-        :return: ``790 + 768 * (buckets - 1)``, plus one under ``"white"``.
+        :return: ``790 + 768 * (buckets - 1)``.
         """
-        return self._term_base + 2 * len(TERM_NAMES) + (1 if perspective == "white" else 0)
+        return self._term_base + 2 * len(TERM_NAMES)
 
-    def active(self, board: chess.Board, perspective: str) -> Tuple[List[int], List[float]]:
-        """Shifted piece entries, then the term entries, then the turn entry.
+    def active(self, board: chess.Board) -> Tuple[List[int], List[float]]:
+        """Shifted piece entries, then the term entries.
 
         :param board: The position.
-        :param perspective: ``"white"`` or ``"side_to_move"``.
         :return: Two parallel lists.
         """
-        indices, values = super().active(board, perspective)
-        if perspective == "white":
-            # The slotted turn entry sits at 768; this class puts its own after the terms.
-            indices.pop()
-            values.pop()
-        owner = chess.WHITE if perspective == "white" else board.turn
-        king = board.king(owner)
-        if owner == chess.BLACK:
+        indices, values = super().active(board)
+        king = board.king(board.turn)
+        if board.turn == chess.BLACK:
             king = chess.square_mirror(king)
         shift = self.bucket(king) * 2 * _OPPONENT_PIECE_BLOCK
         indices = [index + shift for index in indices]
-        term_indices, term_values = _term_entries(board, perspective, self._term_base)
+        term_indices, term_values = _term_entries(board, self._term_base)
         indices.extend(term_indices)
         values.extend(term_values)
-        if perspective == "white":
-            indices.append(self._term_base + 2 * len(TERM_NAMES))
-            values.append(1.0 if board.turn == chess.WHITE else 0.0)
         return indices, values
 
 
@@ -529,13 +321,10 @@ class HybridKings8PstFeatures(HybridPstFeatures):
 
 
 #: Every feature set by its name, the one the saved models and the core refer to.
-FEATURE_SETS: Dict[str, LinearFeatures] = {
+FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
     features.name: features
     for features in (
-        PstFeatures(),
-        PstTermsFeatures(),
         SlottedPstFeatures(),
-        KingSlottedPstFeatures(),
         HybridPstFeatures(),
         HybridKings4PstFeatures(),
         HybridKings8PstFeatures(),
@@ -543,10 +332,10 @@ FEATURE_SETS: Dict[str, LinearFeatures] = {
 }
 
 
-def features_of(model: object) -> LinearFeatures:
-    """Python feature set of a saved model, or of its class.
+def features_of(model: object) -> SlottedPstFeatures:
+    """Python feature set of a saved network, or of its class.
 
-    :param model: A saved linear model or its class.
+    :param model: A saved network or its class.
     :return: The feature set named by its ``feature_set``.
     :raises TypeError: If it is the abstract base, which defines no feature set.
     :raises KeyError: If the name has no Python version.

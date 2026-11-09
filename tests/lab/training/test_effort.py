@@ -6,7 +6,7 @@ import chess
 import pandas as pd
 import pytest
 
-from chess_lab.models.definitions import PstTermsModel
+from chess_lab.models.definitions import NnW32Model
 from chess_lab.models.target import Representation
 from chess_lab.training import effort
 from chess_lab.training.data.raw_shards import shard_path, write_shard
@@ -116,7 +116,7 @@ def test_search_keeps_the_trial_with_the_lowest_validation_loss(monkeypatch):
 
     monkeypatch.setattr(effort, "fit", fake_fit)
     plan = {"positions": 1000, "max_epochs": 1, "patience": 2, "trials": 3, "batch_size": 4096}
-    best = search(PstTermsModel, Representation(), Path("."), Path("."), None, plan,
+    best = search(NnW32Model, Representation(), Path("."), Path("."), None, plan,
                   log=lambda line: None)  # fmt: skip
     assert len(calls) == 3
     assert best == {"l2": calls[1]["l2"], "lr": calls[1]["lr"]}
@@ -137,9 +137,14 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
         splits.append(split)
         return real_iter_batches(raw_dir, sidecar_dir, split, *args, **kwargs)
 
+    def reading_fit_stream(model, batches, validation, config, cache_dir=None):
+        list(batches)  # reads the stream as the fit would, without training
+        return {"val_losses": [0.5]}
+
     monkeypatch.setattr(effort, "iter_batches", recording_iter_batches)
+    monkeypatch.setattr(effort, "fit_stream", reading_fit_stream)
     lines = []
-    search(PstTermsModel, Representation(), raw, side, validation, plan, log=lines.append)
+    search(NnW32Model, Representation(), raw, side, validation, plan, log=lines.append)
     assert splits and set(splits) == {TRAIN}
     assert len(lines) == 1 and lines[0].startswith("trial 1/1")
 

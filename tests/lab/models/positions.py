@@ -1,4 +1,4 @@
-"""Positions and raw-shard rows shared by the linear and neural model tests."""
+"""Positions and raw-shard rows shared by the model tests."""
 
 import chess
 import numpy as np

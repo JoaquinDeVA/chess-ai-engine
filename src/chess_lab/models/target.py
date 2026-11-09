@@ -2,8 +2,8 @@
 
 Raw evaluations (``cp`` / ``mate``) are always from **White's point of view**; a row has either
 ``cp`` or ``mate`` (the other is NaN). A :class:`Representation` fixes the scale of the target
-(win probability or clipped linear centipawns), whose point of view it uses and which positions
-are kept.
+(win probability or clipped linear centipawns) and which positions are kept; the target is always
+the score of the player to move.
 """
 
 import zlib
@@ -20,7 +20,6 @@ from .definitions import CP_SCALE
 LICHESS_K = 0.00368208
 
 _SCALES = ("winprob", "cp_linear")
-_PERSPECTIVES = ("white", "side_to_move")
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
@@ -38,41 +37,38 @@ def validate_mate_keep(mate_keep: float) -> None:
 
 @dataclass(frozen=True)
 class Representation:
-    """Choice of target scale and point of view. Training always uses the quiet positions (see :func:`is_quiet`).
+    """Choice of target scale, seen from the player to move. Training always uses the quiet positions (see :func:`is_quiet`).
 
     :param scale: ``"winprob"`` (logistic of centipawns) or ``"cp_linear"`` (clipped linear).
     :param k: Slope of the logistic curve (only used by ``"winprob"``).
-    :param perspective: ``"white"`` or ``"side_to_move"`` (score of the player to move).
     :param mate_keep: Share of the mate positions kept in the training data, in ``(0, 1]``
         (see :func:`keep_mate_rows`); 1 keeps them all. Defaults to :data:`DEFAULT_MATE_KEEP`.
     """
 
     scale: str = "winprob"
     k: float = LICHESS_K
-    perspective: str = "side_to_move"
     mate_keep: float = DEFAULT_MATE_KEEP
 
     def __post_init__(self) -> None:
         if self.scale not in _SCALES:
             raise ValueError(f"unknown scale: {self.scale!r}")
-        if self.perspective not in _PERSPECTIVES:
-            raise ValueError(f"unknown perspective: {self.perspective!r}")
         validate_mate_keep(self.mate_keep)
 
     @property
     def name(self) -> str:
         """Short identifier, e.g. ``"winprob-k0.00368-stm-quiet"`` (the default mate share).
 
-        Another mate share adds a suffix: ``-mates5`` for 5 %, ``-mates100`` for all of them.
+        Another mate share adds a suffix: ``-mates5`` for 5 %, ``-mates100`` for all of them. The
+        ``stm`` (side to move) part is kept so that the names of the saved caches and models stay
+        valid.
         """
         scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
-        persp = "stm" if self.perspective == "side_to_move" else "white"
-        return f"{scale}-{persp}-quiet{mates_suffix(self.mate_keep)}"
+        return f"{scale}-stm-quiet{mates_suffix(self.mate_keep)}"
 
     def to_dict(self) -> dict:
         """Fields as a plain dictionary.
 
-        :return: ``{"scale": ..., "k": ..., "perspective": ..., "mate_keep": ...}``.
+        :return: ``{"scale": ..., "k": ..., "mate_keep": ...}``.
         """
         return asdict(self)
 
@@ -80,14 +76,17 @@ class Representation:
     def from_dict(cls, d: dict) -> "Representation":
         """Build a representation from a dictionary.
 
-        :param d: Dictionary produced by :meth:`to_dict`. A ``"filter": "quiet"`` entry, written
-            by earlier versions, is ignored.
+        :param d: Dictionary produced by :meth:`to_dict`. The ``"filter": "quiet"`` and
+            ``"perspective": "side_to_move"`` entries, written by earlier versions, are ignored.
         :return: The equivalent representation.
-        :raises ValueError: If ``"filter"`` is anything but ``"quiet"``.
+        :raises ValueError: If ``"filter"`` is anything but ``"quiet"``, or ``"perspective"``
+            anything but ``"side_to_move"``.
         """
         fields = dict(d)
         if fields.pop("filter", "quiet") != "quiet":
             raise ValueError("only the quiet filter exists")
+        if fields.pop("perspective", "side_to_move") != "side_to_move":
+            raise ValueError("only the side-to-move perspective exists")
         return cls(**fields)
 
 
@@ -119,13 +118,11 @@ def target(
     :param mate: Moves to mate, White's point of view.
     :param white_to_move: Boolean array, True where White is to move.
     :param rep: Representation.
-    :return: :func:`white_score`, as ``1 - s`` where Black moves if the perspective is
-        ``"side_to_move"``.
+    :return: :func:`white_score`, as ``1 - s`` where Black moves (the score of the player to
+        move).
     """
     score = white_score(cp, mate, rep)
-    if rep.perspective == "side_to_move":
-        score = np.where(np.asarray(white_to_move, dtype=bool), score, 1.0 - score)
-    return score
+    return np.where(np.asarray(white_to_move, dtype=bool), score, 1.0 - score)
 
 
 def score_to_cp(score: float | np.ndarray, rep: Representation) -> float | np.ndarray:

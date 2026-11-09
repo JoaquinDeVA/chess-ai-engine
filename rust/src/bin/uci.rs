@@ -11,8 +11,7 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 
 use _core::board::{ordered_moves, uci_string, GameState};
-use _core::eval::logistic_model::LinearModel;
-use _core::eval::sparse_features::{FeatureSet, Perspective};
+use _core::eval::sparse_features::FeatureSet;
 use _core::eval::sparse_net::{Layer, Net};
 use _core::eval::{Eval, Evaluator};
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
@@ -20,8 +19,8 @@ use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQU
 use shakmaty::Color;
 
 /// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
-const MODEL_JSON: &str = include_str!("../../models/linear_pst_terms.json");
-const MODEL_NAME: &str = "linear_pst_terms";
+const MODEL_JSON: &str = include_str!("../../models/net_pst_w32.json");
+const MODEL_NAME: &str = "net_pst_w32";
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const DEFAULT_HASH_MB: usize = 64;
 
@@ -63,49 +62,21 @@ fn load_model() -> Result<Eval, String> {
     model_from_json(MODEL_JSON)
 }
 
-/// An evaluation from the JSON of `export_uci_model`: a linear model (`weights`, `bias`) or a
-/// network (`layers`, each with `fan_in`, `fan_out`, row-major `weights` and `bias`).
+/// A network from the JSON of `export_uci_model`: its `features` and its `layers`, each with
+/// `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the networks were the
+/// only model carry `"perspective": "side_to_move"`; any other perspective is refused.
 fn model_from_json(text: &str) -> Result<Eval, String> {
     let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     let features = value["features"]
         .as_str()
         .and_then(FeatureSet::from_name)
         .ok_or("model: unknown features")?;
-    let perspective = match value["perspective"].as_str() {
-        Some("white") => Perspective::White,
-        Some("side_to_move") => Perspective::SideToMove,
-        _ => return Err("model: unknown perspective".into()),
-    };
-    if value.get("layers").is_some() {
-        return network_from_json(&value, features, perspective);
+    if value
+        .get("perspective")
+        .is_some_and(|p| *p != "side_to_move")
+    {
+        return Err("model: only the side-to-move perspective is supported".into());
     }
-    let weights = number_list(&value["weights"])?;
-    let bias = value["bias"].as_f64().ok_or("model: no bias")?;
-    Ok(Eval::Linear(LinearModel::new(
-        features,
-        perspective,
-        weights,
-        bias,
-    )?))
-}
-
-fn number_list(value: &serde_json::Value) -> Result<Vec<f64>, String> {
-    value
-        .as_array()
-        .ok_or("model: no weights")?
-        .iter()
-        .map(|w| {
-            w.as_f64()
-                .ok_or("model: weight is not a number".to_string())
-        })
-        .collect()
-}
-
-fn network_from_json(
-    value: &serde_json::Value,
-    features: FeatureSet,
-    perspective: Perspective,
-) -> Result<Eval, String> {
     let layers = value["layers"]
         .as_array()
         .ok_or("model: layers is not a list")?
@@ -125,7 +96,19 @@ fn network_from_json(
             })
         })
         .collect::<Result<Vec<Layer>, String>>()?;
-    Ok(Eval::Net(Net::new(features, perspective, layers)?))
+    Ok(Eval::Net(Net::new(features, layers)?))
+}
+
+fn number_list(value: &serde_json::Value) -> Result<Vec<f64>, String> {
+    value
+        .as_array()
+        .ok_or("model: no weights")?
+        .iter()
+        .map(|w| {
+            w.as_f64()
+                .ok_or("model: weight is not a number".to_string())
+        })
+        .collect()
 }
 
 /// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
@@ -476,29 +459,37 @@ fn parse_position(fen: String, rest: &[&str]) -> Position {
 mod tests {
     use super::*;
 
-    fn net_json(fan_in: usize) -> String {
+    fn net_json(fan_in: usize, extra: &str) -> String {
         let first = format!(
             r#"{{"fan_in":{fan_in},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
             vec![0.0; fan_in * 2]
         );
         let last = r#"{"fan_in":2,"fan_out":1,"weights":[1.0,1.0],"bias":[0.0]}"#;
-        format!(
-            r#"{{"features":"pst_slotted","perspective":"side_to_move","layers":[{first},{last}]}}"#
-        )
+        format!(r#"{{"features":"pst_slotted",{extra}"layers":[{first},{last}]}}"#)
     }
 
     #[test]
-    fn a_network_file_is_loaded() {
-        assert!(matches!(model_from_json(&net_json(768)), Ok(Eval::Net(_))));
+    fn a_network_file_is_loaded_with_or_without_the_old_perspective_field() {
+        assert!(matches!(
+            model_from_json(&net_json(768, "")),
+            Ok(Eval::Net(_))
+        ));
+        let old = r#""perspective":"side_to_move","#;
+        assert!(matches!(
+            model_from_json(&net_json(768, old)),
+            Ok(Eval::Net(_))
+        ));
+        let white = r#""perspective":"white","#;
+        assert!(model_from_json(&net_json(768, white)).is_err());
     }
 
     #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
-        assert!(model_from_json(&net_json(10)).is_err());
+        assert!(model_from_json(&net_json(10, "")).is_err());
     }
 
     #[test]
-    fn the_compiled_in_model_is_linear() {
-        assert!(matches!(load_model(), Ok(Eval::Linear(_))));
+    fn the_compiled_in_model_is_a_network() {
+        assert!(matches!(load_model(), Ok(Eval::Net(_))));
     }
 }

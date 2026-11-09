@@ -1,6 +1,7 @@
-"""Training of the linear models: encoding, Adam fit and the epoch loop shared with the network.
+"""Shared training plumbing: encoding of the frames, their cache and the epoch loop.
 
-The saved model holds the weights and the feature set name; the Python feature extractors, the targets and the fit live here.
+The networks are trained in :mod:`chess_lab.models.fitting.neural`; this module turns the frames
+into sparse features with their soft targets and runs the epochs with early stopping.
 """
 
 import functools
@@ -19,8 +20,7 @@ import chess
 import numpy as np
 import pandas as pd
 
-from ..definitions import LinearEvalModel
-from ..features import LinearFeatures, features_of
+from ..features import SlottedPstFeatures
 from ..target import Representation, target
 
 #: Hyper-parameters used when the training configuration leaves a key out.
@@ -32,9 +32,6 @@ DEFAULT_FIT_CONFIG: Dict[str, Any] = {
     "patience": 3,
     "workers": 1,
 }
-_ADAM_BETA1 = 0.9
-_ADAM_BETA2 = 0.999
-_ADAM_EPS = 1e-8
 #: Thread-count variables pinned to 1 in the featurization workers (the BLAS threads of
 #: numpy would otherwise oversubscribe the cores).
 _THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
@@ -42,123 +39,8 @@ _THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
 EncodedFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
-def new_linear_model(model_class: type, rep: Optional[Representation] = None) -> LinearEvalModel:
-    """An untrained model: zero weights, sized for the feature set under the perspective.
-
-    :param model_class: A concrete :class:`LinearEvalModel` subclass.
-    :param rep: Representation of the target; defaults to :class:`Representation`.
-    :return: The model, with ``rep`` saved as a dictionary.
-    """
-    rep = rep if rep is not None else Representation()
-    size = features_of(model_class).size(rep.perspective)
-    return model_class(weights=np.zeros(size), rep=rep.to_dict())
-
-
-def fit_stream(
-    model: LinearEvalModel,
-    batches: Iterable[pd.DataFrame],
-    validation: pd.DataFrame,
-    config: Dict[str, Any],
-    cache_dir: Optional[Path] = None,
-) -> Dict[str, Any]:
-    """Train with Adam on the binary cross-entropy against soft targets.
-
-    ``batches`` is read once per epoch, so it must be re-iterable (a list, or an object whose
-    ``__iter__`` restarts), not a one-shot generator. Minibatches never span two frames: each
-    frame is cut into chunks of at most ``batch_size`` rows, so the effective batch size
-    depends on how the caller chunks the data. The weights of the epoch with the lowest
-    validation loss are kept.
-
-    With ``workers > 1`` the frames are featurized in a process pool, in order, while the
-    main process runs the updates; the result is the same as with one worker.
-
-    :param model: The model to train; its weights and bias are replaced by the best epoch.
-    :param batches: DataFrames with columns ``fen, cp, mate, white_to_move``.
-    :param validation: Same columns, used for early stopping; must not be empty.
-    :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
-        ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`. Optional ``lr_decay`` in
-        (0, 1) and ``min_lr`` (default 1e-5): an epoch without validation improvement
-        multiplies the learning rate by ``lr_decay`` and the run goes on (``patience`` is not
-        used) until the rate falls below ``min_lr`` or ``max_epochs`` is reached.
-    :param cache_dir: If set, the encoded frames are stored there (``<index>.npz``) and read
-        back instead of being encoded again; the caller must key the directory by everything
-        that determines the frames. None encodes every epoch.
-    :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
-        ``lr_history`` (rate of each epoch),
-        ``train_rows``, ``seconds`` and the ``config`` used.
-    :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
-        validation loss is not finite.
-    """
-    cfg = {**DEFAULT_FIT_CONFIG, **config}
-    started = time.perf_counter()
-    if len(validation) == 0:
-        raise ValueError("validation set is empty; early stopping needs validation rows")
-    features, rep = features_of(model), Representation.from_dict(model.rep)
-    size = model.weights.size
-    theta = np.append(model.weights, model.bias)  # coefficients, then the intercept
-    moment, velocity = np.zeros_like(theta), np.zeros_like(theta)
-    step = 0
-    validation_data = encode_frame(features, rep, validation)
-    batch_size = int(cfg["batch_size"])
-    lr = float(cfg["lr"])
-
-    def train_batch(encoded: EncodedFrame) -> Tuple[float, int]:
-        nonlocal moment, velocity, step
-        loss_sum, rows_seen = 0.0, 0
-        for local in _minibatches(*encoded, batch_size):
-            local_rows, local_cols, local_vals, local_y = local
-            count = len(local_y)
-            z = scores(local_rows, local_cols, local_vals, count, theta)
-            loss_sum += float(np.sum(losses(z, local_y)))
-            rows_seen += count
-            grad_z = 0.5 * (1.0 + np.tanh(0.5 * z)) - local_y
-            grad_w = (
-                np.bincount(
-                    local_cols,
-                    weights=local_vals * grad_z[local_rows],
-                    minlength=size,
-                )
-                / count
-                + float(cfg["l2"]) * theta[:size]
-            )
-            grad = np.append(grad_w, grad_z.mean())
-            step += 1
-            moment = _ADAM_BETA1 * moment + (1 - _ADAM_BETA1) * grad
-            velocity = _ADAM_BETA2 * velocity + (1 - _ADAM_BETA2) * grad * grad
-            m_hat = moment / (1 - _ADAM_BETA1**step)
-            v_hat = velocity / (1 - _ADAM_BETA2**step)
-            theta[:] -= lr * m_hat / (np.sqrt(v_hat) + _ADAM_EPS)
-        return loss_sum, rows_seen
-
-    def validation_loss() -> float:
-        val_rows, val_cols, val_vals, val_y = validation_data
-        val_z = scores(val_rows, val_cols, val_vals, len(val_y), theta)
-        return float(np.mean(losses(val_z, val_y)))
-
-    def set_lr(value: float) -> None:
-        nonlocal lr
-        lr = value
-
-    summary, best_theta = run_epochs(
-        cfg=cfg,
-        started=started,
-        frames=lambda executor: encoded_frames(
-            features, rep, batches, int(cfg["workers"]), executor, cache_dir
-        ),
-        train_batch=train_batch,
-        validation_loss=validation_loss,
-        get_lr=lambda: lr,
-        set_lr=set_lr,
-        snapshot=theta.copy,
-        initial_best=theta.copy(),
-    )
-    model.weights = best_theta[:size]
-    model.bias = float(best_theta[size])
-    return summary
-
-
 def encoded_frames(
-    features: LinearFeatures,
+    features: SlottedPstFeatures,
     rep: Representation,
     batches: Iterable[pd.DataFrame],
     workers: int,
@@ -326,14 +208,14 @@ def _save_encoded(cache_dir: Path, index: int, encoded: EncodedFrame) -> None:
 
 
 def encode_frame(
-    features: LinearFeatures, rep: Representation, frame: pd.DataFrame
+    features: SlottedPstFeatures, rep: Representation, frame: pd.DataFrame
 ) -> EncodedFrame:
     """Sparse features of the rows of a frame, with their soft targets.
 
     Module-level so that featurization workers can run it.
 
     :param features: Feature set.
-    :param rep: Representation; its perspective selects the features, its scale the targets.
+    :param rep: Representation; its scale sets the targets.
     :param frame: Rows with ``fen, cp, mate, white_to_move``.
     :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
     """
@@ -341,7 +223,7 @@ def encode_frame(
     cols: List[int] = []
     vals: List[float] = []
     for row, fen in enumerate(frame["fen"]):
-        indices, values = features.active(chess.Board(fen), rep.perspective)
+        indices, values = features.active(chess.Board(fen))
         rows.extend([row] * len(indices))
         cols.extend(indices)
         vals.extend(values)
@@ -388,31 +270,6 @@ def _featurization_pool(workers: int) -> Iterator[Optional[ProcessPoolExecutor]]
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
-
-
-def _minibatches(rows, cols, vals, y, batch_size: int):
-    """Split encoded rows into consecutive minibatches.
-
-    :param rows: Sorted row indices of the sparse entries.
-    :param cols: Feature index of each entry.
-    :param vals: Value of each entry.
-    :param y: Targets, one per row.
-    :param batch_size: Rows per minibatch.
-    :return: Generator of ``(local_rows, cols, vals, targets)`` with rows renumbered from 0.
-    """
-    for start in range(0, len(y), batch_size):
-        stop = min(len(y), start + batch_size)
-        first, last = np.searchsorted(rows, [start, stop])
-        yield rows[first:last] - start, cols[first:last], vals[first:last], y[start:stop]
-
-
-def scores(rows, cols, vals, count: int, theta: np.ndarray) -> np.ndarray:
-    """Logits of ``count`` rows, from the sparse entries and ``theta = (weights, bias)``.
-
-    :return: Array of shape ``(count,)``.
-    """
-    weights = theta[:-1]
-    return np.bincount(rows, weights=vals * weights[cols], minlength=count) + theta[-1]
 
 
 def losses(z: np.ndarray, y: np.ndarray) -> np.ndarray:

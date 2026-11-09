@@ -405,7 +405,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
 
 mod incremental {
     use crate::board::{position_from_fen, GameState};
-    use crate::eval::sparse_features::{FeatureSet, Perspective};
+    use crate::eval::sparse_features::FeatureSet;
     use crate::eval::sparse_net::{Layer, Net};
     use crate::search::*;
 
@@ -429,7 +429,6 @@ mod incremental {
     fn the_incremental_evaluation_gives_the_same_search() {
         let net = Net::new(
             FeatureSet::Slotted,
-            Perspective::SideToMove,
             vec![layer(768, 32, 1), layer(32, 16, 2), layer(16, 1, 3)],
         )
         .unwrap();

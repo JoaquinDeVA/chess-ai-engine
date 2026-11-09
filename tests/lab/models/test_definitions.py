@@ -14,45 +14,50 @@ from chess_lab.models.target import Representation
 
 
 def test_every_model_is_in_the_table():
-    assert {"linear_pst_terms", "net_pst_w32", "net_pst_w64", "net_pst_w64x16"} <= set(
+    assert {"net_pst_w32", "net_pst_w64", "net_pst_w64x16", "net_hybrid_w64"} <= set(
         available_models()
     )
 
 
 def test_unknown_model_lists_the_valid_names():
-    with pytest.raises(KeyError, match="available:.*linear_pst_terms"):
+    with pytest.raises(KeyError, match="available:.*net_pst_w32"):
         get_model_class("nope")
 
 
 def test_missing_artifact_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        load_model("linear_pst_terms", tmp_path / "missing.npz")
+        load_model("net_pst_w32", tmp_path / "missing.npz")
 
 
 def test_a_saved_model_keeps_its_representation(tmp_path):
-    model = get_model_class("linear_pst_terms")(weights=np.ones(790), bias=0.5, rep={"x": 1})
-    loaded = get_model_class("linear_pst_terms").load(model.save(tmp_path / "m.npz"))
-    assert loaded.rep == {"x": 1} and loaded.bias == 0.5
-    assert loaded.perspective == "side_to_move"
-    assert loaded.count_parameters() == 791  # 790 coefficients + intercept
+    cls = get_model_class("net_pst_w32")
+    model = new_model(cls, Representation())
+    model.rep = {"x": 1}
+    loaded = cls.load(model.save(tmp_path / "m.npz"))
+    assert loaded.rep == {"x": 1}
+    for (w, b), (w2, b2) in zip(loaded.layers, model.layers, strict=True):
+        assert np.array_equal(w, w2) and np.array_equal(b, b2)
+    assert loaded.count_parameters() == 768 * 32 + 32 + 32 + 1
 
 
 def test_a_file_of_another_feature_set_is_refused(tmp_path):
-    path = new_model(get_model_class("net_pst_w32"), Representation()).save(tmp_path / "m.npz")
+    path = new_model(get_model_class("net_hybrid_w32"), Representation()).save(tmp_path / "m.npz")
     with pytest.raises(ValueError, match="features"):
-        get_model_class("linear_pst_terms").load(path)
+        get_model_class("net_pst_w32").load(path)
 
 
 def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
-    cls = get_model_class("linear_pst_terms")
-    cls(weights=np.zeros(790), bias=0.0).save(tmp_path / "linear_pst_terms.npz")
-    cls(weights=np.full(790, 0.5), bias=1.0).save(tmp_path / "linear_pst_terms@x.npz")
+    cls = get_model_class("net_pst_w32")
+    plain = new_model(cls, Representation())
+    plain.save(tmp_path / "net_pst_w32.npz")
+    tagged_model = new_model(cls, Representation())
+    tagged_model.layers[-1] = (tagged_model.layers[-1][0], np.full(1, 0.5))
+    tagged_model.save(tmp_path / "net_pst_w32@x.npz")
 
-    tagged = load_model("linear_pst_terms@x")
-    assert tagged.bias == 1.0 and tagged.weights[0] == 0.5
-    assert load_model("linear_pst_terms").bias == 0.0
+    assert load_model("net_pst_w32@x").layers[-1][1][0] == 0.5
+    assert load_model("net_pst_w32").layers[-1][1][0] == 0.0
     with pytest.raises(FileNotFoundError):
-        load_model("linear_pst_terms@missing")
+        load_model("net_pst_w32@missing")
     with pytest.raises(KeyError):
         load_model("no_such_model@x")

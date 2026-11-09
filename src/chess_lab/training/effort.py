@@ -1,4 +1,4 @@
-"""Effort-based training of linear models: one number (0-100) sets data size, epochs and search.
+"""Effort-based training of the networks: one number (0-100) sets data size, epochs and search.
 
 :func:`effort_config` maps the effort to a configuration; :func:`calibrate` times a short fit to
 estimate the duration; :func:`search` runs the random hyper-parameter trials; :func:`fit` streams
@@ -18,9 +18,9 @@ import pyarrow.parquet as pq
 
 from chess_lab.models import fit_stream, new_model
 from chess_lab.models.defaults import SAMPLE_SEED
-from chess_lab.models.definitions import NeuralEvalModel, SparseModel
+from chess_lab.models.definitions import NeuralEvalModel
 from chess_lab.models.features import features_of
-from chess_lab.models.fitting.linear import DEFAULT_FIT_CONFIG, encode_frame, losses, scores
+from chess_lab.models.fitting.epochs import DEFAULT_FIT_CONFIG, encode_frame
 from chess_lab.models.target import (
     Representation,
     keep_mate_rows,
@@ -185,10 +185,10 @@ def fit(
     quiet_only: bool = False,
     seed: int = SAMPLE_SEED,
     use_cache: bool = True,
-) -> Tuple[SparseModel, Dict[str, Any]]:
+) -> Tuple[NeuralEvalModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
-    :param model_class: A concrete :class:`SparseModel` subclass.
+    :param model_class: A concrete :class:`NeuralEvalModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
@@ -236,7 +236,7 @@ def calibrate(
     as the real runs do. Featurizing and scoring the validation set are timed separately, and the
     rest of the fit time is attributed to training.
 
-    :param model_class: A concrete :class:`SparseModel` subclass.
+    :param model_class: A concrete :class:`NeuralEvalModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.
@@ -253,17 +253,12 @@ def calibrate(
     )
 
     started = time.perf_counter()
-    rows, cols, vals, targets = encode_frame(features_of(model_class), rep, validation)
+    encode_frame(features_of(model_class), rep, validation)
     encode_seconds = time.perf_counter() - started
-    if isinstance(model, NeuralEvalModel):
-        evaluator = model.evaluator()
-        started = time.perf_counter()
-        for fen in validation["fen"]:
-            evaluator.evaluate(fen, True)
-    else:
-        theta = np.append(model.weights, model.bias)
-        started = time.perf_counter()
-        losses(scores(rows, cols, vals, len(targets), theta), targets).mean()
+    evaluator = model.evaluator()
+    started = time.perf_counter()
+    for fen in validation["fen"]:
+        evaluator.evaluate(fen, True)
     score_seconds = time.perf_counter() - started
 
     train_seconds = max(0.0, summary["seconds"] - encode_seconds - score_seconds)
@@ -322,7 +317,7 @@ def search(
 
     Each trial fits on ``TRIAL_FRACTION`` of ``plan["positions"]``.
 
-    :param model_class: A concrete :class:`SparseModel` subclass.
+    :param model_class: A concrete :class:`NeuralEvalModel` subclass.
     :param rep: Representation of the target.
     :param raw_dir: Directory with the raw shards.
     :param sidecar_dir: Directory with their sidecars.

@@ -1,6 +1,6 @@
 {
   "name": "linear_pst_terms@e30",
-  "status": "current",
+  "status": "retired",
   "architecture": "Tapered piece-square tables plus 11 classical terms (790 weights), logistic",
   "features": "linear_pst_terms",
   "parameters": 791,

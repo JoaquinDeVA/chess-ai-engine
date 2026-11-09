@@ -18,7 +18,7 @@ HISTORY_FILE = ROOT / "docs" / "RESULTS.md"
 BEGIN_MARKER = "<!-- BEGIN GENERATED TABLES -->"
 END_MARKER = "<!-- END GENERATED TABLES -->"
 
-_STATUS_ORDER = {"current": 0, "reference": 1}
+_STATUS_ORDER = {"current": 0, "reference": 1, "retired": 2}
 _DASH = "—"
 _HEADER = (
     "| Model | Params | Representation | Effort | Spearman | MAE | "
@@ -53,7 +53,7 @@ def _number(value: Optional[float], digits: int = 1) -> str:
 
 
 def _representation(card: Dict[str, Any]) -> str:
-    """Short name of the target representation of a linear model."""
+    """Short name of the target representation of a model."""
     fields = _dig(card, "training", "representation")
     return _DASH if not fields else Representation.from_dict(fields).name
 
@@ -64,7 +64,9 @@ def _row(card: Dict[str, Any]) -> str:
     :param card: Model card.
     :return: Markdown table row.
     """
-    name = card["name"].split("@")[0]
+    name = f"`{card['name'].split('@')[0]}`"
+    if card.get("status") == "retired":
+        name += " (retired)"
     accuracy = _dig(card, "accuracy", "all") or {}
     non_quiet = _dig(card, "accuracy", "non_quiet") or {}
     best_move = (
@@ -75,7 +77,7 @@ def _row(card: Dict[str, Any]) -> str:
     )
     effort = _dig(card, "training", "effort")
     cells = [
-        f"`{name}`",
+        name,
         _number(card.get("parameters"), 0),
         _representation(card),
         _DASH if effort is None else str(effort),
@@ -90,7 +92,8 @@ def _row(card: Dict[str, Any]) -> str:
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
-    Models with status ``current`` or ``reference`` (the heuristic ``h1``) are listed; the models that play come first.
+    Models with status ``current``, ``reference`` (the heuristic ``h1``) or ``retired`` are listed,
+    in that order and by name within each status; a retired model is marked as such.
 
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.
@@ -100,7 +103,7 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
         for card in (load_all_cards() if cards is None else cards)
         if card.get("status") in _STATUS_ORDER
     ]
-    rows.sort(key=lambda card: card["name"].split("@")[0])
+    rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"].split("@")[0]))
     return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
 
 

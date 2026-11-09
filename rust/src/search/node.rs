@@ -91,7 +91,7 @@ impl Search<'_> {
             (beta - SCOUT_EPSILON, beta)
         };
         let narrow = beta - alpha > SCOUT_EPSILON;
-        if self.options.techniques.pvs && index > 0 && depth_remaining >= 2 && narrow {
+        if index > 0 && depth_remaining >= 2 && narrow {
             let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
             if scout > alpha && scout < beta && !self.truncated {
                 return self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0;
@@ -149,12 +149,6 @@ impl Search<'_> {
         if depth_remaining <= 0 {
             if self.options.quiescence_plies > 0 {
                 let value = self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves);
-                // Only where the table has nothing: a depth-0 entry must not replace a deeper one.
-                if self.options.techniques.qs_tt && entry.is_none() && !self.truncated {
-                    self.memory
-                        .table
-                        .store(key, value, None, 0, alpha_orig, beta_orig);
-                }
                 return (value, None);
             }
             return (self.static_value(), None);
@@ -177,12 +171,7 @@ impl Search<'_> {
         let maximizing = self.state.turn() == self.root_player;
         let killers: Vec<u32> = self.memory.killers.get(depth_remaining).to_vec();
         let mover = self.state.turn();
-        let history = if self.options.techniques.history {
-            Some((&self.memory.history, mover))
-        } else {
-            None
-        };
-        let mut ordered = order(moves, &killers, history);
+        let mut ordered = order(moves, &killers, Some((&self.memory.history, mover)));
         if self.options.techniques.see {
             // Captures that lose material come after the quiet moves (the order is otherwise kept).
             let pos = self.state.pos();
@@ -243,8 +232,6 @@ impl Search<'_> {
             f64::INFINITY
         };
         let mut best_move = None;
-        let malus = self.options.techniques.history && self.options.techniques.history_malus;
-        let mut failed_quiet: Vec<Move> = Vec::new();
         for (index, action) in ordered.into_iter().enumerate() {
             self.play(action);
             let child = self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing);
@@ -265,17 +252,10 @@ impl Search<'_> {
             if alpha >= beta {
                 self.prunings += 1;
                 self.memory.killers.record(depth_remaining, action);
-                if self.options.techniques.history && !action.is_capture() && !action.is_promotion()
-                {
+                if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
-                    for failed in &failed_quiet {
-                        self.memory.history.penalise(mover, failed, depth_remaining);
-                    }
                 }
                 break;
-            }
-            if malus && !action.is_capture() && !action.is_promotion() {
-                failed_quiet.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.

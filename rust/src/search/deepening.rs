@@ -1,4 +1,4 @@
-//! Iterative deepening: aspiration windows, helper threads and the clock policy.
+//! Iterative deepening: helper threads and the clock policy.
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use std::sync::{Arc, Mutex};
@@ -7,7 +7,7 @@ use shakmaty::Move;
 
 use super::iteration_time;
 use super::memory::*;
-use super::node::{alpha_beta, alpha_beta_window, SearchResult};
+use super::node::alpha_beta;
 use super::options::*;
 use super::ordering::{History, Killers};
 use super::shared_tt::SharedTable;
@@ -18,58 +18,6 @@ use crate::eval::Evaluator;
 
 /// Tolerance for finishing a depth that was started within the budget.
 const OVERSHOOT_FACTOR: f64 = 1.15;
-
-/// First depth searched with an aspiration window (the first iterations are too unstable).
-const ASPIRATION_FROM_DEPTH: i32 = 4;
-/// Half-width of the first aspiration window, in expected score.
-const ASPIRATION_DELTA: f64 = 0.02;
-/// Half-width beyond which the window is the whole interval.
-const ASPIRATION_LIMIT: f64 = 0.4;
-
-/// One iteration of the deepening: [`alpha_beta`], or, with the aspiration technique, a search
-/// in a narrow window around the previous value that is repeated wider when the value falls
-/// outside. The counters are those of all the searches of the iteration. A search cut by the
-/// clock ends the iteration at once.
-fn iteration(
-    state: &mut GameState,
-    eval: &dyn Evaluator,
-    memory: &mut Memory,
-    options: &Options,
-    depth: i32,
-    control: &Control,
-    previous: Option<f64>,
-) -> SearchResult {
-    let Some(value) =
-        previous.filter(|_| options.techniques.aspiration && depth >= ASPIRATION_FROM_DEPTH)
-    else {
-        return alpha_beta(state, eval, memory, options, depth, control);
-    };
-    let mut delta = ASPIRATION_DELTA;
-    let (mut low, mut high) = (value - delta, value + delta);
-    let (mut nodes, mut prunings, mut max_ply) = (0, 0, 0);
-    loop {
-        let mut result =
-            alpha_beta_window(state, eval, memory, options, depth, control, (low, high));
-        nodes += result.nodes;
-        prunings += result.prunings;
-        max_ply = max_ply.max(result.max_ply);
-        let inside = result.value > low && result.value < high;
-        if result.truncated || inside || (low == f64::NEG_INFINITY && high == f64::INFINITY) {
-            result.nodes = nodes;
-            result.prunings = prunings;
-            result.max_ply = max_ply;
-            return result;
-        }
-        delta *= 4.0;
-        if delta > ASPIRATION_LIMIT {
-            (low, high) = (f64::NEG_INFINITY, f64::INFINITY);
-        } else if result.value <= low {
-            low = value - delta;
-        } else {
-            high = value + delta;
-        }
-    }
-}
 
 /// How many consecutive depths a helper skips and searches in turn, and where its pattern starts
 /// (the first six rows of Stockfish's tables), so that the helpers do not all search the same
@@ -107,7 +55,7 @@ fn helper(
         SKIP_SIZE[index % SKIP_SIZE.len()],
         SKIP_PHASE[index % SKIP_PHASE.len()],
     );
-    let (mut nodes, mut depth, mut value) = (0, 1, None);
+    let (mut nodes, mut depth) = (0, 1);
     while !control.stop.is_some_and(|flag| flag.load(Relaxed)) {
         depth = depth.max(control.progress.map_or(1, |p| p.load(Relaxed)));
         if depth > max_depth {
@@ -117,20 +65,18 @@ fn helper(
             depth += 1;
             continue;
         }
-        let result = iteration(
+        let result = alpha_beta(
             &mut state,
             eval,
             &mut memory,
             options,
             depth as i32,
             control,
-            value,
         );
         nodes += result.nodes;
         if result.truncated {
             break;
         }
-        value = Some(result.value);
         if let Some(best) = result.best {
             *report.lock().unwrap() = Some((depth, result.value, best));
         }
@@ -314,15 +260,7 @@ fn deepen(
             progress.store(depth, Relaxed);
         }
         let iteration_start = clock();
-        let result = iteration(
-            state,
-            eval,
-            memory,
-            options,
-            depth as i32,
-            control,
-            last_value,
-        );
+        let result = alpha_beta(state, eval, memory, options, depth as i32, control);
         let seconds = clock() - iteration_start;
         iterations.push(IterationInfo {
             depth,

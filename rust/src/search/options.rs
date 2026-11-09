@@ -13,15 +13,7 @@ pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games
 /// against the reference search (`docs/techniques/README.md`).
-pub const DEFAULT_TECHNIQUES: [&str; 7] = [
-    "incremental",
-    "tt_move",
-    "history",
-    "pvs",
-    "aspiration",
-    "null_move",
-    "see",
-];
+pub const DEFAULT_TECHNIQUES: [&str; 4] = ["incremental", "tt_move", "null_move", "see"];
 
 /// Settings of a search.
 #[derive(Clone, Debug)]
@@ -45,36 +37,16 @@ pub struct Techniques {
     pub incremental: bool,
     /// Try the best move stored in the table first.
     pub tt_move: bool,
-    /// Order quiet moves by how often they caused cut-offs.
-    pub history: bool,
-    /// Principal variation search: zero-width windows after the first move.
-    pub pvs: bool,
-    /// Search the root with a narrow window around the previous value.
-    pub aspiration: bool,
     /// Prune a node if passing the turn already cuts.
     pub null_move: bool,
-    /// Store the value of a horizon node in the table (depth 0) when it has no entry.
-    pub qs_tt: bool,
     /// Static exchange evaluation: the quiescence search skips captures that lose material and the
     /// search tries them after the quiet moves.
     pub see: bool,
-    /// Penalise in the history the quiet moves tried before the one that cut.
-    pub history_malus: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 9] = [
-        "incremental",
-        "tt_move",
-        "history",
-        "pvs",
-        "aspiration",
-        "null_move",
-        "qs_tt",
-        "see",
-        "history_malus",
-    ];
+    pub const NAMES: [&'static str; 4] = ["incremental", "tt_move", "null_move", "see"];
 
     /// The techniques with the given names.
     pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<Techniques, String> {
@@ -83,13 +55,8 @@ impl Techniques {
             match name.as_ref() {
                 "incremental" => techniques.incremental = true,
                 "tt_move" => techniques.tt_move = true,
-                "history" => techniques.history = true,
-                "pvs" => techniques.pvs = true,
-                "aspiration" => techniques.aspiration = true,
                 "null_move" => techniques.null_move = true,
-                "qs_tt" => techniques.qs_tt = true,
                 "see" => techniques.see = true,
-                "history_malus" => techniques.history_malus = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -106,13 +73,8 @@ impl Techniques {
         Techniques {
             incremental: true,
             tt_move: true,
-            history: true,
-            pvs: true,
-            aspiration: true,
             null_move: true,
-            qs_tt: true,
             see: true,
-            history_malus: true,
         }
     }
 }

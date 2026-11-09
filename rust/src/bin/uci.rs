@@ -5,6 +5,7 @@
 //! see `docs/`).
 
 use std::io::{self, BufRead};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -14,6 +15,8 @@ use _core::board::{ordered_moves, uci_string, GameState};
 use _core::eval::sparse_features::FeatureSet;
 use _core::eval::sparse_net::{Layer, Net};
 use _core::eval::{Eval, Evaluator};
+use _core::knowledge::book::OpeningBook;
+use _core::knowledge::tablebase::EndgameTablebase;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
 use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
@@ -30,6 +33,12 @@ struct Settings {
     hash_mb: usize,
     techniques: Techniques,
     eval: Arc<Eval>,
+    /// Opening book (`Book`); off until the option names a file.
+    book: Option<OpeningBook>,
+    /// Whether the game still follows the book: the first position it lacks ends it.
+    in_book: bool,
+    /// Endgame tablebases (`Tablebase`); off until the option names a directory.
+    tablebase: Option<EndgameTablebase>,
 }
 
 /// The position as the GUI sent it: the root FEN and the moves played from it.
@@ -235,6 +244,19 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
                 .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;
             settings.eval = Arc::new(model_from_json(&text)?);
         }
+        "Book" => {
+            settings.book = match value {
+                "" => None,
+                path => Some(OpeningBook::load(Path::new(path))?),
+            };
+            settings.in_book = settings.book.is_some();
+        }
+        "Tablebase" => {
+            settings.tablebase = match value {
+                "" => None,
+                path => Some(EndgameTablebase::open(Path::new(path))?),
+            };
+        }
         "Techniques" => {
             settings.techniques = Techniques::from_names(
                 &value
@@ -246,6 +268,25 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
         other => return Err(format!("unknown option {other:?}")),
     }
     Ok(name == "Hash" || name == "Threads")
+}
+
+/// The move the book or the tablebases give for the position, with the name of its source. The book
+/// is followed while it has the position; the first miss ends it until the next game. `None` leaves
+/// the move to the search.
+fn known_move(settings: &mut Settings, position: &Position) -> Option<(String, &'static str)> {
+    let state = GameState::from_moves(&position.fen, &position.moves).ok()?;
+    if settings.in_book {
+        let found = settings
+            .book
+            .as_ref()
+            .and_then(|book| book.lookup(state.pos()));
+        match found {
+            Some(m) => return Some((uci_string(&m), "book")),
+            None => settings.in_book = false,
+        }
+    }
+    let m = settings.tablebase.as_ref()?.best_move(state.pos())?;
+    Some((uci_string(&m), "tablebase"))
 }
 
 /// Positions of `bench`: a fixed set, so that the node counts are a fingerprint of the search.
@@ -354,6 +395,9 @@ fn main() {
         hash_mb: DEFAULT_HASH_MB,
         techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques"),
         eval: eval.clone(),
+        book: None,
+        in_book: false,
+        tablebase: None,
     };
     let mut memory = Some(new_memory(&settings));
     let mut position = Position {
@@ -373,6 +417,8 @@ fn main() {
                 println!("id name chess_core");
                 println!("option name Hash type spin default {DEFAULT_HASH_MB} min 1 max 65536");
                 println!("option name Threads type spin default 1 min 1 max 64");
+                println!("option name Book type string default");
+                println!("option name Tablebase type string default");
                 println!("option name Model type string default {MODEL_NAME}");
                 println!(
                     "option name Techniques type string default {}",
@@ -383,6 +429,7 @@ fn main() {
             "isready" => println!("readyok"),
             "ucinewgame" => {
                 finish(&mut running, &mut memory);
+                settings.in_book = settings.book.is_some();
                 if let Some(memory) = memory.as_mut() {
                     memory.clear();
                 }
@@ -411,6 +458,10 @@ fn main() {
             },
             "go" => {
                 finish(&mut running, &mut memory);
+                if let Some((best, source)) = known_move(&mut settings, &position) {
+                    println!("info string {source}\nbestmove {best}");
+                    continue;
+                }
                 let white = GameState::from_moves(&position.fen, &position.moves)
                     .map_or(true, |state| state.turn() == Color::White);
                 let job = Job {
@@ -491,5 +542,54 @@ mod tests {
     #[test]
     fn the_compiled_in_model_is_a_network() {
         assert!(matches!(load_model(), Ok(Eval::Net(_))));
+    }
+
+    fn settings_with_book() -> Settings {
+        let start = Position {
+            fen: START_FEN.into(),
+            moves: vec![],
+        };
+        let key = _core::knowledge::book::position_key(&start.fen);
+        Settings {
+            threads: 1,
+            hash_mb: 1,
+            techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).unwrap(),
+            eval: Arc::new(load_model().unwrap()),
+            book: Some(OpeningBook::from_entries([(key, "e2e4".to_string())])),
+            in_book: true,
+            tablebase: None,
+        }
+    }
+
+    #[test]
+    fn the_book_answers_until_the_first_miss() {
+        let mut settings = settings_with_book();
+        let start = Position {
+            fen: START_FEN.into(),
+            moves: vec![],
+        };
+        assert_eq!(
+            known_move(&mut settings, &start),
+            Some(("e2e4".to_string(), "book"))
+        );
+        let off_book = Position {
+            fen: START_FEN.into(),
+            moves: vec!["a2a3".into()],
+        };
+        assert_eq!(known_move(&mut settings, &off_book), None);
+        // After the miss the book stays closed, even for a position it has.
+        assert!(!settings.in_book);
+        assert_eq!(known_move(&mut settings, &start), None);
+    }
+
+    #[test]
+    fn without_book_or_tables_the_search_decides() {
+        let mut settings = settings_with_book();
+        settings.book = None;
+        let start = Position {
+            fen: START_FEN.into(),
+            moves: vec![],
+        };
+        assert_eq!(known_move(&mut settings, &start), None);
     }
 }

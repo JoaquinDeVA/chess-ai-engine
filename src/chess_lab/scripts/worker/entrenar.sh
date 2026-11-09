@@ -25,7 +25,9 @@ if [ "${1:-}" = prueba ]; then
     TAG=prueba
 fi
 OUT="$COPIA/data/results/entrenar/$TAG"
-rm -rf "$OUT" && mkdir -p "$OUT/logs" "$OUT/cards" "$OUT/uci_models" "$OUT/artifacts"
+# SOLO=modelo1,modelo2 entrena solo esos y conserva lo ya hecho en $OUT (para retomar tras una parada); sin SOLO, empieza de cero.
+if [ -n "${SOLO:-}" ]; then IFS=, read -ra MODELOS <<< "$SOLO"; else rm -rf "$OUT"; fi
+mkdir -p "$OUT/logs" "$OUT/cards" "$OUT/uci_models" "$OUT/artifacts"
 # Corre un paso con su log; si falla, enseña el final del log.
 corre() { local log="$OUT/logs/$1.log"; shift; "$@" > "$log" 2>&1 || { tail -40 "$log"; exit 1; }; }
 

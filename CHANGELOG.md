@@ -4,9 +4,6 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
-### Changed
-- The search lists the legal moves in shakmaty's own order instead of sorting them into python-chess' order (`ordered_moves` in `rust/src/board.rs`). On one laptop at fixed depth 6 (`uci bench`) it ran about 28 % more nodes per second and about 8.7 % more nodes (estimated, one run, no SPRT); the Elo effect is not measured. Equal-value ties can resolve to another move (the K+Q vs K tablebase test now expects `a7b6`).
-
 ### Removed
 - The switches `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt`, with their UCI values and tests (`efb595e`): in the round robin at 10 s + 0.1 s none reached a verdict in about 1,100 rounds (removing `pvs` +18.2 ± 12.1, `history` +17.5 ± 12.4, `aspiration` +10.7 ± 12.5; adding `history_malus` +9.2 ± 12.0, `qs_tt` −0.3 ± 12.5). The search keeps only the switches with an accepted SPRT: `incremental`, `tt_move`, `null_move`, `see`. Each page keeps its results as "retired, to be taken up again" ([Search techniques](docs/techniques/README.md#retired-to-be-taken-up-again)).
 - The logistic models (`linear_pst_terms`, `linear_pst`) from the core and the laboratory, and the `Kings` feature set (`8700e6f`); the last commit that plays them is `a1bdf60`. Its card stays, with status `retired` ([Models](docs/MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms-retired)).
@@ -22,6 +19,7 @@ All notable changes. The newest are first.
 - Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/results/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +67.2 ± 34.5 in two SPRTs stopped by hand (no verdict).
 
 ### Changed
+- The search lists the legal moves in shakmaty's own order instead of sorting them into python-chess' order (`ordered_moves` in `rust/src/board.rs`). On one laptop at fixed depth 6 (`uci bench`) it ran about 28 % more nodes per second and about 8.7 % more nodes (estimated, one run, no SPRT); the Elo effect is not measured. Equal-value ties can resolve to another move (the K+Q vs K tablebase test now expects `a7b6`).
 - The `uci` binary consults the opening book and the endgame tablebases itself, through the UCI options `Book` (JSON file) and `Tablebase` (folder), off by default so the matches and tournaments are unchanged; the window sets them. The Python wrappers (`chess_engine/knowledge/`, `_core.Book`, `_core.Tablebase`) are gone; `position_key` lives in `build_opening_book.py` ([Opening book](docs/techniques/opening-book.md), [Endgame tablebases](docs/techniques/endgame-tablebases.md)).
 - Every network has an incremental accumulator, not only the slotted piece-square ones: the bucketed and hybrid networks update their piece part move by move, rebuild it when the king changes bucket, and add the classical terms at each leaf. `uci bench 5`: `net_hybrid_w64` 521,915 to 635,828 nodes/s (+22 %), `net_hybrid_k4_w64` +16 %; about 2 % less for `net_pst_w32` ([incremental](docs/techniques/incremental.md#measured-effect)).
 - The UCI binary plays the piece-square network `net_pst_w32` (embedded, `rust/models/net_pst_w32.json`) instead of `linear_pst_terms` (`8700e6f`): 1,020,805 nodes/s in `uci bench 5` (laptop). `setoption name Model` loads networks only. Training code shared with the networks moved to `models/fitting/epochs.py`.

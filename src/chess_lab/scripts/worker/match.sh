@@ -4,7 +4,7 @@
 #      match.sh status NOMBRE                              ¿corre?, y resumen del log
 #      match.sh fetch NOMBRE                               trae match.pgn y match.log a data/results/matches/NOMBRE/
 #      match.sh stop NOMBRE                                para fastchess (el estado queda guardado para reanudar)
-# A_ARGS y B_ARGS añaden opciones solo a un motor (p. ej. A_ARGS='nodes=20000 option.Techniques=qs_tt').
+# A_ARGS y B_ARGS añaden opciones solo a un motor (p. ej. A_ARGS='nodes=20000 option.Techniques=incremental,tt_move,see').
 # Reanudar = repetir el mismo `start NOMBRE`: carga results/NOMBRE/config.json, que fastchess guarda solo.
 # fastchess escribe config.json solo al salir limpio o con SIGINT: parar siempre con `stop`, nunca `kill -9`
 # (se pierde el estado del SPRT; las partidas del PGN siguen valiendo).

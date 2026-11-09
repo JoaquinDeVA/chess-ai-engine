@@ -27,7 +27,7 @@ fn h1() -> H1 {
 }
 
 /// Values of the first `count` positions at `depth` with the given techniques (iterative
-/// deepening from depth 1, so that the table and the history have something to use).
+/// deepening from depth 1, so that the table has something to use).
 fn values(techniques: Techniques, depth: i32, count: usize) -> Vec<f64> {
     let positions = read(root().join("tests/data/positions.json"));
     let eval = h1();
@@ -96,111 +96,6 @@ fn the_table_move_does_not_change_the_value() {
         tt_move: true,
         ..Techniques::default()
     });
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "slow without optimisation: cargo test --release"
-)]
-fn the_history_does_not_change_the_value() {
-    same_value_as_the_reference(Techniques {
-        history: true,
-        ..Techniques::default()
-    });
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "slow without optimisation: cargo test --release"
-)]
-fn the_history_malus_does_not_change_the_value() {
-    same_value_as_the_reference(Techniques {
-        history: true,
-        history_malus: true,
-        ..Techniques::default()
-    });
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "slow without optimisation: cargo test --release"
-)]
-fn pvs_does_not_change_the_value() {
-    same_value_as_the_reference(Techniques {
-        pvs: true,
-        ..Techniques::default()
-    });
-}
-
-#[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "slow without optimisation: cargo test --release"
-)]
-fn aspiration_windows_do_not_change_the_value() {
-    // the iterations of this helper are searched by hand, so the windows are tested through the
-    // deepening below
-    let positions = read(root().join("tests/data/positions.json"));
-    let eval = h1();
-    let clock = || 0.0;
-    let mut checked = 0;
-    for entry in positions["positions"].as_array().unwrap().iter().take(40) {
-        let moves: Vec<String> = entry["moves"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|m| m.as_str().unwrap().to_string())
-            .collect();
-        let fen = entry["root"].as_str().unwrap();
-        let mut results = Vec::new();
-        for aspiration in [false, true] {
-            let options = Options {
-                quiescence_plies: 4,
-                min_depth: 8,
-                estimator: "never_stop".into(),
-                techniques: Techniques {
-                    aspiration,
-                    ..Techniques::default()
-                },
-                ..Options::default()
-            };
-            let mut state = GameState::from_moves(fen, &moves).unwrap();
-            let legal = _core::board::ordered_moves(state.pos());
-            if state.outcome(&legal).is_some() {
-                break;
-            }
-            let control = Control {
-                start: 0.0,
-                hard_limit: f64::INFINITY,
-                clock: &clock,
-                stop: None,
-                progress: None,
-                rotation: 0,
-            };
-            let (best, stats) = _core::search::iterative_deepening(
-                &mut state,
-                &eval,
-                &mut Memory::default(),
-                &options,
-                5,
-                1e9,
-                &control,
-            )
-            .unwrap();
-            results.push((
-                best.map(|m| _core::board::uci_string(&m)),
-                stats.completed_depth,
-            ));
-        }
-        if results.len() == 2 {
-            assert_eq!(results[0].1, results[1].1);
-            checked += usize::from(results[0].0 == results[1].0);
-        }
-    }
-    assert!(checked >= 36, "{checked} of 40 moves equal");
 }
 
 /// Values of the first `count` positions at depth `depth`, one search each (no deepening).

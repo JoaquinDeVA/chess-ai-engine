@@ -1,7 +1,4 @@
-//! Move ordering: table move, captures by MVV-LVA, killer moves and the history of cuts.
-
-use std::sync::atomic::{AtomicI32, Ordering::Relaxed};
-use std::sync::Arc;
+//! Move ordering: table move, captures by MVV-LVA and killer moves.
 
 use shakmaty::{Chess, Color, Move, Position, Role, Square};
 
@@ -143,62 +140,6 @@ pub fn see_ge(pos: &Chess, m: &Move, threshold: i32) -> bool {
     }
 }
 
-/// Largest identity of a move (`board::move_id`) plus one.
-const MOVE_IDS: usize = 1 << 15;
-/// Value above which the history scores are halved.
-const HISTORY_LIMIT: i32 = 1 << 24;
-
-/// How often each quiet move (by mover and `move_id`) caused a cut-off, weighted by depth. A clone
-/// is another handle to the same scores: the threads of a search share them, with relaxed atomics
-/// (a lost update only blurs a heuristic).
-#[derive(Clone)]
-pub struct History {
-    scores: Arc<[AtomicI32]>,
-}
-
-impl Default for History {
-    fn default() -> History {
-        History {
-            scores: (0..2 * MOVE_IDS).map(|_| AtomicI32::new(0)).collect(),
-        }
-    }
-}
-
-impl History {
-    fn slot(color: Color, m: &Move) -> usize {
-        usize::from(color == Color::Black) * MOVE_IDS + move_id(m) as usize
-    }
-
-    pub fn clear(&self) {
-        for score in self.scores.iter() {
-            score.store(0, Relaxed);
-        }
-    }
-
-    pub fn score(&self, color: Color, m: &Move) -> i32 {
-        self.scores[History::slot(color, m)].load(Relaxed)
-    }
-
-    /// A quiet move caused a cut-off with `depth` plies left.
-    pub fn reward(&self, color: Color, m: &Move, depth: i32) {
-        self.add(color, m, depth * depth);
-    }
-
-    /// A quiet move was tried with `depth` plies left and a later move caused the cut-off.
-    pub fn penalise(&self, color: Color, m: &Move, depth: i32) {
-        self.add(color, m, -depth * depth);
-    }
-
-    fn add(&self, color: Color, m: &Move, amount: i32) {
-        let score = &self.scores[History::slot(color, m)];
-        if (score.fetch_add(amount, Relaxed) + amount).abs() > HISTORY_LIMIT {
-            for score in self.scores.iter() {
-                score.store(score.load(Relaxed) / 2, Relaxed);
-            }
-        }
-    }
-}
-
 /// Put the move with the given identity first, if it is among `moves`.
 pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
     if let Some(id) = id {
@@ -209,22 +150,17 @@ pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
 }
 
 /// The moves in the order the search tries them: killers first, then captures (best MVV-LVA first)
-/// and then the quiet moves, each group keeping its incoming order. With a history the quiet moves
-/// that are not killers come by their score instead, best first.
-pub fn order(moves: Vec<Move>, killers: &[u32], history: Option<(&History, Color)>) -> Vec<Move> {
+/// and then the quiet moves, each group keeping its incoming order.
+pub fn order(moves: Vec<Move>, killers: &[u32]) -> Vec<Move> {
     let is_killer = |m: &Move| killers.contains(&move_id(m));
     let mut ordered: Vec<Move> = Vec::with_capacity(moves.len());
     // Captures: killers first, then the rest, and the whole group sorted by a stable sort.
     ordered.extend(moves.iter().filter(|m| m.is_capture() && is_killer(m)));
     ordered.extend(moves.iter().filter(|m| m.is_capture() && !is_killer(m)));
     ordered.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
-    // Quiet moves: killers first, then the others (by history score when there is one).
+    // Quiet moves: killers first, then the others.
     ordered.extend(moves.iter().filter(|m| !m.is_capture() && is_killer(m)));
-    let others_start = ordered.len();
     ordered.extend(moves.iter().filter(|m| !m.is_capture() && !is_killer(m)));
-    if let Some((history, color)) = history {
-        ordered[others_start..].sort_by_cached_key(|m| std::cmp::Reverse(history.score(color, m)));
-    }
     ordered
 }
 
@@ -304,29 +240,6 @@ mod tests {
     }
 
     #[test]
-    fn history_orders_quiet_moves_by_cuts_after_the_killers() {
-        let a = quiet(Square::B1, Square::C3);
-        let b = quiet(Square::G1, Square::F3);
-        let c = quiet(Square::A2, Square::A3);
-        let history = History::default();
-        history.reward(Color::White, &c, 4);
-        history.reward(Color::White, &b, 2);
-        let ordered = order(
-            vec![a, b, c],
-            &[move_id(&a)],
-            Some((&history, Color::White)),
-        );
-        assert_eq!(ordered, vec![a, c, b]);
-        assert_eq!(
-            history.score(Color::Black, &c),
-            0,
-            "the colours have their own scores"
-        );
-        history.clear();
-        assert_eq!(history.score(Color::White, &c), 0);
-    }
-
-    #[test]
     fn captures_come_first_best_victim_first_then_quiet_moves_with_killers_in_front() {
         let pawn_takes_queen = Move::Normal {
             role: Role::Pawn,
@@ -347,7 +260,6 @@ mod tests {
         let ordered = order(
             vec![a, queen_takes_pawn, b, pawn_takes_queen],
             &[move_id(&b)],
-            None,
         );
         assert_eq!(ordered, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
     }

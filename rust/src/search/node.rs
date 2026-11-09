@@ -13,7 +13,7 @@ use crate::eval::{EvalState, Evaluator};
 
 /// The null move is tried from this depth on.
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
-/// Width of the window of the scouts of the principal variation search.
+/// Width of the zero-width window of the null-move search.
 const SCOUT_EPSILON: f64 = 1e-9;
 
 struct Search<'a> {
@@ -74,33 +74,6 @@ impl Search<'_> {
         (board.by_color(color) & !(board.pawns() | board.kings())).any()
     }
 
-    /// Value of the child just played, searched as the techniques say: the moves after the first
-    /// with a window of no width, and again with the whole window when the cheaper search says the
-    /// move is better than the best so far.
-    fn child_value(
-        &mut self,
-        index: usize,
-        (alpha, beta): (f64, f64),
-        depth_remaining: i32,
-        ply: i32,
-        maximizing: bool,
-    ) -> f64 {
-        let (low, high) = if maximizing {
-            (alpha, alpha + SCOUT_EPSILON)
-        } else {
-            (beta - SCOUT_EPSILON, beta)
-        };
-        let narrow = beta - alpha > SCOUT_EPSILON;
-        if self.options.techniques.pvs && index > 0 && depth_remaining >= 2 && narrow {
-            let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
-            if scout > alpha && scout < beta && !self.truncated {
-                return self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0;
-            }
-            return scout;
-        }
-        self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0
-    }
-
     /// Take back the last move played with [`Search::play`].
     fn unplay(&mut self) {
         self.state.undo();
@@ -148,14 +121,10 @@ impl Search<'_> {
         }
         if depth_remaining <= 0 {
             if self.options.quiescence_plies > 0 {
-                let value = self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves);
-                // Only where the table has nothing: a depth-0 entry must not replace a deeper one.
-                if self.options.techniques.qs_tt && entry.is_none() && !self.truncated {
-                    self.memory
-                        .table
-                        .store(key, value, None, 0, alpha_orig, beta_orig);
-                }
-                return (value, None);
+                return (
+                    self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves),
+                    None,
+                );
             }
             return (self.static_value(), None);
         }
@@ -177,12 +146,7 @@ impl Search<'_> {
         let maximizing = self.state.turn() == self.root_player;
         let killers: Vec<u32> = self.memory.killers.get(depth_remaining).to_vec();
         let mover = self.state.turn();
-        let history = if self.options.techniques.history {
-            Some((&self.memory.history, mover))
-        } else {
-            None
-        };
-        let mut ordered = order(moves, &killers, history);
+        let mut ordered = order(moves, &killers);
         if self.options.techniques.see {
             // Captures that lose material come after the quiet moves (the order is otherwise kept).
             let pos = self.state.pos();
@@ -243,11 +207,9 @@ impl Search<'_> {
             f64::INFINITY
         };
         let mut best_move = None;
-        let malus = self.options.techniques.history && self.options.techniques.history_malus;
-        let mut failed_quiet: Vec<Move> = Vec::new();
-        for (index, action) in ordered.into_iter().enumerate() {
+        for action in ordered {
             self.play(action);
-            let child = self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing);
+            let (child, _) = self.node(alpha, beta, depth_remaining - 1, ply + 1, true);
             self.unplay();
             if maximizing {
                 if child > best_value {
@@ -260,22 +222,12 @@ impl Search<'_> {
                 best_move = Some(move_id(&action));
                 beta = beta.min(best_value);
             }
-            // Cutoff: quiet moves that cut are remembered (killers, history) to be tried earlier
-            // in sibling nodes; captures are already ordered first.
+            // Cutoff: the move that cut is remembered (killers) to be tried earlier in sibling
+            // nodes; captures are already ordered first.
             if alpha >= beta {
                 self.prunings += 1;
                 self.memory.killers.record(depth_remaining, action);
-                if self.options.techniques.history && !action.is_capture() && !action.is_promotion()
-                {
-                    self.memory.history.reward(mover, &action, depth_remaining);
-                    for failed in &failed_quiet {
-                        self.memory.history.penalise(mover, failed, depth_remaining);
-                    }
-                }
                 break;
-            }
-            if malus && !action.is_capture() && !action.is_promotion() {
-                failed_quiet.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
@@ -359,7 +311,7 @@ pub struct SearchResult {
     pub truncated: bool,
 }
 
-/// One alpha-beta search of exactly `max_depth` plies.
+/// One alpha-beta search of exactly `max_depth` plies with the whole window.
 ///
 /// The search is cut when the elapsed time passes `control.hard_limit` or `control.stop` is raised:
 /// it is then flagged as truncated and stores nothing in the table from then on.
@@ -370,28 +322,6 @@ pub fn alpha_beta(
     options: &Options,
     max_depth: i32,
     control: &Control,
-) -> SearchResult {
-    alpha_beta_window(
-        state,
-        eval,
-        memory,
-        options,
-        max_depth,
-        control,
-        (f64::NEG_INFINITY, f64::INFINITY),
-    )
-}
-
-/// [`alpha_beta`] with a window other than the whole interval: a value inside it is exact, one on
-/// its edge (or outside) only says that the true value is on that side.
-pub fn alpha_beta_window(
-    state: &mut GameState,
-    eval: &dyn Evaluator,
-    memory: &mut Memory,
-    options: &Options,
-    max_depth: i32,
-    control: &Control,
-    window: (f64, f64),
 ) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
@@ -414,7 +344,7 @@ pub fn alpha_beta_window(
         truncated: false,
         incremental,
     };
-    let (value, best) = search.node(window.0, window.1, max_depth, 0, true);
+    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0, true);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

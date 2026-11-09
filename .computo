@@ -34,6 +34,42 @@
       ],
       "cmd": "bash src/chess_lab/scripts/worker/parar.sh",
       "fetch": []
+    },
+    "entrenar": {
+      "sync": [
+        "src/chess_engine/",
+        "src/chess_lab/",
+        "pyproject.toml",
+        "README.md",
+        "rust/src/",
+        "rust/models/",
+        "rust/Cargo.toml",
+        "rust/Cargo.lock",
+        "data/LichessPositions/raw/",
+        "data/LichessPositions/sidecar/"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/entrenar.sh",
+      "fetch": [
+        "data/results/entrenar/"
+      ]
+    },
+    "entrenar-prueba": {
+      "sync": [
+        "src/chess_engine/",
+        "src/chess_lab/",
+        "pyproject.toml",
+        "README.md",
+        "rust/src/",
+        "rust/models/",
+        "rust/Cargo.toml",
+        "rust/Cargo.lock",
+        "data/LichessPositions/raw/",
+        "data/LichessPositions/sidecar/"
+      ],
+      "cmd": "bash src/chess_lab/scripts/worker/entrenar.sh prueba",
+      "fetch": [
+        "data/results/entrenar/"
+      ]
     }
   }
 }

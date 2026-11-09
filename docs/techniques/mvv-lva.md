@@ -47,8 +47,7 @@ If `bxc6` wins enough to reach `beta`, the other three captures and every quiet 
 ## Implementation
 
 `mvv_lva_score` and `order` in `rust/src/search/ordering.rs`. The sort is stable, so equal captures keep the
-order of generation (`generation_order` in `rust/src/board.rs`, the order python-chess used, which keeps the
-results identical to the earlier Python engine). Always on (not a switch).
+order of generation (`ordered_moves` in `rust/src/board.rs`, the order shakmaty generates). Always on (not a switch).
 
 ## Measured effect
 

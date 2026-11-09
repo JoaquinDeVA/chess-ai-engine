@@ -26,10 +26,9 @@ networks), the alpha-beta with its techniques, the opening book and the endgame 
 two products: the Python module `chess_engine._core` (PyO3, `maturin`) for the laboratory and the tests, and the UCI
 binary `rust/target/release/uci` that the window and fastchess play.
 
-To keep the results identical, the legal moves are listed in the order python-chess generated them
-(`generation_order` in `rust/src/board.rs`), so moves of equal value are chosen as before.
+The legal moves are listed in the order shakmaty generates them (`ordered_moves` in `rust/src/board.rs`), so among moves of equal value the search plays the first of that order. Until 2026-11-09 they were sorted into the order python-chess generated them, to reproduce the Python engine's trees; that sort is gone, so equal-value ties can now resolve to a different move than in the published Python tournaments.
 
-**Worked example.** The same position and the same depth return the same move with the same nodes in Python and in Rust; only the time per node changes.
+**Worked example.** The same position and the same depth return the same value in Python and in Rust; the chosen move can differ when two moves tie, and the time per node changes.
 
 ## Implementation
 

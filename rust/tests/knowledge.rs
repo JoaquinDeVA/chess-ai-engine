@@ -29,7 +29,7 @@ fn the_three_piece_tables_play_the_winning_move() {
     let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
     for (fen, expected) in [
         ("8/6R1/8/8/8/8/3k1K2/8 w - - 0 1", "g7g3"),
-        ("8/k7/8/8/8/8/3KQ3/8 b - - 0 1", "a7b7"),
+        ("8/k7/8/8/8/8/3KQ3/8 b - - 0 1", "a7b6"),
     ] {
         let pos = position_from_fen(fen).unwrap();
         let got = tables.best_move(&pos).map(|m| uci_string(&m));

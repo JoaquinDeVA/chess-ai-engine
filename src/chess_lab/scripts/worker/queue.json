@@ -1,189 +1,42 @@
 {
  "jobs": [
   {
-   "name": "abl_incremental",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_tt_move",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,history,pvs,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_history",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,pvs,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_pvs",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_aspiration",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,pvs,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_null_move",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "abl_see",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "add_history_malus",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see,history_malus"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "add_qs_tt",
-   "a": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see,qs_tt"
-   ],
-   "b": [
-    "option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see"
-   ],
-   "elo0": -5,
-   "elo1": 0
-  },
-  {
-   "name": "model_net_vs_linear",
+   "name": "model_net_vs_linear_10min",
+   "uci": "bin/1fa18f0aab94/uci",
    "a": [
     "option.Model=models/net_pst_w32.json"
    ],
    "b": [
     "option.Model=models/linear_pst_terms_e30.json"
    ],
+   "each": [
+    "tc=600+5",
+    "proto=uci",
+    "option.Hash=16"
+   ],
    "elo0": 0,
-   "elo1": 5
+   "elo1": 5,
+   "max_rounds": 300,
+   "chunk_rounds": 10
   },
   {
-   "name": "model_terms_in_net",
+   "name": "model_terms_in_net_nodes",
+   "uci": "bin/1fa18f0aab94/uci",
    "a": [
-    "option.Model=models/net_hybrid_w32.json"
+    "option.Model=models/net_hybrid_w64.json"
    ],
    "b": [
     "option.Model=models/net_pst_w32.json"
    ],
-   "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "model_width_64_vs_32",
-   "a": [
-    "option.Model=models/net_hybrid_w64.json"
-   ],
-   "b": [
-    "option.Model=models/net_hybrid_w32.json"
+   "each": [
+    "tc=60+1",
+    "nodes=250000",
+    "proto=uci",
+    "option.Hash=16"
    ],
    "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "model_buckets_k4",
-   "a": [
-    "option.Model=models/net_hybrid_k4_w64.json"
-   ],
-   "b": [
-    "option.Model=models/net_hybrid_w64.json"
-   ],
-   "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "model_buckets_k8_vs_k4",
-   "a": [
-    "option.Model=models/net_hybrid_k8_w64.json"
-   ],
-   "b": [
-    "option.Model=models/net_hybrid_k4_w64.json"
-   ],
-   "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "model_linear_e30_vs_shipped",
-   "a": [
-    "option.Model=models/linear_pst_terms_e30.json"
-   ],
-   "b": [],
-   "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "best_net_hybrid_k4_w64_vs_linear",
-   "a": [
-    "option.Model=models/net_hybrid_k4_w64.json"
-   ],
-   "b": [
-    "option.Model=models/linear_pst_terms_e30.json"
-   ],
-   "elo0": 0,
-   "elo1": 5
-  },
-  {
-   "name": "best_net_hybrid_w64_vs_linear",
-   "a": [
-    "option.Model=models/net_hybrid_w64.json"
-   ],
-   "b": [
-    "option.Model=models/linear_pst_terms_e30.json"
-   ],
-   "elo0": 0,
-   "elo1": 5
+   "elo1": 5,
+   "max_rounds": 6000
   }
  ]
 }

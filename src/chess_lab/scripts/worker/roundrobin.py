@@ -3,8 +3,8 @@
 
 python roundrobin.py queue.json --chunk-rounds 100 --concurrency 4
 
-Runs on the worker (standard library only), from ``~/worker`` where ``uci``, ``fastchess`` and ``openings.epd`` are.
-Each turn resumes one match for ``--chunk-rounds`` rounds (2 games per round) and appends a line to
+Runs on the worker (standard library only), from ``~/worker`` where ``bin/``, ``fastchess`` and ``openings.epd`` are.
+Each turn resumes one match for ``--chunk-rounds`` rounds (or the ``chunk_rounds`` of the job) (2 games per round) and appends a line to
 ``results/<name>/llr.csv``. A match leaves the queue when fastchess ends its SPRT (H0 or H1 accepted) or when it reaches
 ``max_rounds`` (no verdict). The queue file is read again before every turn, so jobs can be added while it runs.
 ``touch results/STOP`` finishes the current turn and exits; SIGTERM does the same at once (fastchess gets SIGINT, which
@@ -12,11 +12,13 @@ keeps the state of its SPRT: never kill it with SIGKILL).
 
 Queue file::
 
-    {"jobs": [{"name": "see_off", "a": ["option.Techniques=incremental,see"], "b": ["option.Techniques=incremental"],
-               "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"], "elo0": 0, "elo1": 5, "max_rounds": 6000}]}
+    {"jobs": [{"name": "see_off", "uci": "bin/0123abcd4567/uci", "a": ["option.Techniques=incremental,see"],
+               "b": ["option.Techniques=incremental"], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
+               "elo0": 0, "elo1": 5, "max_rounds": 6000, "chunk_rounds": 100}]}
 
-``a`` and ``b`` are extra fastchess options of each engine (both run ``./uci``); ``each`` defaults to the screening
-control. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
+``uci`` is the binary both engines run (``instalar.sh`` installs each build in its own ``bin/<hash>/``, so a long match
+keeps its binary when a new one arrives); ``a`` and ``b`` are extra fastchess options of each engine; ``each`` defaults
+to the screening control. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
 """
 
 import argparse
@@ -103,8 +105,8 @@ def command(
         return ["./fastchess", "-config", f"file={config}", f"outname={config}"]
     return [
         "./fastchess",
-        *["-engine", "cmd=./uci", "name=A", *job.get("a", [])],
-        *["-engine", "cmd=./uci", "name=B", *job.get("b", [])],
+        *["-engine", f"cmd=./{job['uci']}", "name=A", *job.get("a", [])],
+        *["-engine", f"cmd=./{job['uci']}", "name=B", *job.get("b", [])],
         *["-each", *job.get("each", DEFAULT_EACH)],
         *["-openings", "file=openings.epd", "format=epd", "order=random"],
         *["-pgnout", f"file={pgn}"],
@@ -180,7 +182,7 @@ class Queue:
         max_rounds = job.get("max_rounds", DEFAULT_MAX_ROUNDS)
         resume = config.exists()
         played = rounds_played(json.loads(config.read_text())) if resume else 0
-        target = next_rounds(played, self.chunk, max_rounds)
+        target = next_rounds(played, job.get("chunk_rounds", self.chunk), max_rounds)
         if resume:
             data = json.loads(config.read_text())
             data["rounds"] = target
@@ -264,7 +266,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--root",
         type=Path,
         default=Path.cwd(),
-        help="folder with uci, fastchess, openings.epd, results/",
+        help="folder with bin/, fastchess, openings.epd, results/",
     )
     args = parser.parse_args(argv)
     queue = Queue(args.queue.resolve(), args.root.resolve(), args.chunk_rounds, args.concurrency)

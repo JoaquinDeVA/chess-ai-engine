@@ -49,9 +49,17 @@ def test_rounds_played_and_next_rounds(script):
 
 
 def test_command_first_turn_and_resume(script):
-    job = {"name": "x", "a": ["option.Techniques=see"], "b": [], "elo0": 0, "elo1": 5}
+    job = {
+        "name": "x",
+        "uci": "bin/ab12/uci",
+        "a": ["option.Techniques=see"],
+        "b": [],
+        "elo0": 0,
+        "elo1": 5,
+    }
     cmd = script.command(job, 100, 4, Path("c.json"), Path("m.pgn"), resume=False)
     assert cmd[0] == "./fastchess" and "option.Techniques=see" in cmd and "elo1=5" in cmd
+    assert cmd.count("cmd=./bin/ab12/uci") == 2
     assert cmd[cmd.index("-rounds") + 1] == "100"
     assert script.command(job, 100, 4, Path("c.json"), Path("m.pgn"), resume=True) == [
         "./fastchess",

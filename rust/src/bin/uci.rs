@@ -348,12 +348,22 @@ fn bench_once(eval: &Eval, print: bool) -> (u64, f64) {
 
 fn main() {
     let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
+    // uci bench [repetitions] [model.json]
     if std::env::args().nth(1).as_deref() == Some("bench") {
         let repetitions = std::env::args()
             .nth(2)
             .and_then(|n| n.parse().ok())
             .unwrap_or(5);
-        bench(&eval, repetitions);
+        match std::env::args().nth(3) {
+            Some(path) => bench(
+                &std::fs::read_to_string(&path)
+                    .map_err(|e| e.to_string())
+                    .and_then(|text| model_from_json(&text))
+                    .unwrap_or_else(|e| panic!("bench model {path}: {e}")),
+                repetitions,
+            ),
+            None => bench(&eval, repetitions),
+        }
         return;
     }
     let mut settings = Settings {

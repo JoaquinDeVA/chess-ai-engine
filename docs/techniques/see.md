@@ -4,7 +4,7 @@
 >
 > **Read it when:** You wonder how the search tells a free pawn from a queen given for a defended pawn, or why this switch is on.
 >
-> **Next:** [Search techniques](README.md)
+> **Next:** [Principal variation search (retired)](pvs.md)
 
 ## Problem
 
@@ -56,6 +56,9 @@ fastchess -engine cmd=./uci name=A option.Techniques=incremental,tt_move,history
 
 Fixed nodes favour a change that saves nodes ([How a change is measured](../MEASUREMENT.md)), and this test does not charge `see` for the time it costs per node. The tests at a time control (above) point the same way but reached no verdict. Nodes saved at depth 6 were not recorded.
 
+**SPRT [−5, 0]**, the default set of then (`incremental,tt_move,history,pvs,aspiration,null_move,see`) against the same set without `see`. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): +64.5 ± 19.5 Elo at 992 games, LLR +2.96 of ±2.94, **H1 accepted**: removing it loses (`data/results/roundrobin/abl_see/llr.csv`). Measured before `pvs`, `aspiration` and `history` were retired; the set without them has no SPRT of its own yet. This is the verdict at a time control that the tests above did not reach.
+
 ## Status
 
-Adopted, on by default since 2026-11-04. SPRT [0, 5] at 20,000 nodes per move accepted H1 (+56.4 ± 17.5 Elo, 1,188 games); the screening at 10 s + 0.1 s (+47.8 ± 34.3) and the two SPRTs at 60 s + 1 s (+41.5 ± 46.1 and +67.2 ± 34.5, no verdict) have the same sign. The effect at a time control is not confirmed by a verdict, but all four measurements are positive and the decision to keep it stands.
+Adopted, on by default since 2026-11-04. SPRT [0, 5] at 20,000 nodes per move accepted H1 (+56.4 ± 17.5 Elo, 1,188
+games), and the removal SPRT at 10 s + 0.1 s accepted H1 too (+64.5 ± 19.5 Elo, 992 games). Kept in the core on 2026-11-09 (`efb595e`): its removal SPRT accepted H1.

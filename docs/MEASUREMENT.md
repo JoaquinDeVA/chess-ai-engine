@@ -120,14 +120,15 @@ control. Fixed nodes are therefore the first filter for a change that should not
    silently becomes an A/A:
 
    ```bash
-   printf 'setoption name Techniques value incremental,tt_move,qs_tt\nquit\n' | rust/target/release/uci   # must print nothing
+   printf 'setoption name Techniques value incremental,tt_move,null_move\nquit\n' | rust/target/release/uci   # must print nothing
    ```
 
-3. Play an SPRT with the change in A only, for example:
+3. Play an SPRT with the change in A only, for example removing `see` (a removal is judged with [−5, 0]: is the
+   simpler engine no worse?):
 
    ```bash
-   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see,qs_tt \
-       -engine cmd=rust/target/release/uci name=B option.Techniques=incremental,tt_move,history,pvs,aspiration,null_move,see \
+   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,null_move \
+       -engine cmd=rust/target/release/uci name=B option.Techniques=incremental,tt_move,null_move,see \
        -each proto=uci nodes=20000 option.Hash=16 -openings file=data/openings/openings.epd format=epd order=random \
        -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 6000 -games 2 -concurrency 8 -srand 21
    ```
@@ -142,20 +143,19 @@ A queue of SPRTs on one worker is played in turns by `src/chess_lab/scripts/work
 saves, and so on until every match is closed. After each turn it appends the games, LLR, Elo and error to
 `results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
 it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
-can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/scripts/worker/queue.json`: the removal of each default technique and the two techniques off
-by default (screening, `[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the
-question is whether each addition is better): a network against `linear_pst_terms@e30`, the classical terms in the
-network, width 64 against 32, four king buckets against none, eight against four, and `linear_pst_terms@e30` against
-the shipped one. The two networks with the best Spearman at a similar cost (`net_hybrid_k4_w64`, `net_hybrid_w64`) also play
-`linear_pst_terms@e30` directly, to tell whether better models pay off even if the plainest network does not. A step that ends at the round cap without a verdict says the addition is too small for this budget.
+can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/scripts/worker/queue.json`; each job names its binary in `uci` (`bin/<hash>/uci`,
+installed by `src/chess_lab/scripts/worker/instalar.sh`), so a long SPRT keeps its binary when a new one arrives. The
+round robin of 2026-11-06 to 2026-11-09 played the removal of each default technique and the addition of the two that
+were off (`[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the question is whether
+each addition is better); its jobs and results are in [Results](RESULTS.md#round-robin-rust-engine-fastchess). A step
+that ends at the round cap without a verdict says the addition is too small for this budget.
 
 ### Playing a model that is not compiled in
 
-`uci` embeds `linear_pst_terms` and loads any other model from a JSON file with
-`setoption name Model value <file>.json` (`setoption name Model value linear_pst_terms` goes back to the embedded one).
-The file is written by `python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64@e30 --out <folder>`; linear
-models and networks are accepted. The command `eval` prints the evaluation of the current position, which equals the
+`uci` embeds `net_pst_w32` and loads any other network from a JSON file with
+`setoption name Model value <file>.json` (`setoption name Model value net_pst_w32` goes back to the embedded one).
+The file is written by `python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64 --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
 Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). A network is played without
-an incremental accumulator unless its features are the slotted ones, so it reaches fewer nodes per second than the
-linear model (about 400,000 against 910,000 with `net_hybrid_w64`, one thread, `go movetime 3000`, not a controlled
-benchmark): the SPRT at a time control includes that cost.
+an incremental accumulator unless its features are the slotted ones, so the hybrids reach about half the nodes per
+second of `net_pst_w32` (`uci bench 5 <file>.json`, laptop, 2026-11-09: 528,562 for `net_hybrid_w64` against
+1,020,805): the SPRT at a time control includes that cost, and an SPRT at fixed nodes leaves it out.

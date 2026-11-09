@@ -26,7 +26,7 @@ passant counts as a pawn taking a pawn. Quiet moves score 0 and keep their order
 1. the move stored in the transposition table ([`tt_move`](tt-move.md), if on);
 2. captures by MVV-LVA score;
 3. the [killer moves](killer-moves.md);
-4. the other quiet moves, by [history](history.md) score if that switch is on.
+4. the other quiet moves, in generation order (until `efb595e`, by [history](history.md) score when that switch was on).
 
 **Worked example.** A position with four captures:
 
@@ -41,7 +41,7 @@ If `bxc6` wins enough to reach `beta`, the other three captures and every quiet 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../img/move-ordering-dark.svg">
-  <img src="../img/move-ordering-light.svg" alt="Order in which moves are tried: table move, captures by MVV-LVA, killers, then history; an early cut-off skips the later moves">
+  <img src="../img/move-ordering-light.svg" alt="Order in which moves are tried: table move, captures by MVV-LVA, killers, then the other quiet moves; an early cut-off skips the later moves">
 </picture>
 
 ## Implementation

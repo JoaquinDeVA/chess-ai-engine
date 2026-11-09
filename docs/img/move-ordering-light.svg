@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t d">
   <title id="t">Move ordering in the alpha-beta search</title>
-  <desc id="d">Six moves of one node, in the order the search tries them: first the move stored in the transposition table, then the captures by MVV-LVA score (NxB before PxN), then a killer move that caused a cut at this depth, then the other quiet moves by history. Below, two rows show that when the cut move is tried first, five moves are skipped; when it is tried fifth, one is skipped. The position and the scores are illustrative, not measured.</desc>
+  <desc id="d">Six moves of one node, in the order the search tries them: first the move stored in the transposition table, then the captures by MVV-LVA score (NxB before PxN), then a killer move that caused a cut at this depth, then the other quiet moves in generation order. Below, two rows show that when the cut move is tried first, five moves are skipped; when it is tried fifth, one is skipped. The position and the scores are illustrative, not measured.</desc>
   <style>
     text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #0f172a; }
     .title { font-size: 20px; font-weight: 700; }
@@ -41,8 +41,8 @@
   <text x="217" y="146" text-anchor="middle" class="small t-green">capture</text>
   <text x="339" y="146" text-anchor="middle" class="small t-green">capture</text>
   <text x="461" y="146" text-anchor="middle" class="small t-green">killer</text>
-  <text x="583" y="146" text-anchor="middle" class="small t-green">history</text>
-  <text x="705" y="146" text-anchor="middle" class="small t-green">history</text>
+  <text x="583" y="146" text-anchor="middle" class="small t-green">quiet</text>
+  <text x="705" y="146" text-anchor="middle" class="small t-green">quiet</text>
 
   <path class="edge" d="M 40 170 L 752 170"/>
   <polygon points="762,170 750,164 750,176" fill="#15803d"/>

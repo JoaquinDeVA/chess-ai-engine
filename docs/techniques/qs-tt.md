@@ -29,8 +29,8 @@ the clock stores nothing.
 
 ## Implementation
 
-The horizon branch of `Search::node` in `rust/src/search/node.rs`. Switch: `qs_tt` (UCI option `Techniques`, not
-in the default list), field `qs_tt` of `Techniques` in `rust/src/search/options.rs`. Test:
+Removed in `efb595e` (2026-11-09) with its switch, its tests and its UCI name; the last version is in `a1bdf60`. It lived in the horizon branch of `Search::node` in `rust/src/search/node.rs`. Switch: `qs_tt` (not in the default
+list), field `qs_tt` of `Techniques` in `rust/src/search/options.rs`. Test:
 `the_horizon_table_entries_do_not_change_the_value` in `rust/src/search/tests.rs` (same root value, three
 positions).
 
@@ -53,9 +53,13 @@ fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=increment
 
 Neither bound was crossed: the interval (−3.2 to +4.6 Elo) rules out a loss of 5 Elo only loosely and shows no
 gain. Fixed nodes favour a change that saves nodes ([Measurement](../MEASUREMENT.md)), so a gain here would still
-need a test at a time control; there was none. The nodes saved and the share of table hits were not recorded.
+need a test at a time control. The nodes saved and the share of table hits were not recorded.
+
+**SPRT [−5, 0] with the clock**, the default set plus `qs_tt` against the default set. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): −0.3 ± 12.5 Elo
+at 2,134 games, LLR +0.19 of ±2.94, no verdict when the round robin was stopped
+(`data/results/roundrobin/add_qs_tt/llr.csv`).
 
 ## Status
 
-Implemented, off by default; no gain at 20,000 nodes (2026-11-02: +0.7 ± 3.9 Elo, SPRT without verdict at 10,000
-games).
+Retired, to be taken up again (`efb595e`, 2026-11-09); it was off by default. Neither SPRT gave a verdict, and
+neither shows a gain (+0.7 ± 3.9 Elo at 20,000 nodes, −0.3 ± 12.5 at 10 s + 0.1 s). To take it up again: restore it from `a1bdf60` and run its SPRT to a verdict against the current default ([How a change is measured](../MEASUREMENT.md)).

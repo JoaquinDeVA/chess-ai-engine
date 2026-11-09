@@ -45,7 +45,7 @@ mate, which is a draw.
 ## AI settings
 
 Every setting is a field of `AISettings` (`gui/settings.py`). The engine is the UCI binary
-`rust/target/release/uci`, which has one evaluation (`linear_pst_terms`, compiled in) and a fixed
+`rust/target/release/uci`, which has one evaluation (`net_pst_w32`, compiled in) and a fixed
 quiescence depth of 4 plies, so neither is a setting.
 
 | Setting | `AISettings` field | UCI option or `go` limit | Default |
@@ -54,7 +54,7 @@ quiescence depth of 4 plies, so neither is a setting.
 | Fixed time per move; unchecked, the engine spends a share of its clock | `move_time` | `go movetime ms` | 3 s |
 | Opening book | `opening_book` | none: read in Python before the engine | on |
 | Endgame tablebases (up to five pieces) | `tablebase` | none: read in Python before the engine | on |
-| Advanced: search techniques | `techniques` | `setoption name Techniques` | the seven default ones (all but `qs_tt`) |
+| Advanced: search techniques | `techniques` | `setoption name Techniques` | the four default ones (`incremental,tt_move,null_move,see`) |
 | Advanced: search threads | `threads` | `setoption name Threads` | 1 by default, 4 recommended for play (6 was no better); the window accepts up to 64 |
 
 With a clock and no fixed time, the window sends `wtime`, `btime`, `winc` and `binc`; the binary

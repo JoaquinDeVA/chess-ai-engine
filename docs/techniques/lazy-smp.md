@@ -20,12 +20,12 @@ wait for each other and, blind to each other's results, prune less.
 ## How it works
 
 - The main thread runs [iterative deepening](iterative-deepening.md) as usual, with the clock.
-- Each helper runs its own iterative deepening, with aspiration windows, on its own copy of the position. It never
+- Each helper runs its own iterative deepening on its own copy of the position. It never
   searches shallower than the main thread is, and it skips depths by a pattern that depends on its index (skip
   size 1, 1, 2, 2, 2, 2 and phase 0, 1, 0, 1, 2, 3 for helpers 1 to 6), so the helpers do not all search the same depth.
   It also rotates the moves of the root by its index.
-- The table and the history scores are shared without locks; a table slot written by two threads at once is detected
-  and ignored. Each thread keeps its own killer moves.
+- The table is shared without locks; a slot written by two threads at once is detected and ignored. Each thread keeps
+  its own killer moves.
 - When the main thread finishes it raises a stop flag and the helpers abandon their search.
 - The move is chosen by a vote: every thread whose last finished iteration is at least as deep as the main thread's
   gives its move a weight of its depth times (its value minus the lowest value among the voters plus 0.01). The move
@@ -53,7 +53,8 @@ e4 gets 0.32 and d4 gets 1.29, so d4 is played although the main thread chose e4
 
 `iterative_deepening`, `helper` and `vote` in `rust/src/search/deepening.rs`; `SharedTable` in
 `rust/src/search/shared_tt.rs` (three atomic words per slot checked by XOR, in a 32-byte slot so that none straddles
-two cache lines); `History` in `rust/src/search/ordering.rs` (relaxed atomics, a clone is a handle to the same scores).
+two cache lines); the rotation of the root moves in `rust/src/search/node.rs`. Until `efb595e` (2026-11-09) the
+helpers also used [aspiration windows](aspiration.md) and shared the [history](history.md) scores; both were retired.
 `Memory::with_threads` (`rust/src/search/memory.rs`) builds the shared table only with more than one thread. UCI options
 `Threads` and `Hash` (megabytes of the shared table; with one thread `Hash` has no effect); in the window, Settings →
 Advanced. With more than one thread the search is not deterministic.
@@ -93,4 +94,6 @@ The vote did not help: the point estimate is negative and the interval just reac
 ## Status
 
 Adopted as an option, off by default (one thread keeps matches reproducible and the clock fair); since 2026-10-25. Four threads are the recommended count to play with (the Lichess bot uses them): six gave no gain over four in 280 games.
-Helpers with their own deepening, the shared history, the aligned slots and the vote: 2026-11-04.
+Helpers with their own deepening, the shared history, the aligned slots and the vote: 2026-11-04. The shared history
+and the helpers' aspiration windows went with those techniques in `efb595e` (2026-11-09); the threads were not
+measured again after that.

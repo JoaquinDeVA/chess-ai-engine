@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know the technique that gained most in games, and when it is not tried.
 >
-> **Next:** [Quiescence with the table](qs-tt.md)
+> **Next:** [Static exchange evaluation](see.md)
 
 ## Problem
 
@@ -48,6 +48,8 @@ Rust core, `linear_pst_terms`, 100 positions at depth 6 (`scripts/bench/compare_
 games the largest gain: the set with it scored 76.5 % (95 % interval 69.0–84.0, +205 Elo) against the reference,
 against 64.5 % without it ([catalogue](README.md#how-the-switches-were-judged)).
 
+**SPRT [−5, 0]**, the default set of then (`incremental,tt_move,history,pvs,aspiration,null_move,see`) against the same set without `null_move`. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): +97.4 ± 24.5 Elo at 710 games, LLR +2.95 of ±2.94, **H1 accepted**: removing it loses (`data/results/roundrobin/abl_null_move/llr.csv`). Measured before `pvs`, `aspiration` and `history` were retired; the set without them has no SPRT of its own yet.
+
 ## Status
 
-Adopted, on by default; since 2026-10-25 (`f5e368a`).
+Adopted, on by default; since 2026-10-25 (`f5e368a`). Kept in the core on 2026-11-09 (`efb595e`): its removal SPRT accepted H1.

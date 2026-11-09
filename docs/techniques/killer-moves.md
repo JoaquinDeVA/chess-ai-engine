@@ -2,7 +2,7 @@
 
 > **What it is:** Remembering the moves that caused a cut-off at a depth and trying them first in sibling nodes.
 >
-> **Read it when:** You want to know how quiet moves are ordered before the history heuristic.
+> **Read it when:** You want to know how quiet moves are ordered.
 >
 > **Next:** [Move ordering by MVV-LVA](mvv-lva.md)
 

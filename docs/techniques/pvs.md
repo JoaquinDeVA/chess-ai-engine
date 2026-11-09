@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know why most moves cost less than the first.
 >
-> **Next:** [Aspiration windows](aspiration.md)
+> **Next:** [Aspiration windows (retired)](aspiration.md)
 
 ## Problem
 
@@ -35,9 +35,9 @@ three moves were narrow searches; one needed a repeat.
 
 ## Implementation
 
-`child_value` in `rust/src/search/node.rs`. Values are continuous probabilities, so the width is
-`SCOUT_EPSILON = 1e-9`. Only from 2 plies left, and only when the window is not already of zero width. A repeat
-cut short by the clock keeps the narrow value. Switch: `pvs`.
+Removed in `efb595e` (2026-11-09) with its switch, its tests and its UCI name; the last version is in `a1bdf60`. It lived in `child_value` in `rust/src/search/node.rs`. Values are continuous probabilities, so the width was
+`SCOUT_EPSILON = 1e-9`. Only from 2 plies left, and only when the window was not already of zero width. A repeat
+cut short by the clock kept the narrow value. Switch: `pvs`.
 
 ## Measured effect
 
@@ -46,6 +46,11 @@ Rust core, `linear_pst_terms`, 100 positions at depth 6 (`scripts/bench/compare_
 games, with `aspiration` (and `tt_move`, `history`): 64.5 %, +104 Elo
 ([catalogue](README.md#how-the-switches-were-judged)).
 
+**SPRT [−5, 0]**, the default set against the same set without `pvs`. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): +18.2 ± 12.1 Elo at 2,200 games, LLR
++2.21 of ±2.94, no verdict when the round robin was stopped (`data/results/roundrobin/abl_pvs/llr.csv`). The
+interval leans to a gain but includes 0.
+
 ## Status
 
-Adopted, on by default; since 2026-10-25.
+Retired, to be taken up again (`efb595e`, 2026-11-09). Adopted on 2026-10-25 before the SPRT existed; its SPRT gave
+no verdict, and the core keeps only switches accepted by one. To take it up again: restore it from `a1bdf60` and run its SPRT to a verdict against the current default ([How a change is measured](../MEASUREMENT.md)).

@@ -75,16 +75,18 @@ whole data (it indexes all 124.9 million positions) and on 20,000 test positions
 The last row is a lower bound (only the positions reached by one more move are searched). It is
 inherent to splitting positions that come from real games: most positions have a neighbour. To see
 whether the neighbours flatter the models, the fixed test sample of 200,000 positions is split into
-the 59.6 % with a neighbour in train and the rest, and each model is judged on both:
+the 59.6 % with a neighbour in train and the rest, and each model is judged on both (measured on the logistic model
+`linear_pst_terms`, retired in `8700e6f`; the networks were not judged this way):
 
 | model | Spearman with a neighbour | Spearman without | MAE with | MAE without |
 |---|---|---|---|---|
 | `linear_pst_terms` | 0.665 | 0.623 | 0.1283 | 0.1372 |
 
-`linear_pst_terms` does better with a neighbour, but it has 791 weights and cannot memorize positions: the
+`linear_pst_terms` did better with a neighbour, but it had 791 weights and could not memorize positions: the
 difference (0.042 in Spearman) comes from the kind of position that has neighbours, which are more ordinary, and
-not from copying. Nothing here suggests that its accuracy is inflated by the split. The training and validation
-losses agree as well (the gap is at most 0.003, `training` section of the model card).
+not from copying. Nothing here suggested that its accuracy was inflated by the split; `net_pst_w32` has 24,641 weights, so the
+check would have to be run again for it (`check_split_leakage.py --models net_pst_w32@e30`, [Training](TRAINING.md)). The training and validation
+losses agreed as well (the gap was at most 0.003, `training` section of the model card).
 
 ## From centipawns to a target
 
@@ -98,7 +100,7 @@ With this curve, +100 centipawns maps to about 0.59 and +900 to about 0.96: the 
 
 Mate positions all share the same target (exactly 1 or 0) whatever the material on the board, and the database holds many of them. By default training keeps 10 % of them (`DEFAULT_MATE_KEEP = 0.10` in `src/chess_lab/models/defaults.py`). The kept set is chosen by a hash of the FEN (`keep_mate_rows`), so it is the same on every run and a smaller share is always a subset of a larger one. The share applies to the train and validation sets.
 
-Evidence: `linear_pst_terms` trained with 10 % of the mates scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1, +156 Elo) in 100 games against the same model trained with all of them (effort 15, 50 openings with colours swapped, 60 s + 1 s per move, Python engine). To train the 100 % variant again:
+Evidence: `linear_pst_terms` trained with 10 % of the mates scored 71.0 % (64 wins, 14 draws, 22 losses; 95 % interval 62.9 to 79.1, +156 Elo) in 100 games against the same model trained with all of them (effort 15, 50 openings with colours swapped, 60 s + 1 s per move, Python engine). The logistic model was retired in `8700e6f`; to train the 100 % variant again, at `a1bdf60`:
 
 ```bash
 python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100

@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know why an iteration is sometimes searched twice.
 >
-> **Next:** [Null move](null-move.md)
+> **Next:** [History heuristic (retired)](history.md)
 
 ## Problem
 
@@ -28,9 +28,9 @@ result that kept falling outside would be searched at most four times, the last 
 
 ## Implementation
 
-`iteration` in `rust/src/search/deepening.rs`, with `ASPIRATION_FROM_DEPTH = 4`, `ASPIRATION_DELTA = 0.02` and
-`ASPIRATION_LIMIT = 0.4`. A repeat cut short by the clock ends the iteration and keeps the last complete result; a
-search outside its window is never stored as exact in the table. Switch: `aspiration`.
+Removed in `efb595e` (2026-11-09) with its switch, its tests and its UCI name; the last version is in `a1bdf60`. It lived in `iteration` in `rust/src/search/deepening.rs`, with `ASPIRATION_FROM_DEPTH = 4`, `ASPIRATION_DELTA = 0.02` and
+`ASPIRATION_LIMIT = 0.4`. A repeat cut short by the clock ended the iteration and kept the last complete result; a
+search outside its window was never stored as exact in the table. Switch: `aspiration`.
 
 ## Measured effect
 
@@ -38,6 +38,11 @@ Rust core, `linear_pst_terms`, 100 positions at depth 6 (`scripts/bench/compare_
 `6162db8`; in the git history): nodes per move 672,800 → 440,213, time 1.86 s → 1.20 s, same move in 100 %. In
 games, with `pvs` (and `tt_move`, `history`): +104 Elo ([catalogue](README.md#how-the-switches-were-judged)).
 
+**SPRT [−5, 0]**, the default set against the same set without `aspiration`. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): +10.7 ± 12.5 Elo at 2,200
+games, LLR +1.37 of ±2.94, no verdict when the round robin was stopped
+(`data/results/roundrobin/abl_aspiration/llr.csv`).
+
 ## Status
 
-Adopted, on by default; since 2026-10-25.
+Retired, to be taken up again (`efb595e`, 2026-11-09). Adopted on 2026-10-25 before the SPRT existed; its SPRT gave
+no verdict, and the core keeps only switches accepted by one. To take it up again: restore it from `a1bdf60` and run its SPRT to a verdict against the current default ([How a change is measured](../MEASUREMENT.md)).

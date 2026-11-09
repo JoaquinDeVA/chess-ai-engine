@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 720" role="img" aria-labelledby="t d">
   <title id="t">Lazy SMP: depths per thread, shared memory and the vote</title>
-  <desc id="d">Top: which depths each of six threads searches between depths 6 and 11; the main thread searches all of them and each helper skips a pattern of depths set by its index. Middle: the transposition table and the history scores are shared by all threads, the killer moves belong to each thread. Bottom: a vote among four threads; the main thread voted e4 with depth 8, helpers 1 and 2 voted d4 with depths 8 and 9, helper 3 voted e4 with depth 8; d4 has weight 1.29 against 0.32 for e4 and is played.</desc>
+  <desc id="d">Top: which depths each of six threads searches between depths 6 and 11; the main thread searches all of them and each helper skips a pattern of depths set by its index. Middle: the transposition table is shared by all threads; the killer moves and the rotation of the root moves belong to each thread. Bottom: a vote among four threads; the main thread voted e4 with depth 8, helpers 1 and 2 voted d4 with depths 8 and 9, helper 3 voted e4 with depth 8; d4 has weight 1.29 against 0.32 for e4 and is played.</desc>
   <style>
     text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #e2e8f0; font-size: 14px; }
     .title { font-size: 18px; font-weight: 700; }
@@ -110,17 +110,14 @@
   <rect class="on" x="330" y="320" width="450" height="64" rx="8"/>
   <text x="555" y="346" text-anchor="middle" class="b">Transposition table (shared)</text>
   <text class="sub" x="555" y="368" text-anchor="middle">lock-free; 32-byte slots, 3 words checked by XOR</text>
-  <rect class="on" x="330" y="394" width="450" height="52" rx="8"/>
-  <text x="555" y="418" text-anchor="middle" class="b">History scores (shared)</text>
-  <text class="sub" x="555" y="436" text-anchor="middle">atomic counters, relaxed ordering</text>
+  <rect class="amber" x="330" y="394" width="450" height="52" rx="8"/>
+  <text x="555" y="418" text-anchor="middle" class="b">Root moves: rotated by the thread's index</text>
+  <text class="sub" x="555" y="436" text-anchor="middle">each helper starts on a different subtree</text>
   <rect class="amber" x="330" y="456" width="450" height="40" rx="8"/>
   <text x="555" y="481" text-anchor="middle" class="b">Killer moves: one set per thread (not shared)</text>
   <path class="line" d="M170 340 L330 352"/>
-  <path class="line" d="M170 340 L330 420"/>
   <path class="line" d="M170 392 L330 352"/>
-  <path class="line" d="M170 392 L330 420"/>
   <path class="line" d="M170 444 L330 352"/>
-  <path class="line" d="M170 444 L330 420"/>
   <text class="title" x="20" y="536">3. The vote (four threads finished an iteration at depth 8 or more)</text>
   <text class="sub b" x="20" y="562">Thread</text>
   <text class="sub b" x="150" y="562">Move</text>

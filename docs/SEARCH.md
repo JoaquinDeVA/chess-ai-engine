@@ -25,7 +25,7 @@ which searches. The binary alone (in fastchess matches) always searches.
 ## Values
 
 Every value is the expected score for the player the search runs for: `1` win, `0.5` draw, `0` loss. Evaluations
-(the logistic models and the network) are clipped to `0.01 .. 0.99`, so an estimate never outranks a real result;
+(the networks) are clipped to `0.01 .. 0.99`, so an estimate never outranks a real result;
 finished games use exact values. A terminal value is nudged by `0.003` per ply from the root
 (`DEPTH_PREFERENCE_EPSILON` in `rust/src/search/options.rs`, `terminal_utility` in `rust/src/search/node.rs`): a
 mate in 2 is worth `0.994` and a mate in 9 `0.973`, so the engine plays the quicker win and, when losing, the slower
@@ -78,16 +78,16 @@ flowchart TD
     C -- yes --> R4["evaluate, mark the search truncated"]
     C -- no --> NM{"null move cuts?"}
     NM -- yes --> R5["return beta"]
-    NM -- no --> O["order moves: table move, killers,<br/>captures by MVV-LVA, quiet moves by history"]
-    O --> L["for each move: play it, search the child<br/>(PVS), take it back"]
+    NM -- no --> O["order moves: table move, killers,<br/>captures by MVV-LVA, other quiet moves"]
+    O --> L["for each move: play it, search the child,<br/>take it back"]
     L --> P{"alpha ≥ beta?"}
-    P -- yes --> K["remember a quiet move as killer and in the history; stop"]
+    P -- yes --> K["remember a quiet move as killer; stop"]
     P -- no --> L
     K --> S["store in the table (not if truncated)"]
     L --> S
 ```
 
-The switched techniques (null move, table move, history, PVS) only act when on; see the
+The switched techniques (null move, table move, static exchange evaluation in quiescence, incremental accumulator) only act when on; see the
 [catalogue](techniques/README.md) for which are on by default and what each one gained.
 
 See also [RESULTS.md](RESULTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md).

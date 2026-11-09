@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know which technique saves the most nodes.
 >
-> **Next:** [History heuristic](history.md)
+> **Next:** [Null move](null-move.md)
 
 ## Problem
 
@@ -40,6 +40,8 @@ Rust core, `linear_pst_terms`, 100 positions at depth 6
 resolved in another order). In games, together with `history`: 63.0 %, +92 Elo against the reference
 (table in the [catalogue](README.md#how-the-switches-were-judged)).
 
+**SPRT [−5, 0]**, the default set of then (`incremental,tt_move,history,pvs,aspiration,null_move,see`) against the same set without `tt_move`. Round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the model then embedded, `linear_pst_terms`; queue `src/chess_lab/scripts/worker/queue.json` at `d2d03ba`): +56.5 ± 18.3 Elo at 1,098 games, LLR +2.96 of ±2.94, **H1 accepted**: removing it loses (`data/results/roundrobin/abl_tt_move/llr.csv`). Measured before `pvs`, `aspiration` and `history` were retired; the set without them has no SPRT of its own yet.
+
 ## Status
 
-Adopted, on by default; since 2026-10-25.
+Adopted, on by default; since 2026-10-25. Kept in the core on 2026-11-09 (`efb595e`): its removal SPRT accepted H1.

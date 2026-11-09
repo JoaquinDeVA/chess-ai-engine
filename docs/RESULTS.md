@@ -13,31 +13,68 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 
 ## The short answer
 
-- **The engine that plays is the Rust UCI binary** with seven search techniques on by default (incremental
-  accumulator, table move, history, PVS, aspiration windows, null move, static exchange evaluation). The first six
-  together scored 76.5 % against the plain search in 100 games ("Search techniques in games" below); the seventh
-  won an SPRT at 20,000 nodes per move (`see_nodes`); each one's own measurement is in the
-  [catalogue](techniques/README.md).
-- **The model that plays is the Piece-square-and-terms logistic model (`linear_pst_terms`)**, trained on quiet
-  positions only (effort 10): it beat the same model trained on every
-  position by +284 ± 43 Elo in 362 games at 60 s + 1 s (`quiet_vs_actual` below).
-- **The networks are not measured yet**: the candidates of [Models](MODELS.md) are registered but not trained.
+- **The engine that plays is the Rust UCI binary** with four search techniques on by default: incremental
+  accumulator, table move, null move and static exchange evaluation. Each one won an SPRT against the set without
+  it (+35.5 to +97.4 Elo, "Round robin" below). Five others (`pvs`, `aspiration`, `history`, `history_malus`,
+  `qs_tt`) reached no verdict and were retired in `efb595e` ([catalogue](techniques/README.md)).
+- **The model that plays is the Piece-square network, width 32 (`net_pst_w32`)**, embedded in the binary since
+  `8700e6f`. It beat the Piece-square-and-terms logistic model (`linear_pst_terms@e30`), which played before it,
+  by +165.1 ± 32.9 Elo (SPRT [0, 5], 504 games at 10 s + 0.1 s). The logistic model was retired.
+- **More accurate is not stronger**: the hybrid networks, with the classical terms as inputs, have a higher
+  Spearman (0.702 to 0.722 against 0.693) but search about half the nodes per second and lose
+  (`net_hybrid_w32` against `net_pst_w32`, −105.5 ± 25.5 Elo, H0); see [Models](MODELS.md).
 
 ## Measured and estimated
 
 | Claim | How it is known | Engine | Strength of the evidence |
 |---|---|---|---|
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
-| The default techniques make the engine stronger | 100 games at 4 s + 0.05 s against the plain search, 76.5 % | Rust core through Python | Measured, one match; per technique only node counts and short matches ([catalogue](techniques/README.md)) |
-| Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted (next section) |
-| Static exchange evaluation makes the engine stronger | SPRT [0, 5] of 1,188 games at 20,000 nodes per move: 58.04 %, +56.4 ± 17.5 Elo | Rust | Measured; H1 accepted at fixed nodes, not yet confirmed at a time control |
+| Each of the four default techniques makes the engine stronger | SPRT [−5, 0] removing it from the default set of then, 710 to 1,690 games at 10 s + 0.1 s ("Round robin" below) | Rust | Measured; H1 accepted for each. The set of four has no SPRT against the set of seven |
+| `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 2.21); retired |
+| The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted. At 10 min + 5 s: pending |
+| Adding the classical terms to the network makes it weaker | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Measured; H0 accepted, but it mixes quality and speed (the hybrids have no accumulator). At fixed nodes: pending |
+| Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |
-| Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo | Rust | Measured; H1 accepted |
+| Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo (logistic model) | Rust | Measured; H1 accepted |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |
+
+## Round robin (Rust engine, fastchess)
+
+From 2026-11-06 to 2026-11-09 the compute node played every job of `src/chess_lab/scripts/worker/queue.json` at
+`d2d03ba` in turns (`src/chess_lab/scripts/worker/roundrobin.py`): 10 s + 0.1 s, `Hash` 16, one thread, the 10,000
+openings of `data/openings/openings.epd`, LLR bounds ±2.94. Technique jobs used the default set of then
+(`incremental,tt_move,history,pvs,aspiration,null_move,see`) and `linear_pst_terms`; `abl_` removes one switch from
+it (A is the full set, so a positive Elo is what the switch gains), `add_` adds one. Model jobs used the default
+techniques. It was stopped on 2026-11-09 with jobs still running; their figures are the last report. Files:
+`data/results/roundrobin/<job>/llr.csv`.
+
+| job | A against B | SPRT | games | Elo (95 %) | LLR | verdict |
+|---|---|---|---|---|---|---|
+| `abl_null_move` | default against default without `null_move` | [−5, 0] | 710 | +97.4 ± 24.5 | +2.95 | H1: keep |
+| `abl_see` | default against default without `see` | [−5, 0] | 992 | +64.5 ± 19.5 | +2.96 | H1: keep |
+| `abl_tt_move` | default against default without `tt_move` | [−5, 0] | 1,098 | +56.5 ± 18.3 | +2.96 | H1: keep |
+| `abl_incremental` | default against default without `incremental` | [−5, 0] | 1,690 | +35.5 ± 14.7 | +2.96 | H1: keep |
+| `abl_pvs` | default against default without `pvs` | [−5, 0] | 2,200 | +18.2 ± 12.1 | +2.21 | no verdict; retired |
+| `abl_history` | default against default without `history` | [−5, 0] | 2,200 | +17.5 ± 12.4 | +2.09 | no verdict; retired |
+| `abl_aspiration` | default against default without `aspiration` | [−5, 0] | 2,200 | +10.7 ± 12.5 | +1.37 | no verdict; retired |
+| `add_history_malus` | default + `history_malus` against default | [−5, 0] | 2,200 | +9.2 ± 12.0 | +1.24 | no verdict; retired |
+| `add_qs_tt` | default + `qs_tt` against default | [−5, 0] | 2,134 | −0.3 ± 12.5 | +0.19 | no verdict; retired |
+| `model_net_vs_linear` | `net_pst_w32` against `linear_pst_terms@e30` | [0, 5] | 504 | +165.1 ± 32.9 | +2.95 | H1: stronger |
+| `best_net_hybrid_w64_vs_linear` | `net_hybrid_w64` against `linear_pst_terms@e30` | [0, 5] | 888 | +82.1 ± 22.2 | +2.95 | H1: stronger |
+| `best_net_hybrid_k4_w64_vs_linear` | `net_hybrid_k4_w64` against `linear_pst_terms@e30` | [0, 5] | 900 | +78.9 ± 21.6 | +2.95 | H1: stronger |
+| `model_terms_in_net` | `net_hybrid_w32` against `net_pst_w32` | [0, 5] | 672 | −105.5 ± 25.5 | −2.97 | H0: weaker |
+| `model_width_64_vs_32` | `net_hybrid_w64` against `net_hybrid_w32` | [0, 5] | 1,612 | +44.0 ± 15.9 | +2.95 | H1: stronger |
+| `model_buckets_k4` | `net_hybrid_k4_w64` against `net_hybrid_w64` | [0, 5] | 1,800 | −2.5 ± 15.0 | −0.39 | no verdict |
+| `model_buckets_k8_vs_k4` | `net_hybrid_k8_w64` against `net_hybrid_k4_w64` | [0, 5] | 1,800 | −24.4 ± 14.9 | −2.14 | no verdict |
+| `model_linear_e30_vs_shipped` | `linear_pst_terms@e30` against `linear_pst_terms` | [0, 5] | 1,800 | +2.1 ± 12.1 | +0.02 | no verdict |
+
+Two more jobs were queued on 2026-11-09 (`queue.json` at `a1bdf60`), results pending: `model_net_vs_linear_10min`,
+the network against the logistic model at 10 min + 5 s, and `model_terms_in_net_nodes`, `net_hybrid_w64` against
+`net_pst_w32` at a fixed 250,000 nodes per move.
 
 ## Engine matches (Rust engine, fastchess)
 
-Matches of the UCI binary against itself, one change at a time, as explained in
+Earlier matches of the UCI binary against itself, one change at a time, as explained in
 [How a change is measured](MEASUREMENT.md). Logs in `data/results/matches/<name>/match.log`.
 
 | match | A against B | conditions | games | score | Elo (95 %) | LLR | verdict |
@@ -66,13 +103,13 @@ Matches of the UCI binary against itself, one change at a time, as explained in
 
 | Judge | What it measures | Command |
 |---|---|---|
-| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model linear_pst_terms` |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_w32@e30` |
 | Match | Games of the UCI binary against itself with fastchess, Elo with a 95 % interval | [Measurement](MEASUREMENT.md) |
 
 ## Search techniques in games
 
-The Rust engine reaches 2 to 3 plies more than the Python one in the same time ([The search in Rust](techniques/rust-core.md)). The six default techniques
-([search techniques](techniques/README.md)) scored 76.5 % against the plain search with the same model in 100
+The Rust engine reaches 2 to 3 plies more than the Python one in the same time ([The search in Rust](techniques/rust-core.md)). The six techniques on by default before
+`see` ([search techniques](techniques/README.md)) scored 76.5 % against the plain search with the same model in 100
 games at 4 s + 0.05 s, reaching 5.54 plies against 4.68 (`scripts/bench/compare_engine_versions.py --candidate
 incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`, removed in `6162db8`).
 
@@ -80,8 +117,8 @@ incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --in
 
 | Question | Answer | Where it comes from |
 |---|---|---|
-| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, Python engine). Keeping 0.5 % instead did not differ beyond the error (−44 ± 36 Elo, `q_m05_vs_quiet`). | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100` and a match against the default model |
-| Train on quiet positions only? | Yes: +284 ± 43 Elo against the all-positions model (362 games, SPRT [0, 5] accepted). Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not differ from it beyond the error (−7 ± 35, −44 ± 36, +23 ± 41 Elo). | `data/results/matches/quiet_vs_actual/match.log`, `q_k65_vs_quiet`, `q_m05_vs_quiet`, `q30_vs_quiet`; [Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms) |
+| Keep every mate position in training? | No: 10 % of them. `linear_pst_terms` trained that way scored 71.0 % against 29.0 % for the all-mates version (100 games, effort 15, 60 s + 1 s, Python engine). Keeping 0.5 % instead did not differ beyond the error (−44 ± 36 Elo, `q_m05_vs_quiet`). | `DEFAULT_MATE_KEEP = 0.10`; `python -m chess_lab.training.train --model linear_pst_terms --effort 15 --mate-keep 1.0 --tag mates100` (at `a1bdf60`, before the logistic model was retired) and a match against the default model |
+| Train on quiet positions only? | Yes: +284 ± 43 Elo against the all-positions model (362 games, SPRT [0, 5] accepted). Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not differ from it beyond the error (−7 ± 35, −44 ± 36, +23 ± 41 Elo). | `data/results/matches/quiet_vs_actual/match.log`, `q_k65_vs_quiet`, `q_m05_vs_quiet`, `q30_vs_quiet`; [Models](MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms-retired) |
 | Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` (removed in `6162db8`); [Quiescence](techniques/quiescence.md) |
 | Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `scripts/bench/compare_time_estimators.py` (removed in `6162db8`); [Iterative deepening](techniques/iterative-deepening.md) |
 | Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5` (removed in `6162db8`); [Endgame tablebases](techniques/endgame-tablebases.md) |
@@ -106,13 +143,13 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
-| `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.9 |
-| `linear_pst_terms` | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
 | `net_hybrid_k4_w64` | 198,145 | winprob-k0.00368-stm-quiet | 30 | 0.722 | 0.110 | 22.0% / 56.8% | 3.8 |
 | `net_hybrid_k8_w64` | 394,753 | winprob-k0.00368-stm-quiet | 30 | 0.719 | 0.111 | 21.9% / 56.5% | 3.9 |
 | `net_hybrid_w32` | 25,345 | winprob-k0.00368-stm-quiet | 30 | 0.702 | 0.115 | 21.4% / 56.2% | 3.4 |
 | `net_hybrid_w64` | 50,689 | winprob-k0.00368-stm-quiet | 30 | 0.718 | 0.111 | 21.7% / 56.5% | 3.8 |
 | `net_pst_w32` | 24,641 | winprob-k0.00368-stm-quiet | 30 | 0.693 | 0.118 | 21.3% / 56.2% | 2.4 |
+| `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.9 |
+| `linear_pst_terms` (retired) | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
 <!-- END GENERATED TABLES -->
 
 ## Reproduce

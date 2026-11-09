@@ -1,8 +1,7 @@
 # Chess AI Engine
 
 A chess engine with an alpha-beta search written in Rust and played through UCI. It asks an evaluation
-function how good each position is: a hand-written heuristic, a logistic model or a small neural network
-trained to imitate Stockfish on 125 million positions of the Lichess evaluation database. A Python window
+function how good each position is: a small neural network (NNUE) trained to imitate Stockfish on 125 million positions of the Lichess evaluation database. A Python window
 plays against it, and a Python laboratory holds the rest of the experiment: the data pipeline, the training
 and the measurements, with the commands that reproduce them.
 
@@ -14,14 +13,16 @@ and the measurements, with the commands that reproduce them.
 Every figure and its command are in [Results](docs/RESULTS.md#the-short-answer).
 
 - **Search.** Moving the search to Rust made it 8 to 35 times faster to a given depth
-  ([the search in Rust](docs/techniques/rust-core.md)). Six pruning and ordering techniques on top of it scored
-  76.5 % (+205 Elo) against the plain search; a seventh, static exchange evaluation, won an SPRT at a fixed node count (+56 ± 17 Elo) ([search techniques](docs/techniques/README.md)).
+  ([the search in Rust](docs/techniques/rust-core.md)). Four techniques on top of it each won an SPRT against the
+  search without them (null move +97, static exchange evaluation +64, table move first +57, incremental accumulator
+  +35 Elo); five others reached no verdict and were retired ([search techniques](docs/techniques/README.md)).
 - **Measurement.** Changes are kept or dropped by SPRT matches with fastchess
   ([how a change is measured](docs/MEASUREMENT.md)). Late move reductions searched deeper but lost 8.6 ± 6.1 Elo
   over 10,244 games, so they are off.
-- **Evaluation.** The engine plays with the **Piece-square-and-terms logistic model** (`linear_pst_terms`, 791
-  parameters, trained on quiet positions only: +284 Elo over the all-positions version), the strongest evaluation measured so far. Small networks are
-  registered as candidates and not trained yet ([Models](docs/MODELS.md)).
+- **Evaluation.** The engine plays with the **Piece-square network, width 32** (`net_pst_w32`, 24,641 parameters,
+  768 → 32 → 1, trained on 30 M quiet positions). It beat the Piece-square-and-terms logistic model
+  (`linear_pst_terms`) that played before it by +165 ± 33 Elo, so the logistic model was retired. Networks with the
+  classical chess terms as extra inputs are more accurate but slower, and lost ([Models](docs/MODELS.md)).
 
 ## Where to read
 
@@ -61,12 +62,12 @@ It lists its options and plays a move; the depth, nodes and move depend on the m
 id name chess_core
 option name Hash type spin default 64 min 1 max 65536
 option name Threads type spin default 1 min 1 max 64
-option name Model type string default linear_pst_terms
-option name Techniques type string default incremental,tt_move,history,pvs,aspiration,null_move,see
+option name Model type string default net_pst_w32
+option name Techniques type string default incremental,tt_move,null_move,see
 uciok
 readyok
-info depth 7 nodes 287757 time 788
-bestmove g1f3
+info depth 7 nodes 816941 time 1000
+bestmove e2e4
 ```
 
 Then `python main.py` opens the window, where you choose who plays each colour, the time control and,
@@ -77,7 +78,7 @@ binary too. `pip install -e ".[ml,data]"` adds Keras and the data tools for trai
 
 ## Status
 
-- Working: the Rust search with seven techniques on, the UCI binary, the window, the training and measurement
+- Working: the Rust search with four techniques on, the UCI binary, the window, the training and measurement
   pipeline (`DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` prints every command without running it).
 - Engine matches are played with fastchess on a separate machine ([Measurement](docs/MEASUREMENT.md)); the model
   tournaments in [Results](docs/RESULTS.md) predate the Rust engine and are kept as history.

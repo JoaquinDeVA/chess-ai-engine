@@ -93,8 +93,10 @@ piece-square inputs once per king bucket of the side to move (the bucket follows
 
 **Implementation.** `NnHybridW32Model`, `NnHybridW64Model`, `NnHybridK4W64Model` and `NnHybridK8W64Model` in
 `src/chess_lab/models/definitions.py`; the `pst_hybrid`, `pst_hybrid_k4` and `pst_hybrid_k8` feature sets in
-`src/chess_lab/models/features.py` and `rust/src/eval/sparse_features.rs`. `rust/src/eval/sparse_net.rs` has no
-accumulator for them (only the slotted piece-square set has one), so it sums the whole first layer at every leaf.
+`src/chess_lab/models/features.py` and `rust/src/eval/sparse_features.rs`. Since the general accumulator
+([incremental](techniques/incremental.md#how-it-works)) the piece part is updated move by move, with a rebuild when the
+king changes bucket, and the 22 term inputs are computed at every leaf; until then the whole first layer was summed at
+every leaf, and the SPRTs below are from that time.
 
 **Measured effect.** Accuracy, all trained at effort 30 on quiet positions and measured on the same laptop on 200,000
 validation rows (`python -m chess_lab.measure.evaluate --model <id>`; the table in [Results](RESULTS.md#model-table)
@@ -125,12 +127,12 @@ Chained through these results, `net_pst_w32` is ahead of `net_hybrid_w64` by +61
 inflated, because an SPRT stops early on a lucky streak.
 
 The hybrids are more accurate but play worse, and at a fixed time the two cannot be told apart: they search about
-half the nodes per second of `net_pst_w32`, partly because the terms cost and partly because they have no
-accumulator. An SPRT at a fixed 250,000 nodes per move, `net_hybrid_w64` against `net_pst_w32` (which removes speed
+half the nodes per second of `net_pst_w32`, partly because the terms cost and partly because they had no
+accumulator then (with it, `net_hybrid_w64` goes from 521,915 to 635,828 nodes/s in `uci bench 5`). An SPRT at a fixed 250,000 nodes per move, `net_hybrid_w64` against `net_pst_w32` (which removes speed
 from the comparison), was queued on 2026-11-09 (`model_terms_in_net_nodes` in
 `src/chess_lab/scripts/worker/queue.json`); result pending.
 
-**Status.** Trained, not the default. Kept to be measured again once they have an accumulator.
+**Status.** Trained, not the default. They have an accumulator since 2026-11-09; their SPRT with it is pending.
 
 ## Piece-square-and-terms logistic model (`linear_pst_terms`): retired
 

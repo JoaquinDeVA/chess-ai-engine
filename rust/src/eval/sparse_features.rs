@@ -8,6 +8,8 @@ use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 /// Phase of the start position (sum of the phase weights of all pieces).
 const MAX_PHASE: usize = 24;
 const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
+/// Inputs of one king bucket: one per piece, colour and square.
+pub const PIECE_INPUTS: usize = 2 * OPPONENT_PIECE_BLOCK;
 const TERM_COUNT: usize = 11;
 const PAWN_SCALE: f64 = 4.0;
 const MOBILITY_SCALE: f64 = 10.0;
@@ -46,10 +48,38 @@ impl FeatureSet {
     /// Number of inputs.
     pub fn size(self) -> usize {
         match self {
-            FeatureSet::Slotted => 2 * OPPONENT_PIECE_BLOCK,
+            FeatureSet::Slotted => PIECE_INPUTS,
             FeatureSet::Hybrid { file_groups } => {
-                buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK + 2 * TERM_COUNT
+                buckets(file_groups) * PIECE_INPUTS + 2 * TERM_COUNT
             }
+        }
+    }
+
+    /// Bucket of the inputs when `owner` moves with its king on `king` (always 0 without buckets).
+    pub fn king_bucket(self, owner: Color, king: Square) -> usize {
+        let FeatureSet::Hybrid { file_groups } = self else {
+            return 0;
+        };
+        let king = if owner == Color::Black {
+            mirror(king)
+        } else {
+            u32::from(king) as usize
+        };
+        match 8usize.checked_div(file_groups) {
+            None => 0,
+            Some(width) => 2 * ((king % 8) / width) + usize::from(king / 8 >= 2),
+        }
+    }
+
+    /// Whether the set has inputs that are not single pieces (the classical terms).
+    pub fn has_terms(self) -> bool {
+        matches!(self, FeatureSet::Hybrid { .. })
+    }
+
+    /// The inputs that are not single pieces (the classical terms), appended to the vectors.
+    pub fn term_inputs(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+        if let FeatureSet::Hybrid { file_groups } = self {
+            terms(pos, buckets(file_groups) * PIECE_INPUTS, indices, values);
         }
     }
 
@@ -265,23 +295,10 @@ fn hybrid(pos: &Chess, file_groups: usize, indices: &mut Vec<usize>, values: &mu
     slotted(pos, indices, values);
     let owner = pos.turn();
     let king = pos.board().king_of(owner).expect("a king per side");
-    let king = if owner == Color::Black {
-        mirror(king)
-    } else {
-        u32::from(king) as usize
-    };
-    let bucket = match 8usize.checked_div(file_groups) {
-        None => 0,
-        Some(width) => 2 * ((king % 8) / width) + usize::from(king / 8 >= 2),
-    };
-    let shift = bucket * 2 * OPPONENT_PIECE_BLOCK;
+    let set = FeatureSet::Hybrid { file_groups };
+    let shift = set.king_bucket(owner, king) * PIECE_INPUTS;
     for index in indices.iter_mut() {
         *index += shift;
     }
-    terms(
-        pos,
-        buckets(file_groups) * 2 * OPPONENT_PIECE_BLOCK,
-        indices,
-        values,
-    );
+    set.term_inputs(pos, indices, values);
 }

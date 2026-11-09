@@ -54,7 +54,7 @@ impl Search<'_> {
     /// Play `m` in the game state and in the incremental evaluation.
     fn play(&mut self, m: Move) {
         if let Some(state) = &mut self.incremental {
-            state.apply(self.state.turn(), &m);
+            state.apply(self.state.pos(), &m);
         }
         self.state.apply(m);
     }

@@ -28,8 +28,8 @@ pub trait Evaluator: Send + Sync {
 /// `evaluate` for the position it is in; the result equals the evaluator's own `evaluate` up to
 /// rounding.
 pub trait EvalState {
-    /// `mover` plays `m`.
-    fn apply(&mut self, mover: Color, m: &Move);
+    /// The side to move in `pos` (the position before the move) plays `m`.
+    fn apply(&mut self, pos: &Chess, m: &Move);
     /// The side to move passes (a null move).
     fn apply_null(&mut self);
     /// Take back the last move played with `apply` or `apply_null`.

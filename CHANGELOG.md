@@ -5,11 +5,12 @@ All notable changes. The newest are first.
 ## Unreleased
 
 ### Removed
-- The switches `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt`, with their UCI values and tests (`efb595e`): in the round robin at 10 s + 0.1 s none reached a verdict in about 1,100 rounds (removing `pvs` +18.2 ± 12.1, `history` +17.5 ± 12.4, `aspiration` +10.7 ± 12.5; adding `history_malus` +9.2 ± 12.0, `qs_tt` −0.3 ± 12.5). The search keeps only the switches with an accepted SPRT: `incremental`, `tt_move`, `null_move`, `see`. Each page keeps its results as "retired, to be taken up again" ([Search techniques](docs/techniques/README.md#retired-to-be-taken-up-again)).
+- The switches `aspiration`, `history_malus` and `qs_tt`, with their UCI values and tests (`efb595e`): in the round robin at 10 s + 0.1 s none reached a verdict in about 1,100 rounds (removing `aspiration` +10.7 ± 12.5; adding `history_malus` +9.2 ± 12.0, `qs_tt` −0.3 ± 12.5). The search has four switches: `incremental`, `tt_move`, `null_move`, `see`. Each page keeps its results as "retired, to be taken up again" ([Search techniques](docs/techniques/README.md#retired-to-be-taken-up-again)).
 - The logistic models (`linear_pst_terms`, `linear_pst`) from the core and the laboratory, and the `Kings` feature set (`8700e6f`); the last commit that plays them is `a1bdf60`. Its card stays, with status `retired` ([Models](docs/MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms-retired)).
 - The switches `lmr`, `qs_evasions` and the UCI option `TimeRules`, all measured and rejected ([Search techniques](docs/techniques/README.md#how-the-switches-were-judged)).
 
 ### Added
+- [`pvs`](docs/techniques/pvs.md) and [`history`](docs/techniques/history.md) are part of the core, with no switch (`70701f7`). Their SPRTs [−5, 0] (`abl_pvs`, `abl_history`) continue in the round robin from LLR +2.21 and +2.09.
 - The `pst_k4` feature set (piece squares in 4 king buckets, without the classical terms) and its network, King-bucket piece-square network (`net_pst_k4_w64`), registered and not trained ([Models](docs/MODELS.md#king-bucket-piece-square-network-net_pst_k4_w64)).
 - Round robin of SPRTs on the compute node (fastchess, 10 s + 0.1 s, 2026-11-06 to 2026-11-09): the removal of each default technique and the models in steps; 17 jobs in [Results](docs/RESULTS.md#round-robin-rust-engine-fastchess). Removing `null_move` (−97.4 ± 24.5), `see`, `tt_move` or `incremental` loses; `net_pst_w32` beats `linear_pst_terms@e30` by +165.1 ± 32.9; the hybrid networks, without an incremental accumulator, lose to it.
 - The worker installs each engine build in its own path (`bin/<hash>/uci`) and each queue job names its binary, so a long SPRT keeps its build (`a1bdf60`).

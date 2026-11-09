@@ -35,9 +35,9 @@ three moves were narrow searches; one needed a repeat.
 
 ## Implementation
 
-Removed in `efb595e` (2026-11-09) with its switch, its tests and its UCI name; the last version is in `a1bdf60`. It lived in `child_value` in `rust/src/search/node.rs`. Values are continuous probabilities, so the width was
-`SCOUT_EPSILON = 1e-9`. Only from 2 plies left, and only when the window was not already of zero width. A repeat
-cut short by the clock kept the narrow value. Switch: `pvs`.
+Always on, with no switch (`70701f7`). It lives in `child_value` in `rust/src/search/node.rs`. Values are continuous probabilities, so the width is
+`SCOUT_EPSILON = 1e-9`. Only from 2 plies left, and only when the window is not already of zero width. A repeat
+cut short by the clock keeps the narrow value.
 
 ## Measured effect
 
@@ -52,5 +52,4 @@ interval leans to a gain but includes 0.
 
 ## Status
 
-Retired, to be taken up again (`efb595e`, 2026-11-09). Adopted on 2026-10-25 before the SPRT existed; its SPRT gave
-no verdict, and the core keeps only switches accepted by one. To take it up again: restore it from `a1bdf60` and run its SPRT to a verdict against the current default ([How a change is measured](../MEASUREMENT.md)).
+In the core (`70701f7`). Its SPRT `abl_pvs` [−5, 0] continues from the LLR +2.21 above, against the same set without `pvs`, with the binary of `3719da0`; verdict pending ([How a change is measured](../MEASUREMENT.md)).

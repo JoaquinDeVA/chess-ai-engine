@@ -23,8 +23,12 @@ removing it from the default set of then, SPRT [−5, 0], in the round robin of 
 | Null move (`null_move`) | +97.4 ± 24.5 Elo, 710 games, H1 | [null-move](null-move.md) |
 | Static exchange evaluation (`see`) | +64.5 ± 19.5 Elo, 992 games, H1 | [see](see.md) |
 
-The SPRTs were run while `pvs`, `aspiration` and `history` were still in the set; the set of four has no SPRT of its
-own against the set of seven yet.
+`pvs` and `history` are always on, with no switch (`70701f7`); their SPRTs are running and continue from the earlier LLR:
+
+| Technique | Removal SPRT [−5, 0] | Page |
+|---|---|---|
+| Principal variation search | LLR +2.21 of ±2.94 so far (`abl_pvs`) | [pvs](pvs.md) |
+| History heuristic | LLR +2.09 of ±2.94 so far (`abl_history`) | [history](history.md) |
 
 ## The base: always on, no SPRT of its own
 
@@ -47,15 +51,13 @@ what was measured (nodes, speed, positions solved).
 ## Retired, to be taken up again
 
 Removed from the code in `efb595e` (2026-11-09) because the round robin did not prove them: none reached a verdict
-before it was stopped. The last version of each is in `a1bdf60`; its page keeps the measurements and says how to
+before it was stopped (`pvs` and `history` came back in `70701f7`). The last version of each is in `a1bdf60`; its page keeps the measurements and says how to
 take it up again. Same conditions as the core table; `abl_` jobs remove the switch from the set of then, `add_` jobs
 add it.
 
 | Technique | Round-robin SPRT [−5, 0] | Page |
 |---|---|---|
-| Principal variation search (`pvs`) | +18.2 ± 12.1 Elo, 2,200 games, LLR 2.21, no verdict (`abl_pvs`) | [pvs](pvs.md) |
 | Aspiration windows (`aspiration`) | +10.7 ± 12.5 Elo, 2,200 games, LLR 1.37, no verdict (`abl_aspiration`) | [aspiration](aspiration.md) |
-| History heuristic (`history`) | +17.5 ± 12.4 Elo, 2,200 games, LLR 2.09, no verdict (`abl_history`) | [history](history.md) |
 | History malus (`history_malus`) | +9.2 ± 12.0 Elo, 2,200 games, LLR 1.24, no verdict (`add_history_malus`) | [history-malus](history-malus.md) |
 | Quiescence with the table (`qs_tt`) | −0.3 ± 12.5 Elo, 2,134 games, LLR 0.19, no verdict (`add_qs_tt`) | [qs-tt](qs-tt.md) |
 

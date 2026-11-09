@@ -28,8 +28,8 @@ In a later node the quiet moves `h3`, `a3`, `Rd1` (generation order) are tried a
 
 ## Implementation
 
-Removed in `efb595e` (2026-11-09) with its switch, its tests and its UCI name; the last version is in `a1bdf60`. It lived in `History` in `rust/src/search/ordering.rs` (`reward`, `score`), indexed by colour and `move_id`, and `order`
-used it. The counts lived for the whole game, like the table, and were cleared on `ucinewgame`. Switch: `history`.
+Always on, with no switch (`70701f7`). It lives in `History` in `rust/src/search/ordering.rs` (`reward`, `score`), indexed by colour and `move_id`, and `order`
+uses it. The counts live for the whole game, like the table, and are cleared on `ucinewgame`.
 Killer moves never depended on it.
 
 ## Measured effect
@@ -43,6 +43,4 @@ LLR +2.09 of ±2.94, no verdict when the round robin was stopped (`data/results/
 
 ## Status
 
-Retired, to be taken up again (`efb595e`, 2026-11-09), together with its [malus](history-malus.md). Adopted on
-2026-10-25 before the SPRT existed; its SPRT gave no verdict, and the core keeps only switches accepted by one.
-To take it up again: restore it from `a1bdf60` and run its SPRT to a verdict against the current default ([How a change is measured](../MEASUREMENT.md)).
+In the core (`70701f7`); its [malus](history-malus.md) stays retired. Its SPRT `abl_history` [−5, 0] continues from the LLR +2.09 above, against the same set without `history`, with the binary of `3719da0`; verdict pending ([How a change is measured](../MEASUREMENT.md)).

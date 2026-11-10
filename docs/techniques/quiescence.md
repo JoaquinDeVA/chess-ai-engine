@@ -22,8 +22,10 @@ for a few more plies until the position is quiet.
 At `depth_remaining = 0` the node becomes a quiescence node:
 
 1. The static evaluation is the *stand-pat* value. If it already reaches `beta`, return it (cut).
-2. Otherwise raise `alpha` to it, and try each capture and promotion, with alpha-beta, one ply less of
-   quiescence each time.
+2. Otherwise raise `alpha` to it, and try each capture and promotion, the most valuable first, with alpha-beta,
+   one ply less of quiescence each time. The order is `noisy_score` (`rust/src/search/ordering.rs`): ten times what
+   the move wins (the victim plus what a pawn gains by promoting) minus the attacker, so `PxQ` is 49, `NxR` 38 and
+   queening without capture 39. With `see`, a capture that loses material is skipped when its turn comes.
 3. After 4 plies of quiescence the position is scored statically whatever is left.
 
 **Worked example.** Values in pawns for White, for readability. White's last move at depth 0 is `Qxd5`,
@@ -59,6 +61,13 @@ report `data/results/reports/QUIESCENCE.md`). Agreement is the share of position
 Paired differences: +0.047 for `h1` and +0.096 for `linear_pst_terms`, standard error 0.015 each. The price
 is 2.5 to 3.6 times the nodes at the same depth.
 
+Order of the moves (2026-11-10): before it, the captures were tried in the order the generator lists them (pawns,
+knights, ..., each from the lowest square), so `NxP` could be searched before the `PxQ` that cuts the node. Over
+the 20 positions of `rust/bench/middlegame.epd` at depth 9, one thread (`uci ttd 9 rust/bench/middlegame.epd`), the
+nodes went from 113,050,947 to 107,372,423 (-5.0 %), the share of quiescence nodes from 22.0 % to 19.3 %, and the
+time by about 1 % (nodes per second 1.29 M to 1.24 M, two alternating pairs: the sort costs per node). The value
+at a fixed depth is the same (`same_value_as_the_reference`, `rust/tests/techniques.rs`).
+
 ## Status
 
-Adopted; on since 2026-10-17 (`40571a4`).
+Adopted; on since 2026-10-17 (`40571a4`). Ordered by gain since 2026-11-10.

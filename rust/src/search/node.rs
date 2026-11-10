@@ -6,9 +6,9 @@ use shakmaty::{Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
+use super::ordering::{move_to_front, order, order_noisy, see_ge, MAX_KILLERS_PER_DEPTH};
 use super::tt::Flag;
-use crate::board::{is_noisy, move_id, ordered_moves, GameState};
+use crate::board::{move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
 
 /// The null move is tried from this depth on.
@@ -382,7 +382,7 @@ impl Search<'_> {
             return best_value;
         }
         let see = self.options.techniques.see;
-        for action in moves.into_iter().filter(is_noisy) {
+        for action in order_noisy(&moves) {
             if see && !see_ge(self.state.pos(), &action, 0) {
                 continue;
             }

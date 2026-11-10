@@ -39,6 +39,13 @@ On by default but not yet judged by an SPRT (queued for the compute node).
 | Late move reductions (`lmr`) | `ttd 11`: −68 % nodes, 23.53 s to 10.82 s; screening 51.33 % in 300 games | [lmr](lmr.md) |
 | Reverse futility pruning (`rfp`) | `ttd 11` with `lmr`: −33.7 % nodes, 11.13 s to 8.58 s median | [rfp](rfp.md) |
 
+**Implemented, off by default**, also waiting for their SPRT:
+
+| Technique | Evidence so far | Page |
+|---|---|---|
+| Futility pruning (`futility`) | `ttd 11` with `lmr`, `rfp`: −32.8 % nodes, 8.65 s to 6.96 s median | [futility](futility.md) |
+| Late move pruning (`lmp`) | same set: −69.3 % nodes, 8.65 s to 3.91 s median | [lmp](lmp.md) |
+
 ## The base: always on, no SPRT of its own
 
 These are part of the search itself rather than switches, so they were never removed in a match. Their pages give
@@ -83,7 +90,6 @@ add it.
 
 | Technique | Status |
 |---|---|
-| Futility pruning | idea; not implemented |
 | Razoring | idea; not implemented |
 | Check extensions | idea; not implemented |
 | Using the increment in the clock | pending: the UCI binary ignores `winc`/`binc` |

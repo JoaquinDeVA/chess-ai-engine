@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know how the search skips nodes that are clearly won or lost for the side to move.
 >
-> **Next:** [Search techniques](README.md)
+> **Next:** [Futility pruning](futility.md)
 
 ## Problem
 

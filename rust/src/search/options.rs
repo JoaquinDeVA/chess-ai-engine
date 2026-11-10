@@ -49,6 +49,12 @@ pub struct Techniques {
     /// Reverse futility pruning: a node whose static value is far beyond the bound, at a shallow
     /// depth, returns that value without searching.
     pub rfp: bool,
+    /// Futility pruning: at a shallow depth, skip the quiet moves when the static value plus a
+    /// margin cannot reach the best value so far.
+    pub futility: bool,
+    /// Late move pruning: at a shallow depth, skip the quiet moves beyond a count that grows with
+    /// the depth.
+    pub lmp: bool,
 }
 
 impl Techniques {
@@ -67,6 +73,8 @@ impl Techniques {
                 "see" => techniques.see = true,
                 "lmr" => techniques.lmr = true,
                 "rfp" => techniques.rfp = true,
+                "futility" => techniques.futility = true,
+                "lmp" => techniques.lmp = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -87,6 +95,8 @@ impl Techniques {
             see: true,
             lmr: true,
             rfp: true,
+            futility: true,
+            lmp: true,
         }
     }
 }

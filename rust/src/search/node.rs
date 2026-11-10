@@ -32,6 +32,17 @@ pub(super) fn log_odds(p: f64) -> f64 {
     (p / (1.0 - p)).ln()
 }
 
+/// Futility pruning and late move pruning work up to this depth. The futility margin is
+/// `FUTILITY_MARGIN_PER_PLY` log-odds per ply left (120 centipawns on the usual logistic scale,
+/// `120 · ln 10 / 400`); late move pruning skips the quiet moves from the `3 + depth²`-th on.
+const SHALLOW_UP_TO_DEPTH: i32 = 3;
+const FUTILITY_MARGIN_PER_PLY: f64 = 0.69;
+
+/// Quiet moves a node of `depth_remaining` plies tries before late move pruning skips the rest.
+pub(super) fn late_move_limit(depth_remaining: i32) -> usize {
+    3 + (depth_remaining * depth_remaining) as usize
+}
+
 /// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
 /// the history says the move has cut before, and never so many that the search falls below one ply.
 pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) -> i32 {
@@ -354,6 +365,11 @@ impl Search<'_> {
                 }
             }
         }
+        // Shallow pruning of the quiet moves: not in check, bounds outside the mate range.
+        let shallow =
+            !in_check && depth_remaining <= SHALLOW_UP_TO_DEPTH && alpha > 0.01 && beta < 0.99;
+        let futility_static =
+            (shallow && self.options.techniques.futility).then(|| self.static_value());
         let mut best_value = if maximizing {
             f64::NEG_INFINITY
         } else {
@@ -369,6 +385,32 @@ impl Search<'_> {
                 && !action.is_promotion()
                 && !killers.contains(&move_id(&action)))
             .then(|| self.memory.history.score(mover, &action) > 0);
+            if shallow
+                && index > 0
+                && !action.is_capture()
+                && !action.is_promotion()
+                && !killers.contains(&move_id(&action))
+            {
+                let by_count =
+                    self.options.techniques.lmp && index >= late_move_limit(depth_remaining);
+                let by_margin = futility_static.is_some_and(|value| {
+                    let margin = FUTILITY_MARGIN_PER_PLY * f64::from(depth_remaining);
+                    if maximizing {
+                        log_odds(alpha) - log_odds(value) >= margin
+                    } else {
+                        log_odds(value) - log_odds(beta) >= margin
+                    }
+                });
+                if by_count || by_margin {
+                    // A move that gives check is never skipped.
+                    self.play(action);
+                    let gives_check = self.state.pos().is_check();
+                    self.unplay();
+                    if !gives_check {
+                        continue;
+                    }
+                }
+            }
             self.play(action);
             let child =
                 self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing, late);

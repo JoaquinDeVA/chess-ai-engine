@@ -64,7 +64,7 @@ A shallower entry is not used for its value, but its best move is still the best
 
 `Table` and `Entry` in `rust/src/search/tt.rs`; probed at the start of `Search::node` and written at
 its end (`rust/src/search/node.rs`). The key is `GameState::key()` (`rust/src/board.rs`): a hash of
-the position (placement, side to move, castling rights, en passant square) without the move counters, so a position reached by two move orders shares its entry. The table is capped at 500,000 entries
+the position (placement, side to move, castling rights, en passant square) without the move counters, so a position reached by two move orders shares its entry. The table is capped at 2,000,000 entries
 (`DEFAULT_MAX_TT_ENTRIES`), oldest dropped first. The UCI option `Hash` (megabytes) sizes only the
 shared table of several threads; with one thread it has no effect.
 Three guards make the shared key safe:
@@ -87,9 +87,9 @@ does not use it. With several threads the table is the lock-free `SharedTable`
 
 ## Measured effect
 
-Not measured with the Rust engine. Dropping the move counters from the key lowered the nodes of `uci ttd 9 rust/bench/middlegame.epd` (20 positions, one thread) from 122,806,437 to 117,358,262 (-4.4 %, table hits 3.9 % to 4.8 % of probes); the Elo effect is not measured. Figures taken with the earlier Python engine have no reproducible source today and are not quoted. The table is warm from the previous moves in a game, which a per-position measurement does not cover.
+The Elo effect is not measured with the Rust engine; the nodes are. Dropping the move counters from the key lowered the nodes of `uci ttd 9 rust/bench/middlegame.epd` (20 positions, one thread) from 122,806,437 to 117,358,262 (-4.4 %, table hits 3.9 % to 4.8 % of probes); a table of 2,000,000 entries instead of 500,000 (`TTD_ENTRIES=2000000`, the same command) lowered them to 113,050,947 (-3.7 %), table hits to 5.2 % of probes, and no search overwrote another position; 8,000,000 gave the same nodes (peak memory 173 MB in both). Figures taken with the earlier Python engine have no reproducible source today and are not quoted. The table is warm from the previous moves in a game, which a per-position measurement does not cover.
 
 ## Status
 
 Adopted; part of the reference search since the first commit (2026-10-16). Size cap and no store after
-truncation since `1ee37d6`. Key without move counters, mates relative to the node and the fifty-move and repetition guards since 2026-11-10.
+truncation since `1ee37d6`. Capacity 500,000 to 2,000,000 entries and key without move counters, mates relative to the node and the fifty-move and repetition guards since 2026-11-10.

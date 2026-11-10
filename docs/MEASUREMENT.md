@@ -120,7 +120,7 @@ and what the search counted: branching factor, share of quiescence nodes, cuts b
 slot, table hits and the stores that drop another position. It is the instrument for changes that must reach a
 depth sooner; `uci bench` stays the fingerprint of the search (same nodes before and after a change that only
 makes it faster). `TTD_TABLE=shared` searches with the lock-free table of several threads (64 MB) instead of the
-single-thread one. The 20 middlegame positions are in `rust/bench/middlegame.epd`.
+single-thread one, and `TTD_ENTRIES=<n>` sets the entries of that table. The 20 middlegame positions are in `rust/bench/middlegame.epd`.
 
 ```bash
 cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/middlegame.epd

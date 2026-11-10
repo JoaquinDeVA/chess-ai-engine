@@ -392,6 +392,11 @@ fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<()
         return Err(format!("{path}: no positions"));
     }
     let shared = std::env::var("TTD_TABLE").is_ok_and(|table| table == "shared");
+    // Entries of the local table, to measure how its size matters (the bench only).
+    let entries = std::env::var("TTD_ENTRIES")
+        .ok()
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(DEFAULT_MAX_TT_ENTRIES);
     let options = Options {
         techniques: Techniques::from_names(&DEFAULT_TECHNIQUES)?,
         ..Options::default()
@@ -407,7 +412,7 @@ fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<()
             memory.threads = 1;
             memory
         } else {
-            Memory::new(DEFAULT_MAX_TT_ENTRIES)
+            Memory::new(entries)
         };
         memory.counters = counters;
         let mut state = GameState::from_moves(fen, &[])?;

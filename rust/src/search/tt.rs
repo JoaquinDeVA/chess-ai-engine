@@ -6,7 +6,7 @@ use std::hash::{BuildHasherDefault, Hasher};
 use crate::board::Key;
 
 /// Default maximum number of entries of a table.
-pub const DEFAULT_MAX_TT_ENTRIES: usize = 500_000;
+pub const DEFAULT_MAX_TT_ENTRIES: usize = 2_000_000;
 
 /// What an entry says about the value of the position.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

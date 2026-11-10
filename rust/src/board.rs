@@ -15,7 +15,7 @@ use shakmaty::uci::UciMove;
 use shakmaty::zobrist::Zobrist64;
 use shakmaty::{
     Bitboard, CastlingMode, CastlingSide, Chess, Color, EnPassantMode, File, FromSetup, Move,
-    Position, Rank, Role, Square,
+    MoveList, Position, Rank, Role, Square,
 };
 
 /// Key of a position in the transposition table: the position (placement, side to move, castling
@@ -78,8 +78,8 @@ pub fn is_noisy(m: &Move) -> bool {
 /// Legal moves of a position in the order shakmaty generates them: en passant, pawns, knights,
 /// bishops, rooks, queens, king and castling, each from the lowest square to the highest.
 /// Among moves of equal value the search plays the first.
-pub fn ordered_moves(pos: &Chess) -> Vec<Move> {
-    pos.legal_moves().into_iter().collect()
+pub fn ordered_moves(pos: &Chess) -> MoveList {
+    pos.legal_moves()
 }
 
 /// Position of a FEN string.

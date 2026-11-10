@@ -2,11 +2,11 @@
 
 use std::sync::atomic::Ordering::Relaxed;
 
-use shakmaty::{Color, Move, Position};
+use shakmaty::{Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order, see_ge};
+use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
 use super::tt::Flag;
 use crate::board::{is_noisy, move_id, ordered_moves, GameState};
 use crate::eval::{EvalState, Evaluator};
@@ -189,17 +189,29 @@ impl Search<'_> {
         }
 
         let maximizing = self.state.turn() == self.root_player;
-        let killers: Vec<u32> = self.memory.killers.get(depth_remaining).to_vec();
+        let mut killer_ids = [0u32; MAX_KILLERS_PER_DEPTH];
+        let stored = self.memory.killers.get(depth_remaining);
+        killer_ids[..stored.len()].copy_from_slice(stored);
+        let killers = &killer_ids[..stored.len()];
         let mover = self.state.turn();
-        let mut ordered = order(moves, &killers, Some((&self.memory.history, mover)));
+        let mut ordered = order(&moves, killers, Some((&self.memory.history, mover)));
         if self.options.techniques.see {
             // Captures that lose material come after the quiet moves (the order is otherwise kept).
             let pos = self.state.pos();
-            let (good, bad): (Vec<Move>, Vec<Move>) = ordered
-                .into_iter()
-                .partition(|m| !m.is_capture() || see_ge(pos, m, 0));
-            ordered = good;
-            ordered.extend(bad);
+            let mut reordered = MoveList::new();
+            reordered.extend(
+                ordered
+                    .iter()
+                    .filter(|m| !m.is_capture() || see_ge(pos, m, 0))
+                    .copied(),
+            );
+            reordered.extend(
+                ordered
+                    .iter()
+                    .filter(|m| m.is_capture() && !see_ge(pos, m, 0))
+                    .copied(),
+            );
+            ordered = reordered;
         }
         // Helper threads rotate the root moves so they do not all search the same subtree; the
         // table move is not put first there for the same reason.
@@ -316,7 +328,7 @@ impl Search<'_> {
         mut beta: f64,
         plies_left: u32,
         ply: i32,
-        moves: Vec<Move>,
+        moves: MoveList,
     ) -> f64 {
         let mut best_value = self.static_value(); // nobody is forced to capture
         if plies_left == 0 {

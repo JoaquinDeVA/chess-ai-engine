@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicI32, Ordering::Relaxed};
 use std::sync::Arc;
 
-use shakmaty::{Chess, Color, Move, Position, Role, Square};
+use shakmaty::{Chess, Color, Move, MoveList, Position, Role, Square};
 
 use crate::board::move_id;
 
@@ -203,22 +203,65 @@ pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
     }
 }
 
+/// Sort `moves` by descending `keys`, keeping the incoming order among equal keys (insertion sort:
+/// stable and with no allocation, for the few dozen moves of a position).
+fn sort_descending(moves: &mut [Move], keys: &mut [i32]) {
+    for i in 1..moves.len() {
+        let mut j = i;
+        while j > 0 && keys[j - 1] < keys[j] {
+            moves.swap(j - 1, j);
+            keys.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+}
+
 /// The moves in the order the search tries them: killers first, then captures (best MVV-LVA first)
 /// and then the quiet moves, each group keeping its incoming order. With a history the quiet moves
 /// that are not killers come by their score instead, best first.
-pub fn order(moves: Vec<Move>, killers: &[u32], history: Option<(&History, Color)>) -> Vec<Move> {
+pub fn order(moves: &[Move], killers: &[u32], history: Option<(&History, Color)>) -> MoveList {
     let is_killer = |m: &Move| killers.contains(&move_id(m));
-    let mut ordered: Vec<Move> = Vec::with_capacity(moves.len());
+    let mut ordered = MoveList::new();
     // Captures: killers first, then the rest, and the whole group sorted by a stable sort.
-    ordered.extend(moves.iter().filter(|m| m.is_capture() && is_killer(m)));
-    ordered.extend(moves.iter().filter(|m| m.is_capture() && !is_killer(m)));
-    ordered.sort_by_key(|m| std::cmp::Reverse(mvv_lva_score(m)));
+    ordered.extend(
+        moves
+            .iter()
+            .filter(|m| m.is_capture() && is_killer(m))
+            .copied(),
+    );
+    ordered.extend(
+        moves
+            .iter()
+            .filter(|m| m.is_capture() && !is_killer(m))
+            .copied(),
+    );
+    let mut keys = [0i32; 256];
+    for (key, m) in keys.iter_mut().zip(ordered.iter()) {
+        *key = mvv_lva_score(m);
+    }
+    let captures = ordered.len();
+    sort_descending(&mut ordered, &mut keys[..captures]);
     // Quiet moves: killers first, then the others (by history score when there is one).
-    ordered.extend(moves.iter().filter(|m| !m.is_capture() && is_killer(m)));
+    ordered.extend(
+        moves
+            .iter()
+            .filter(|m| !m.is_capture() && is_killer(m))
+            .copied(),
+    );
     let others_start = ordered.len();
-    ordered.extend(moves.iter().filter(|m| !m.is_capture() && !is_killer(m)));
+    ordered.extend(
+        moves
+            .iter()
+            .filter(|m| !m.is_capture() && !is_killer(m))
+            .copied(),
+    );
     if let Some((history, color)) = history {
-        ordered[others_start..].sort_by_cached_key(|m| std::cmp::Reverse(history.score(color, m)));
+        let others = &mut ordered[others_start..];
+        for (key, m) in keys.iter_mut().zip(others.iter()) {
+            *key = history.score(color, m);
+        }
+        let count = others.len();
+        sort_descending(others, &mut keys[..count]);
     }
     ordered
 }
@@ -306,12 +349,8 @@ mod tests {
         let history = History::default();
         history.reward(Color::White, &c, 4);
         history.reward(Color::White, &b, 2);
-        let ordered = order(
-            vec![a, b, c],
-            &[move_id(&a)],
-            Some((&history, Color::White)),
-        );
-        assert_eq!(ordered, vec![a, c, b]);
+        let ordered = order(&[a, b, c], &[move_id(&a)], Some((&history, Color::White)));
+        assert_eq!(ordered.as_slice(), &[a, c, b]);
         assert_eq!(
             history.score(Color::Black, &c),
             0,
@@ -340,10 +379,13 @@ mod tests {
         let a = quiet(Square::B1, Square::C3);
         let b = quiet(Square::G1, Square::F3);
         let ordered = order(
-            vec![a, queen_takes_pawn, b, pawn_takes_queen],
+            &[a, queen_takes_pawn, b, pawn_takes_queen],
             &[move_id(&b)],
             None,
         );
-        assert_eq!(ordered, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
+        assert_eq!(
+            ordered.as_slice(),
+            &[pawn_takes_queen, queen_takes_pawn, b, a]
+        );
     }
 }

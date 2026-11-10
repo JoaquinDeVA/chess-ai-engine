@@ -129,31 +129,24 @@ is generated from those runs), and speed in the engine (`uci bench 5 data/result
 | Model | Spearman | MAE | µs per evaluation | `uci bench` nodes/s |
 |---|---:|---:|---:|---:|
 | `net_pst_w32` (reference) | 0.693 | 0.118 | 2.4 | 1,020,805 |
-| `net_hybrid_w32` | 0.702 | 0.115 | 3.4 | 600,912 |
-| `net_hybrid_w64` | 0.718 | 0.111 | 3.8 | 528,562 |
-| `net_hybrid_k8_w64` | 0.719 | 0.111 | 3.9 | not measured |
-| `net_hybrid_k4_w64` | 0.722 | 0.110 | 3.8 | 507,407 |
+| `net_hybrid_w32` | 0.702 | 0.115 | 2.8 | 600,912 |
+| `net_hybrid_w64` | 0.718 | 0.111 | 2.9 | 528,562 |
+| `net_hybrid_k8_w64` | 0.719 | 0.111 | 3.3 | not measured |
+| `net_hybrid_k4_w64` | 0.722 | 0.110 | 3.3 | 507,407 |
 
 SPRT [0, 5] in the round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the default techniques of then) (`data/results/roundrobin/<job>/llr.csv`):
 
 | Job | Players (A vs B) | Result |
 |---|---|---|
-| `model_terms_in_net` | `net_hybrid_w32` vs `net_pst_w32` | −105.5 ± 25.5 Elo, 672 games, **H0** |
 | `model_width_64_vs_32` | `net_hybrid_w64` vs `net_hybrid_w32` | +44.0 ± 15.9 Elo, 1,612 games, **H1** |
-| `model_buckets_k4` | `net_hybrid_k4_w64` vs `net_hybrid_w64` | −2.5 ± 15.0 Elo, 1,800 games, no verdict (LLR −0.39) |
-| `model_buckets_k8_vs_k4` | `net_hybrid_k8_w64` vs `net_hybrid_k4_w64` | −24.4 ± 14.9 Elo, 1,800 games, no verdict (LLR −2.14) |
-| `best_net_hybrid_w64_vs_linear` | `net_hybrid_w64` vs `linear_pst_terms@e30` | +82.1 ± 22.2 Elo, 888 games, **H1** |
-| `best_net_hybrid_k4_w64_vs_linear` | `net_hybrid_k4_w64` vs `linear_pst_terms@e30` | +78.9 ± 21.6 Elo, 900 games, **H1** |
+| `model_terms_in_net_nodes` | `net_hybrid_w64` vs `net_pst_w32`, 250,000 nodes per move | +89.2 ± 22.5 Elo, 784 games, **H1** |
 
-Chained through these results, `net_pst_w32` is ahead of `net_hybrid_w64` by +61.5 ± 30 Elo (via
-`net_hybrid_w32`) or +83.0 ± 39.7 (via the common rival `linear_pst_terms@e30`). The sign is reliable; the size is
-inflated, because an SPRT stops early on a lucky streak.
-
-The hybrids are more accurate but play worse, and at a fixed time the two cannot be told apart: they search about
-half the nodes per second of `net_pst_w32`, partly because the terms cost and partly because they had no
-accumulator then (with it, `net_hybrid_w64` goes from 521,915 to 635,828 nodes/s in `uci bench 5`). An SPRT at a fixed 250,000 nodes per move, `net_hybrid_w64` against `net_pst_w32` (which removes speed
-from the comparison), was queued on 2026-11-09 (`model_terms_in_net_nodes` in
-`src/chess_lab/scripts/worker/queue.json`); result pending.
+At a fixed 250,000 nodes per move (speed removed) the hybrid beats `net_pst_w32`; at a time control it is not yet settled. The
+earlier time-control SPRTs of the hybrids and king buckets (`model_terms_in_net`, `model_buckets_k4`,
+`model_buckets_k8_vs_k4`, `best_net_hybrid_*_vs_linear`) were removed: they played without the accumulator against networks
+that had it. The same questions are asked again with the same binary on both sides: `acc_hybrid_w64_vs_pst_w32`,
+`acc_hybrid_k4_vs_w64`, `acc_hybrid_w64_vs_pst_w64`, `pst_*` (`queue.json` and `queue_despues.json` in `src/chess_lab/scripts/worker/`); results pending.
+Data: `data/results/roundrobin/<job>/llr.csv`.
 
 **Status.** Trained, not the default. They have an accumulator since 2026-11-09; their SPRT with it is pending.
 

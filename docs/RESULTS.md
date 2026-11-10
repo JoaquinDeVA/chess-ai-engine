@@ -60,17 +60,18 @@ techniques. It was stopped on 2026-11-09 with jobs still running; their figures 
 | `add_history_malus` | default + `history_malus` against default | [−5, 0] | 2,200 | +9.2 ± 12.0 | +1.24 | no verdict; retired |
 | `add_qs_tt` | default + `qs_tt` against default | [−5, 0] | 2,134 | −0.3 ± 12.5 | +0.19 | no verdict; retired |
 | `model_net_vs_linear` | `net_pst_w32` against `linear_pst_terms@e30` | [0, 5] | 504 | +165.1 ± 32.9 | +2.95 | H1: stronger |
-| `best_net_hybrid_w64_vs_linear` | `net_hybrid_w64` against `linear_pst_terms@e30` | [0, 5] | 888 | +82.1 ± 22.2 | +2.95 | H1: stronger |
-| `best_net_hybrid_k4_w64_vs_linear` | `net_hybrid_k4_w64` against `linear_pst_terms@e30` | [0, 5] | 900 | +78.9 ± 21.6 | +2.95 | H1: stronger |
-| `model_terms_in_net` | `net_hybrid_w32` against `net_pst_w32` | [0, 5] | 672 | −105.5 ± 25.5 | −2.97 | H0: weaker |
 | `model_width_64_vs_32` | `net_hybrid_w64` against `net_hybrid_w32` | [0, 5] | 1,612 | +44.0 ± 15.9 | +2.95 | H1: stronger |
-| `model_buckets_k4` | `net_hybrid_k4_w64` against `net_hybrid_w64` | [0, 5] | 1,800 | −2.5 ± 15.0 | −0.39 | no verdict |
-| `model_buckets_k8_vs_k4` | `net_hybrid_k8_w64` against `net_hybrid_k4_w64` | [0, 5] | 1,800 | −24.4 ± 14.9 | −2.14 | no verdict |
+| `model_terms_in_net_nodes` | `net_hybrid_w64` against `net_pst_w32` at 250,000 nodes per move | [0, 5] | 784 | +89.2 ± 22.5 | +2.95 | H1: stronger per node |
 | `model_linear_e30_vs_shipped` | `linear_pst_terms@e30` against `linear_pst_terms` | [0, 5] | 1,800 | +2.1 ± 12.1 | +0.02 | no verdict |
 
-Two more jobs were queued on 2026-11-09 (`queue.json` at `a1bdf60`), results pending: `model_net_vs_linear_10min`,
-the network against the logistic model at 10 min + 5 s, and `model_terms_in_net_nodes`, `net_hybrid_w64` against
-`net_pst_w32` at a fixed 250,000 nodes per move.
+`model_net_vs_linear_10min` (the network against the logistic model at 10 min + 5 s, queued on 2026-11-09, `queue.json` at `a1bdf60`)
+is pending.
+
+The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `model_terms_in_net`, `model_buckets_k4` and
+`model_buckets_k8_vs_k4` were removed from this table: they ran at a time control before the incremental accumulator
+of the hybrid and king-bucket networks (2026-11-09), against networks that had it, so they mixed quality with speed. They
+are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`queue.json` and `queue_despues.json` in `src/chess_lab/scripts/worker/`).
+The files stay in `data/results/roundrobin/`.
 
 ## Engine matches (Rust engine, fastchess)
 

@@ -2,7 +2,7 @@
 # Bot de Lichess en el nodo (~/lichess), con el motor en su modo más fuerte, y relevo con el round robin.
 # Uso: lichess.sh subir            (en local: copia bot, .env, binario, libro y tablas al nodo y lo instala)
 #      lichess.sh instalar|arrancar|parar|estado   (en el nodo; con ssh, `bash ~/lichess/lichess.sh <orden>`)
-# Modo más fuerte: Model net_pst_w64, Book, Tablebase, técnicas por defecto, Threads 7, Hash 2048 (el nodo tiene 8 núcleos).
+# Modo más fuerte: Model net_pst_w64, Book, Tablebase, técnicas por defecto, Threads 4 (docs/techniques/lazy-smp.md: seis no ganaron a cuatro), Hash 2048.
 # Relevo: arrancar lanza el bot y un supervisor (desacoplados, sin pueue). El supervisor, cuando el bot llega al límite diario
 # de partidas contra bots (línea «'bot_is_rate_limited': True» del log de lichess-bot) o cuando el bot sale por su cuenta, hace
 # SIGINT al bot (acaba las partidas en curso) y reanuda el round robin con arrancar.sh.
@@ -36,7 +36,7 @@ instalar)
     [ -d .venv ] || "${PY:-$HOME/train/venv/bin/python}" -m venv .venv
     .venv/bin/pip install -q -r lichess-bot/requirements.txt
     sed -e "s#^  dir:.*#  dir: \"$L/engine\"#" \
-        -e 's/^    Threads:.*/    Threads: 7/' \
+        -e 's/^    Threads:.*/    Threads: 4/' \
         -e "s#^    Hash:.*#    Hash: 2048\n    Model: \"net_pst_w64\"\n    Book: \"$L/knowledge/opening_book/opening_book.json\"\n    Tablebase: \"$L/knowledge/endgame_tablebase\"#" \
         config.local.yml > config.yml
     printf 'uci\nsetoption name Book value %s/knowledge/opening_book/opening_book.json\nsetoption name Tablebase value %s/knowledge/endgame_tablebase\nisready\nquit\n' "$L" "$L" | ./engine/uci | grep -E "readyok|error"

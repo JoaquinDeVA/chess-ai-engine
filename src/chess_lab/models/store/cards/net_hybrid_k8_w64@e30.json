@@ -32,10 +32,10 @@
     }
   },
   "cost": {
-    "us_per_eval": 3.91,
+    "us_per_eval": 3.28,
     "samples": 1000,
-    "date": "2026-11-06",
-    "commit": "ec58665+dirty"
+    "date": "2026-11-10",
+    "commit": "d2c029b+dirty"
   },
   "size_kb": 3085.7,
   "status": "current",

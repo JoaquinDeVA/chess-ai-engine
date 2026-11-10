@@ -14,8 +14,7 @@ mkdir -p "$W/models" "$W/bin/$H"
 [ -f "$W/bin/$H/uci" ] || { cp rust/target/release/uci "$W/bin/$H/uci.new" && mv "$W/bin/$H/uci.new" "$W/bin/$H/uci"; }
 cp data/results/uci_models/*.json "$W/models/"
 cp data/openings/openings.epd "$W/"
-cp src/chess_lab/scripts/worker/queue_despues.json src/chess_lab/scripts/worker/queue_10min.json src/chess_lab/scripts/worker/despues.sh "$W/"
-# queue.json solo si no hay round robin: en marcha, despues.sh le añade trabajos y copiarlo encima los borraría.
+# queue.json solo si no hay round robin: en marcha, el nodo puede tener trabajos que el repo no, y copiarlo encima los borraría.
 [ -f "$W/queue.json" ] && pgrep -f "[r]oundrobin.py queue.json" >/dev/null || cp src/chess_lab/scripts/worker/queue.json "$W/queue.json"
 if pgrep -f "[r]oundrobin.py queue.json" >/dev/null; then
     cmp src/chess_lab/scripts/worker/roundrobin.py "$W/roundrobin.py" || echo "AVISO: roundrobin.py cambió; se aplica al reiniciarlo"

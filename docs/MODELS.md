@@ -48,9 +48,7 @@ promotion ([Data](DATA.md)); the search resolves the others with quiescence.
 Spearman 0.693, MAE 0.118, 2.37 µs per evaluation in the laboratory harness. In the engine, `uci bench 5` gives
 1,020,805 nodes/s (`rust/target/release/uci bench 5`, six-core laptop, 2026-11-09, at `8700e6f`). In games, SPRT
 [0, 5] against the Piece-square-and-terms logistic model (`linear_pst_terms@e30`) in the round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.1 s, `Hash` 16, the 10,000 openings of `data/openings/openings.epd`, the default techniques of then):
-+165.1 ± 32.9 Elo at 504 games, **H1 accepted** (`data/results/roundrobin/model_net_vs_linear/llr.csv`). The same
-SPRT at 10 min + 5 s was queued on 2026-11-09 (`model_net_vs_linear_10min` in `src/chess_lab/scripts/worker/queue.json`);
-result pending.
++165.1 ± 32.9 Elo at 504 games, **H1 accepted** (`data/results/roundrobin/model_net_vs_linear/llr.csv`).
 
 **Status.** Default since `8700e6f` (2026-11-09): the UCI binary embeds `rust/models/net_pst_w32.json`, exported with
 `python -m chess_lab.scripts.export_uci_model --model net_pst_w32@e30 --out rust/models`; `setoption name Model value
@@ -142,10 +140,10 @@ SPRT [0, 5] in the round robin of 2026-11-06 to 2026-11-09 (fastchess, 10 s + 0.
 | `model_terms_in_net_nodes` | `net_hybrid_w64` vs `net_pst_w32`, 250,000 nodes per move | +89.2 ± 22.5 Elo, 784 games, **H1** |
 
 At a fixed 250,000 nodes per move (speed removed) the hybrid beats `net_pst_w32`; at a time control it is not yet settled. The
-earlier time-control SPRTs of the hybrids and king buckets (`model_terms_in_net`, `model_buckets_k4`,
+earlier time-control SPRTs of the hybrids and king buckets (`model_terms_in_net`,
 `model_buckets_k8_vs_k4`, `best_net_hybrid_*_vs_linear`) were removed: they played without the accumulator against networks
 that had it. The same questions are asked again with the same binary on both sides: `acc_hybrid_w64_vs_pst_w32`,
-`acc_hybrid_k4_vs_w64`, `acc_hybrid_w64_vs_pst_w64`, `pst_*` (`queue.json` and `queue_despues.json` in `src/chess_lab/scripts/worker/`); results pending.
+`acc_hybrid_k4_vs_w64`, `acc_hybrid_w64_vs_pst_w64`, `pst_*` (`queue.json` in `src/chess_lab/scripts/worker/`); results pending.
 Data: `data/results/roundrobin/<job>/llr.csv`.
 
 **Status.** Trained, not the default. They have an accumulator since 2026-11-09; their SPRT with it is pending.
@@ -162,9 +160,7 @@ features: its verdict is a plain sum.
 What it taught that the networks keep: training on quiet positions only played +284 ± 43 Elo better than training on
 every position (362 games at 60 s + 1 s, `data/results/matches/quiet_vs_actual/match.log`). More features (passed
 pawns by rank, king attack, king-relative piece squares) gave no gain (+29.0 ± 35.2 and 0.0 ± 35.3 Elo in 300-game
-screenings, `data/results/matches/{passed,king}_vs_base/match.log`), and 30 M positions (`linear_pst_terms@e30`)
-raised Spearman from 0.638 to 0.646 but did not separate in play: +2.1 ± 12.1 Elo at 1,800 games, no verdict
-(`data/results/roundrobin/model_linear_e30_vs_shipped/llr.csv`).
+screenings, `data/results/matches/{passed,king}_vs_base/match.log`).
 
 **Last measurements.** `uci bench 5` with the binary of `a1bdf60` (laptop, 2026-11-09): 931,652 nodes/s, against
 948,666 for `net_pst_w32` on the same binary. In games it lost the SPRT against `net_pst_w32` above (−165.1 ± 32.9

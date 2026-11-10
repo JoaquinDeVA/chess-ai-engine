@@ -72,6 +72,90 @@
    "elo0": -5,
    "elo1": 0,
    "max_rounds": 6000
+  },
+  {
+   "name": "pst_w64_vs_w32",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_pst_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "pst_w64x16_vs_w32",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_pst_w64x16.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "pst_k4_w64_vs_w32",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_pst_k4_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w32.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "pst_w64x16_vs_w64",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_pst_w64x16.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w64.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "pst_k4_w64_vs_w64",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_pst_k4_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w64.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
+  },
+  {
+   "name": "acc_hybrid_w64_vs_pst_w64",
+   "uci": "bin/cc258520bbdb/uci",
+   "a": [
+    "option.Model=models/net_hybrid_w64.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w64.json"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 6000,
+   "chunk_rounds": 400
   }
  ]
 }

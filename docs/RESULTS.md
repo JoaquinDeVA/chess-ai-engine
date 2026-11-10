@@ -62,15 +62,11 @@ techniques. It was stopped on 2026-11-09 with jobs still running; their figures 
 | `model_net_vs_linear` | `net_pst_w32` against `linear_pst_terms@e30` | [0, 5] | 504 | +165.1 ± 32.9 | +2.95 | H1: stronger |
 | `model_width_64_vs_32` | `net_hybrid_w64` against `net_hybrid_w32` | [0, 5] | 1,612 | +44.0 ± 15.9 | +2.95 | H1: stronger |
 | `model_terms_in_net_nodes` | `net_hybrid_w64` against `net_pst_w32` at 250,000 nodes per move | [0, 5] | 784 | +89.2 ± 22.5 | +2.95 | H1: stronger per node |
-| `model_linear_e30_vs_shipped` | `linear_pst_terms@e30` against `linear_pst_terms` | [0, 5] | 1,800 | +2.1 ± 12.1 | +0.02 | no verdict |
 
-`model_net_vs_linear_10min` (the network against the logistic model at 10 min + 5 s, queued on 2026-11-09, `queue.json` at `a1bdf60`)
-is pending.
-
-The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `model_terms_in_net`, `model_buckets_k4` and
+The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `model_terms_in_net` and
 `model_buckets_k8_vs_k4` were removed from this table: they ran at a time control before the incremental accumulator
 of the hybrid and king-bucket networks (2026-11-09), against networks that had it, so they mixed quality with speed. They
-are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`queue.json` and `queue_despues.json` in `src/chess_lab/scripts/worker/`).
+are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`queue.json` in `src/chess_lab/scripts/worker/`).
 The files stay in `data/results/roundrobin/`.
 
 ## Engine matches (Rust engine, fastchess)

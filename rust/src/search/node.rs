@@ -13,6 +13,7 @@ use crate::eval::{EvalState, Evaluator};
 
 /// The null move is tried from this depth on.
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
+const IIR_FROM_DEPTH: i32 = 4;
 /// The clock is read once every this many nodes: reading it costs about as much as a node.
 const CLOCK_EVERY_NODES: u64 = 2048;
 /// Width of the window of the scouts of the principal variation search.
@@ -365,6 +366,17 @@ impl Search<'_> {
                 }
             }
         }
+        // Internal iterative reduction: with no table move the order is poor, so search one ply
+        // less; the next iteration, with the move stored, goes deeper.
+        let depth_remaining = if self.options.techniques.iir
+            && table_move.is_none()
+            && ply > 0
+            && depth_remaining >= IIR_FROM_DEPTH
+        {
+            depth_remaining - 1
+        } else {
+            depth_remaining
+        };
         // Shallow pruning of the quiet moves: not in check, bounds outside the mate range.
         let shallow =
             !in_check && depth_remaining <= SHALLOW_UP_TO_DEPTH && alpha > 0.01 && beta < 0.99;

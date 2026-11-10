@@ -8,6 +8,7 @@ All notable changes. The newest are first.
 - `uci ttd <depth> <positions> [limit_s]`, the time to a fixed depth over the 20 positions of `rust/bench/middlegame.epd`, with counters of the search (quiescence, table, cuts by killer, repetitions); the tree is unchanged (`uci bench`: 349,598 nodes before and after). See [Measurement](docs/MEASUREMENT.md#time-to-a-depth).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - Futility pruning (`futility`) and late move pruning (`lmp`) are implemented as switches, **off by default** until their SPRT: `uci ttd 11` nodes 215,120,644 to 144,499,072 (-32.8 %) and to 66,027,302 (-69.3 %). See [Futility pruning](docs/techniques/futility.md) and [Late move pruning](docs/techniques/lmp.md).
 - Reverse futility pruning (`rfp`) is on by default: at 6 plies or fewer, a node whose static value is beyond the bound by 0.46 log-odds per ply left (not in check, bounds outside the mate range) returns that value. `uci ttd 11` with `lmr` (1 thread): 324,595,891 to 215,120,644 nodes (-33.7 %), median 11.13 s to 8.58 s; SPRT queued. See [Reverse futility pruning](docs/techniques/rfp.md).
 - Late move reductions (`lmr`) are on by default: the quiet moves from the fourth on are searched shallower first and again at full depth if they improve. `uci ttd 11` (1 thread): 1,004,922,392 to 324,595,891 nodes (-68 %), median 23.53 s to 10.82 s; screening 51.33 % in 300 games, SPRT queued. See [Late move reductions](docs/techniques/lmr.md).
@@ -23,6 +24,7 @@ All notable changes. The newest are first.
 - `entrenar.sh` resumes only the models named in `SOLO` (`d2c029b`).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The round robin runs with 6 concurrent games (`0bc7b69`).
 - The node chains the work after training and queues the 10+5 match alone (`6d15f3a`).
 - The SPRTs played without the incremental accumulator are dropped and the matched pairs are queued (`c564f5b`).
@@ -43,6 +45,7 @@ A switch to the network: the engine plays `net_pst_w32` by default, the logistic
 - The training task `entrenar` sets up and trains the candidate networks on the node (`91f807f`).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The search lists the legal moves in shakmaty's own order instead of sorting them into python-chess' order (`ordered_moves` in `rust/src/board.rs`). On one laptop at fixed depth 6 (`uci bench`) it ran about 28 % more nodes per second and about 8.7 % more nodes (estimated, one run, no SPRT); the Elo effect is not measured. Equal-value ties can resolve to another move (the K+Q vs K tablebase test now expects `a7b6`).
 - The `uci` binary consults the opening book and the endgame tablebases itself, through the UCI options `Book` (JSON file) and `Tablebase` (folder), off by default so the matches and tournaments are unchanged; the window sets them. The Python wrappers (`chess_engine/knowledge/`, `_core.Book`, `_core.Tablebase`) are gone; `position_key` lives in `build_opening_book.py` ([Opening book](docs/techniques/opening-book.md), [Endgame tablebases](docs/techniques/endgame-tablebases.md)).
 - Every network has an incremental accumulator, not only the slotted piece-square ones: the bucketed and hybrid networks update their piece part move by move, rebuild it when the king changes bucket, and add the classical terms at each leaf. `uci bench 5`: `net_hybrid_w64` 521,915 to 635,828 nodes/s (+22 %), `net_hybrid_k4_w64` +16 %; about 2 % less for `net_pst_w32` ([incremental](docs/techniques/incremental.md#measured-effect)).
@@ -63,6 +66,7 @@ A switch to the network: the engine plays `net_pst_w32` by default, the logistic
 - Trained hybrid networks (768 piece-square inputs plus the eleven classical terms, optionally with 4 or 8 king buckets) at effort 30: Spearman 0.702 to 0.722 against 0.646 for the logistic model, 3.4 to 3.9 µs per evaluation against 2.4, all measured on one laptop (`python -m chess_lab.measure.evaluate`). Not played yet. See [Models](docs/MODELS.md#hybrid-networks-net_hybrid_w32-net_hybrid_w64-net_hybrid_k4_w64-net_hybrid_k8_w64).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - `chess_lab` reorganised: `models/features.py` (was `linear_features.py`), `models/target.py` (was `representation.py`), `models/fitting/{linear,neural}.py` (were `linear_eval.py`, `neural_eval.py`), `training/data/{raw_shards,sidecar,split}.py` (were `lichess_raw.py`, `sidecar.py`, `dataset.py`) `training/cache.py` (cache directory, split from `effort.py`) and `models/store/` (`artifacts/`, `cards/`, `h1_weights.json`, `loader.py`, `cards.py`). The Lichess data directory is now `data/LichessPositions/` and the encoded-batch cache sits directly in `data/cache/`. Same behaviour; imports and paths in the docs follow.
 - Every trained network is measured on one laptop with `python -m chess_lab.measure.evaluate` and listed by name (`63427fb`).
 
@@ -75,6 +79,7 @@ A switch to the network: the engine plays `net_pst_w32` by default, the logistic
 - [Several threads](docs/techniques/lazy-smp.md): each helper runs its own iterative deepening with a skip pattern and aspiration, the history scores are shared, the table slots are cache-aligned and the move is chosen by a vote of the threads. Seconds to depth 8 with 4 threads: 0.788 → 0.638; with 6: 0.871 → 0.627 (`python -m chess_lab.measure.search_speed`). In games 6 threads against 4 gave +5.0 ± 37.5 Elo in 280 games at 10 s + 0.1 s (no verdict), so 4 is the recommended count. The vote itself, at 6 threads against the same code without it: −36.0 ± 37.9 Elo in 300 games (`data/results/matches/smp_vote/match.log`), not significant.
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/results/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +67.2 ± 34.5 in two SPRTs stopped by hand (no verdict).
 - Two more speed-ups of the Rust search, same nodes: the build targets x86-64-v3 (AVX2, BMI2; `.cargo/config.toml`), 750 k to 788 k nodes/s (+5 %), and `linear_pst_terms` follows its piece-square sums move by move ([`incremental`](docs/techniques/incremental.md)), 788 k to 928 k (+17 %), 275,144 nodes in `uci bench` (median of 5 runs, laptop). Against the binary before the 2.6x speed-up, same techniques without `see`: 73.83 % in 300 games at 10 s + 0.1 s, +180.2 ± 36.0 Elo at the last rating printed (280 games; `data/results/matches/speed_vs_old/match.log`).
 - The Rust search is 2.58x faster in `uci bench` (304 k to 784 k nodes/s, the same 565,744 nodes; 2.2x at depth 8 on 60 other positions, 302 k to 661 k, with a one-off harness that was not kept): packed move-order keys, pawn terms on bitboards, no allocation per node in the logistic model, one list in move ordering. +130.9 ± 39.8 Elo against the previous binary in 300 games at 10 s + 0.1 s. The Rust modules were renamed after what they hold (see [Architecture](docs/ARCHITECTURE.md)).
@@ -92,6 +97,7 @@ A switch to the network: the engine plays `net_pst_w32` by default, the logistic
 - Passed-pawn and king-attack term models, `linear_pst_passed` and `linear_pst_king` (`2e848cb`), and the `see` technique, off by default, to be measured (`6caf4dc`).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).
 - The clock of the UCI binary is again the share of the time left (15 %, between 1.5 and 40 s): the rule that spent the time left over the moves to go plus 75 % of the increment lost −64 ± 24 Elo at 60 s + 1 s in 720 games (SPRT stopped by hand), see [Results](docs/RESULTS.md).
 - [How a change is measured](docs/MEASUREMENT.md) says which time control to use and that fixed nodes favour changes that save nodes. The worker notes in `match.sh` describe the port forwarding of the desktop's SSH.
@@ -106,6 +112,7 @@ changed (below).
 - **Reader-first documentation**: a front page with reader paths, one page per search technique (problem, idea, how it works with a worked example, implementation, measured effect, status) with light and dark diagrams, [How the engine chooses a move](docs/SEARCH.md) and [How a change is measured](docs/MEASUREMENT.md) (fastchess, SPRT, the A/A check). [Results](docs/RESULTS.md) separates what is measured from what is estimated and marks the Python-engine tournaments as history.
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The extra `ml` no longer installs `matplotlib` (nothing imports it). The worker scripts read the worker's address and the repository root from `src/chess_lab/scripts/worker/env.sh`; `keepalive.sh`, which managed the laptop's wifi, left the repository.
 - The results table holds what can be measured again today (accuracy and cost): the depth, search agreement and tournament columns of the Python engine, and the `tradeoff` and `tournament` card sections they came from, were removed; those figures stay in the prose of [Results](docs/RESULTS.md).
 - The data directories and the split seed live in `chess_lab.models.defaults` (`RAW_DIR`, `SIDECAR_DIR`, `SPLIT_SEED`), absolute from the repository root, so the commands find the data from any working directory. `run_full_pipeline.sh` trains every registered model by default (it asks the registry instead of keeping its own list).
@@ -131,6 +138,7 @@ fastchess instead of its own tournaments. The console game, the Python bots and 
 - **A remote worker for matches**: `src/chess_lab/scripts/worker/` deploys the UCI binary and fastchess to the desktop and plays matches there over SSH.
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The window's AI is the UCI engine: the Python bot classes, the Python game loop and the Python search wrapper are gone. The window keeps the book and the tablebases in Python, before the engine. The engine has one evaluation (`linear_pst_terms`) and quiescence fixed at 4 plies, so the Settings dialog no longer offers them.
 - The laboratory measures models with `python -m chess_lab.measure.{report,evaluate}`. Games between engines are no longer played by this repository: fastchess plays them against the UCI binary. The pipeline `run_full_pipeline.sh` no longer runs tournaments.
 - Dependencies: `numpy` is a base dependency; `joblib` and `pytest-cov` were dropped.
@@ -186,6 +194,7 @@ results published for 1.1 were played with the Python engine and are not compara
 - `scripts/bench/measure_search_speed.py`: depth reached in a time budget and cost of a fixed depth, per player.
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - **`python main.py` with no arguments** starts a game of you (White) against `IterativeModelBookBot` with
   `linear_pst_terms`, 3 s per move (`--move-time`) and up to four threads. Naming one player completes the other so
   that a human faces a bot.
@@ -242,6 +251,7 @@ Training on the Lichess evaluation database, the model family, the opening book 
   sample of its moves with Stockfish (98.7 % within 50 centipawns of the best line on 2,438 entries).
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - The default training keeps 10 % of the mate positions; the 100 % variant is `--mate-keep 1.0 --tag mates100`. The default
   representation name no longer carries a `-mates10` suffix.
 - A model card keeps one tournament entry per time control (`60+1`, `600+5`, `depth3`), and retraining clears the
@@ -304,6 +314,7 @@ logical reasoning, machine learning, optional extension) and then reworked.
   time, by an illegal move or by an exception were exported to PGN with result `*`.
 
 ### Changed
+- Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See [Internal iterative reduction](docs/techniques/iir.md).
 - Tactical bot restored as an optional bot (needs SWI-Prolog).
 - Bots find shared modules through an underscore convention (`bots/_*.py` are not registered).
 - Documentation and comments are now in English.

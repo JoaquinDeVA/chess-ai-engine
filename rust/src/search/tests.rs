@@ -593,3 +593,20 @@ fn late_move_pruning_allows_more_quiet_moves_the_deeper_the_node() {
     assert_eq!(late_move_limit(2), 7);
     assert_eq!(late_move_limit(3), 12);
 }
+
+#[test]
+fn internal_iterative_reduction_keeps_the_forced_mate_and_the_hanging_queen() {
+    let with = Techniques::all();
+    let without = Techniques {
+        iir: false,
+        ..Techniques::all()
+    };
+    let result = quiescent(MATE_IN_TWO, 6, with);
+    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
+    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    let fen = "4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1";
+    assert_eq!(
+        quiescent(fen, 5, with).best,
+        quiescent(fen, 5, without).best
+    );
+}

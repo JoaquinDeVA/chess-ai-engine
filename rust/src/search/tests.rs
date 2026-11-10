@@ -345,10 +345,12 @@ fn an_iteration_cut_by_the_hard_limit_is_discarded() {
         estimator: "never_stop".into(),
         ..Options::default()
     };
-    // depth 1 and 2 finish within 0.15 fake seconds, depth 3 does not
-    let (best, stats, _) = run(START, &options, 6, 1e9, 0.15, 1e-3);
+    // The clock is read at the first node of each iteration and then every 2,048 nodes: depths 1
+    // to 4 (under 2,048 nodes each) start before 0.6 fake seconds and finish unread, and depth 5
+    // starts after the limit and is cut at its first node.
+    let (best, stats, _) = run(START, &options, 6, 1e9, 0.6, 1e-3);
     assert_eq!(stats.stop_reason, StopReason::Truncated);
-    assert_eq!(stats.completed_depth, 2, "{stats:?}");
+    assert_eq!(stats.completed_depth, 4, "{stats:?}");
     assert!(stats.iterations.last().unwrap().truncated);
     assert!(best.is_some() && !stats.truncated);
 }

@@ -13,6 +13,8 @@ use crate::eval::{EvalState, Evaluator};
 
 /// The null move is tried from this depth on.
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
+/// The clock is read once every this many nodes: reading it costs about as much as a node.
+const CLOCK_EVERY_NODES: u64 = 2048;
 /// Width of the window of the scouts of the principal variation search.
 const SCOUT_EPSILON: f64 = 1e-9;
 
@@ -28,6 +30,8 @@ struct Search<'a> {
     prunings: u64,
     max_ply: i32,
     truncated: bool,
+    /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
+    next_clock_check: u64,
     /// Evaluation that follows the moves, when the technique is on and the evaluator supports it.
     incremental: Option<Box<dyn EvalState + 'a>>,
 }
@@ -175,10 +179,11 @@ impl Search<'_> {
             .options
             .node_limit
             .is_some_and(|limit| self.nodes >= limit);
-        if stopped
-            || out_of_nodes
-            || (self.control.clock)() - self.control.start >= self.control.hard_limit
-        {
+        let out_of_time = self.nodes >= self.next_clock_check && {
+            self.next_clock_check = self.nodes + CLOCK_EVERY_NODES;
+            (self.control.clock)() - self.control.start >= self.control.hard_limit
+        };
+        if stopped || out_of_nodes || out_of_time || self.truncated {
             self.truncated = true;
             return (self.static_value(), None);
         }
@@ -425,6 +430,7 @@ pub fn alpha_beta_window(
         prunings: 0,
         max_ply: 0,
         truncated: false,
+        next_clock_check: 0,
         incremental,
     };
     let (value, best) = search.node(window.0, window.1, max_depth, 0, true);

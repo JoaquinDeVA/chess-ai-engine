@@ -155,7 +155,9 @@ that ends at the round cap without a verdict says the addition is too small for 
 `uci` embeds `net_pst_w32` and loads any other network from a JSON file with
 `setoption name Model value <file>.json` (`setoption name Model value net_pst_w32` goes back to the embedded one).
 The file is written by `python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64 --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
-Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). A network is played without
-an incremental accumulator unless its features are the slotted ones, so the hybrids reach about half the nodes per
-second of `net_pst_w32` (`uci bench 5 <file>.json`, laptop, 2026-11-09: 528,562 for `net_hybrid_w64` against
-1,020,805): the SPRT at a time control includes that cost, and an SPRT at fixed nodes leaves it out.
+Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). Every network is played with an
+incremental accumulator since 2026-11-09 (commit `75a8071`); before, only the slotted features had one. The hybrids
+still reach fewer nodes per second than `net_pst_w32` (`uci bench 5 <file>.json`, laptop, 2026-11-09: 635,828 for
+`net_hybrid_w64` with the accumulator, 521,915 without, against 1,020,805): the SPRT at a time control includes that
+cost, and an SPRT at fixed nodes leaves it out. A time-control SPRT run before that commit played the hybrids and the
+king-bucket networks without the accumulator against networks with it, so it does not compare them on equal terms.

@@ -164,7 +164,7 @@ screenings, `data/results/matches/{passed,king}_vs_base/match.log`).
 
 **Last measurements.** `uci bench 5` with the binary of `a1bdf60` (laptop, 2026-11-09): 931,652 nodes/s, against
 948,666 for `net_pst_w32` on the same binary. In games it lost the SPRT against `net_pst_w32` above (−165.1 ± 32.9
-Elo at 10 s + 0.1 s); the 10 min + 5 s SPRT is pending.
+Elo at 10 s + 0.1 s).
 
 **Status.** Retired in `8700e6f` (2026-11-09), with the whole linear fitting code of the laboratory; the last
 version is in `a1bdf60`. Its cards stay in `src/chess_lab/models/store/cards/` with status `retired` and `superseded`.

@@ -31,7 +31,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | Each of the four default techniques makes the engine stronger | SPRT [−5, 0] removing it from the default set of then, 710 to 1,690 games at 10 s + 0.1 s ("Round robin" below) | Rust | Measured; H1 accepted for each. The set of four has no SPRT against the set of seven |
 | `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 2.21); retired |
-| The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted. At 10 min + 5 s: pending |
+| The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted |
 | Adding the classical terms to the network makes it weaker | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Measured; H0 accepted, but it mixes quality and speed (the hybrids have no accumulator). At fixed nodes: pending |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
 | Several threads search faster | Time to depth 8 on 60 positions ([Lazy SMP](techniques/lazy-smp.md)) | Rust | Measured speed; effect in games not measured |

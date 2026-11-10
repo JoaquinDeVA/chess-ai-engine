@@ -8,6 +8,7 @@ All notable changes. The newest are first.
 - `uci ttd <depth> <positions> [limit_s]`, the time to a fixed depth over the 20 positions of `rust/bench/middlegame.epd`, with counters of the search (quiescence, table, cuts by killer, repetitions); the tree is unchanged (`uci bench`: 349,598 nodes before and after). See [Measurement](docs/MEASUREMENT.md#time-to-a-depth).
 
 ### Changed
+- The preference for quicker wins and slower losses is `0.0001` per ply instead of `0.003` (a mate in 9 is worth `0.9991`, not `0.973`), so it never outweighs a real difference between two lines. The Elo effect is not measured (SPRT queued).
 - The search is 21 % faster per node with the same tree (`uci bench`: 349,598 nodes; 1,088,861 to 1,316,298 nodes/s, median of 5 alternating pairs, desktop): the clock is read every 2,048 nodes, the moves are ordered on the stack and the Zobrist key follows the move ([Rust core](docs/techniques/rust-core.md)). The Elo effect is not measured.
 
 ## 3.7.0 (2026-11-10)

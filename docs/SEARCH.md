@@ -26,9 +26,9 @@ which searches. The binary alone (in fastchess matches) always searches.
 
 Every value is the expected score for the player the search runs for: `1` win, `0.5` draw, `0` loss. Evaluations
 (the networks) are clipped to `0.01 .. 0.99`, so an estimate never outranks a real result;
-finished games use exact values. A terminal value is nudged by `0.003` per ply from the root
+finished games use exact values. A terminal value is nudged by `0.0001` per ply from the root
 (`DEPTH_PREFERENCE_EPSILON` in `rust/src/search/options.rs`, `terminal_utility` in `rust/src/search/node.rs`): a
-mate in 2 is worth `0.994` and a mate in 9 `0.973`, so the engine plays the quicker win and, when losing, the slower
+mate in 2 is worth `0.9998` and a mate in 9 `0.9991`, so the engine plays the quicker win and, when losing, the slower
 loss. That nudge is not measured; it has been there since the first commit (2026-10-16).
 
 ## Minimax
@@ -71,7 +71,7 @@ flowchart TD
     N["node(alpha, beta, depth)"] --> T{"transposition table entry<br/>deep enough?"}
     T -- "exact, or its bound closes the window" --> R1["return the stored value"]
     T -- no --> X{"game over?"}
-    X -- yes --> R2["return 1 − 0.003·ply (win)<br/>0.5 (draw), 0.003·ply (loss)"]
+    X -- yes --> R2["return 1 − 0.0001·ply (win)<br/>0.5 (draw), 0.0001·ply (loss)"]
     X -- no --> D{"depth left = 0?"}
     D -- yes --> Q["quiescence search"]
     D -- no --> C{"hard time limit passed<br/>or stop flag raised?"}

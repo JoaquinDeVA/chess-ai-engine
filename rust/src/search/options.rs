@@ -8,7 +8,7 @@ pub const MAX_DEPTH: usize = 30;
 /// Rule that predicts the duration of the next iteration.
 pub const DEFAULT_ESTIMATOR: &str = "geometric_growth";
 /// Weight of the "win faster / lose slower" preference, in utility units per ply.
-pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.003;
+pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.0001;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games

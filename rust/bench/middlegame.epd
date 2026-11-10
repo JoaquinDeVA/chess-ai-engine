@@ -1,0 +1,22 @@
+# Middlegame positions of `uci ttd`: twenty opening lines played out, none in check and none
+# reached by a capture. One FEN per line; what follows the semicolon is the name of the line.
+r1b2rk1/2q1bppp/p2p1n2/npp1p3/3PP3/2P2N1P/PPB2PP1/RNBQR1K1 w - - 1 12 ; Ruy Lopez, Closed
+r1bqr1k1/bpp2pp1/p1np1n1p/4p3/4P3/1BPP1N1P/PP1N1PP1/R1BQR1K1 w - - 2 11 ; Italian, Giuoco Pianissimo
+r2q1rk1/3nbppp/p2pbn2/1p2p3/4P1P1/1NN1BP2/PPPQ3P/2KR1B1R w - - 0 12 ; Sicilian, Najdorf
+2rq1rk1/pp1bppbp/3p1np1/4n3/3NP3/1BN1BP2/PPPQ2PP/2KR3R w - - 9 12 ; Sicilian, Dragon
+r1b2rk1/1p1nqppp/p1n1p3/2ppP3/3P1P2/2N2N2/PPPQ2PP/2KR1B1R w - - 0 11 ; French, Classical
+r3kb1r/ppqn1pp1/2p1pn1p/7P/3P4/3Q1NN1/PPPB1PP1/2KR3R w kq - 6 14 ; Caro-Kann, Classical
+r2q1rk1/pb1nbpp1/1p3n1p/2pp4/3P3B/2NBPN2/PP3PPP/2RQ1RK1 w - - 0 12 ; Queen's Gambit Declined, Tartakower
+r2q1rk1/pp1n1ppp/2p1pnb1/8/PbBPP3/2N2N2/1P2QPPP/R1B2RK1 w - - 1 11 ; Slav
+r3kb1r/1bqn1ppp/p3pn2/1ppP4/4P3/2NB1N2/PP3PPP/R1BQ1RK1 w kq - 1 12 ; Semi-Slav, Meran
+r1bq1rk1/pppnn1bp/3p4/3Pp1p1/2P1Pp2/2N2P2/PP2BBPP/R2QNRK1 w - - 0 13 ; King's Indian, Classical
+r1b2rk1/ppq2ppp/2n1pn2/2p5/2BP4/P1P1PN2/5PPP/R1BQ1RK1 w - - 1 11 ; Nimzo-Indian, Rubinstein
+2rq1rk1/p2nbppp/bpp1p3/3p4/2PP4/1PB3P1/P2NPPBP/R2Q1RK1 w - - 4 13 ; Queen's Indian
+r1br2k1/ppq1ppbp/2n3p1/2p5/2BPP3/2P1B3/P3NPPP/2RQ1RK1 w - - 8 12 ; Gruenfeld, Exchange
+r2q1rk1/pb2npbp/1pn1p1p1/2pp4/2P5/P1NP1NP1/1P1BPPBP/1R1Q1RK1 w - - 2 11 ; English, Symmetrical
+r2q1rk1/2pnbppp/p3pn2/1p6/3Pb3/5NP1/PP1BPPBP/RNQ2RK1 w - - 6 12 ; Catalan, Open
+r3k2r/p1ppqpbp/b1p3p1/3nP3/2P5/1P6/PB2QPPP/RN2KB1R w KQkq - 2 11 ; Scotch
+r2q1rk1/ppp1bppp/2n5/3p1b2/2PP4/P1P2N2/4BPPP/R1BQ1RK1 w - - 1 13 ; Petroff
+r1bq1rk1/5ppp/p1np4/1p1Np1b1/4P3/2P5/PPN2PPP/R2QKB1R w KQ - 3 13 ; Sicilian, Sveshnikov
+r1bqr1k1/p1n2pbp/1p1p1np1/2pP4/P3P3/2N2P2/1P1NB1PP/R1BQ1RK1 w - - 0 13 ; Modern Benoni
+r2q1rk1/pb2nppp/1p1bpn2/2ppN3/3P1P2/2PBP1B1/PP1N2PP/R2QK2R w KQ - 1 11 ; London

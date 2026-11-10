@@ -95,7 +95,8 @@ impl Table {
         self.map.get(key).map(|(entry, _)| *entry)
     }
 
-    /// Store a result, classifying it against the original window of the search.
+    /// Store a result, classifying it against the original window of the search. Returns the
+    /// depth of the entry of another position dropped to make room, if any.
     pub fn store(
         &mut self,
         key: Key,
@@ -104,7 +105,8 @@ impl Table {
         depth: i32,
         alpha_orig: f64,
         beta_orig: f64,
-    ) {
+    ) -> Option<i32> {
+        let mut dropped = None;
         let flag = if value <= alpha_orig {
             Flag::UpperBound
         } else if value >= beta_orig {
@@ -131,7 +133,7 @@ impl Table {
                 break;
             };
             if self.map.get(&old).is_some_and(|(_, s)| *s == seq) {
-                self.map.remove(&old);
+                dropped = self.map.remove(&old).map(|(entry, _)| entry.depth);
             }
         }
         if self.order.len() > 4 * self.map.len() + 1024 {
@@ -139,6 +141,7 @@ impl Table {
             self.order
                 .retain(|(key, seq)| map.get(key).is_some_and(|(_, s)| s == seq));
         }
+        dropped
     }
 }
 
@@ -165,7 +168,7 @@ impl Tt {
         depth: i32,
         alpha_orig: f64,
         beta_orig: f64,
-    ) {
+    ) -> Option<i32> {
         match self {
             Tt::Local(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),
             Tt::Shared(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),

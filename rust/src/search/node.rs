@@ -129,21 +129,36 @@ impl Search<'_> {
         let key = self.state.key();
         let entry = self.memory.table.get(&key);
         let table_move = entry.and_then(|e| e.best);
+        self.memory.counters.table_probes += 1;
         if let Some(entry) = entry {
+            self.memory.counters.table_hits += 1;
             if entry.depth >= depth_remaining {
                 match entry.flag {
-                    Flag::Exact => return (entry.value, entry.best),
+                    Flag::Exact => {
+                        self.memory.counters.table_cuts += 1;
+                        return (entry.value, entry.best);
+                    }
                     Flag::LowerBound => alpha = alpha.max(entry.value),
                     Flag::UpperBound => beta = beta.min(entry.value),
                 }
                 if alpha >= beta {
+                    self.memory.counters.table_cuts += 1;
                     return (entry.value, entry.best);
                 }
             }
         }
+        let repetitions_before = self.memory.counters.repetition_draws;
 
         let moves = ordered_moves(self.state.pos());
         if let Some(winner) = self.state.outcome(&moves) {
+            let pos = self.state.pos();
+            if winner.is_none()
+                && !moves.is_empty()
+                && !pos.is_insufficient_material()
+                && pos.halfmoves() < 100
+            {
+                self.memory.counters.repetition_draws += 1;
+            }
             return (self.terminal_utility(winner, ply), None);
         }
         if depth_remaining <= 0 {
@@ -251,6 +266,15 @@ impl Search<'_> {
             // in sibling nodes; captures are already ordered first.
             if alpha >= beta {
                 self.prunings += 1;
+                let counters = &mut self.memory.counters;
+                counters.cuts += 1;
+                counters.first_move_cuts += u64::from(index == 0);
+                let id = move_id(&action);
+                if !action.is_capture() && table_move != Some(id) {
+                    if let Some(slot) = killers.iter().position(|&killer| killer == id) {
+                        counters.killer_cuts[slot] += 1;
+                    }
+                }
                 self.memory.killers.record(depth_remaining, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
@@ -260,7 +284,7 @@ impl Search<'_> {
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
         if !self.truncated {
-            self.memory.table.store(
+            let dropped = self.memory.table.store(
                 key,
                 best_value,
                 best_move,
@@ -268,6 +292,14 @@ impl Search<'_> {
                 alpha_orig,
                 beta_orig,
             );
+            let counters = &mut self.memory.counters;
+            counters.stores += 1;
+            counters.stores_over_repetition +=
+                u64::from(counters.repetition_draws > repetitions_before);
+            if let Some(depth) = dropped {
+                counters.evictions += 1;
+                counters.deeper_evictions += u64::from(depth > depth_remaining);
+            }
         }
         (best_value, best_move)
     }
@@ -302,6 +334,7 @@ impl Search<'_> {
             }
             self.play(action);
             self.nodes += 1;
+            self.memory.counters.quiescence_nodes += 1;
             let child_moves = ordered_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
                 Some(winner) => self.terminal_utility(winner, ply + 1),

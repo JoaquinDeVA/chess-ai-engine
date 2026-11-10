@@ -112,6 +112,25 @@ test is the best case for it. Late move reductions lost anyway (48.76 % at 20,00
 also makes each node cheaper. A win at fixed nodes proves nothing about time: it has to be confirmed at a time
 control. Fixed nodes are therefore the first filter for a change that should not lose, never the last.
 
+## Time to a depth
+
+`uci ttd <depth> <positions> [limit_s]` searches every position of a file (one FEN per line, `#` starts a comment)
+to a fixed depth with one thread and fresh memory, and prints the nodes and seconds of each, then the median time
+and what the search counted: branching factor, share of quiescence nodes, cuts by the first move and by each killer
+slot, table hits and the stores that drop another position. It is the instrument for changes that must reach a
+depth sooner; `uci bench` stays the fingerprint of the search (same nodes before and after a change that only
+makes it faster). `TTD_TABLE=shared` searches with the lock-free table of several threads (64 MB) instead of the
+single-thread one. The 20 middlegame positions are in `rust/bench/middlegame.epd`.
+
+```bash
+cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/middlegame.epd
+```
+
+Baseline at `63cace7` plus the counters (`net_pst_w32`, desktop, one thread, 2026-11-10; the runs were made one
+after the other, with the machine idle): depth 9 finished in 20 of 20 positions, 122,806,437 nodes, median 4.30 s
+(1,006,294 nodes/s), branching factor 2.70 from depth 7 to 9, quiescence 22.0 % of the nodes, table hits 3.9 % of
+the probes. With the shared table: 118,614,205 nodes but median 4.58 s (974,990 nodes/s).
+
 ## How to measure a change
 
 1. Build the binary (`cargo build --release --bin uci` in `rust/`) and the opening suite ([Openings](OPENINGS.md)).

@@ -18,7 +18,7 @@ use _core::eval::{Eval, Evaluator};
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
-use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
+use _core::search::{self, Control, Counters, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
 
 /// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
@@ -370,8 +370,167 @@ fn bench_once(eval: &Eval, print: bool) -> (u64, f64) {
     (total_nodes, started.elapsed().as_secs_f64())
 }
 
+/// `uci ttd <depth> <positions> [limit_s]`: searches every position of the file (one FEN per line,
+/// `#` starts a comment) to `depth` with fresh memory and one thread, and prints the time and the
+/// nodes of each and what the search counted over all of them. A position that does not finish
+/// within the limit counts as the limit in the median. `TTD_TABLE=shared` searches with the table
+/// of several threads (64 MB) instead of the one of a single thread.
+fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<(), String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    let fens: Vec<String> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| {
+            line.split_whitespace()
+                .take(6)
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    if fens.is_empty() {
+        return Err(format!("{path}: no positions"));
+    }
+    let shared = std::env::var("TTD_TABLE").is_ok_and(|table| table == "shared");
+    let options = Options {
+        techniques: Techniques::from_names(&DEFAULT_TECHNIQUES)?,
+        ..Options::default()
+    };
+    let mut counters = Counters::default();
+    let mut seconds: Vec<f64> = Vec::new();
+    let (mut total_nodes, mut total_seconds, mut finished) = (0u64, 0.0, 0);
+    let mut nodes_by_depth = vec![0u64; depth + 1];
+    for (number, fen) in fens.iter().enumerate() {
+        let mut memory = if shared {
+            // The shared table without its helper threads.
+            let mut memory = Memory::with_threads(DEFAULT_MAX_TT_ENTRIES, 2, DEFAULT_HASH_MB);
+            memory.threads = 1;
+            memory
+        } else {
+            Memory::new(DEFAULT_MAX_TT_ENTRIES)
+        };
+        memory.counters = counters;
+        let mut state = GameState::from_moves(fen, &[])?;
+        let origin = Instant::now();
+        let clock = || origin.elapsed().as_secs_f64();
+        let control = Control {
+            start: 0.0,
+            hard_limit: limit,
+            clock: &clock,
+            stop: None,
+            progress: None,
+            rotation: 0,
+        };
+        let (_, stats) = search::iterative_deepening(
+            &mut state,
+            eval,
+            &mut memory,
+            &options,
+            depth,
+            f64::INFINITY,
+            &control,
+        )?;
+        let elapsed = clock();
+        counters = memory.counters;
+        let done = stats.completed_depth >= depth;
+        if done {
+            finished += 1;
+            for iteration in &stats.iterations {
+                nodes_by_depth[iteration.depth] += iteration.nodes;
+            }
+        }
+        total_nodes += stats.nodes_visited;
+        total_seconds += elapsed;
+        seconds.push(if done { elapsed } else { limit });
+        let by_iteration: Vec<String> = stats
+            .iterations
+            .iter()
+            .map(|iteration| format!("{}:{}", iteration.depth, iteration.nodes))
+            .collect();
+        println!(
+            "{:2} depth {} nodes {} seconds {elapsed:.2} iterations {}",
+            number + 1,
+            stats.completed_depth,
+            stats.nodes_visited,
+            by_iteration.join(" ")
+        );
+    }
+    seconds.sort_by(f64::total_cmp);
+    let percent = |part: u64, whole: u64| 100.0 * part as f64 / whole.max(1) as f64;
+    println!(
+        "positions {} finished {finished} depth {depth} table {}",
+        fens.len(),
+        if shared { "shared" } else { "local" }
+    );
+    println!("median seconds {:.2}", seconds[seconds.len() / 2]);
+    println!(
+        "nodes {total_nodes} nodes/s {:.0}",
+        total_nodes as f64 / total_seconds
+    );
+    if depth >= 3 && nodes_by_depth[depth - 2] > 0 {
+        // Over two plies, so that the odd and even iterations do not alternate.
+        let growth = nodes_by_depth[depth] as f64 / nodes_by_depth[depth - 2] as f64;
+        println!(
+            "branching factor {:.2} (depth {} to {depth}, per ply, finished positions)",
+            growth.sqrt(),
+            depth - 2
+        );
+    }
+    let c = counters;
+    println!(
+        "quiescence nodes {:.1} %",
+        percent(c.quiescence_nodes, total_nodes)
+    );
+    println!(
+        "first-move cuts {:.1} % of {} cuts",
+        percent(c.first_move_cuts, c.cuts),
+        c.cuts
+    );
+    println!(
+        "killer cuts {:.1} % of cuts, by slot (oldest first) {:.1} % {:.1} % {:.1} %",
+        percent(c.killer_cuts.iter().sum(), c.cuts),
+        percent(c.killer_cuts[0], c.cuts),
+        percent(c.killer_cuts[1], c.cuts),
+        percent(c.killer_cuts[2], c.cuts)
+    );
+    println!(
+        "table hits {:.1} % of {} probes, ending the node {:.1} %",
+        percent(c.table_hits, c.table_probes),
+        c.table_probes,
+        percent(c.table_cuts, c.table_probes)
+    );
+    println!(
+        "table stores {} dropping another position {:.1} %, a deeper one {:.1} %",
+        c.stores,
+        percent(c.evictions, c.stores),
+        percent(c.deeper_evictions, c.stores)
+    );
+    println!(
+        "repetition draws {} stores over a repetition {} ({:.3} % of stores)",
+        c.repetition_draws,
+        c.stores_over_repetition,
+        percent(c.stores_over_repetition, c.stores)
+    );
+    Ok(())
+}
+
 fn main() {
     let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
+    // uci ttd <depth> <positions> [limit_s]
+    if std::env::args().nth(1).as_deref() == Some("ttd") {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        let depth = args.first().and_then(|depth| depth.parse().ok());
+        let limit = args.get(2).map_or(Some(f64::INFINITY), |s| s.parse().ok());
+        let result = match (depth, args.get(1), limit) {
+            (Some(depth), Some(path), Some(limit)) => time_to_depth(&eval, depth, path, limit),
+            _ => Err("usage: uci ttd <depth> <positions> [limit_s]".to_string()),
+        };
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     // uci bench [repetitions] [model.json]
     if std::env::args().nth(1).as_deref() == Some("bench") {
         let repetitions = std::env::args()

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use super::ordering::{History, Killers};
 use super::shared_tt::SharedTable;
+use super::stats::Counters;
 use super::tt::{Table, Tt, DEFAULT_MAX_TT_ENTRIES};
 
 /// What a game keeps between two moves: the transposition table and the killer moves, and how
@@ -14,6 +15,7 @@ pub struct Memory {
     pub killers: Killers,
     pub history: History,
     pub threads: usize,
+    pub counters: Counters,
 }
 
 impl Memory {
@@ -24,6 +26,7 @@ impl Memory {
             killers: Killers::default(),
             history: History::default(),
             threads: 1,
+            counters: Counters::default(),
         }
     }
 
@@ -38,6 +41,7 @@ impl Memory {
             killers: Killers::default(),
             history: History::default(),
             threads,
+            counters: Counters::default(),
         }
     }
 

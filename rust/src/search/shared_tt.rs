@@ -120,7 +120,8 @@ impl SharedTable {
     }
 
     /// Store a result, classifying it against the original window of the search. A slot holding
-    /// a deeper entry of the current search for another position is kept.
+    /// a deeper entry of the current search for another position is kept. Returns the depth of the
+    /// entry of another position that was overwritten, if any.
     pub fn store(
         &self,
         key: Key,
@@ -129,13 +130,17 @@ impl SharedTable {
         depth: i32,
         alpha_orig: f64,
         beta_orig: f64,
-    ) {
+    ) -> Option<i32> {
         let hash = hash(&key);
         let index = self.index(hash);
         let age = self.age.load(Relaxed);
+        let mut dropped = None;
         if let Some((old, old_age)) = self.read_any(index) {
             if old_age == age && old.0 != hash && old.1.depth > depth {
-                return;
+                return None;
+            }
+            if old.0 != hash {
+                dropped = Some(old.1.depth);
             }
         }
         let flag = if value <= alpha_orig {
@@ -155,6 +160,7 @@ impl SharedTable {
         slot[1].store(value, Relaxed);
         slot[2].store(data, Relaxed);
         slot[0].store(hash ^ value ^ data, Relaxed);
+        dropped
     }
 
     /// The valid slot at `index` whatever its key: `(key hash, entry)` and its age.

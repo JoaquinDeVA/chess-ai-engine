@@ -2,6 +2,11 @@
 
 All notable changes. The newest are first.
 
+## Unreleased
+
+### Added
+- `uci ttd <depth> <positions> [limit_s]`, the time to a fixed depth over the 20 positions of `rust/bench/middlegame.epd`, with counters of the search (quiescence, table, cuts by killer, repetitions); the tree is unchanged (`uci bench`: 349,598 nodes before and after). See [Measurement](docs/MEASUREMENT.md#time-to-a-depth).
+
 ## 3.7.0 (2026-11-10)
 
 ### Added

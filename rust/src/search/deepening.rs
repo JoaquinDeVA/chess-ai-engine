@@ -50,6 +50,7 @@ fn helper(
         killers: Killers::default(),
         history,
         threads: 1,
+        counters: Counters::default(),
     };
     let (size, phase) = (
         SKIP_SIZE[index % SKIP_SIZE.len()],

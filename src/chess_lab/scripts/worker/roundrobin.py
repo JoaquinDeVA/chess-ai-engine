@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Play several SPRT matches in turns, a fixed number of rounds each, on the worker.
 
-python roundrobin.py queue.json --chunk-rounds 100 --concurrency 4
+python roundrobin.py queue.json --chunk-rounds 100 --concurrency 6
 
 Runs on the worker (standard library only), from ``~/worker`` where ``bin/``, ``fastchess`` and ``openings.epd`` are.
 Each turn resumes one match for ``--chunk-rounds`` rounds (or the ``chunk_rounds`` of the job) (2 games per round) and appends a line to

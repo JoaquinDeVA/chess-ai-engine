@@ -8,6 +8,6 @@ cd "$W"
 setsid nohup bash despues.sh </dev/null >/dev/null 2>&1 &
 sleep 1
 if pgrep -f "roundrobin.py queue.json" >/dev/null; then echo "ya está en marcha"; exit 0; fi
-setsid nohup python3 roundrobin.py queue.json --chunk-rounds 100 --concurrency 4 >>roundrobin.log 2>&1 </dev/null &
+setsid nohup python3 roundrobin.py queue.json --chunk-rounds 100 --concurrency 6 >>roundrobin.log 2>&1 </dev/null &
 sleep 3
 pgrep -af "roundrobin.py|fastchess|despues.sh" | cut -c1-120

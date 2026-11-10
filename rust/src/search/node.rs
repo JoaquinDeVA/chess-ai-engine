@@ -21,6 +21,17 @@ const SCOUT_EPSILON: f64 = 1e-9;
 const LMR_FROM_DEPTH: i32 = 3;
 const LMR_FROM_INDEX: usize = 3;
 
+/// Reverse futility pruning works up to this depth, and prunes when the static value is beyond the
+/// bound by `RFP_MARGIN_PER_PLY` log-odds per ply left: 80 centipawns of the plan on the usual
+/// logistic scale (`80 · ln 10 / 400`).
+const RFP_UP_TO_DEPTH: i32 = 6;
+const RFP_MARGIN_PER_PLY: f64 = 0.46;
+
+/// Log-odds of an expected score, to measure distances that mean the same at 0.5 and at 0.9.
+pub(super) fn log_odds(p: f64) -> f64 {
+    (p / (1.0 - p)).ln()
+}
+
 /// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
 /// the history says the move has cut before, and never so many that the search falls below one ply.
 pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) -> i32 {
@@ -289,10 +300,29 @@ impl Search<'_> {
         if self.options.techniques.tt_move && !helper_root {
             move_to_front(&mut ordered, table_move);
         }
+        let in_check = self.state.pos().is_check();
+        // Reverse futility: a static value far beyond the bound, in a window of no width and not in
+        // check, is taken as the value of the node.
+        if self.options.techniques.rfp
+            && ply > 0
+            && depth_remaining <= RFP_UP_TO_DEPTH
+            && !in_check
+            && beta - alpha <= SCOUT_EPSILON
+            // A bound in the range of the mates is not one a static value can judge.
+            && alpha > 0.01
+            && beta < 0.99
+        {
+            let value = self.static_value();
+            let margin = RFP_MARGIN_PER_PLY * f64::from(depth_remaining);
+            if (maximizing && value >= beta && log_odds(value) - log_odds(beta) >= margin)
+                || (!maximizing && value <= alpha && log_odds(alpha) - log_odds(value) >= margin)
+            {
+                return (value, None);
+            }
+        }
         // Null move: it needs a pass to be safe (not in check, not at the root, not twice in a
         // row) and pieces on the board, or zugzwang makes passing the best move. Only tried when
         // the static value already beats the bound, so the reduced search rarely wastes time.
-        let in_check = self.state.pos().is_check();
         if self.options.techniques.null_move
             && allow_null
             && ply > 0

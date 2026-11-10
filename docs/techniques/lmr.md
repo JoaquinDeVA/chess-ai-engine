@@ -4,7 +4,7 @@
 >
 > **Read it when:** You want to know why the search reaches depth 11 in half the time, and what it risks.
 >
-> **Next:** [Search techniques](README.md)
+> **Next:** [Reverse futility pruning](rfp.md)
 
 ## Problem
 

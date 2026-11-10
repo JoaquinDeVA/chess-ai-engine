@@ -37,6 +37,7 @@ On by default but not yet judged by an SPRT (queued for the compute node).
 | Technique | Evidence so far | Page |
 |---|---|---|
 | Late move reductions (`lmr`) | `ttd 11`: −68 % nodes, 23.53 s to 10.82 s; screening 51.33 % in 300 games | [lmr](lmr.md) |
+| Reverse futility pruning (`rfp`) | `ttd 11` with `lmr`: −33.7 % nodes, 11.13 s to 8.58 s median | [rfp](rfp.md) |
 
 ## The base: always on, no SPRT of its own
 

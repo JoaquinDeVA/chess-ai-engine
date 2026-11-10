@@ -13,7 +13,8 @@ pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.0001;
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games
 /// against the reference search (`docs/techniques/README.md`).
-pub const DEFAULT_TECHNIQUES: [&str; 5] = ["incremental", "tt_move", "null_move", "see", "lmr"];
+pub const DEFAULT_TECHNIQUES: [&str; 6] =
+    ["incremental", "tt_move", "null_move", "see", "lmr", "rfp"];
 
 /// Settings of a search.
 #[derive(Clone, Debug)]
@@ -45,11 +46,15 @@ pub struct Techniques {
     /// Late move reductions: the quiet moves far down the order are searched shallower first, and
     /// again at full depth only if they improve on the best move so far.
     pub lmr: bool,
+    /// Reverse futility pruning: a node whose static value is far beyond the bound, at a shallow
+    /// depth, returns that value without searching.
+    pub rfp: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 5] = ["incremental", "tt_move", "null_move", "see", "lmr"];
+    pub const NAMES: [&'static str; 6] =
+        ["incremental", "tt_move", "null_move", "see", "lmr", "rfp"];
 
     /// The techniques with the given names.
     pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<Techniques, String> {
@@ -61,6 +66,7 @@ impl Techniques {
                 "null_move" => techniques.null_move = true,
                 "see" => techniques.see = true,
                 "lmr" => techniques.lmr = true,
+                "rfp" => techniques.rfp = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -80,6 +86,7 @@ impl Techniques {
             null_move: true,
             see: true,
             lmr: true,
+            rfp: true,
         }
     }
 }

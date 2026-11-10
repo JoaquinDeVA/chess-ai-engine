@@ -546,3 +546,25 @@ fn late_move_reductions_still_find_the_forced_mate() {
     let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
     assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
 }
+
+#[test]
+fn reverse_futility_keeps_the_forced_mate_and_the_hanging_queen() {
+    let with = Techniques {
+        rfp: true,
+        ..Techniques::all()
+    };
+    let result = quiescent(MATE_IN_TWO, 6, with);
+    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
+    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    let queen = quiescent("4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1", 3, with);
+    let without = quiescent("4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1", 3, Techniques::all());
+    assert_eq!(queen.best, without.best);
+}
+
+#[test]
+fn the_reverse_futility_margin_means_the_same_at_every_level() {
+    use super::node::log_odds;
+    // 0.5 -> 0.61 and 0.9 -> 0.934 are the same distance in log-odds (about 0.46).
+    assert!((log_odds(0.61) - log_odds(0.5) - 0.447).abs() < 0.02);
+    assert!((log_odds(0.934) - log_odds(0.9) - 0.472).abs() < 0.03);
+}

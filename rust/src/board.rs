@@ -35,6 +35,19 @@ pub fn zobrist(pos: &Chess) -> u64 {
     pos.zobrist_hash::<Zobrist64>(EnPassantMode::Legal).0
 }
 
+/// Zobrist hash of the position after `m`, from the hash `current` of `pos` (shakmaty updates it
+/// from the squares the move touches; the whole hash is computed again where it cannot).
+pub fn zobrist_after(pos: &Chess, current: u64, m: &Move) -> u64 {
+    match pos.update_zobrist_hash::<Zobrist64>(Zobrist64(current), *m, EnPassantMode::Legal) {
+        Some(hash) => hash.0,
+        None => {
+            let mut child = pos.clone();
+            child.play_unchecked(*m);
+            zobrist(&child)
+        }
+    }
+}
+
 /// Identity of a move by its squares and promotion (as `chess.Move` compares moves), a number
 /// that orders like the UCI string (`e2e4` < `e7e8q`). Captured pieces do not count.
 pub fn move_id(m: &Move) -> u32 {
@@ -178,8 +191,8 @@ impl GameState {
             has_repeated: self.has_repeated,
         });
         let zeroing = m.role() == Role::Pawn || m.is_capture();
+        let key = zobrist_after(&self.pos, self.keys[self.keys.len() - 1], &m);
         self.pos.play_unchecked(m);
-        let key = zobrist(&self.pos);
         let irreversible =
             zeroing || had_legal_ep || self.pos.castles().castling_rights() != rights;
         if irreversible {
@@ -251,9 +264,7 @@ impl GameState {
             return false;
         }
         moves.iter().any(|m| {
-            let mut child = self.pos.clone();
-            child.play_unchecked(*m);
-            let key = zobrist(&child);
+            let key = zobrist_after(&self.pos, current, m);
             history.iter().filter(|&&k| k == key).count() >= 2
         })
     }
@@ -428,6 +439,38 @@ mod tests {
 
     fn outcome_of(s: &GameState) -> Option<Winner> {
         s.outcome(&ordered_moves(s.pos()))
+    }
+
+    #[test]
+    fn the_key_that_follows_the_moves_is_the_one_computed_from_scratch() {
+        // Playouts that take the move at a fixed stride, with a null move now and then.
+        let fens = [
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        ];
+        let mut checked = 0;
+        for fen in fens {
+            for stride in 1..8 {
+                let mut s = GameState::new(position_from_fen(fen).unwrap());
+                for ply in 0..80 {
+                    let moves = ordered_moves(s.pos());
+                    if moves.is_empty() {
+                        break;
+                    }
+                    if ply % 11 == 10 && !s.pos().is_check() {
+                        s.apply_null();
+                    } else {
+                        s.apply(moves[(ply * stride + stride) % moves.len()]);
+                    }
+                    let key = s.key().zobrist;
+                    assert_eq!(key, zobrist(s.pos()), "{fen} stride {stride} ply {ply}");
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 1000);
     }
 
     #[test]

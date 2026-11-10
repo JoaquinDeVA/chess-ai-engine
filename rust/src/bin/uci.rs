@@ -22,8 +22,8 @@ use _core::search::{self, Control, Counters, Memory, Options, Techniques, DEFAUL
 use shakmaty::Color;
 
 /// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
-const MODEL_JSON: &str = include_str!("../../models/net_pst_w32.json");
-const MODEL_NAME: &str = "net_pst_w32";
+const MODEL_JSON: &str = include_str!("../../models/net_pst_w64.json");
+const MODEL_NAME: &str = "net_pst_w64";
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const DEFAULT_HASH_MB: usize = 64;
 

@@ -2,22 +2,31 @@
 
 All notable changes. The newest are first.
 
-## Unreleased
+## 3.7.0 (2026-11-10)
+
+### Added
+- Three networks trained on the GPU: `net_pst_w64`, `net_pst_w64x16` and `net_pst_k4_w64` (`59a33dd`). Every model was timed again on the same laptop.
+- `entrenar.sh` resumes only the models named in `SOLO` (`d2c029b`).
+
+### Changed
+- The round robin runs with 6 concurrent games (`0bc7b69`).
+- The node chains the work after training and queues the 10+5 match alone (`6d15f3a`).
+- The SPRTs played without the incremental accumulator are dropped and the matched pairs are queued (`c564f5b`).
+
+## 3.6.0 (2026-11-09)
+
+A switch to the network: the engine plays `net_pst_w32` by default, the logistic models leave the code, and the book and the tablebases move into the UCI binary.
 
 ### Removed
 - The switches `aspiration`, `history_malus` and `qs_tt`, with their UCI values and tests (`efb595e`): in the round robin at 10 s + 0.1 s none reached a verdict in about 1,100 rounds (removing `aspiration` +10.7 ± 12.5; adding `history_malus` +9.2 ± 12.0, `qs_tt` −0.3 ± 12.5). The search has four switches: `incremental`, `tt_move`, `null_move`, `see`. Each page keeps its results as "retired, to be taken up again" ([Search techniques](docs/techniques/README.md#retired-to-be-taken-up-again)).
 - The logistic models (`linear_pst_terms`, `linear_pst`) from the core and the laboratory, and the `Kings` feature set (`8700e6f`); the last commit that plays them is `a1bdf60`. Its card stays, with status `retired` ([Models](docs/MODELS.md#piece-square-and-terms-logistic-model-linear_pst_terms-retired)).
-- The switches `lmr`, `qs_evasions` and the UCI option `TimeRules`, all measured and rejected ([Search techniques](docs/techniques/README.md#how-the-switches-were-judged)).
 
 ### Added
 - [`pvs`](docs/techniques/pvs.md) and [`history`](docs/techniques/history.md) are part of the core, with no switch (`70701f7`). Their SPRTs [−5, 0] (`abl_pvs`, `abl_history`) continue in the round robin from LLR +2.21 and +2.09.
 - The `pst_k4` feature set (piece squares in 4 king buckets, without the classical terms) and its network, King-bucket piece-square network (`net_pst_k4_w64`), registered and not trained ([Models](docs/MODELS.md#king-bucket-piece-square-network-net_pst_k4_w64)).
 - Round robin of SPRTs on the compute node (fastchess, 10 s + 0.1 s, 2026-11-06 to 2026-11-09): the removal of each default technique and the models in steps; 17 jobs in [Results](docs/RESULTS.md#round-robin-rust-engine-fastchess). Removing `null_move` (−97.4 ± 24.5), `see`, `tt_move` or `incremental` loses; `net_pst_w32` beats `linear_pst_terms@e30` by +165.1 ± 32.9; the hybrid networks, without an incremental accumulator, lose to it.
 - The worker installs each engine build in its own path (`bin/<hash>/uci`) and each queue job names its binary, so a long SPRT keeps its build (`a1bdf60`).
-- Trained hybrid networks (768 piece-square inputs plus the eleven classical terms, optionally with 4 or 8 king buckets) at effort 30: Spearman 0.702 to 0.722 against 0.646 for the logistic model, 3.4 to 3.9 µs per evaluation against 2.4, all measured on one laptop (`python -m chess_lab.measure.evaluate`). Not played yet. See [Models](docs/MODELS.md#hybrid-networks-net_hybrid_w32-net_hybrid_w64-net_hybrid_k4_w64-net_hybrid_k8_w64).
-- A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
-- A move-ordering switch, off by default and measured at a fixed 20,000 nodes: [`history_malus`](docs/techniques/history-malus.md) (quiet moves tried before a cut lose history score; +3.9 ± 9.3 Elo, no verdict). Results in [RESULTS](docs/RESULTS.md).
-- Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/results/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +67.2 ± 34.5 in two SPRTs stopped by hand (no verdict).
+- The training task `entrenar` sets up and trains the candidate networks on the node (`91f807f`).
 
 ### Changed
 - The search lists the legal moves in shakmaty's own order instead of sorting them into python-chess' order (`ordered_moves` in `rust/src/board.rs`). On one laptop at fixed depth 6 (`uci bench`) it ran about 28 % more nodes per second and about 8.7 % more nodes (estimated, one run, no SPRT); the Elo effect is not measured. Equal-value ties can resolve to another move (the K+Q vs K tablebase test now expects `a7b6`).
@@ -25,11 +34,50 @@ All notable changes. The newest are first.
 - Every network has an incremental accumulator, not only the slotted piece-square ones: the bucketed and hybrid networks update their piece part move by move, rebuild it when the king changes bucket, and add the classical terms at each leaf. `uci bench 5`: `net_hybrid_w64` 521,915 to 635,828 nodes/s (+22 %), `net_hybrid_k4_w64` +16 %; about 2 % less for `net_pst_w32` ([incremental](docs/techniques/incremental.md#measured-effect)).
 - The UCI binary plays the piece-square network `net_pst_w32` (embedded, `rust/models/net_pst_w32.json`) instead of `linear_pst_terms` (`8700e6f`): 1,020,805 nodes/s in `uci bench 5` (laptop). `setoption name Model` loads networks only. Training code shared with the networks moved to `models/fitting/epochs.py`.
 - Documentation centred on the network ([Models](docs/MODELS.md)); the retired techniques and the logistic model keep a section with what was measured.
+- The opening suite for the matches has 10,000 openings (`107b9e7`).
+
+## 3.5.0 (2026-11-07)
+
+### Added
+- A round-robin scheduler for SPRT matches on the compute node (`4654821`); the node starts it, uploads the engine and collects the results (`35387f0`, `3d8c467`). A stop task ends it (`3147519`).
+- The `uci` binary loads networks and linear models from a JSON file (`b531f9a`).
+- The models are compared in steps instead of all against the linear one, and the best networks also play the linear model directly (`88c31c3`, `d2d03ba`).
+
+## 3.4.0 (2026-11-05)
+
+### Added
+- Trained hybrid networks (768 piece-square inputs plus the eleven classical terms, optionally with 4 or 8 king buckets) at effort 30: Spearman 0.702 to 0.722 against 0.646 for the logistic model, 3.4 to 3.9 µs per evaluation against 2.4, all measured on one laptop (`python -m chess_lab.measure.evaluate`). Not played yet. See [Models](docs/MODELS.md#hybrid-networks-net_hybrid_w32-net_hybrid_w64-net_hybrid_k4_w64-net_hybrid_k8_w64).
+
+### Changed
 - `chess_lab` reorganised: `models/features.py` (was `linear_features.py`), `models/target.py` (was `representation.py`), `models/fitting/{linear,neural}.py` (were `linear_eval.py`, `neural_eval.py`), `training/data/{raw_shards,sidecar,split}.py` (were `lichess_raw.py`, `sidecar.py`, `dataset.py`) `training/cache.py` (cache directory, split from `effort.py`) and `models/store/` (`artifacts/`, `cards/`, `h1_weights.json`, `loader.py`, `cards.py`). The Lichess data directory is now `data/LichessPositions/` and the encoded-batch cache sits directly in `data/cache/`. Same behaviour; imports and paths in the docs follow.
+- Every trained network is measured on one laptop with `python -m chess_lab.measure.evaluate` and listed by name (`63427fb`).
+
+## 3.3.0 (2026-11-04)
+
+### Added
+- A move-ordering switch, off by default and measured at a fixed 20,000 nodes: [`history_malus`](docs/techniques/history-malus.md) (quiet moves tried before a cut lose history score; +3.9 ± 9.3 Elo, no verdict). Results in [RESULTS](docs/RESULTS.md).
+- The `--patience` option of the training: stop after N epochs without improvement (`33497b7`).
+- The king-bucket network `net_kings_w32` and its feature set `pst_kings` (`57a23aa`).
 - [Several threads](docs/techniques/lazy-smp.md): each helper runs its own iterative deepening with a skip pattern and aspiration, the history scores are shared, the table slots are cache-aligned and the move is chosen by a vote of the threads. Seconds to depth 8 with 4 threads: 0.788 → 0.638; with 6: 0.871 → 0.627 (`python -m chess_lab.measure.search_speed`). In games 6 threads against 4 gave +5.0 ± 37.5 Elo in 280 games at 10 s + 0.1 s (no verdict), so 4 is the recommended count. The vote itself, at 6 threads against the same code without it: −36.0 ± 37.9 Elo in 300 games (`data/results/matches/smp_vote/match.log`), not significant.
-- Documentation reduced to what is current: the models page covers `linear_pst_terms`, `h1` and the light network candidates; figures of the earlier Python engine and of removed models are gone or marked "not measured"; the techniques index has an "Elo estimated" column.
+
+### Changed
+- Static exchange evaluation, [`see`](docs/techniques/see.md), now **on by default** (binary and window): SPRT [0, 5] at a fixed 20,000 nodes per move accepted H1, +56.4 ± 17.5 Elo in 1,188 games (`data/results/matches/see_nodes/match.log`). At a time control it had +47.8 ± 34.3 in a 300-game screening and +41.5 ± 46.1 and +67.2 ± 34.5 in two SPRTs stopped by hand (no verdict).
 - Two more speed-ups of the Rust search, same nodes: the build targets x86-64-v3 (AVX2, BMI2; `.cargo/config.toml`), 750 k to 788 k nodes/s (+5 %), and `linear_pst_terms` follows its piece-square sums move by move ([`incremental`](docs/techniques/incremental.md)), 788 k to 928 k (+17 %), 275,144 nodes in `uci bench` (median of 5 runs, laptop). Against the binary before the 2.6x speed-up, same techniques without `see`: 73.83 % in 300 games at 10 s + 0.1 s, +180.2 ± 36.0 Elo at the last rating printed (280 games; `data/results/matches/speed_vs_old/match.log`).
 - The Rust search is 2.58x faster in `uci bench` (304 k to 784 k nodes/s, the same 565,744 nodes; 2.2x at depth 8 on 60 other positions, 302 k to 661 k, with a one-off harness that was not kept): packed move-order keys, pawn terms on bitboards, no allocation per node in the logistic model, one list in move ordering. +130.9 ± 39.8 Elo against the previous binary in 300 games at 10 s + 0.1 s. The Rust modules were renamed after what they hold (see [Architecture](docs/ARCHITECTURE.md)).
+- Documentation reduced to what is current: the models page covers `linear_pst_terms`, `h1` and the light network candidates; figures of the earlier Python engine and of removed models are gone or marked "not measured"; the techniques index has an "Elo estimated" column.
+- Training uses quiet positions always; the `Representation` filter option is gone (`30d4a85`). Models and features that were discarded are removed (`29549a9`).
+
+### Removed
+- The switches `lmr`, `qs_evasions` and the UCI option `TimeRules`, all measured and rejected ([Search techniques](docs/techniques/README.md#how-the-switches-were-judged)).
+
+## 3.2.0 (2026-11-03)
+
+### Added
+- A quiescence switch, off by default and measured at a fixed 20,000 nodes: [`qs_tt`](docs/techniques/qs-tt.md) (the value of a horizon node goes into the table; +0.7 ± 3.9 Elo, no verdict). Results in [Results](docs/RESULTS.md).
+- The quiescence switch `qs_evasions` and the UCI option `TimeRules` (single, half, stab, nodes), both off by default and rejected later (`e2cea5b`, `30cba50`).
+- Passed-pawn and king-attack term models, `linear_pst_passed` and `linear_pst_king` (`2e848cb`), and the `see` technique, off by default, to be measured (`6caf4dc`).
+
+### Changed
 - The shipped `linear_pst_terms` is now trained on quiet positions only (effort 10): +284 ± 43 Elo against the previous model in 362 games at 60 s + 1 s. Three variants (`k` 0.0065, 0.5 % of the mates, 30 M positions) did not beat it. See [Models](docs/MODELS.md) and [Results](docs/RESULTS.md).
 - The clock of the UCI binary is again the share of the time left (15 %, between 1.5 and 40 s): the rule that spent the time left over the moves to go plus 75 % of the increment lost −64 ± 24 Elo at 60 s + 1 s in 720 games (SPRT stopped by hand), see [Results](docs/RESULTS.md).
 - [How a change is measured](docs/MEASUREMENT.md) says which time control to use and that fixed nodes favour changes that save nodes. The worker notes in `match.sh` describe the port forwarding of the desktop's SSH.

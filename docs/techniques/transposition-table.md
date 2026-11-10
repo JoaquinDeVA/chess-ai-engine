@@ -64,9 +64,21 @@ A shallower entry is not used for its value, but its best move is still the best
 
 `Table` and `Entry` in `rust/src/search/tt.rs`; probed at the start of `Search::node` and written at
 its end (`rust/src/search/node.rs`). The key is `GameState::key()` (`rust/src/board.rs`): a hash of
-the position and the two move counters. The table is capped at 500,000 entries
+the position (placement, side to move, castling rights, en passant square) without the move counters, so a position reached by two move orders shares its entry. The table is capped at 500,000 entries
 (`DEFAULT_MAX_TT_ENTRIES`), oldest dropped first. The UCI option `Hash` (megabytes) sizes only the
 shared table of several threads; with one thread it has no effect.
+Three guards make the shared key safe:
+
+- **Mates by distance from the node.** A mate is stored as `value ± ply·eps` (`for_table`) and read back
+  for the ply of the new visit (`at_ply`), so a mate found at ply 7 and read at ply 6 keeps its true
+  distance. Evaluations are clipped to `0.01 .. 0.99` and a mate with `eps = 0.0001` per ply stays outside
+  that range, so what lies outside is a mate.
+- **Fifty-move clock.** If `halfmoves + depth_remaining ≥ 100` the value could depend on the clock: the entry
+  neither cuts nor is stored, and still gives its move. (Test: `an_entry_that_the_fifty_move_clock_could_change_is_not_stored`.)
+- **Repetition.** With a repeated position in the history (`GameState::has_repeated`) the table is not
+  asked, so the draw by repetition is found by the terminal check. A value computed under a repetition
+  inside its subtree can still be reused from another path; that is the usual limit of a table keyed by position.
+
 Nothing is stored after the clock truncates a search, because a truncated value is neither exact nor
 a bound. The table lives for the whole game (the iterations of a move and the moves that follow);
 values are from the point of view of the colour played, so it is cleared on a new game. Quiescence
@@ -75,9 +87,9 @@ does not use it. With several threads the table is the lock-free `SharedTable`
 
 ## Measured effect
 
-Not measured with the Rust engine. Figures taken with the earlier Python engine have no reproducible source today and are not quoted. The table is warm from the previous moves in a game, which a per-position measurement does not cover.
+Not measured with the Rust engine. Dropping the move counters from the key lowered the nodes of `uci ttd 9 rust/bench/middlegame.epd` (20 positions, one thread) from 122,806,437 to 117,358,262 (-4.4 %, table hits 3.9 % to 4.8 % of probes); the Elo effect is not measured. Figures taken with the earlier Python engine have no reproducible source today and are not quoted. The table is warm from the previous moves in a game, which a per-position measurement does not cover.
 
 ## Status
 
 Adopted; part of the reference search since the first commit (2026-10-16). Size cap and no store after
-truncation since `1ee37d6`.
+truncation since `1ee37d6`. Key without move counters, mates relative to the node and the fifty-move and repetition guards since 2026-11-10.

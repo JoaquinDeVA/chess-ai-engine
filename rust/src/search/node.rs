@@ -39,6 +39,33 @@ struct Search<'a> {
 type Outcome = (f64, Option<u32>);
 
 impl Search<'_> {
+    /// A value as the table keeps it: the distance to a mate counts from the node, not from the
+    /// root. The evaluations are clipped to `0.01 ..= 0.99` and a mate is farther out (the
+    /// preference per ply is small enough for that), so what lies outside is a mate. The map is
+    /// increasing, so the bounds of the window can go through it as well.
+    fn for_table(&self, value: f64, ply: i32) -> f64 {
+        let shift = ply as f64 * self.options.epsilon;
+        if value > 0.99 {
+            value + shift
+        } else if value < 0.01 {
+            value - shift
+        } else {
+            value
+        }
+    }
+
+    /// The inverse of [`Search::for_table`] for a node at `ply`.
+    fn at_ply(&self, value: f64, ply: i32) -> f64 {
+        let shift = ply as f64 * self.options.epsilon;
+        if value > 0.99 {
+            value - shift
+        } else if value < 0.01 {
+            value + shift
+        } else {
+            value
+        }
+    }
+
     /// Utility of a finished game, nudged so that quicker wins and slower losses are preferred.
     fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> f64 {
         match winner {
@@ -131,23 +158,32 @@ impl Search<'_> {
         // Order of the checks: the table first (it can end the node for free), then game end and
         // horizon, then the clock, and only then the techniques that cost a search.
         let key = self.state.key();
-        let entry = self.memory.table.get(&key);
+        // A value searched `depth_remaining` plies deep can depend on the fifty-move clock only if
+        // the clock can reach 100 inside that search; then the entry gives its move and nothing
+        // else. A position with a repetition behind it is a possible draw: the table is not asked.
+        let clock_free = self.state.pos().halfmoves() as i32 + depth_remaining < 100;
+        let entry = if self.state.has_repeated() {
+            None
+        } else {
+            self.memory.table.get(&key)
+        };
         let table_move = entry.and_then(|e| e.best);
         self.memory.counters.table_probes += 1;
         if let Some(entry) = entry {
             self.memory.counters.table_hits += 1;
-            if entry.depth >= depth_remaining {
+            if clock_free && entry.depth >= depth_remaining {
+                let value = self.at_ply(entry.value, ply);
                 match entry.flag {
                     Flag::Exact => {
                         self.memory.counters.table_cuts += 1;
-                        return (entry.value, entry.best);
+                        return (value, entry.best);
                     }
-                    Flag::LowerBound => alpha = alpha.max(entry.value),
-                    Flag::UpperBound => beta = beta.min(entry.value),
+                    Flag::LowerBound => alpha = alpha.max(value),
+                    Flag::UpperBound => beta = beta.min(value),
                 }
                 if alpha >= beta {
                     self.memory.counters.table_cuts += 1;
-                    return (entry.value, entry.best);
+                    return (value, entry.best);
                 }
             }
         }
@@ -300,14 +336,15 @@ impl Search<'_> {
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
-        if !self.truncated {
+        if !self.truncated && clock_free {
+            // Mates are stored by their distance from this node, not from the root.
             let dropped = self.memory.table.store(
                 key,
-                best_value,
+                self.for_table(best_value, ply),
                 best_move,
                 depth_remaining,
-                alpha_orig,
-                beta_orig,
+                self.for_table(alpha_orig, ply),
+                self.for_table(beta_orig, ply),
             );
             let counters = &mut self.memory.counters;
             counters.stores += 1;

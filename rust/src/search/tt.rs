@@ -1,7 +1,7 @@
 //! Transposition table.
 
 use std::collections::{HashMap, VecDeque};
-use std::hash::{BuildHasherDefault, Hash, Hasher};
+use std::hash::{BuildHasherDefault, Hasher};
 
 use crate::board::Key;
 
@@ -39,17 +39,6 @@ impl Hasher for KeyHasher {
     }
     fn write_u64(&mut self, value: u64) {
         self.0 ^= value;
-    }
-    fn write_u32(&mut self, value: u32) {
-        self.0 ^= (value as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
-    }
-}
-
-impl Hash for Key {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.zobrist);
-        state.write_u32(self.halfmoves);
-        state.write_u32(self.fullmoves.rotate_left(7));
     }
 }
 
@@ -206,11 +195,7 @@ mod tests {
     use super::*;
 
     fn key(n: u64) -> Key {
-        Key {
-            zobrist: n,
-            halfmoves: 0,
-            fullmoves: 1,
-        }
+        n
     }
 
     #[test]

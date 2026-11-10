@@ -140,6 +140,52 @@ fn a_quicker_win_is_worth_more_than_a_slower_one() {
 }
 
 #[test]
+fn a_mate_keeps_its_distance_when_it_comes_back_from_the_table() {
+    // The deepening reads the mates of the previous iteration from the table at other plies.
+    let two = fixed(MATE_IN_TWO, 6);
+    assert!(
+        (two.value - (1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON)).abs() < 1e-12,
+        "{}",
+        two.value
+    );
+}
+
+#[test]
+fn an_entry_that_the_fifty_move_clock_could_change_is_not_stored() {
+    let search = |fen: &str| {
+        let clock = FakeClock::default();
+        let eval = Material {
+            clock: &clock,
+            tick: 0.0,
+        };
+        let now = || clock.now();
+        let control = Control {
+            start: 0.0,
+            hard_limit: f64::INFINITY,
+            clock: &now,
+            stop: None,
+            progress: None,
+            rotation: 0,
+        };
+        let mut game = state(fen);
+        let key = game.key();
+        let mut memory = Memory::default();
+        alpha_beta(
+            &mut game,
+            &eval,
+            &mut memory,
+            &Options::default(),
+            4,
+            &control,
+        );
+        memory.table.get(&key).is_some()
+    };
+    assert!(search("4k3/8/8/8/8/8/8/R3K3 w - - 0 1"));
+    assert!(search("4k3/8/8/8/8/8/8/R3K3 w - - 90 80"));
+    assert!(!search("4k3/8/8/8/8/8/8/R3K3 w - - 97 80"));
+}
+
+#[test]
 fn the_state_is_restored_after_every_search() {
     let mut game = state(START);
     let before = game.key();

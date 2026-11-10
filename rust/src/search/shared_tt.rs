@@ -15,12 +15,6 @@ use crate::board::Key;
 const SLOT_BYTES: usize = 32;
 const VALID: u64 = 1 << 63;
 
-fn hash(key: &Key) -> u64 {
-    key.zobrist
-        ^ (key.halfmoves as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        ^ (key.fullmoves as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
-}
-
 fn flag_bits(flag: Flag) -> u64 {
     match flag {
         Flag::Exact => 0,
@@ -115,7 +109,7 @@ impl SharedTable {
     }
 
     pub fn get(&self, key: &Key) -> Option<Entry> {
-        let hash = hash(key);
+        let hash = *key;
         self.read(self.index(hash), hash).map(|(entry, _)| entry)
     }
 
@@ -131,7 +125,7 @@ impl SharedTable {
         alpha_orig: f64,
         beta_orig: f64,
     ) -> Option<i32> {
-        let hash = hash(&key);
+        let hash = key;
         let index = self.index(hash);
         let age = self.age.load(Relaxed);
         let mut dropped = None;
@@ -185,11 +179,7 @@ mod tests {
     use super::*;
 
     fn key(n: u64) -> Key {
-        Key {
-            zobrist: n.wrapping_mul(0x9E37_79B9_7F4A_7C15),
-            halfmoves: 0,
-            fullmoves: 1,
-        }
+        n.wrapping_mul(0x9E37_79B9_7F4A_7C15)
     }
 
     #[test]
@@ -212,10 +202,10 @@ mod tests {
         let table = SharedTable::with_slots(1024);
         // find two keys that share a slot
         let first = key(1);
-        let slot = table.index(hash(&first));
+        let slot = table.index(first);
         let second = (2..100_000u64)
             .map(key)
-            .find(|k| table.index(hash(k)) == slot)
+            .find(|k| table.index(*k) == slot)
             .unwrap();
         table.store(first, 0.5, None, 6, 0.0, 1.0);
         table.store(second, 0.6, None, 2, 0.0, 1.0);

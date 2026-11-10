@@ -18,14 +18,10 @@ use shakmaty::{
     MoveList, Position, Rank, Role, Square,
 };
 
-/// Key of a position in the transposition table: the position (placement, side to move, castling
-/// rights, legal en passant square) and the two move counters.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Key {
-    pub zobrist: u64,
-    pub halfmoves: u32,
-    pub fullmoves: u32,
-}
+/// Key of a position in the transposition table: its Zobrist hash (placement, side to move,
+/// castling rights, legal en passant square). The move counters are not part of it, so the same
+/// position reached by two move orders shares its entry; the search guards the fifty-move clock.
+pub type Key = u64;
 
 /// The result of a finished game: the winner, or `None` for a draw.
 pub type Winner = Option<Color>;
@@ -174,11 +170,12 @@ impl GameState {
 
     /// Key for the transposition table.
     pub fn key(&self) -> Key {
-        Key {
-            zobrist: *self.keys.last().expect("the history is never empty"),
-            halfmoves: self.pos.halfmoves(),
-            fullmoves: self.pos.fullmoves().get(),
-        }
+        *self.keys.last().expect("the history is never empty")
+    }
+
+    /// Whether some position of the history since the last irreversible move occurred twice.
+    pub fn has_repeated(&self) -> bool {
+        self.has_repeated
     }
 
     /// Play a legal move, extending the history.
@@ -464,7 +461,7 @@ mod tests {
                     } else {
                         s.apply(moves[(ply * stride + stride) % moves.len()]);
                     }
-                    let key = s.key().zobrist;
+                    let key = s.key();
                     assert_eq!(key, zobrist(s.pos()), "{fen} stride {stride} ply {ply}");
                     checked += 1;
                 }
@@ -524,10 +521,10 @@ mod tests {
         let before = s.key();
         s.apply_null();
         assert_eq!(s.turn(), Color::Black);
-        assert_ne!(s.key().zobrist, before.zobrist);
+        assert_ne!(s.key(), before);
         // passing twice in a row repeats the first position
         s.apply_null();
-        assert_eq!(s.key().zobrist, before.zobrist);
+        assert_eq!(s.key(), before);
         let moves = ordered_moves(s.pos());
         assert!(
             s.outcome(&moves).is_none(),
@@ -536,6 +533,13 @@ mod tests {
         s.undo();
         s.undo();
         assert_eq!(s.key(), before);
+    }
+
+    #[test]
+    fn a_null_move_does_not_advance_the_fifty_move_clock() {
+        let mut s = state("4k3/8/8/8/8/8/8/R3K3 w - - 40 60");
+        s.apply_null();
+        assert_eq!(s.pos().halfmoves(), 40);
     }
 
     #[test]

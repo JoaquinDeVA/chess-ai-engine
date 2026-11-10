@@ -22,8 +22,8 @@ happen among those, so the draw rules read that short list instead of replaying 
 ## How it works
 
 - **Make/unmake.** `apply` pushes the move onto an undo stack and updates the position; `undo` pops it.
-- **Key.** A hash of the position plus the two move counters: the same positions the FEN identifies, without
-  building the string.
+- **Key.** The Zobrist hash of the position (placement, side to move, castling rights, en passant square), updated from the move without
+  building the string; the move counters are not part of it.
 - **Terminal check**, same answer as `board.outcome(claim_draw=True)`: checkmate, stalemate and insufficient
   material come from the position; the fifty-move claim needs 100 halfmoves and a legal move; the threefold
   claim holds when the position occurred three times, or a legal move reaches one that occurred twice.

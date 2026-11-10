@@ -37,7 +37,7 @@ game. Always on (not a switch).
 
 ## Measured effect
 
-Not measured with the Rust engine. Figures taken with the earlier Python engine have no reproducible source today and are not quoted.
+Not measured with the Rust engine as a whole. Storing the killers by ply instead of by remaining depth (tried 2026-11-10 on `uci ttd 9 rust/bench/middlegame.epd`, one thread) raised the nodes from 107,372,423 to 111,175,719 (+3.5 %) with the same killer cut share (10.9 % to 11.0 %), so it was not adopted; with only null move reducing the depth, ply and remaining depth almost coincide. Figures taken with the earlier Python engine have no reproducible source today and are not quoted.
 
 ## Status
 

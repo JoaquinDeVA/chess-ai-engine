@@ -397,8 +397,15 @@ fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<()
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(DEFAULT_MAX_TT_ENTRIES);
+    // Techniques to measure, comma separated (`TTD_TECHNIQUES=incremental,see`); the default set otherwise.
+    let names = std::env::var("TTD_TECHNIQUES").unwrap_or_else(|_| DEFAULT_TECHNIQUES.join(","));
     let options = Options {
-        techniques: Techniques::from_names(&DEFAULT_TECHNIQUES)?,
+        techniques: Techniques::from_names(
+            &names
+                .split(',')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>(),
+        )?,
         ..Options::default()
     };
     let mut counters = Counters::default();

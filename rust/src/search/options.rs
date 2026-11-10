@@ -13,7 +13,7 @@ pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.0001;
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games
 /// against the reference search (`docs/techniques/README.md`).
-pub const DEFAULT_TECHNIQUES: [&str; 4] = ["incremental", "tt_move", "null_move", "see"];
+pub const DEFAULT_TECHNIQUES: [&str; 5] = ["incremental", "tt_move", "null_move", "see", "lmr"];
 
 /// Settings of a search.
 #[derive(Clone, Debug)]
@@ -42,11 +42,14 @@ pub struct Techniques {
     /// Static exchange evaluation: the quiescence search skips captures that lose material and the
     /// search tries them after the quiet moves.
     pub see: bool,
+    /// Late move reductions: the quiet moves far down the order are searched shallower first, and
+    /// again at full depth only if they improve on the best move so far.
+    pub lmr: bool,
 }
 
 impl Techniques {
     /// Names, as the switches are called from Python.
-    pub const NAMES: [&'static str; 4] = ["incremental", "tt_move", "null_move", "see"];
+    pub const NAMES: [&'static str; 5] = ["incremental", "tt_move", "null_move", "see", "lmr"];
 
     /// The techniques with the given names.
     pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<Techniques, String> {
@@ -57,6 +60,7 @@ impl Techniques {
                 "tt_move" => techniques.tt_move = true,
                 "null_move" => techniques.null_move = true,
                 "see" => techniques.see = true,
+                "lmr" => techniques.lmr = true,
                 other => {
                     return Err(format!(
                         "unknown technique {other:?}; available: {:?}",
@@ -75,6 +79,7 @@ impl Techniques {
             tt_move: true,
             null_move: true,
             see: true,
+            lmr: true,
         }
     }
 }

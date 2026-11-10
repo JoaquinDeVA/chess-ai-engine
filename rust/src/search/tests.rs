@@ -524,3 +524,25 @@ mod incremental {
         }
     }
 }
+
+#[test]
+fn late_move_reductions_follow_the_depth_and_the_position_in_the_order() {
+    use super::node::reduction;
+    assert_eq!(reduction(3, 2, false), 0, "too early in the order");
+    assert_eq!(reduction(2, 9, false), 0, "too shallow");
+    assert_eq!(reduction(3, 3, false), 1);
+    assert_eq!(reduction(6, 10, false), 2);
+    assert_eq!(reduction(6, 10, true), 1, "good history: one ply less");
+    assert_eq!(reduction(3, 100, false), 1, "never below one ply of search");
+}
+
+#[test]
+fn late_move_reductions_still_find_the_forced_mate() {
+    let with = Techniques {
+        lmr: true,
+        ..Techniques::all()
+    };
+    let result = quiescent(MATE_IN_TWO, 6, with);
+    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
+    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+}

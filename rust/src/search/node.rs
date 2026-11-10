@@ -17,6 +17,20 @@ const NULL_MOVE_FROM_DEPTH: i32 = 3;
 const CLOCK_EVERY_NODES: u64 = 2048;
 /// Width of the window of the scouts of the principal variation search.
 const SCOUT_EPSILON: f64 = 1e-9;
+/// Late move reductions start at this depth and at this position in the move order.
+const LMR_FROM_DEPTH: i32 = 3;
+const LMR_FROM_INDEX: usize = 3;
+
+/// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
+/// the history says the move has cut before, and never so many that the search falls below one ply.
+pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) -> i32 {
+    if depth_remaining < LMR_FROM_DEPTH || index < LMR_FROM_INDEX {
+        return 0;
+    }
+    let raw = 0.75 + f64::from(depth_remaining).ln() * (index as f64).ln() / 2.25;
+    let steps = raw as i32 - i32::from(good_history);
+    steps.clamp(0, depth_remaining - 2)
+}
 
 struct Search<'a> {
     state: &'a mut GameState,
@@ -115,6 +129,7 @@ impl Search<'_> {
         depth_remaining: i32,
         ply: i32,
         maximizing: bool,
+        late: Option<bool>,
     ) -> f64 {
         let (low, high) = if maximizing {
             (alpha, alpha + SCOUT_EPSILON)
@@ -123,6 +138,21 @@ impl Search<'_> {
         };
         let narrow = beta - alpha > SCOUT_EPSILON;
         if index > 0 && depth_remaining >= 2 && narrow {
+            // A late quiet move that gives no check is searched shallower first; if even so it
+            // improves on the best move, it is searched again to the full depth.
+            let reduction = match late {
+                Some(good_history) if !self.state.pos().is_check() => {
+                    reduction(depth_remaining, index, good_history)
+                }
+                _ => 0,
+            };
+            if reduction > 0 {
+                let (shallow, _) =
+                    self.node(low, high, depth_remaining - 1 - reduction, ply + 1, true);
+                if (shallow <= alpha && maximizing) || (shallow >= beta && !maximizing) {
+                    return shallow;
+                }
+            }
             let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
             if scout > alpha && scout < beta && !self.truncated {
                 return self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0;
@@ -301,8 +331,17 @@ impl Search<'_> {
         };
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
+            // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
+            // whether the history says the move has cut before.
+            let late = (self.options.techniques.lmr
+                && !in_check
+                && !action.is_capture()
+                && !action.is_promotion()
+                && !killers.contains(&move_id(&action)))
+            .then(|| self.memory.history.score(mover, &action) > 0);
             self.play(action);
-            let child = self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing);
+            let child =
+                self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing, late);
             self.unplay();
             if maximizing {
                 if child > best_value {

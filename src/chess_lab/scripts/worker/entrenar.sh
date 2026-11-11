@@ -56,7 +56,7 @@ S=src/chess_lab/models/store
 for m in "${MODELOS[@]}"; do
     corre "train_$m" python -m chess_lab.training.train --model "$m" "${RECETA[@]}" --tag "$TAG"
     corre "evaluate_$m" python -m chess_lab.measure.evaluate --model "$m@$TAG"
-    corre "export_$m" python -m chess_lab.scripts.export_uci_model --model "$m@$TAG" --out "$OUT/uci_models"
+    corre "export_$m" python -m chess_lab.models.export_uci --model "$m@$TAG" --out "$OUT/uci_models"
     cp "$S/cards/$m@$TAG.json" "$OUT/cards/"
     cp "$S/artifacts/$m@$TAG.npz" "$OUT/artifacts/"
     echo "hecho: $m@$TAG"

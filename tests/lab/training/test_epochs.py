@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from chess_lab.models.features import FEATURE_SETS
-from chess_lab.models.fitting import epochs
 from chess_lab.models.target import Representation
+from chess_lab.training import epochs
 from tests.conftest import random_positions
 from tests.lab.models.positions import frame
 

@@ -1,6 +1,6 @@
 """Shared training plumbing: encoding of the frames, their cache and the epoch loop.
 
-The networks are trained in :mod:`chess_lab.models.fitting.neural`; this module turns the frames
+The networks are trained in :mod:`chess_lab.training.neural`; this module turns the frames
 into sparse features with their soft targets and runs the epochs with early stopping.
 """
 
@@ -20,8 +20,8 @@ import chess
 import numpy as np
 import pandas as pd
 
-from ..features import SlottedPstFeatures
-from ..target import Representation, target
+from chess_lab.models.features import SlottedPstFeatures
+from chess_lab.models.target import Representation, target
 
 #: Hyper-parameters used when the training configuration leaves a key out.
 DEFAULT_FIT_CONFIG: Dict[str, Any] = {

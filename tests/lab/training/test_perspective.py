@@ -3,7 +3,7 @@
 import chess
 import pytest
 
-from chess_lab.training.data.raw_shards import SIDE_TO_MOVE, WHITE, detect_perspective
+from chess_lab.datasets.raw_shards import SIDE_TO_MOVE, WHITE, detect_perspective
 from tests.conftest import material_cp, random_positions
 
 

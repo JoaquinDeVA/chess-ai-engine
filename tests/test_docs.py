@@ -7,7 +7,7 @@ from tests.paths import ROOT
 
 LINK = re.compile(r"\]\(([^)\s]+)\)|\b(?:src|srcset)=\"([^\"]+)\"")
 MODULE_COMMAND = re.compile(r"python -m ((?:chess_engine|chess_lab)(?:\.\w+)+)")
-SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/scripts/[\w./-]+\.(?:py|sh)\b")
+SCRIPT_PATH = re.compile(r"\bsrc/chess_lab/[\w./-]+\.(?:py|sh)\b")
 
 
 def checked_docs():

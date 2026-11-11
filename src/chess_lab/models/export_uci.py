@@ -5,8 +5,8 @@ any other file with ``setoption name Model value <file>.json``.
 
 Example::
 
-    python -m chess_lab.scripts.export_uci_model --model net_pst_w32@e30
-    python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64 --out /tmp/models
+    python -m chess_lab.models.export_uci --model net_pst_w32@e30
+    python -m chess_lab.models.export_uci --model net_hybrid_w64 --out /tmp/models
 """
 
 import argparse

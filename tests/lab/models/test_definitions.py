@@ -3,7 +3,6 @@
 import numpy as np
 import pytest
 
-from chess_lab.models import new_model
 from chess_lab.models.definitions import (
     available_models,
     get_model_class,
@@ -11,6 +10,7 @@ from chess_lab.models.definitions import (
 )
 from chess_lab.models.store import loader
 from chess_lab.models.target import Representation
+from chess_lab.training.neural import new_model
 
 
 def test_every_model_is_in_the_table():

@@ -1,20 +1,14 @@
-"""Tests of src/chess_lab/scripts/worker/roundrobin.py: pure parts only (no fastchess is run)."""
+"""Tests of src/chess_lab/measure/roundrobin.py: pure parts only (no fastchess is run)."""
 
-import importlib.util
+import importlib
 from pathlib import Path
 
 import pytest
 
-from tests.paths import ROOT
-
 
 @pytest.fixture(scope="module")
 def script():
-    path = ROOT / "src" / "chess_lab" / "scripts" / "worker" / "roundrobin.py"
-    spec = importlib.util.spec_from_file_location("roundrobin", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("chess_lab.measure.roundrobin")
 
 
 LOG = """Elo: 1.23 +/- 4.50, nElo: 2.1 +/- 9.0

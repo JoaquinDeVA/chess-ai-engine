@@ -41,8 +41,8 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 
 ## Round robin (Rust engine, fastchess)
 
-From 2026-11-06 to 2026-11-09 the compute node played every job of `src/chess_lab/scripts/worker/queue.json` at
-`d2d03ba` in turns (`src/chess_lab/scripts/worker/roundrobin.py`): 10 s + 0.1 s, `Hash` 16, one thread, the 10,000
+From 2026-11-06 to 2026-11-09 the compute node played every job of `src/chess_lab/measure/queue.json` at
+`d2d03ba` in turns (`src/chess_lab/measure/roundrobin.py`): 10 s + 0.1 s, `Hash` 16, one thread, the 10,000
 openings of `data/openings/openings.epd`, LLR bounds ±2.94. Technique jobs used the default set of then
 (`incremental,tt_move,history,pvs,aspiration,null_move,see`) and `linear_pst_terms`; `abl_` removes one switch from
 it (A is the full set, so a positive Elo is what the switch gains), `add_` adds one. Model jobs used the default
@@ -67,7 +67,7 @@ techniques. It was stopped on 2026-11-09 with jobs still running; their figures 
 The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `model_terms_in_net` and
 `model_buckets_k8_vs_k4` were removed from this table: they ran at a time control before the incremental accumulator
 of the hybrid and king-bucket networks (2026-11-09), against networks that had it, so they mixed quality with speed. They
-are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`queue.json` in `src/chess_lab/scripts/worker/`).
+are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`src/chess_lab/measure/queue.json`).
 The files stay in `data/results/roundrobin/`.
 
 ## Engine matches (Rust engine, fastchess)
@@ -120,12 +120,12 @@ incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --in
 | Is quiescence worth its cost? | Yes: at depth 3 it adds +0.047 (`h1`) and +0.096 (`linear_pst_terms`) to the share of positions where the move is Stockfish's (standard error 0.015), at 2.5 to 3.6 times the nodes. | `scripts/bench/compare_quiescence.py --players h1,linear_pst_terms` (removed in `6162db8`); Quiescence |
 | Why did games stop at depth 2? | The original rule that predicts the next iteration (last duration squared over the previous one) over-estimated it. It was replaced by `geometric_growth`, with a floor of depth 3. | `scripts/bench/compare_time_estimators.py` (removed in `6162db8`); Iterative deepening |
 | Do the endgame tables help? | Yes: from 60 won endgames of 3 to 5 pieces the search with the tables converts 52 and without them 8. | `scripts/bench/compare_endgame_tablebase.py --positions 60 --seconds 0.5` (removed in `6162db8`); Endgame tablebases |
-| Is the opening book good? | 98.7 % of 2,438 sampled moves are within 50 centipawns of Stockfish's best line, none illegal. | `python src/chess_lab/scripts/data/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16` |
+| Is the opening book good? | 98.7 % of 2,438 sampled moves are within 50 centipawns of Stockfish's best line, none illegal. | `python src/chess_lab/datasets/check_opening_book.py data/opening_book.json --fraction 0.02 --engine /usr/games/stockfish --depth 16` |
 
 ## Limits and leakage
 
 - **Positions, not games.** The data has no game identifiers, so the split is by a hash of the position.
-  `python src/chess_lab/scripts/data/check_split_leakage.py` found no duplicate position among the 124,923,027
+  `python src/chess_lab/datasets/check_split_leakage.py` found no duplicate position among the 124,923,027
   rows; 1.1 % of the test positions have their colour-swapped image in the data and 72.0 % have a
   position one move away (60.2 % in train).
 - **The neighbours do not flatter the models.** Judged separately on test positions with and without a neighbour
@@ -159,6 +159,6 @@ The pipeline rebuilds the sidecars, trains the models, evaluates them and regene
 games (games are played with fastchess, [Measurement](MEASUREMENT.md)).
 
 ```bash
-DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh   # prints every command
-nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
+DRY_RUN=1 bash src/chess_lab/pipeline.sh   # prints every command
+nohup setsid bash src/chess_lab/pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
 ```

@@ -21,7 +21,7 @@ use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
 use _core::search::{self, Control, Counters, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
 use shakmaty::Color;
 
-/// The model compiled in (`rust/models/`, written by `chess_lab.scripts.export_uci_model`).
+/// The model compiled in (`rust/models/`, written by `chess_lab.models.export_uci`).
 const MODEL_JSON: &str = include_str!("../../models/net_pst_w64.json");
 const MODEL_NAME: &str = "net_pst_w64";
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -71,9 +71,9 @@ fn load_model() -> Result<Eval, String> {
     model_from_json(MODEL_JSON)
 }
 
-/// A network from the JSON of `export_uci_model`: its `features` and its `layers`, each with
-/// `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the networks were the
-/// only model carry `"perspective": "side_to_move"`; any other perspective is refused.
+/// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`, each
+/// with `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the networks were
+/// the only model carry `"perspective": "side_to_move"`; any other perspective is refused.
 fn model_from_json(text: &str) -> Result<Eval, String> {
     let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
     let features = value["features"]

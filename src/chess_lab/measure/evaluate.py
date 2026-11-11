@@ -15,14 +15,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from chess_engine import _core
+from chess_lab.datasets.sidecar import load_sample
+from chess_lab.datasets.split import TEST
 from chess_lab.measure.judge import judge
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
 from chess_lab.models.store.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
-from chess_lab.training.data.sidecar import load_sample
-from chess_lab.training.data.split import TEST
 
 #: Evaluations that are not saved models: the hand-written heuristic.
 HEURISTICS = ("h1",)

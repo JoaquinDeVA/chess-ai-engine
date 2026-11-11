@@ -1,9 +1,9 @@
-"""Tests of src/chess_lab/scripts/export_uci_model.py with small made-up models."""
+"""Tests of src/chess_lab/models/export_uci.py with small made-up models."""
 
 import numpy as np
 
 from chess_lab.models.definitions import NnW32Model
-from chess_lab.scripts.export_uci_model import export_payload
+from chess_lab.models.export_uci import export_payload
 
 
 def test_network_payload_is_row_major():

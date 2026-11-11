@@ -5,7 +5,7 @@ import json
 import pyarrow.parquet as pq
 import pytest
 
-from chess_lab.training.data.raw_shards import (
+from chess_lab.datasets.raw_shards import (
     RAW_COLUMNS,
     is_legal_position,
     parse_raw_record,
@@ -13,7 +13,6 @@ from chess_lab.training.data.raw_shards import (
     shard_path,
     write_shard,
 )
-from tests.paths import ROOT
 
 FEN = "8/4r3/2R2pk1/6pp/3P4/6P1/5K1P/8 b - -"
 
@@ -90,18 +89,13 @@ def test_shard_roundtrip(tmp_path):
 
 @pytest.mark.slow  # starts a pool of worker processes
 def test_fetch_is_sharded_and_restartable(tmp_path):
-    import importlib.util
+    import importlib
 
     import zstandard
 
     from tests.conftest import material_cp, random_positions
 
-    spec = importlib.util.spec_from_file_location(
-        "build_raw_shards",
-        ROOT / "src/chess_lab/scripts/data/build_raw_shards.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = importlib.import_module("chess_lab.datasets.build_raw_shards")
 
     lines = []
     for board in random_positions(400, seed=1):

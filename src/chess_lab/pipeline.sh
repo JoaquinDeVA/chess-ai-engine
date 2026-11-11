@@ -16,10 +16,10 @@
 # STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/results/pipeline),
 # PYTHON (.venv/bin/python if it exists, else python).
 #
-#   Dry run:   DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh
-#   Real run:  nohup setsid bash src/chess_lab/scripts/run_full_pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
+#   Dry run:   DRY_RUN=1 bash src/chess_lab/pipeline.sh
+#   Real run:  nohup setsid bash src/chess_lab/pipeline.sh > data/results/pipeline/pipeline.log 2>&1 &
 set -euo pipefail
-cd "$(dirname "$0")/../../.."
+cd "$(dirname "$0")/../.."
 
 RAW="${RAW:-data/LichessPositions/raw}"
 SIDECAR="${SIDECAR:-data/LichessPositions/sidecar}"
@@ -62,7 +62,7 @@ present_models() {
 join() { local IFS=,; echo "$*"; }
 
 step_sidecars() {
-  run "$PYTHON" src/chess_lab/scripts/data/build_sidecars.py --raw "$RAW" --out "$SIDECAR"
+  run "$PYTHON" src/chess_lab/datasets/build_sidecars.py --raw "$RAW" --out "$SIDECAR"
 }
 
 step_train() {

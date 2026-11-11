@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the opening book from the Lichess evaluations.
 
-python src/chess_lab/scripts/data/build_opening_book.py --raw data/LichessPositions/raw --out data/knowledge/opening_book/opening_book.json
+python -m chess_lab.datasets.build_opening_book --raw data/LichessPositions/raw --out data/knowledge/opening_book/opening_book.json
 
 The raw shards hold a Stockfish evaluation for each of 125 million positions; most opening
 positions are among them. The book is a walk through that data: from the starting position the

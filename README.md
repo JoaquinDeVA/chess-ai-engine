@@ -89,7 +89,7 @@ python main.py
 </table>
 
 The window plays the opening book and the endgame tablebases itself and asks the UCI binary for every other move.
-The captures come from `python -m chess_lab.scripts.capturas_gui`, which draws the window offscreen.
+The captures come from `python -m chess_lab.screenshots`, which draws the window offscreen.
 
 ## The path of one move
 
@@ -106,8 +106,8 @@ of the deepest depth that finished when the time runs out.
 
 - **Positions and labels.** The Lichess evaluation database, one line per position with Stockfish's evaluation.
   The project reads its first 126,000,000 lines, drops the illegal positions and keeps 124,923,027 rows
-  (`src/chess_lab/scripts/data/build_raw_shards.py`, Parquet shards under `data/`, ignored by git).
-- **Opening book.** Built from the same database by `src/chess_lab/scripts/data/build_opening_book.py`.
+  (`src/chess_lab/datasets/build_raw_shards.py`, Parquet shards under `data/`, ignored by git).
+- **Opening book.** Built from the same database by `src/chess_lab/datasets/build_opening_book.py`.
 - **Endgame tablebases.** Syzygy tables up to five pieces, read by `shakmaty-syzygy`.
 - **Measurements.** Engine matches with [fastchess](https://github.com/Disservin/fastchess) and the SPRT test,
   described in [How a change is measured](docs/MEASUREMENT.md).
@@ -134,9 +134,9 @@ of the deepest depth that finished when the time runs out.
 |---|---|
 | Play | `python main.py` |
 | Use the engine from a GUI | `rust/target/release/uci` |
-| See every step of the pipeline without running it | `DRY_RUN=1 bash src/chess_lab/scripts/run_full_pipeline.sh` |
+| See every step of the pipeline without running it | `DRY_RUN=1 bash src/chess_lab/pipeline.sh` |
 | Rebuild the model table of the results | `python -m chess_lab.measure.report` |
-| Refresh the window captures | `QT_QPA_PLATFORM=offscreen python -m chess_lab.scripts.capturas_gui` |
+| Refresh the window captures | `QT_QPA_PLATFORM=offscreen python -m chess_lab.screenshots` |
 | Test | `pytest -m "not slow"` |
 | Lint | `ruff check . && ruff format --check .` |
 | Test the Rust core | `cargo test --manifest-path rust/Cargo.toml` |
@@ -151,10 +151,11 @@ src/chess_engine/
   uci.py        the UCI client the window plays through
   gui/          the window: board, game page, player selection and AI settings
 src/chess_lab/  the laboratory (not needed to play)
-  models/       the learned evaluators, their files and cards
-  training/     sampling, targets and the training command
-  measure/      judge, model evaluation and the results table
-  scripts/      data pipeline, run_full_pipeline.sh, worker scripts
+  models/       the learned evaluators, their cards and the export to the binary
+  datasets/     the Lichess shards, their sidecars, the split and the opening book
+  training/     fitting the networks and the training command
+  measure/      judge, model evaluation, the results table and the round robin of SPRTs
+  pipeline.sh   every stage, from training to the results table
 docs/           RESULTS.md, MEASUREMENT.md and the images
 tests/          the test suite
 ```

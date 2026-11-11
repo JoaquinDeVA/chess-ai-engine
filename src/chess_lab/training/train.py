@@ -12,6 +12,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
+from chess_lab.datasets.sidecar import load_sample
+from chess_lab.datasets.split import VALIDATION
 from chess_lab.models.defaults import (
     DEFAULT_MATE_KEEP,
     RAW_DIR,
@@ -24,8 +26,6 @@ from chess_lab.models.store.cards import clear_measurements, current_commit, tod
 from chess_lab.models.store.loader import artifact_path
 from chess_lab.models.target import Representation
 
-from .data.sidecar import load_sample
-from .data.split import VALIDATION
 from .effort import (
     available_rows,
     calibrate,

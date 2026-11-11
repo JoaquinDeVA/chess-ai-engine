@@ -155,12 +155,12 @@ the probes. With the shared table: 118,614,205 nodes but median 4.58 s (974,990 
 
 ## Several SPRTs in turns
 
-A queue of SPRTs on one worker is played in turns by `src/chess_lab/scripts/worker/roundrobin.py`: each match advances
+A queue of SPRTs on one worker is played in turns by `src/chess_lab/measure/roundrobin.py`: each match advances
 `--chunk-rounds` rounds (two games each, default 100), then the next one resumes from the `config.json` that fastchess
 saves, and so on until every match is closed. After each turn it appends the games, LLR, Elo and error to
 `results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
 it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
-can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/scripts/worker/queue.json`; each job names its binary in `uci` (`bin/<hash>/uci`,
+can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/measure/queue.json`; each job names its binary in `uci` (`bin/<hash>/uci`,
 installed by `src/chess_lab/scripts/worker/instalar.sh`), so a long SPRT keeps its binary when a new one arrives. The
 round robin of 2026-11-06 to 2026-11-09 played the removal of each default technique and the addition of the two that
 were off (`[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the question is whether
@@ -171,7 +171,7 @@ that ends at the round cap without a verdict says the addition is too small for 
 
 `uci` embeds `net_pst_w32` and loads any other network from a JSON file with
 `setoption name Model value <file>.json` (`setoption name Model value net_pst_w32` goes back to the embedded one).
-The file is written by `python -m chess_lab.scripts.export_uci_model --model net_hybrid_w64 --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
+The file is written by `python -m chess_lab.models.export_uci --model net_hybrid_w64 --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
 Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). Every network is played with an
 incremental accumulator since 2026-11-09 (commit `75a8071`); before, only the slotted features had one. The hybrids
 still reach fewer nodes per second than `net_pst_w32` (`uci bench 5 <file>.json`, laptop, 2026-11-09: 635,828 for

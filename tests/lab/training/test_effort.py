@@ -6,12 +6,12 @@ import chess
 import pandas as pd
 import pytest
 
+from chess_lab.datasets.raw_shards import shard_path, write_shard
+from chess_lab.datasets.sidecar import build_sidecar, load_sample
+from chess_lab.datasets.split import TRAIN, VALIDATION, assign_split
 from chess_lab.models.definitions import NnW32Model
 from chess_lab.models.target import Representation
 from chess_lab.training import effort
-from chess_lab.training.data.raw_shards import shard_path, write_shard
-from chess_lab.training.data.sidecar import build_sidecar, load_sample
-from chess_lab.training.data.split import TRAIN, VALIDATION, assign_split
 from chess_lab.training.effort import (
     MIN_POSITIONS,
     Timing,

@@ -8,7 +8,6 @@ import chess
 import numpy as np
 import pytest
 
-from chess_lab.models import fit_stream, new_model
 from chess_lab.models.definitions import (
     NeuralEvalModel,
     NnW64x16Model,
@@ -17,6 +16,7 @@ from chess_lab.models.definitions import (
 )
 from chess_lab.models.features import features_of
 from chess_lab.models.target import Representation
+from chess_lab.training.neural import fit_stream, new_model
 from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 

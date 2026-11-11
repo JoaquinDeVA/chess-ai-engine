@@ -1,19 +1,19 @@
-"""Tests of src/chess_lab/scripts/run_full_pipeline.sh: valid bash and a dry run."""
+"""Tests of src/chess_lab/pipeline.sh: valid bash and a dry run."""
 
 import os
 import subprocess
 
 from tests.paths import ROOT
 
-SCRIPT = ROOT / "src" / "chess_lab" / "scripts" / "run_full_pipeline.sh"
+SCRIPT = ROOT / "src" / "chess_lab" / "pipeline.sh"
 PIPELINE_MODELS = "net_pst_w32 net_pst_w64 net_pst_w64x16"
 
 
-def test_run_full_pipeline_is_valid_bash():
+def test_pipeline_is_valid_bash():
     subprocess.run(["bash", "-n", str(SCRIPT)], check=True)
 
 
-def test_run_full_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
+def test_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
     state = tmp_path / "state"
     env = {**os.environ, "DRY_RUN": "1", "STATE_DIR": str(state)}
     result = subprocess.run(

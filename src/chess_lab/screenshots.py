@@ -6,8 +6,8 @@ two runs give the same picture.
 
 Example::
 
-    QT_QPA_PLATFORM=offscreen python -m chess_lab.scripts.capturas_gui
-    QT_QPA_PLATFORM=offscreen python -m chess_lab.scripts.capturas_gui --out /tmp/img
+    QT_QPA_PLATFORM=offscreen python -m chess_lab.screenshots
+    QT_QPA_PLATFORM=offscreen python -m chess_lab.screenshots --out /tmp/img
 """
 
 import argparse

@@ -15,11 +15,11 @@ mkdir -p "$W/models" "$W/bin/$H"
 cp data/results/uci_models/*.json "$W/models/"
 cp data/openings/openings.epd "$W/"
 # queue.json solo si no hay round robin: en marcha, el nodo puede tener trabajos que el repo no, y copiarlo encima los borraría.
-[ -f "$W/queue.json" ] && pgrep -f "[r]oundrobin.py queue.json" >/dev/null || cp src/chess_lab/scripts/worker/queue.json "$W/queue.json"
+[ -f "$W/queue.json" ] && pgrep -f "[r]oundrobin.py queue.json" >/dev/null || cp src/chess_lab/measure/queue.json "$W/queue.json"
 if pgrep -f "[r]oundrobin.py queue.json" >/dev/null; then
-    cmp src/chess_lab/scripts/worker/roundrobin.py "$W/roundrobin.py" || echo "AVISO: roundrobin.py cambió; se aplica al reiniciarlo"
+    cmp src/chess_lab/measure/roundrobin.py "$W/roundrobin.py" || echo "AVISO: roundrobin.py cambió; se aplica al reiniciarlo"
 else
-    cp src/chess_lab/scripts/worker/roundrobin.py "$W/roundrobin.py"
+    cp src/chess_lab/measure/roundrobin.py "$W/roundrobin.py"
     echo "AVISO: roundrobin no está en marcha"
 fi
 echo "binario: bin/$H/uci"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the train/validation/test split for leakage.
 
-python src/chess_lab/scripts/data/check_split_leakage.py --raw data/LichessPositions/raw --sidecar data/LichessPositions/sidecar
+python -m chess_lab.datasets.check_split_leakage --raw data/LichessPositions/raw --sidecar data/LichessPositions/sidecar
 
 The split assigns each position to train, validation or test by a hash of its FEN. By construction a
 position cannot be in two splits, but two *different* positions that are almost the same can: the data
@@ -30,9 +30,9 @@ import chess
 import numpy as np
 import pyarrow.parquet as pq
 
+from chess_lab.datasets.build_opening_book import position_key
+from chess_lab.datasets.split import TEST, TRAIN, VALIDATION
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
-from chess_lab.scripts.data.build_opening_book import position_key
-from chess_lab.training.data.split import TEST, TRAIN, VALIDATION
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}
 
@@ -248,7 +248,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"| a position one move away | {near['child_in_data']:.1%} | {near['child_in_train']:.1%} |",
     ]
     if args.models:
-        from chess_lab.training.data.sidecar import load_sample
+        from chess_lab.datasets.sidecar import load_sample
 
         sample = load_sample(args.raw, args.sidecar, TEST, args.sample_rows, seed=SAMPLE_SEED)
         flags = has_train_child(hashes, splits, sample["fen"].tolist())

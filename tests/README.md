@@ -5,12 +5,13 @@ The folders mirror the source: a test sits where the code it checks sits.
 | Folder | Checks | Source |
 |---|---|---|
 | `app/test_uci.py` | the UCI client: the limits it sends and the moves of the binary | `src/chess_engine/uci.py` |
-| `lab/models/` | model definitions, saved files and tagged specs, the shipped models through the core, feature extractors, target representation and fitting | `src/chess_lab/models/` |
+| `lab/models/` | model definitions, saved files and tagged specs, the shipped models through the core, feature extractors, target representation and the export to the binary | `src/chess_lab/models/` |
 | `app/gui/`, `app/test_uci.py` | the window (the widgets are skipped without PySide6), the UCI client | `src/chess_engine/{gui,uci.py}` |
 | `core/` | the Rust core against the Python feature extractors of `chess_lab/models/` | `rust/` |
-| `lab/training/` | sampling, split, effort, cards, the raw Lichess export | `src/chess_lab/training/` |
-| `lab/measure/` | judge, model evaluation and report | `src/chess_lab/measure/` |
-| `lab/scripts/` | one file per script, named `test_<script>.py` | `src/chess_lab/scripts/` |
+| `lab/datasets/` | raw Lichess shards, sidecars, split, opening book and openings | `src/chess_lab/datasets/` |
+| `lab/training/` | fitting the networks, effort, cache, the training command | `src/chess_lab/training/` |
+| `lab/measure/` | judge, model evaluation, report and the round robin | `src/chess_lab/measure/` |
+| `lab/test_pipeline.py`, `lab/test_screenshots.py` | the pipeline script and the window captures | `src/chess_lab/{pipeline.sh,screenshots.py}` |
 | `test_docs.py` | links, commands and script paths quoted in the docs exist | `README.md`, `docs/RESULTS.md`, `docs/MEASUREMENT.md` |
 
 Shared pieces: `conftest.py` (fixtures, a material stub model, and a guard that fails the run if a test
@@ -23,8 +24,8 @@ positions of the feature-parity and technique tests), `data/syzygy/` (five 3-pie
 - A test checks one behaviour (a function, a format, a refusal). It does not train, play a full game or
   judge a model: that is the comparison's job. Anything heavy is replaced by a fake; the clock of the game
   loop is a fake too, so no test sleeps.
-- Scripts are not a package: their tests load them by path with `importlib` and call their functions on a
-  handful of synthetic positions.
+- Command-line modules are imported like any other module; their tests call their functions on a handful of
+  synthetic positions.
 - A test that takes more than a few seconds is marked `slow` (`pytest -m "not slow"` skips it).
 - The Rust tests live in `rust/tests/` (`cargo test --release`).
 

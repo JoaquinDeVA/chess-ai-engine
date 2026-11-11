@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a sample of the opening book against Stockfish, through the Lichess cloud evaluation.
 
-python src/chess_lab/scripts/data/check_opening_book.py data/knowledge/opening_book/opening_book.json --fraction 0.02
+python -m chess_lab.datasets.check_opening_book data/knowledge/opening_book/opening_book.json --fraction 0.02
 
 A random share of the book entries (fixed seed) is judged by the public ``cloud-eval`` API of
 Lichess (Stockfish). For each entry the script asks for the best lines of the position and takes the

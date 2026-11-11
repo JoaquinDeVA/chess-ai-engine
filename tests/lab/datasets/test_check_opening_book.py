@@ -1,22 +1,16 @@
-"""Tests of src/chess_lab/scripts/data/check_opening_book.py with a fake engine (no network)."""
+"""Tests of src/chess_lab/datasets/check_opening_book.py with a fake engine (no network)."""
 
-import importlib.util
+import importlib
 
 import chess
 import pytest
-
-from tests.paths import ROOT
 
 START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
 
 
 @pytest.fixture(scope="module")
 def script():
-    path = ROOT / "src" / "chess_lab" / "scripts" / "data" / "check_opening_book.py"
-    spec = importlib.util.spec_from_file_location("check_opening_book", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("chess_lab.datasets.check_opening_book")
 
 
 def engine(pvs):

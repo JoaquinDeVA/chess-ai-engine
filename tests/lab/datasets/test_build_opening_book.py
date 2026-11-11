@@ -1,21 +1,15 @@
-"""Tests of src/chess_lab/scripts/data/build_opening_book.py with a fake evaluation table (no shards)."""
+"""Tests of src/chess_lab/datasets/build_opening_book.py with a fake evaluation table (no shards)."""
 
-import importlib.util
+import importlib
 
 import chess
 import numpy as np
 import pytest
 
-from tests.paths import ROOT
-
 
 @pytest.fixture(scope="module")
 def script():
-    path = ROOT / "src" / "chess_lab" / "scripts" / "data" / "build_opening_book.py"
-    spec = importlib.util.spec_from_file_location("build_opening_book", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("chess_lab.datasets.build_opening_book")
 
 
 def key_after(script, *ucis):

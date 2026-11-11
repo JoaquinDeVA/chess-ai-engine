@@ -2,7 +2,7 @@
 
 :func:`effort_config` maps the effort to a configuration; :func:`calibrate` times a short fit to
 estimate the duration; :func:`search` runs the random hyper-parameter trials; :func:`fit` streams
-the TRAIN split of the raw shards through :func:`chess_lab.models.fit_stream`.
+the TRAIN split of the raw shards through :func:`chess_lab.training.neural.fit_stream`.
 """
 
 import math
@@ -16,20 +16,20 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from chess_lab.models import fit_stream, new_model
+from chess_lab.datasets.sidecar import iter_batches
+from chess_lab.datasets.split import TRAIN
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import NeuralEvalModel
 from chess_lab.models.features import features_of
-from chess_lab.models.fitting.epochs import DEFAULT_FIT_CONFIG, encode_frame
 from chess_lab.models.target import (
     Representation,
     keep_mate_rows,
     validate_mate_keep,
 )
+from chess_lab.training.epochs import DEFAULT_FIT_CONFIG, encode_frame
+from chess_lab.training.neural import fit_stream, new_model
 
 from .cache import cache_path
-from .data.sidecar import iter_batches
-from .data.split import TRAIN
 
 MAX_EFFORT = 100
 #: Positions per effort point: effort 30 trains on 30 M positions, effort 70 on 70 M.
@@ -148,7 +148,7 @@ def fit_config(
     min_lr: float = 1e-5,
     patience: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Keyword configuration of :func:`chess_lab.models.fit_stream` for a plan.
+    """Keyword configuration of :func:`chess_lab.training.neural.fit_stream` for a plan.
 
     :param plan: Output of :func:`effort_config`.
     :param l2: L2 penalty.
@@ -198,7 +198,7 @@ def fit(
     :param quiet_only: Train on quiet positions only.
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
     :param use_cache: Keep the encoded batches in ``data/cache`` and reuse them.
-    :return: The fitted model and the summary of :func:`chess_lab.models.fit_stream`. The TRAIN
+    :return: The fitted model and the summary of :func:`chess_lab.training.neural.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
     model = new_model(model_class, rep)

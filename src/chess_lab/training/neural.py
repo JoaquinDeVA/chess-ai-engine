@@ -14,9 +14,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from ..definitions import Layer, NeuralEvalModel
-from ..features import features_of
-from ..target import Representation
+from chess_lab.models.definitions import Layer, NeuralEvalModel
+from chess_lab.models.features import features_of
+from chess_lab.models.target import Representation
+
 from .epochs import (
     DEFAULT_FIT_CONFIG,
     EncodedFrame,
@@ -36,7 +37,7 @@ _INTRA_OP_THREADS = 2
 _PREDICT_BATCH = 4096
 
 
-def new_network_model(model_class: type, rep: Optional[Representation] = None) -> NeuralEvalModel:
+def new_model(model_class: type, rep: Optional[Representation] = None) -> NeuralEvalModel:
     """An untrained network: random He-normal weights, zero biases.
 
     :param model_class: A concrete :class:`NeuralEvalModel` subclass.

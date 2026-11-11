@@ -3,15 +3,15 @@
 
 One shard per worker process; existing sidecars are skipped, so the run can be repeated.
 
-    python src/chess_lab/scripts/data/build_sidecars.py --raw data/LichessPositions/raw --out data/LichessPositions/sidecar --jobs 5
+    python -m chess_lab.datasets.build_sidecars --raw data/LichessPositions/raw --out data/LichessPositions/sidecar --jobs 5
 """
 
 import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from chess_lab.datasets.sidecar import build_sidecar, sidecar_path
 from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
-from chess_lab.training.data.sidecar import build_sidecar, sidecar_path
 
 
 def main() -> None:

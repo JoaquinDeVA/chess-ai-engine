@@ -23,8 +23,7 @@ engine, and the node and depth counts only explain the result.
   costs time per node must earn it back. At a fixed node count (`nodes=20000`) speed plays no part and the search
   alone is compared; the result is reproducible on any machine.
 - **Another machine.** Matches run on an otherwise idle eight-core desktop, so that the clock of one game is not
-  shared with other work; `src/chess_lab/scripts/worker/match.sh` starts them there and passes its options to
-  fastchess.
+  shared with other work; the round robin below starts them there and passes each job's options to fastchess.
 
 ## Reading a result
 
@@ -79,7 +78,7 @@ test. The result must be about 50 % with an interval around 0, and the SPRT must
 would mean the openings, the pairing or the machine bias the result.
 
 Three A/A matches at 10 s + 0.1 s, `Hash` 16, SPRT `[−5, 0]`, default techniques, 3 games at a time on the worker
-(`match.sh start aa_s12 -each tc=10+0.1 proto=uci option.Hash=16 -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 250 -games 2 -concurrency 3 -ratinginterval 20 -srand 12`;
+(played with a match script of 2026-11-01, since retired, which passed these options to fastchess for `aa_s12`: `-each tc=10+0.1 proto=uci option.Hash=16 -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 250 -games 2 -concurrency 3 -ratinginterval 20 -srand 12`;
 `aa_s11` and `aa_s13` with seeds 11 and 13; logs in `data/results/matches/<name>/match.log`):
 
 | match | games | score | Elo (95 %) | LLR | verdict |
@@ -161,7 +160,7 @@ saves, and so on until every match is closed. After each turn it appends the gam
 `results/<name>/llr.csv`. A match leaves the queue when fastchess accepts H0 or H1 (the LLR left `[−2.94, 2.94]`) or when
 it reaches `max_rounds` (6,000 by default) without a verdict. `queue.json` is read again before every turn, so matches
 can be added while it runs; `touch results/STOP` or SIGTERM stops it cleanly. The queue is `src/chess_lab/measure/queue.json`; each job names its binary in `uci` (`bin/<hash>/uci`,
-installed by `src/chess_lab/scripts/worker/instalar.sh`), so a long SPRT keeps its binary when a new one arrives. The
+installed once per hash on the compute node), so a long SPRT keeps its binary when a new one arrives. The
 round robin of 2026-11-06 to 2026-11-09 played the removal of each default technique and the addition of the two that
 were off (`[−5, 0]`), and the models in steps, each against the one below it (`[0, 5]`, since the question is whether
 each addition is better); its jobs and results are in [Results](RESULTS.md#round-robin-rust-engine-fastchess). A step

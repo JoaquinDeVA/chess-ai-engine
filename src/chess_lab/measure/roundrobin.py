@@ -18,7 +18,7 @@ Queue file::
 
 ``uci`` is the binary both engines run, or only A's when the job names B's in ``uci_b`` (the node installs each build
 in its own ``bin/<hash>/``, so a long match keeps its binary when a new one arrives); ``a`` and ``b`` are extra fastchess options of each engine; ``each`` defaults
-to the screening control. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
+to the screening control; ``openings`` (an EPD file in ``~/worker``) defaults to ``openings.epd``. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
 """
 
 import argparse
@@ -108,7 +108,7 @@ def command(
         *["-engine", f"cmd=./{job['uci']}", "name=A", *job.get("a", [])],
         *["-engine", f"cmd=./{job.get('uci_b', job['uci'])}", "name=B", *job.get("b", [])],
         *["-each", *job.get("each", DEFAULT_EACH)],
-        *["-openings", "file=openings.epd", "format=epd", "order=random"],
+        *["-openings", f"file={job.get('openings', 'openings.epd')}", "format=epd", "order=random"],
         *["-pgnout", f"file={pgn}"],
         *[
             "-sprt",

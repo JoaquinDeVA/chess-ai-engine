@@ -55,6 +55,9 @@ def test_command_first_turn_and_resume(script):
     assert cmd[0] == "./fastchess" and "option.Techniques=see" in cmd and "elo1=5" in cmd
     assert cmd.count("cmd=./bin/ab12/uci") == 2
     assert cmd[cmd.index("-rounds") + 1] == "100"
+    assert "file=openings.epd" in cmd
+    own = script.command({**job, "openings": "book_suite.epd"}, 100, 4, Path("c"), Path("p"), False)
+    assert "file=book_suite.epd" in own
     two = script.command(
         {**job, "uci_b": "bin/cd34/uci"}, 100, 4, Path("c.json"), Path("m.pgn"), False
     )

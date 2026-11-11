@@ -179,3 +179,15 @@ still reach fewer nodes per second than `net_pst_w32` (`uci bench 5 <file>.json`
 `net_hybrid_w64` with the accumulator, 521,915 without, against 1,020,805): the SPRT at a time control includes that
 cost, and an SPRT at fixed nodes leaves it out. A time-control SPRT run before that commit played the hybrids and the
 king-bucket networks without the accumulator against networks with it, so it does not compare them on equal terms.
+
+### Playing one opening book against another
+
+No position of the usual suite is in an opening book (they are random playouts; 0 of the 10,000 positions of
+`data/openings/openings.epd` are in `data/knowledge/opening_book/opening_book.json`), and the engine leaves its book at
+the first position it lacks, so ordinary matches never use the book. A match between two books therefore has its own
+suite, `data/openings/book_suite.epd`, written by
+`python -m chess_lab.datasets.build_book_suite --book <book A> <book B>`: the positions four half-moves in that both
+books hold. A job of the round robin names it with `"openings": "book_suite.epd"` (the default is `openings.epd`), runs
+the same binary on both sides and gives each engine its book with `option.Book=<file>`. Where a book leaves the engine in
+real games is measured without playing, by replaying the Lichess bot's logged games:
+`python -m chess_lab.datasets.book_exits --book <books> --log <bot logs>`.

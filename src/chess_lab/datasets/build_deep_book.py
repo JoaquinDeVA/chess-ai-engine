@@ -195,7 +195,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--engine", required=True, help="path of a UCI engine (Stockfish)")
     parser.add_argument("--budget", type=int, default=1_000_000, help="positions analysed")
-    parser.add_argument("--depth", type=int, default=20)
+    parser.add_argument("--depth", type=int, default=16)
     parser.add_argument("--multipv", type=int, default=4, help="opponent moves considered")
     parser.add_argument("--margin", type=float, default=80.0, help="centipawns within the best")
     parser.add_argument("--temperature", type=float, default=30.0, help="centipawns")

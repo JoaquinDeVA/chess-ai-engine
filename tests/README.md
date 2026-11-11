@@ -11,7 +11,7 @@ The folders mirror the source: a test sits where the code it checks sits.
 | `lab/training/` | sampling, split, effort, cards, the raw Lichess export | `src/chess_lab/training/` |
 | `lab/measure/` | judge, model evaluation and report | `src/chess_lab/measure/` |
 | `lab/scripts/` | one file per script, named `test_<script>.py` | `src/chess_lab/scripts/` |
-| `test_docs.py` | links, commands and script paths quoted in the docs exist | `README.md`, `docs/` |
+| `test_docs.py` | links, commands and script paths quoted in the docs exist | `README.md`, `docs/RESULTS.md`, `docs/MEASUREMENT.md` |
 
 Shared pieces: `conftest.py` (fixtures, a material stub model, and a guard that fails the run if a test
 overwrites a shipped model file), `paths.py` (`ROOT`, `POSITIONS`, `SYZYGY`), `data/positions.json` (the

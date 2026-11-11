@@ -12,7 +12,7 @@ pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.0001;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Techniques the binary and the window switch on by default: the ones that won in the games
-/// against the reference search (`docs/techniques/README.md`).
+/// against the reference search (see `docs/RESULTS.md`).
 pub const DEFAULT_TECHNIQUES: [&str; 7] = [
     "incremental",
     "tt_move",

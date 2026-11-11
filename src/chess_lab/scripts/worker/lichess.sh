@@ -2,7 +2,7 @@
 # Bot de Lichess en el nodo (~/lichess), con el motor en su modo más fuerte, y relevo con el round robin.
 # Uso: lichess.sh subir            (en local: copia bot, .env, binario, libro y tablas al nodo y lo instala)
 #      lichess.sh instalar|arrancar|parar|estado   (en el nodo; con ssh, `bash ~/lichess/lichess.sh <orden>`)
-# Modo más fuerte: Model net_pst_w64, Book, Tablebase, técnicas por defecto, Threads 4 (docs/techniques/lazy-smp.md: seis no ganaron a cuatro), Hash 2048.
+# Modo más fuerte: Model net_pst_w64, Book, Tablebase, técnicas por defecto, Threads 4 (seis hilos no ganaron a cuatro; ver la pestaña Hilos de la guía), Hash 2048.
 # Relevo: arrancar lanza el bot y un supervisor (desacoplados, sin pueue). El supervisor, cuando el bot llega al límite diario
 # de partidas contra bots (línea «'bot_is_rate_limited': True» del log de lichess-bot) o cuando el bot sale por su cuenta, hace
 # SIGINT al bot (acaba las partidas en curso) y reanuda el round robin con arrancar.sh.

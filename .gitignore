@@ -78,9 +78,8 @@ rust/target/
 *.so
 *.pyd
 
-# Puente con Lichess (clon externo y estado local)
-lichess/lichess-bot/
-lichess/*.log
+# Restos de ficheros abiertos y borrados en el disco FUSE
+.fuse_hidden*
 
 # Registro privado del nodo de cómputo
 .computo/

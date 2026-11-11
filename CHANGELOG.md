@@ -2,6 +2,17 @@
 
 All notable changes. The newest are first.
 
+## Unreleased
+
+### Changed
+- `chess_lab` is organised by stage, `models` → `datasets` → `training` → `measure`. The new `datasets` package holds the
+  raw shards, sidecars and split with their six commands, all run as `python -m chess_lab.datasets.<name>`. Fitting
+  (`epochs`, `neural`) moves to `training`, `export_uci_model` becomes `chess_lab.models.export_uci`, the round robin and
+  its `queue.json` move to `measure`, `run_full_pipeline.sh` becomes `src/chess_lab/pipeline.sh` and `capturas_gui`
+  becomes `chess_lab.screenshots`. `scripts/` is gone.
+- Trained model files (`.npz`) leave git for `data/models/`; their cards stay in git as the record.
+- The scripts that drive the compute node leave the repo; the retired `match.sh`, `deploy.sh` and `env.sh` are deleted.
+
 ## 4.0.0 (2026-11-11)
 
 ### Added

@@ -1,31 +1,16 @@
-"""Where the trained models are saved, and the fixed heuristic ``h1``.
+"""Where the trained models are saved.
 
 A saved model is a ``.npz`` file in :data:`ARTIFACTS_DIR` (``data/models/``, outside git); :mod:`chess_lab.models.definitions`
 reads and writes it and turns it into a ``_core.Evaluator``.
 """
 
-import json
 from pathlib import Path
 from typing import Optional, Tuple
 
-from chess_engine import _core
 from chess_engine.paths import ROOT
 
 #: Folder of the trained model files (ignored by git: the model cards are the record).
 ARTIFACTS_DIR = ROOT / "data" / "models"
-
-#: Names of the features of ``h1``, in the order the core takes their weights.
-FEATURE_NAMES = (
-    "material_diff_normalized",
-    "positional_diff_normalized",
-    "mobility_diff_normalized",
-    "center_diff_normalized",
-    "king_safety_diff_normalized",
-    "development_diff_normalized",
-)
-
-#: Versioned JSON file with the fitted weights of ``h1``.
-H1_WEIGHTS_PATH = Path(__file__).with_name("h1_weights.json")
 
 
 def split_spec(spec: str) -> Tuple[str, Optional[str]]:
@@ -61,24 +46,3 @@ def installed_models() -> list[str]:
     :return: Sorted list of names.
     """
     return sorted(path.stem for path in ARTIFACTS_DIR.glob("*.npz") if "@" not in path.stem)
-
-
-def load_h1_weights() -> dict:
-    """The fitted weights of ``h1``.
-
-    :return: Weight per feature name in :data:`FEATURE_NAMES`.
-    :raises ValueError: If the file is not keyed by exactly those names.
-    """
-    weights = json.loads(H1_WEIGHTS_PATH.read_text())["weights"]
-    if set(weights) != set(FEATURE_NAMES):
-        raise ValueError(f"{H1_WEIGHTS_PATH}: weights must be keyed by {list(FEATURE_NAMES)}")
-    return {name: float(weights[name]) for name in FEATURE_NAMES}
-
-
-def h1_evaluator() -> "_core.Evaluator":
-    """The heuristic ``h1`` as a native evaluation.
-
-    :return: Evaluator with the fitted weights of ``h1_weights.json``.
-    """
-    weights = load_h1_weights()
-    return _core.Evaluator.h1([weights[name] for name in FEATURE_NAMES])

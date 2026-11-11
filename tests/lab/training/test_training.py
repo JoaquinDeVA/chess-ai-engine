@@ -315,32 +315,12 @@ class TestCommandLineWithDoubles:
         assert card["parameters"] == 7
 
 
-class TestHeuristicEvaluation:
-    def test_h1_is_accepted_and_unknown_names_are_not(self):
-        assert evaluate_cli.parse_args(["--model", "h1"]).model == "h1"
-        with pytest.raises(SystemExit):
-            evaluate_cli.parse_args(["--model", "nope"])
+class TestEvaluateNames:
+    def test_only_registered_models_are_accepted(self):
         assert "h1" not in definitions.available_models()
-
-    def test_main_writes_a_reference_card_that_the_report_lists(self, isolated_cards, monkeypatch):
-        boards = random_positions(30, seed=5, max_plies=20)
-        sample = pd.DataFrame(
-            {
-                "fen": [b.fen() for b in boards],
-                "cp": [float(material_cp(b)) for b in boards],
-                "mate": [np.nan] * len(boards),
-                "best_move": [next(iter(b.legal_moves)).uci() for b in boards],
-                "quiet": [i % 2 == 0 for i in range(len(boards))],
-            }
-        )
-        monkeypatch.setattr(evaluate_cli, "load_sample", lambda *a, **k: sample)
-        assert evaluate_cli.main(["--model", "h1", "--agreement-n", "5"]) == 0
-        card = cards.load_card("h1")
-        assert card["status"] == "reference" and card["features"] == "h1"
-        assert card["architecture"] == "Hand-crafted heuristic (weights fitted to Stockfish)"
-        assert card["parameters"] == 6 and "training" not in card and "size_kb" not in card
-        assert card["accuracy"]["all"]["n"] == 30 and card["cost"]["us_per_eval"] > 0
-        assert "| `h1` | 6 |" in report.render_tables()
+        for name in ("h1", "nope"):
+            with pytest.raises(SystemExit):
+                evaluate_cli.parse_args(["--model", name])
 
 
 @pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])

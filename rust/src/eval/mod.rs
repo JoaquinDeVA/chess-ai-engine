@@ -1,13 +1,11 @@
-//! Evaluations: the hand-written heuristic `h1` and the sparse network. Both return the expected score of a player in `[0.01, 0.99]`, like the Python
-//! `ModelEvaluator`.
+//! Evaluation: the sparse network, which returns the expected score of a player in `[0.01, 0.99]`.
 
-pub mod classic_heuristic;
 pub mod sparse_features;
 pub mod sparse_net;
 
 use shakmaty::{Chess, Color, Move};
 
-/// Lowest and highest value of a heuristic, to stay clear of the terminal values 0 and 1.
+/// Distance of the lowest and highest evaluation from 0 and 1, to stay clear of the terminal values 0 and 1.
 pub const MARGIN: f64 = 1e-2;
 
 /// A position evaluation seen from a player.
@@ -55,22 +53,17 @@ pub fn sigmoid(z: f64) -> f64 {
 
 /// The evaluations the search can run natively.
 pub enum Eval {
-    H1(classic_heuristic::H1),
     Net(sparse_net::Net),
 }
 
 impl Evaluator for Eval {
     fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        match self {
-            Eval::H1(e) => e.evaluate(pos, player),
-            Eval::Net(e) => e.evaluate(pos, player),
-        }
+        let Eval::Net(e) = self;
+        e.evaluate(pos, player)
     }
 
     fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
-        match self {
-            Eval::Net(e) => e.new_state(pos),
-            Eval::H1(_) => None,
-        }
+        let Eval::Net(e) = self;
+        e.new_state(pos)
     }
 }

@@ -1,11 +1,12 @@
 //! The techniques that only change the order or the windows of the search must give the value of
-//! the reference search. Positions: tests/data/positions.json; evaluation: `h1`.
+//! the reference search. Positions: tests/data/positions.json; evaluation: the compiled-in network.
 
 use std::fs;
 use std::path::PathBuf;
 
 use _core::board::GameState;
-use _core::eval::classic_heuristic::{FEATURE_NAMES, H1};
+use _core::eval::sparse_net::Net;
+use _core::eval::Eval;
 use _core::search::{alpha_beta, Control, Memory, Options, Techniques};
 use serde_json::Value;
 
@@ -17,20 +18,17 @@ fn read(path: PathBuf) -> Value {
     serde_json::from_str(&fs::read_to_string(&path).expect("file")).expect("valid JSON")
 }
 
-fn h1() -> H1 {
-    let file = read(root().join("src/chess_lab/models/store/h1_weights.json"));
-    let mut weights = [0.0; 6];
-    for (slot, name) in FEATURE_NAMES.iter().enumerate() {
-        weights[slot] = file["weights"][name].as_f64().unwrap();
-    }
-    H1::new(weights)
+/// The network the UCI binary compiles in.
+fn net() -> Eval {
+    let text = fs::read_to_string(root().join("rust/models/net_pst_w64.json")).expect("model");
+    Eval::Net(Net::from_json(&text).expect("valid model"))
 }
 
 /// Values of the first `count` positions at `depth` with the given techniques (iterative
 /// deepening from depth 1, so that the table has something to use).
 fn values(techniques: Techniques, depth: i32, count: usize) -> Vec<f64> {
     let positions = read(root().join("tests/data/positions.json"));
-    let eval = h1();
+    let eval = net();
     let clock = || 0.0;
     let options = Options {
         quiescence_plies: 4,
@@ -101,7 +99,7 @@ fn the_table_move_does_not_change_the_value() {
 /// Values of the first `count` positions at depth `depth`, one search each (no deepening).
 fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(f64, Option<String>)> {
     let positions = read(root().join("tests/data/positions.json"));
-    let eval = h1();
+    let eval = net();
     let clock = || 0.0;
     let options = Options {
         quiescence_plies: 4,
@@ -197,7 +195,7 @@ fn the_selective_techniques_keep_the_forced_results_and_most_moves() {
 fn the_null_move_is_not_used_in_pawn_endings() {
     // Lasker's zugzwang position: passing the turn would look winning, but nobody may pass.
     let fen = "8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1";
-    let eval = h1();
+    let eval = net();
     let clock = || 0.0;
     let mut values = Vec::new();
     for null_move in [false, true] {

@@ -10,7 +10,6 @@ use pyo3::prelude::*;
 use shakmaty::Color;
 
 use crate::board::position_from_fen;
-use crate::eval::classic_heuristic::H1;
 use crate::eval::sparse_features::FeatureSet;
 use crate::eval::sparse_net::{Layer, Net};
 use crate::eval::{Eval, Evaluator};
@@ -24,35 +23,20 @@ fn parse_features(name: &str) -> PyResult<FeatureSet> {
     FeatureSet::from_name(name).ok_or_else(|| value_error(format!("unknown feature set {name:?}")))
 }
 
-/// A Python-owned evaluator backed by a Rust heuristic or neural network.
+/// A Python-owned evaluator backed by a Rust neural network.
 ///
-/// The evaluator stores the selected implementation and, for neural networks, the feature set
-/// needed to expose active sparse features through [`PyEvaluator::features`].
+/// The evaluator stores the network and the feature set needed to expose active sparse features
+/// through [`PyEvaluator::features`].
 #[pyclass(name = "Evaluator", frozen)]
 struct PyEvaluator {
-    /// The concrete evaluator implementation.
+    /// The network.
     eval: Eval,
-    /// The sparse feature set, or `None` for the scalar heuristic.
-    features: Option<FeatureSet>,
+    /// The sparse feature set of the network.
+    features: FeatureSet,
 }
 
 #[pymethods]
 impl PyEvaluator {
-    /// Build the `h1` heuristic from its six ordered weights.
-    ///
-    /// The weights are accepted as a vector at the Python boundary, then converted to the fixed
-    /// six-element array required by the Rust implementation.
-    #[staticmethod]
-    fn h1(weights: Vec<f64>) -> PyResult<PyEvaluator> {
-        let weights: [f64; 6] = weights
-            .try_into()
-            .map_err(|_| value_error("h1 needs exactly six weights"))?;
-        Ok(PyEvaluator {
-            eval: Eval::H1(H1::new(weights)),
-            features: None,
-        })
-    }
-
     /// Build a neural network over a named sparse feature set.
     ///
     /// Each layer is a Python `(weights, bias)` pair. Weights are copied into Rust-owned storage;
@@ -78,7 +62,7 @@ impl PyEvaluator {
         let net = Net::new(set, layers).map_err(value_error)?;
         Ok(PyEvaluator {
             eval: Eval::Net(net),
-            features: Some(set),
+            features: set,
         })
     }
 
@@ -94,13 +78,8 @@ impl PyEvaluator {
     }
 
     /// Return the active sparse feature indices and values for a FEN position.
-    ///
-    /// This operation is available only for network evaluators because the scalar `h1` heuristic
-    /// does not have a sparse feature representation.
     fn features(&self, fen: &str) -> PyResult<(Vec<usize>, Vec<f64>)> {
-        let set = self
-            .features
-            .ok_or_else(|| value_error("this evaluator has no sparse features"))?;
+        let set = self.features;
         let pos = position_from_fen(fen).map_err(value_error)?;
         let (mut indices, mut values) = (Vec::new(), Vec::new());
         set.active(&pos, &mut indices, &mut values);

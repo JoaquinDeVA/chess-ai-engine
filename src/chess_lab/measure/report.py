@@ -92,8 +92,9 @@ def _row(card: Dict[str, Any]) -> str:
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
-    Models with status ``current``, ``reference`` (the heuristic ``h1``) or ``retired`` are listed,
-    in that order and by name within each status; a retired model is marked as such.
+    Models with status ``current``, ``reference`` (the retired heuristic ``h1``, kept as the record
+    of the anchor) or ``retired`` are listed, in that order and by name within each status; a
+    retired model is marked as such.
 
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.

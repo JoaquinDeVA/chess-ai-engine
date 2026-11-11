@@ -26,7 +26,7 @@ def test_pipeline_dry_run_prints_the_pipeline_and_writes_nothing(tmp_path):
             "training.train" in line and f"--model {model} " in line and "--effort 30" in line
             for line in lines
         ), model
-    assert any("measure.evaluate --model h1 " in line for line in lines)
+    assert not any("--model h1" in line for line in lines)
     assert "tournament" not in result.stdout
     assert "mlp_features" not in result.stdout and "cnn_resnet" not in result.stdout
     assert not state.exists() or not list(state.glob("*.done"))

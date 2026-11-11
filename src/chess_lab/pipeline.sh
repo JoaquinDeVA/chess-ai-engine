@@ -8,9 +8,6 @@
 # training: a failed model is logged and the loop continues. Per-model training logs go to
 # $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
 #
-# h1 is fixed (src/chess_lab/models/store/h1_weights.json): changing it would change the anchor, so every result
-# measured against the old h1 would stop being comparable.
-#
 # Variables (defaults): RAW (data/LichessPositions/raw), SIDECAR (data/LichessPositions/sidecar), EFFORT (30),
 # AGREEMENT_N (20000), MODELS (every registered model, from chess_lab.models.definitions),
 # STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/results/pipeline),
@@ -82,7 +79,7 @@ step_train() {
 
 step_evaluate() {
   local model
-  for model in $(present_models) h1; do
+  for model in $(present_models); do
     log "evaluate $model"
     run "$PYTHON" -m chess_lab.measure.evaluate --model "$model" \
       --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"

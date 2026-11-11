@@ -12,8 +12,7 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 
 use _core::board::{ordered_moves, uci_string, GameState};
-use _core::eval::sparse_features::FeatureSet;
-use _core::eval::sparse_net::{Layer, Net};
+use _core::eval::sparse_net::Net;
 use _core::eval::{Eval, Evaluator};
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
@@ -71,53 +70,9 @@ fn load_model() -> Result<Eval, String> {
     model_from_json(MODEL_JSON)
 }
 
-/// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`, each
-/// with `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the networks were
-/// the only model carry `"perspective": "side_to_move"`; any other perspective is refused.
+/// The network of a model file (see [`Net::from_json`]).
 fn model_from_json(text: &str) -> Result<Eval, String> {
-    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
-    let features = value["features"]
-        .as_str()
-        .and_then(FeatureSet::from_name)
-        .ok_or("model: unknown features")?;
-    if value
-        .get("perspective")
-        .is_some_and(|p| *p != "side_to_move")
-    {
-        return Err("model: only the side-to-move perspective is supported".into());
-    }
-    let layers = value["layers"]
-        .as_array()
-        .ok_or("model: layers is not a list")?
-        .iter()
-        .map(|layer| {
-            let size = |key: &str| {
-                layer[key]
-                    .as_u64()
-                    .map(|n| n as usize)
-                    .ok_or(format!("model: layer has no {key}"))
-            };
-            Ok(Layer {
-                fan_in: size("fan_in")?,
-                fan_out: size("fan_out")?,
-                weights: number_list(&layer["weights"])?,
-                bias: number_list(&layer["bias"])?,
-            })
-        })
-        .collect::<Result<Vec<Layer>, String>>()?;
-    Ok(Eval::Net(Net::new(features, layers)?))
-}
-
-fn number_list(value: &serde_json::Value) -> Result<Vec<f64>, String> {
-    value
-        .as_array()
-        .ok_or("model: no weights")?
-        .iter()
-        .map(|w| {
-            w.as_f64()
-                .ok_or("model: weight is not a number".to_string())
-        })
-        .collect()
+    Ok(Eval::Net(Net::from_json(text)?))
 }
 
 /// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s

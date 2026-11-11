@@ -6,17 +6,10 @@
 //! Legal moves are listed in the order shakmaty generates them; among moves of equal value the
 //! search plays the first.
 
-use shakmaty::attacks::{
-    between, bishop_attacks, king_attacks, knight_attacks, pawn_attacks, queen_attacks,
-    rook_attacks,
-};
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::zobrist::Zobrist64;
-use shakmaty::{
-    Bitboard, CastlingMode, CastlingSide, Chess, Color, EnPassantMode, File, FromSetup, Move,
-    MoveList, Position, Rank, Role, Square,
-};
+use shakmaty::{CastlingMode, Chess, Color, EnPassantMode, Move, MoveList, Position, Role};
 
 /// Key of a position in the transposition table: its Zobrist hash (placement, side to move,
 /// castling rights, legal en passant square). The move counters are not part of it, so the same
@@ -267,165 +260,6 @@ impl GameState {
     }
 }
 
-/// Number of legal moves `color` would have in `pos` if it were its turn (en passant rights are
-/// those of the side that really moves, so they are dropped for the other side).
-pub fn mobility(pos: &Chess, color: Color) -> usize {
-    if pos.turn() == color {
-        return pos.legal_moves().len();
-    }
-    let mode = pos.castles().mode();
-    let mut setup = pos.to_setup(EnPassantMode::Always);
-    setup.turn = color;
-    setup.ep_square = None;
-    match Chess::from_setup(setup, mode).or_else(|e| e.ignore_impossible_check()) {
-        Ok(flipped) => flipped.legal_moves().len(),
-        // The side to move is in check by `color`: shakmaty refuses such a position, python-chess
-        // does not, so count by hand.
-        Err(_) => count_moves(pos, color),
-    }
-}
-
-/// Squares of `color`'s pieces that attack `square`, given the occupancy and the pieces to ignore.
-fn attackers(
-    pos: &Chess,
-    square: Square,
-    color: Color,
-    occupied: Bitboard,
-    removed: Bitboard,
-) -> Bitboard {
-    let board = pos.board();
-    let theirs = board.by_color(color) & !removed;
-    (knight_attacks(square) & board.knights()
-        | king_attacks(square) & board.kings()
-        | bishop_attacks(square, occupied) & (board.bishops() | board.queens())
-        | rook_attacks(square, occupied) & (board.rooks() | board.queens())
-        | pawn_attacks(!color, square) & board.pawns())
-        & theirs
-}
-
-/// Legal moves of `color` counted from the attack tables, for a position in which the other side
-/// is in check (so that `shakmaty` cannot generate them). No en passant, as for the flipped side.
-fn count_moves(pos: &Chess, color: Color) -> usize {
-    let board = pos.board();
-    let occupied = board.occupied();
-    let own = board.by_color(color);
-    let enemy = board.by_color(!color);
-    let Some(king) = board.king_of(color) else {
-        return 0;
-    };
-    let safe_after = |from: Square, to: Square| -> bool {
-        // The king stays safe if no enemy piece attacks it once the move is played.
-        let captured = Bitboard::from_square(to) & enemy;
-        let occupied_after = (occupied ^ Bitboard::from_square(from)) | Bitboard::from_square(to);
-        let king_square = if from == king { to } else { king };
-        attackers(pos, king_square, !color, occupied_after, captured).is_empty()
-    };
-    let mut count = 0;
-    for from in own {
-        let role = board.role_at(from).expect("occupied");
-        let targets = match role {
-            Role::Knight => knight_attacks(from) & !own,
-            Role::Bishop => bishop_attacks(from, occupied) & !own,
-            Role::Rook => rook_attacks(from, occupied) & !own,
-            Role::Queen => queen_attacks(from, occupied) & !own,
-            Role::King => king_attacks(from) & !own,
-            Role::Pawn => {
-                let forward: i32 = if color == Color::White { 8 } else { -8 };
-                let one = Square::try_from(u32::from(from) as i32 + forward).ok();
-                let mut set = Bitboard::EMPTY;
-                if let Some(one) = one {
-                    if !occupied.contains(one) {
-                        set |= Bitboard::from_square(one);
-                        let start = if color == Color::White {
-                            Rank::Second
-                        } else {
-                            Rank::Seventh
-                        };
-                        if from.rank() == start {
-                            if let Ok(two) = Square::try_from(u32::from(one) as i32 + forward) {
-                                if !occupied.contains(two) {
-                                    set |= Bitboard::from_square(two);
-                                }
-                            }
-                        }
-                    }
-                }
-                set | pawn_attacks(color, from) & enemy
-            }
-        };
-        for to in targets {
-            if !safe_after(from, to) {
-                continue;
-            }
-            let last = if color == Color::White {
-                Rank::Eighth
-            } else {
-                Rank::First
-            };
-            count += if role == Role::Pawn && to.rank() == last {
-                4
-            } else {
-                1
-            };
-        }
-    }
-    // Castling: king and rook in place, empty path, and no attacked square on the king's way.
-    let home = if color == Color::White {
-        Rank::First
-    } else {
-        Rank::Eighth
-    };
-    let king_home = Square::from_coords(File::E, home);
-    if king == king_home {
-        for side in [CastlingSide::KingSide, CastlingSide::QueenSide] {
-            let Some(rook) = pos.castles().rook(color, side) else {
-                continue;
-            };
-            let destination = Square::from_coords(
-                if side == CastlingSide::KingSide {
-                    File::G
-                } else {
-                    File::C
-                },
-                home,
-            );
-            let rook_destination = Square::from_coords(
-                if side == CastlingSide::KingSide {
-                    File::F
-                } else {
-                    File::D
-                },
-                home,
-            );
-            let path = (between(king, rook)
-                | Bitboard::from_square(destination)
-                | Bitboard::from_square(rook_destination))
-                & !Bitboard::from_square(king)
-                & !Bitboard::from_square(rook);
-            if (path & occupied).any() {
-                continue;
-            }
-            let walk = between(king, destination)
-                | Bitboard::from_square(king)
-                | Bitboard::from_square(destination);
-            let attacked = walk.into_iter().any(|sq| {
-                attackers(
-                    pos,
-                    sq,
-                    !color,
-                    occupied ^ Bitboard::from_square(king),
-                    Bitboard::EMPTY,
-                )
-                .any()
-            });
-            if !attacked {
-                count += 1;
-            }
-        }
-    }
-    count
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551,31 +385,5 @@ mod tests {
         assert_ne!(s.key(), before);
         s.undo();
         assert_eq!(s.key(), before);
-    }
-
-    #[test]
-    fn counting_by_hand_agrees_with_shakmaty_for_the_side_to_move() {
-        for fen in [
-            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-            "r3k2r/pp3ppp/2n1bn2/q1pp4/3P4/2N1PN2/PP2BPPP/R2QK2R w KQkq - 0 1",
-            "r3k2r/1P4P1/8/8/8/8/1p4p1/R3K2R w KQkq - 0 1",
-            "8/2k5/8/3Pp3/8/8/8/4K3 b - - 0 1",
-            "4k3/8/8/8/8/8/PPPPPPPP/R3K2R b KQ - 0 1",
-        ] {
-            let pos = position_from_fen(fen).unwrap();
-            for color in [Color::White, Color::Black] {
-                if pos.turn() == color && pos.legal_ep_square().is_none() {
-                    assert_eq!(count_moves(&pos, color), pos.legal_moves().len(), "{fen}");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn mobility_of_the_side_not_to_move() {
-        let pos =
-            position_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
-        assert_eq!(mobility(&pos, Color::White), 20);
-        assert_eq!(mobility(&pos, Color::Black), 20);
     }
 }

@@ -22,12 +22,7 @@ from chess_lab.measure.report import update_history_file
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
-from chess_lab.models.store.loader import artifact_path, h1_evaluator, load_h1_weights, split_spec
-
-#: Evaluations that are not saved models: the hand-written heuristic.
-HEURISTICS = ("h1",)
-#: Architecture written in the card of a heuristic.
-HEURISTIC_ARCHITECTURE = "Hand-crafted heuristic (weights fitted to Stockfish)"
+from chess_lab.models.store.loader import artifact_path, split_spec
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000
@@ -77,21 +72,19 @@ def sample_benchmark(
 
 
 def model_spec_arg(text: str) -> str:
-    """Argument type of ``--model``: a registered name, ``name@tag`` or a heuristic (``h1``).
+    """Argument type of ``--model``: a registered name or ``name@tag``.
 
     :param text: The command-line value.
     :return: The value, unchanged.
     :raises argparse.ArgumentTypeError: If the name is not registered or the spec is malformed.
     """
-    if text in HEURISTICS:
-        return text
     try:
         name, _ = split_spec(text)
     except ValueError as error:
         raise argparse.ArgumentTypeError(str(error)) from error
     if name not in available_models():
         raise argparse.ArgumentTypeError(
-            f"invalid choice: {name!r} (choose from {', '.join([*available_models(), *HEURISTICS])})"
+            f"invalid choice: {name!r} (choose from {', '.join(available_models())})"
         )
     return text
 
@@ -125,30 +118,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     :return: Process exit code.
     """
     args = parse_args(argv)
-    heuristic = args.model in HEURISTICS
-    if heuristic:
-        evaluator = h1_evaluator()
-        sections: Dict[str, Any] = {
-            "architecture": HEURISTIC_ARCHITECTURE,
-            "features": args.model,
-            "parameters": len(load_h1_weights()),
-        }
-    else:
-        model = load_model(args.model, args.path)
-        evaluator = model.evaluator()
-        sections = {
-            "architecture": model.architecture,
-            "features": model.feature_set,
-            "parameters": model.count_parameters(),
-        }
+    model = load_model(args.model, args.path)
+    evaluator = model.evaluator()
+    sections: Dict[str, Any] = {
+        "architecture": model.architecture,
+        "features": model.feature_set,
+        "parameters": model.count_parameters(),
+    }
     print(f"Evaluating {args.model} ...")
     sections.update(sample_benchmark(evaluator, args.raw, args.sidecar, args.agreement_n))
-    if heuristic:
-        sections["status"] = "reference"
-    else:
-        saved = args.path or artifact_path(args.model)
-        if saved.exists():
-            sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
+    saved = args.path or artifact_path(args.model)
+    if saved.exists():
+        sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
     if "status" not in sections and "status" not in load_card(args.model):
         sections["status"] = "current"
     update_card(args.model, **sections)

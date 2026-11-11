@@ -4,12 +4,10 @@
 >
 > **Read it when:** You are about to measure a technique or a model, or want to know what a score, an Elo interval or an LLR in these pages means.
 >
-> **Next:** [Openings](OPENINGS.md)
-
 ## Why games
 
 Nodes and time per move show what a change costs, not whether the engine plays better. A change can search fewer
-nodes, reach more depth and still lose: late move reductions (removed, [catalogue](techniques/README.md#how-the-switches-were-judged)) searched half a ply deeper and
+nodes, reach more depth and still lose: late move reductions (removed) searched half a ply deeper and
 scored 49 % against the engine without them. So a change is kept on the evidence of games against the current
 engine, and the node and depth counts only explain the result.
 
@@ -18,7 +16,7 @@ engine, and the node and depth counts only explain the result.
 - **Two copies of the same binary.** fastchess plays the UCI binary against itself, engine A with the change
   switched on through a UCI option (`option.Techniques=...`) and engine B without it. Everything else is equal:
   machine, time control, `Hash`, threads.
-- **Paired openings.** Every game starts from a position of the [opening suite](OPENINGS.md) and every position is
+- **Paired openings.** Every game starts from a position of the opening suite and every position is
   played twice with the colours swapped, so a lopsided opening favours both engines equally. A pair scores 0, ½,
   1, 1½ or 2 points for A.
 - **A time control or a node count.** At a time control (`tc=10+0.1`) the result includes speed: a change that
@@ -60,7 +58,7 @@ under H0. With error rates alpha = beta = 0.05 the bounds are `ln(0.05 / 0.95) =
 regresses), above +2.94 H1 is accepted (it does not). A cap on rounds stops a match that crosses neither, which
 means the difference is smaller than the test can see in that many games.
 
-**Worked example**: the test of late move reductions (removed, [catalogue](techniques/README.md#how-the-switches-were-judged)) at 20,000 nodes per move, `[−5, 0]`
+**Worked example**: the test of late move reductions (removed) at 20,000 nodes per move, `[−5, 0]`
 (`data/results/matches/lmr_nodes/match.log`). A scored a little under 49 % from the start, and the LLR fell steadily:
 
 | games | 200 | 2,200 | 4,200 | 6,200 | 8,200 | 10,200 | 10,244 |
@@ -133,7 +131,7 @@ the probes. With the shared table: 118,614,205 nodes but median 4.58 s (974,990 
 
 ## How to measure a change
 
-1. Build the binary (`cargo build --release --bin uci` in `rust/`) and the opening suite ([Openings](OPENINGS.md)).
+1. Build the binary (`cargo build --release --bin uci` in `rust/`) and the opening suite (Openings).
 2. Check that the binary accepts the technique list. A misspelt name stops nothing: the binary answers
    `info string unknown technique ...` and keeps the default set, fastchess does not show that line, and the match
    silently becomes an A/A:

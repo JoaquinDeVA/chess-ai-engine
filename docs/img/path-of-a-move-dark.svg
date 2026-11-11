@@ -8,20 +8,20 @@
     .label { font-size: 15px; }
     .small { font-size: 13px; }
     .bold { font-weight: 700; }
-    .on { fill: #052e16; stroke: #4ade80; stroke-width: 2; }
-    .cut { fill: #450a0a; stroke: #f87171; stroke-width: 2; }
-    .blue { fill: #172554; stroke: #60a5fa; stroke-width: 2; }
-    .gray { fill: #1f2937; stroke: #9ca3af; stroke-width: 2; stroke-dasharray: 5 4; }
-    .edge { stroke: #4ade80; stroke-width: 2.5; fill: none; }
-    .edge-cut { stroke: #f87171; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
-    .t-green { fill: #bbf7d0; }
-    .t-red { fill: #fecaca; }
-    .step { fill: #111827; stroke: #cbd5e1; stroke-width: 2; }
+    .on { fill: #2f3b24; stroke: #a3c177; stroke-width: 2; }
+    .cut { fill: #4a2a24; stroke: #c9776a; stroke-width: 2; }
+    .blue { fill: #2e353b; stroke: #8fa0ad; stroke-width: 2; }
+    .gray { fill: #33302c; stroke: #9ca3af; stroke-width: 2; stroke-dasharray: 5 4; }
+    .edge { stroke: #a3c177; stroke-width: 2.5; fill: none; }
+    .edge-cut { stroke: #c9776a; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .t-green { fill: #d7e6bd; }
+    .t-red { fill: #ecc9c0; }
+    .step { fill: #1d1b19; stroke: #cbd5e1; stroke-width: 2; }
     .t-step { fill: #e2e8f0; }
-    .t-blue { fill: #bfdbfe; }
+    .t-blue { fill: #cdd6dd; }
     .t-gray { fill: #d1d5db; }
   </style>
-  <rect x="1" y="1" width="798" height="448" rx="12" fill="#0f172a" stroke="#475569" stroke-width="2"/>
+  <rect x="1" y="1" width="798" height="448" rx="12" fill="#262421" stroke="#769656" stroke-width="2"/>
   <text x="24" y="38" class="title">From the board to a move: the first test that applies wins</text>
 
   <!-- edges -->

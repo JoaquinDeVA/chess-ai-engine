@@ -1,7 +1,8 @@
-//! The Python module `chess_engine._core`.
+//! Python bindings for the Rust core, exposed as `chess_engine._core`.
 //!
-//! The evaluations, for the laboratory. The search, the opening book and the endgame tables run
-//! only in the UCI binary (`src/bin/uci.rs`); Python reads its defaults from here.
+//! This module exposes the evaluators and the configuration metadata needed by the laboratory.
+//! The search, opening book and endgame tablebases run only in the UCI binary
+//! (`src/bin/uci.rs`); Python reads the corresponding defaults from this module.
 
 use numpy::{PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -18,20 +19,29 @@ fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 
+/// Resolve a public feature-set name to the Rust implementation used by the evaluator.
 fn parse_features(name: &str) -> PyResult<FeatureSet> {
     FeatureSet::from_name(name).ok_or_else(|| value_error(format!("unknown feature set {name:?}")))
 }
 
-/// An evaluation of positions.
+/// A Python-owned evaluator backed by a Rust heuristic or neural network.
+///
+/// The evaluator stores the selected implementation and, for neural networks, the feature set
+/// needed to expose active sparse features through [`PyEvaluator::features`].
 #[pyclass(name = "Evaluator", frozen)]
 struct PyEvaluator {
+    /// The concrete evaluator implementation.
     eval: Eval,
+    /// The sparse feature set, or `None` for the scalar heuristic.
     features: Option<FeatureSet>,
 }
 
 #[pymethods]
 impl PyEvaluator {
-    /// The heuristic `h1` with its six weights.
+    /// Build the `h1` heuristic from its six ordered weights.
+    ///
+    /// The weights are accepted as a vector at the Python boundary, then converted to the fixed
+    /// six-element array required by the Rust implementation.
     #[staticmethod]
     fn h1(weights: Vec<f64>) -> PyResult<PyEvaluator> {
         let weights: [f64; 6] = weights
@@ -43,7 +53,10 @@ impl PyEvaluator {
         })
     }
 
-    /// A network over sparse features: `layers` are `(weights, bias)` pairs, accumulator first.
+    /// Build a neural network over a named sparse feature set.
+    ///
+    /// Each layer is a Python `(weights, bias)` pair. Weights are copied into Rust-owned storage;
+    /// the first layer consumes the feature accumulator produced by the selected feature set.
     #[staticmethod]
     fn network(
         features: &str,
@@ -69,7 +82,10 @@ impl PyEvaluator {
         })
     }
 
-    /// Value of the position for White (`white=True`) or Black, in `[0.01, 0.99]`.
+    /// Evaluate a FEN position from White's or Black's perspective.
+    ///
+    /// `white=True` evaluates for White; `white=False` evaluates for Black. The returned score is
+    /// in the evaluator's `[0.01, 0.99]` range.
     fn evaluate(&self, fen: &str, white: bool) -> PyResult<f64> {
         let pos = position_from_fen(fen).map_err(value_error)?;
         Ok(self
@@ -77,7 +93,10 @@ impl PyEvaluator {
             .evaluate(&pos, if white { Color::White } else { Color::Black }))
     }
 
-    /// Active feature indices and values of a position (networks only).
+    /// Return the active sparse feature indices and values for a FEN position.
+    ///
+    /// This operation is available only for network evaluators because the scalar `h1` heuristic
+    /// does not have a sparse feature representation.
     fn features(&self, fen: &str) -> PyResult<(Vec<usize>, Vec<f64>)> {
         let set = self
             .features
@@ -89,7 +108,7 @@ impl PyEvaluator {
     }
 }
 
-/// Evaluation of the chess engine, in Rust, and the defaults of its search.
+/// Register the Rust evaluator and search metadata in `chess_engine._core`.
 #[pymodule]
 mod _core {
     use pyo3::prelude::*;
@@ -99,6 +118,8 @@ mod _core {
 
     #[pymodule_init]
     fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
+        // Keep these values sourced from Rust so Python tooling uses the same defaults as the
+        // engine instead of maintaining a second copy.
         module.add("MAX_DEPTH", crate::search::MAX_DEPTH)?;
         module.add(
             "DEFAULT_TECHNIQUES",

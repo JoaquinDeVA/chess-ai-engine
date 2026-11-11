@@ -12,21 +12,15 @@ const LMR_FROM_DEPTH: i32 = 3;
 const LMR_FROM_INDEX: usize = 3;
 
 /// Reverse futility pruning works up to this depth, and prunes when the static value is beyond the
-/// bound by `RFP_MARGIN_PER_PLY` log-odds per ply left: 80 centipawns of the plan on the usual
-/// logistic scale (`80 · ln 10 / 400`).
+/// bound by `RFP_MARGIN_PER_PLY` per ply left (it was 0.46 log-odds, the same 80 centipawns).
 pub(super) const RFP_UP_TO_DEPTH: i32 = 6;
-pub(super) const RFP_MARGIN_PER_PLY: f64 = 0.46;
-
-/// Log-odds of an expected score, to measure distances that mean the same at 0.5 and at 0.9.
-pub(super) fn log_odds(p: f64) -> f64 {
-    (p / (1.0 - p)).ln()
-}
+pub(super) const RFP_MARGIN_PER_PLY: i32 = 80;
 
 /// Futility pruning and late move pruning work up to this depth. The futility margin is
-/// `FUTILITY_MARGIN_PER_PLY` log-odds per ply left (120 centipawns on the usual logistic scale,
-/// `120 · ln 10 / 400`); late move pruning skips the quiet moves from the `3 + depth²`-th on.
+/// `FUTILITY_MARGIN_PER_PLY` per ply left (it was 0.69 log-odds, the same 120 centipawns); late
+/// move pruning skips the quiet moves from the `3 + depth²`-th on.
 pub(super) const SHALLOW_UP_TO_DEPTH: i32 = 3;
-pub(super) const FUTILITY_MARGIN_PER_PLY: f64 = 0.69;
+pub(super) const FUTILITY_MARGIN_PER_PLY: i32 = 120;
 
 /// Quiet moves a node of `depth_remaining` plies tries before late move pruning skips the rest.
 pub(super) fn late_move_limit(depth_remaining: i32) -> usize {

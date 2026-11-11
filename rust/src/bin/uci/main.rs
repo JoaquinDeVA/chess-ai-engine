@@ -15,8 +15,9 @@ use _core::board::{ordered_moves, uci_string, GameState};
 use _core::eval::Net;
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
-use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
-use _core::search::{self, Control, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
+use _core::search::{
+    self, Control, Memory, Options, Techniques, DEFAULT_HASH_MB, DEFAULT_TECHNIQUES,
+};
 use shakmaty::Color;
 
 use bench::{bench, time_to_depth};
@@ -27,7 +28,6 @@ mod bench;
 const MODEL_JSON: &str = include_str!("../../../models/net_pst_w64.json");
 const MODEL_NAME: &str = "net_pst_w64";
 const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-const DEFAULT_HASH_MB: usize = 64;
 
 /// Settings changed with `setoption`.
 struct Settings {
@@ -173,7 +173,7 @@ fn finish(running: &mut Option<Running>, memory: &mut Option<Memory>) {
 }
 
 fn new_memory(settings: &Settings) -> Memory {
-    Memory::with_threads(DEFAULT_MAX_TT_ENTRIES, settings.threads, settings.hash_mb)
+    Memory::new(settings.threads, settings.hash_mb)
 }
 
 fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {

@@ -4,7 +4,7 @@ use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
 
 use super::features::PIECE_INPUTS;
 use super::net::Net;
-use super::{for_player, sigmoid};
+use super::score;
 
 /// Index of a piece among the inputs of one king bucket when `mover` is the side to move: the
 /// pieces of the mover come first, then the opponent's, each colour seen from its own home rank.
@@ -25,26 +25,38 @@ fn slot(color: Color) -> usize {
     usize::from(color == Color::Black)
 }
 
+/// Plies the stack of accumulators holds before it has to grow: more than any search reaches.
+const STACK_PLIES: usize = 128;
+
 /// The accumulator of the first layer for both sides to move, updated move by move.
 ///
 /// The inputs depend on who moves, so two accumulators are kept, one for each side as the mover; the
 /// position is evaluated with the one of the side to move. Playing a move touches the two to four
 /// pieces that change, instead of adding the rows of every piece again.
 ///
+/// The accumulators of every ply of the line being searched are kept in a stack: a move copies the
+/// top frame into the next one and changes the copy, and taking it back only steps down.
+///
 /// With king buckets each accumulator uses the rows of its mover's bucket: when that king moves to
 /// another bucket, its accumulator is rebuilt from the board. The classical terms are not pieces:
 /// they are computed and added at every evaluation.
 ///
-/// The search calls `apply` for every move it plays and `undo` when it takes it back, and
-/// `evaluate` for the position it is in; the result equals [`Net::evaluate`] up to rounding.
+/// The search calls `apply` for every move it plays and `undo` when it takes it back, and `score`
+/// for the position it is in; the result equals [`Net::score`] up to the rounding of `f32` sums.
 pub struct NetState<'a> {
     net: &'a Net,
     width: usize,
-    acc: Vec<f64>,
-    /// King bucket of each accumulator, by `slot` of its mover.
-    buckets: [usize; 2],
-    snapshots: Vec<f64>,
-    bucket_snapshots: Vec<[usize; 2]>,
+    /// One frame of `2 * width` sums per ply, the white mover's accumulator first.
+    stack: Vec<f32>,
+    /// King bucket of each accumulator, by `slot` of its mover, one pair per ply.
+    buckets: Vec<[usize; 2]>,
+    /// Frame of the current position.
+    top: usize,
+    /// Buffers of an evaluation: the layers and the inputs of the classical terms.
+    hidden: Vec<f32>,
+    spare: Vec<f32>,
+    term_indices: Vec<usize>,
+    term_values: Vec<f64>,
 }
 
 impl<'a> NetState<'a> {
@@ -54,57 +66,84 @@ impl<'a> NetState<'a> {
         let mut state = NetState {
             net,
             width,
-            acc: vec![0.0; 2 * width],
-            buckets: [0; 2],
-            snapshots: Vec::with_capacity(2 * width * 64),
-            bucket_snapshots: Vec::with_capacity(64),
+            stack: vec![0.0; 2 * width * STACK_PLIES],
+            buckets: vec![[0; 2]; STACK_PLIES],
+            top: 0,
+            hidden: vec![0.0; net.max_width],
+            spare: vec![0.0; net.max_width],
+            term_indices: Vec::with_capacity(32),
+            term_values: Vec::with_capacity(32),
         };
         for mover in [Color::White, Color::Black] {
             let king = pos.board().king_of(mover).expect("a king per side");
-            state.buckets[slot(mover)] = net.features.king_bucket(mover, king);
+            state.buckets[0][slot(mover)] = net.features.king_bucket(mover, king);
             state.refresh(mover, pos.board());
         }
         state
     }
 
+    /// The accumulator of `mover` in the current frame.
+    fn acc(&mut self, mover: Color) -> &mut [f32] {
+        let start = (2 * self.top + slot(mover)) * self.width;
+        &mut self.stack[start..start + self.width]
+    }
+
     /// The row of a piece in the accumulator of `mover`.
-    fn row(&self, mover: Color, piece: Piece, square: Square) -> &'a [f64] {
-        let first = &self.net.layers[0];
-        let index = self.buckets[slot(mover)] * PIECE_INPUTS
+    fn row(&self, mover: Color, piece: Piece, square: Square) -> &'a [f32] {
+        let index = self.buckets[self.top][slot(mover)] * PIECE_INPUTS
             + input_index(mover, piece.color, piece.role, square);
-        &first.weights[index * self.width..(index + 1) * self.width]
+        self.net.layers[0].row(index)
     }
 
     /// Rebuild the accumulator of `mover` from the bias and every piece of `board`.
     fn refresh(&mut self, mover: Color, board: &Board) {
-        let start = slot(mover) * self.width;
-        self.acc[start..start + self.width].copy_from_slice(&self.net.layers[0].bias);
+        let net = self.net;
+        self.acc(mover).copy_from_slice(&net.layers[0].bias);
         for (square, piece) in board.clone() {
             let row = self.row(mover, piece, square);
-            for (a, w) in self.acc[start..start + self.width].iter_mut().zip(row) {
+            for (a, w) in self.acc(mover).iter_mut().zip(row) {
                 *a += w;
             }
         }
     }
 
-    /// Add (`sign` = 1) or remove (`sign` = -1) a piece from the accumulator of `mover`.
-    fn toggle(&mut self, mover: Color, piece: Piece, square: Square, sign: f64) {
+    /// Add (`add`) or remove a piece from the accumulator of `mover`.
+    fn toggle(&mut self, mover: Color, piece: Piece, square: Square, add: bool) {
         let row = self.row(mover, piece, square);
-        let start = slot(mover) * self.width;
-        for (a, w) in self.acc[start..start + self.width].iter_mut().zip(row) {
-            *a += sign * w;
+        let acc = self.acc(mover);
+        if add {
+            for (a, w) in acc.iter_mut().zip(row) {
+                *a += w;
+            }
+        } else {
+            for (a, w) in acc.iter_mut().zip(row) {
+                *a -= w;
+            }
         }
+    }
+
+    /// Step up one frame, copying the current one into it.
+    fn push(&mut self) {
+        let frame = 2 * self.width;
+        if (self.top + 2) * frame > self.stack.len() {
+            self.stack.resize(self.stack.len() * 2, 0.0);
+            self.buckets.resize(self.buckets.len() * 2, [0; 2]);
+        }
+        let start = self.top * frame;
+        self.stack.copy_within(start..start + frame, start + frame);
+        self.buckets[self.top + 1] = self.buckets[self.top];
+        self.top += 1;
     }
 }
 
 /// The pieces a move takes off and puts on the board, and where the mover's king ends.
-fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<Square>) {
+fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option<Square>) {
     let own = |role| Piece { color: mover, role };
     let other = |role| Piece {
         color: !mover,
         role,
     };
-    let none = (own(Role::Pawn), Square::A1, 0.0);
+    let none = (own(Role::Pawn), Square::A1, false);
     match *m {
         Move::Normal {
             role,
@@ -113,12 +152,12 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<
             to,
             promotion,
         } => {
-            let taken = capture.map_or(none, |taken| (other(taken), to, -1.0));
+            let taken = capture.map_or(none, |taken| (other(taken), to, false));
             let king = (role == Role::King).then_some(to);
             (
                 [
-                    (own(role), from, -1.0),
-                    (own(promotion.unwrap_or(role)), to, 1.0),
+                    (own(role), from, false),
+                    (own(promotion.unwrap_or(role)), to, true),
                     taken,
                     none,
                 ],
@@ -128,12 +167,12 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<
         }
         Move::EnPassant { from, to } => (
             [
-                (own(Role::Pawn), from, -1.0),
-                (own(Role::Pawn), to, 1.0),
+                (own(Role::Pawn), from, false),
+                (own(Role::Pawn), to, true),
                 (
                     other(Role::Pawn),
                     Square::from_coords(to.file(), from.rank()),
-                    -1.0,
+                    false,
                 ),
                 none,
             ],
@@ -150,13 +189,13 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<
             let king_to = Square::from_coords(king_file, king.rank());
             (
                 [
-                    (own(Role::King), king, -1.0),
-                    (own(Role::King), king_to, 1.0),
-                    (own(Role::Rook), rook, -1.0),
+                    (own(Role::King), king, false),
+                    (own(Role::King), king_to, true),
+                    (own(Role::Rook), rook, false),
                     (
                         own(Role::Rook),
                         Square::from_coords(rook_file, rook.rank()),
-                        1.0,
+                        true,
                     ),
                 ],
                 4,
@@ -170,72 +209,62 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<
 impl NetState<'_> {
     /// The side to move in `pos` (the position before the move) plays `m`.
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
-        self.snapshots.extend_from_slice(&self.acc);
-        self.bucket_snapshots.push(self.buckets);
+        self.push();
         let mover = pos.turn();
         let (pieces, count, king) = changes(mover, m);
         // a king that enters another bucket rebuilds its own accumulator from the board
         let moved_bucket = king
             .map(|king| self.net.features.king_bucket(mover, king))
-            .filter(|&bucket| bucket != self.buckets[slot(mover)]);
-        for &(piece, square, sign) in &pieces[..count] {
+            .filter(|&bucket| bucket != self.buckets[self.top][slot(mover)]);
+        for &(piece, square, add) in &pieces[..count] {
             for side in [Color::White, Color::Black] {
                 if side != mover || moved_bucket.is_none() {
-                    self.toggle(side, piece, square, sign);
+                    self.toggle(side, piece, square, add);
                 }
             }
         }
         if let Some(bucket) = moved_bucket {
-            self.buckets[slot(mover)] = bucket;
+            self.buckets[self.top][slot(mover)] = bucket;
             let mut after = pos.clone();
             after.play_unchecked(*m);
             self.refresh(mover, after.board());
         }
     }
 
-    /// The side to move passes (a null move).
+    /// The side to move passes (a null move): the accumulators of both sides stay as they are.
     pub fn apply_null(&mut self) {
-        // the accumulators of both sides are kept, so passing changes nothing
-        self.snapshots.extend_from_slice(&self.acc);
-        self.bucket_snapshots.push(self.buckets);
+        self.push();
     }
 
     /// Take back the last move played with `apply` or `apply_null`.
     pub fn undo(&mut self) {
-        let start = self.snapshots.len() - self.acc.len();
-        self.acc.copy_from_slice(&self.snapshots[start..]);
-        self.snapshots.truncate(start);
-        self.buckets = self.bucket_snapshots.pop().expect("a move to undo");
+        self.top -= 1;
     }
 
-    /// Expected score of `player` in `pos`, the position the state is following.
-    pub fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        let mover = pos.turn();
-        let start = slot(mover) * self.width;
-        let mut hidden = self.acc[start..start + self.width].to_vec();
-        if self.net.features.has_terms() {
-            let first = &self.net.layers[0];
-            let (mut indices, mut values) = (Vec::with_capacity(32), Vec::with_capacity(32));
-            self.net
-                .features
-                .term_inputs(pos, &mut indices, &mut values);
-            for (index, value) in indices.iter().zip(&values) {
-                let row = &first.weights[index * self.width..(index + 1) * self.width];
-                for (h, w) in hidden.iter_mut().zip(row) {
-                    *h += w * value;
+    /// Network output before the logistic function, for the side to move in `pos`, the position
+    /// the state is following.
+    pub fn logit(&mut self, pos: &Chess) -> f32 {
+        let net = self.net;
+        let width = self.width;
+        let start = (2 * self.top + slot(pos.turn())) * width;
+        self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
+        if net.features.has_terms() {
+            self.term_indices.clear();
+            self.term_values.clear();
+            net.features
+                .term_inputs(pos, &mut self.term_indices, &mut self.term_values);
+            for (&index, &value) in self.term_indices.iter().zip(&self.term_values) {
+                for (h, w) in self.hidden.iter_mut().zip(net.layers[0].row(index)) {
+                    *h += w * value as f32;
                 }
             }
         }
-        for h in &mut hidden {
-            *h = h.clamp(0.0, 1.0);
-        }
-        let score = sigmoid(self.net.finish(hidden));
-        let white = if mover == Color::Black {
-            1.0 - score
-        } else {
-            score
-        };
-        for_player(white, player)
+        net.finish(&mut self.hidden, &mut self.spare)
+    }
+
+    /// Score of `player` in `pos`, the position the state is following.
+    pub fn score(&mut self, pos: &Chess, player: Color) -> i32 {
+        score(self.logit(pos), pos.turn(), player)
     }
 }
 
@@ -244,6 +273,9 @@ mod tests {
     use super::*;
     use crate::board::{ordered_moves, position_from_fen};
     use crate::eval::{FeatureSet, Layer};
+
+    /// The incremental and the full sums add the same `f32` terms in another order.
+    const TOLERANCE: f32 = 1e-4;
 
     fn layer(fan_in: usize, fan_out: usize, seed: u64) -> Layer {
         let mut state = seed;
@@ -311,23 +343,17 @@ mod tests {
                     trail.push(pos.clone());
                     pos.play_unchecked(m);
                     bucket_changes += usize::from(bucket(&pos) != before);
-                    for player in [Color::White, Color::Black] {
-                        let full = net.evaluate(&pos, player);
-                        assert!(
-                            (state.evaluate(&pos, player) - full).abs() < 1e-12,
-                            "{}",
-                            crate::board::fen_of(&pos)
-                        );
-                    }
+                    assert!(
+                        (state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE,
+                        "{}",
+                        crate::board::fen_of(&pos)
+                    );
                     checked += 1;
                 }
                 while let Some(before) = trail.pop() {
                     state.undo();
                     pos = before;
-                    for player in [Color::White, Color::Black] {
-                        let full = net.evaluate(&pos, player);
-                        assert!((state.evaluate(&pos, player) - full).abs() < 1e-12);
-                    }
+                    assert!((state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE);
                 }
             }
         }
@@ -381,16 +407,9 @@ mod tests {
             };
             assert_ne!(king(&pos), king(&after));
             state.apply(&pos, &m);
-            for player in [Color::White, Color::Black] {
-                assert!(
-                    (state.evaluate(&after, player) - net.evaluate(&after, player)).abs() < 1e-12
-                );
-            }
+            assert!((state.logit(&after) - net.logit(&after)).abs() < TOLERANCE);
             state.undo();
-            assert!(
-                (state.evaluate(&pos, Color::White) - net.evaluate(&pos, Color::White)).abs()
-                    < 1e-12
-            );
+            assert!((state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE);
         }
     }
 }

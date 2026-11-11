@@ -4,10 +4,9 @@ use std::time::Instant;
 
 use _core::board::{uci_string, GameState};
 use _core::eval::Net;
-use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
-use _core::search::{self, Control, Counters, Memory, Options, Techniques, DEFAULT_TECHNIQUES};
-
-use crate::DEFAULT_HASH_MB;
+use _core::search::{
+    self, Control, Counters, Memory, Options, Techniques, DEFAULT_HASH_MB, DEFAULT_TECHNIQUES,
+};
 
 /// Positions of `bench`: a fixed set, so that the node counts are a fingerprint of the search.
 const BENCH_FENS: [&str; 6] = [
@@ -39,15 +38,19 @@ pub fn bench(eval: &Net, repetitions: usize) {
     );
 }
 
-/// Searches the fixed positions one by one with fresh memory and a fixed depth. When `print` is
-/// set, the node counts go to stdout (the same on every run). Returns the total nodes and the time.
+/// Searches the fixed positions one by one with cleared memory and a fixed depth. When `print` is
+/// set, the node counts go to stdout (the same on every run). Returns the total nodes and the time
+/// of the searches: the table is cleared outside the clock, as a game does it once and not per
+/// move (clearing also brings its pages into memory, which a fresh table would do mid-search).
 fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
     let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
-    let started = Instant::now();
+    let mut memory = Memory::new(1, DEFAULT_HASH_MB);
+    let mut seconds = 0.0;
     let mut total_nodes = 0;
     let mut nodes_by_depth = [0u64; BENCH_DEPTH + 1];
     for fen in BENCH_FENS {
-        let mut memory = Memory::new(DEFAULT_MAX_TT_ENTRIES);
+        memory.clear();
+        memory.counters = Counters::default();
         let mut state = GameState::from_moves(fen, &[]).expect("bench position is valid");
         let options = Options {
             techniques,
@@ -62,6 +65,7 @@ fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
             progress: None,
             rotation: 0,
         };
+        let started = Instant::now();
         let (best, stats) = search::iterative_deepening(
             &mut state,
             eval,
@@ -72,6 +76,7 @@ fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
             &control,
         )
         .expect("bench search");
+        seconds += started.elapsed().as_secs_f64();
         let best = best.as_ref().map_or("0000".to_string(), uci_string);
         if print {
             println!("{fen} nodes {} bestmove {best}", stats.nodes_visited);
@@ -87,14 +92,13 @@ fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
             println!("depth {depth} nodes {nodes}");
         }
     }
-    (total_nodes, started.elapsed().as_secs_f64())
+    (total_nodes, seconds)
 }
 
 /// `uci ttd <depth> <positions> [limit_s]`: searches every position of the file (one FEN per line,
 /// `#` starts a comment) to `depth` with fresh memory and one thread, and prints the time and the
 /// nodes of each and what the search counted over all of them. A position that does not finish
-/// within the limit counts as the limit in the median. `TTD_TABLE=shared` searches with the table
-/// of several threads (64 MB) instead of the one of a single thread.
+/// within the limit counts as the limit in the median.
 pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result<(), String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
     let fens: Vec<String> = text
@@ -111,12 +115,6 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
     if fens.is_empty() {
         return Err(format!("{path}: no positions"));
     }
-    let shared = std::env::var("TTD_TABLE").is_ok_and(|table| table == "shared");
-    // Entries of the local table, to measure how its size matters (the bench only).
-    let entries = std::env::var("TTD_ENTRIES")
-        .ok()
-        .and_then(|n| n.parse().ok())
-        .unwrap_or(DEFAULT_MAX_TT_ENTRIES);
     // Techniques to measure, comma separated (`TTD_TECHNIQUES=lmr,futility`); the default set otherwise.
     let names = std::env::var("TTD_TECHNIQUES").unwrap_or_else(|_| DEFAULT_TECHNIQUES.join(","));
     let options = Options {
@@ -133,14 +131,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
     let (mut total_nodes, mut total_seconds, mut finished) = (0u64, 0.0, 0);
     let mut nodes_by_depth = vec![0u64; depth + 1];
     for (number, fen) in fens.iter().enumerate() {
-        let mut memory = if shared {
-            // The shared table without its helper threads.
-            let mut memory = Memory::with_threads(DEFAULT_MAX_TT_ENTRIES, 2, DEFAULT_HASH_MB);
-            memory.threads = 1;
-            memory
-        } else {
-            Memory::new(entries)
-        };
+        let mut memory = Memory::new(1, DEFAULT_HASH_MB);
         memory.counters = counters;
         let mut state = GameState::from_moves(fen, &[])?;
         let origin = Instant::now();
@@ -189,11 +180,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
     }
     seconds.sort_by(f64::total_cmp);
     let percent = |part: u64, whole: u64| 100.0 * part as f64 / whole.max(1) as f64;
-    println!(
-        "positions {} finished {finished} depth {depth} table {}",
-        fens.len(),
-        if shared { "shared" } else { "local" }
-    );
+    println!("positions {} finished {finished} depth {depth}", fens.len());
     println!("median seconds {:.2}", seconds[seconds.len() / 2]);
     println!(
         "nodes {total_nodes} nodes/s {:.0}",

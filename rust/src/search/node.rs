@@ -11,12 +11,21 @@ use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
 use super::pruning::*;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
-use crate::eval::{Net, NetState};
+use crate::eval::{Net, NetState, EVAL_LIMIT};
 
 /// The clock is read once every this many nodes: reading it costs about as much as a node.
 const CLOCK_EVERY_NODES: u64 = 2048;
-/// Width of the window of the scouts of the principal variation search.
-const SCOUT_EPSILON: f64 = 1e-9;
+/// Width of the window of the scouts of the principal variation search: one unit of the score.
+const SCOUT: i32 = 1;
+
+/// A bound beyond every value, the window of the root.
+pub const INFINITE: i32 = 32_000;
+/// Value of a mate on the board; a mate `n` plies from the root is worth `MATE - n` to the winner,
+/// so a quicker mate is preferred one unit per ply.
+pub const MATE: i32 = 31_000;
+/// Values from here out are mates: no line is longer than `MATE - MATE_BOUND` plies, and every
+/// evaluation is within `EVAL_LIMIT`, far below.
+pub const MATE_BOUND: i32 = MATE - 1_000;
 
 pub(super) struct Search<'a> {
     pub(super) state: &'a mut GameState,
@@ -35,47 +44,21 @@ pub(super) struct Search<'a> {
     pub(super) eval: NetState<'a>,
 }
 
-type Outcome = (f64, Option<u32>);
+type Outcome = (i32, Option<u32>);
 
 impl Search<'_> {
-    /// A value as the table keeps it: the distance to a mate counts from the node, not from the
-    /// root. The evaluations are clipped to `0.01 ..= 0.99` and a mate is farther out (the
-    /// preference per ply is small enough for that), so what lies outside is a mate. The map is
-    /// increasing, so the bounds of the window can go through it as well.
-    fn for_table(&self, value: f64, ply: i32) -> f64 {
-        let shift = ply as f64 * self.options.epsilon;
-        if value > 0.99 {
-            value + shift
-        } else if value < 0.01 {
-            value - shift
-        } else {
-            value
-        }
-    }
-
-    /// The inverse of [`Search::for_table`] for a node at `ply`.
-    fn at_ply(&self, value: f64, ply: i32) -> f64 {
-        let shift = ply as f64 * self.options.epsilon;
-        if value > 0.99 {
-            value - shift
-        } else if value < 0.01 {
-            value + shift
-        } else {
-            value
-        }
-    }
-
-    /// Utility of a finished game, nudged so that quicker wins and slower losses are preferred.
-    pub(super) fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> f64 {
+    /// Value of a finished game for the root player: a mate counts the plies to it, so that
+    /// quicker wins and slower losses are preferred.
+    pub(super) fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> i32 {
         match winner {
-            Some(color) if color == self.root_player => 1.0 - ply as f64 * self.options.epsilon,
-            Some(_) => ply as f64 * self.options.epsilon,
-            None => 0.5,
+            Some(color) if color == self.root_player => MATE - ply,
+            Some(_) => ply - MATE,
+            None => 0,
         }
     }
 
-    pub(super) fn static_value(&self) -> f64 {
-        self.eval.evaluate(self.state.pos(), self.root_player)
+    pub(super) fn static_value(&mut self) -> i32 {
+        self.eval.score(self.state.pos(), self.root_player)
     }
 
     /// Play `m` in the game state and in the incremental evaluation.
@@ -96,18 +79,18 @@ impl Search<'_> {
     fn child_value(
         &mut self,
         index: usize,
-        (alpha, beta): (f64, f64),
+        (alpha, beta): (i32, i32),
         depth_remaining: i32,
         ply: i32,
         maximizing: bool,
         late: Option<bool>,
-    ) -> f64 {
+    ) -> i32 {
         let (low, high) = if maximizing {
-            (alpha, alpha + SCOUT_EPSILON)
+            (alpha, alpha + SCOUT)
         } else {
-            (beta - SCOUT_EPSILON, beta)
+            (beta - SCOUT, beta)
         };
-        let narrow = beta - alpha > SCOUT_EPSILON;
+        let narrow = beta - alpha > SCOUT;
         if index > 0 && depth_remaining >= 2 && narrow {
             // A late quiet move that gives no check is searched shallower first; if even so it
             // improves on the best move, it is searched again to the full depth.
@@ -142,8 +125,8 @@ impl Search<'_> {
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
     fn node(
         &mut self,
-        mut alpha: f64,
-        mut beta: f64,
+        mut alpha: i32,
+        mut beta: i32,
         depth_remaining: i32,
         ply: i32,
         allow_null: bool,
@@ -171,7 +154,7 @@ impl Search<'_> {
         if let Some(entry) = entry {
             self.memory.counters.table_hits += 1;
             if clock_free && entry.depth >= depth_remaining {
-                let value = self.at_ply(entry.value, ply);
+                let value = at_ply(entry.value, ply);
                 match entry.flag {
                     Flag::Exact => {
                         self.memory.counters.table_cuts += 1;
@@ -259,16 +242,14 @@ impl Search<'_> {
             && ply > 0
             && depth_remaining <= RFP_UP_TO_DEPTH
             && !in_check
-            && beta - alpha <= SCOUT_EPSILON
+            && beta - alpha <= SCOUT
             // A bound in the range of the mates is not one a static value can judge.
-            && alpha > 0.01
-            && beta < 0.99
+            && alpha > -EVAL_LIMIT
+            && beta < EVAL_LIMIT
         {
             let value = self.static_value();
-            let margin = RFP_MARGIN_PER_PLY * f64::from(depth_remaining);
-            if (maximizing && value >= beta && log_odds(value) - log_odds(beta) >= margin)
-                || (!maximizing && value <= alpha && log_odds(alpha) - log_odds(value) >= margin)
-            {
+            let margin = RFP_MARGIN_PER_PLY * depth_remaining;
+            if (maximizing && value - beta >= margin) || (!maximizing && alpha - value >= margin) {
                 return (value, None);
             }
         }
@@ -290,9 +271,9 @@ impl Search<'_> {
                 // If passing the turn already cuts, playing a move will too: prune.
                 let reduction = if depth_remaining >= 6 { 3 } else { 2 };
                 let (low, high) = if maximizing {
-                    (beta - SCOUT_EPSILON, beta)
+                    (beta - SCOUT, beta)
                 } else {
-                    (alpha, alpha + SCOUT_EPSILON)
+                    (alpha, alpha + SCOUT)
                 };
                 self.play_null();
                 let (value, _) =
@@ -317,15 +298,13 @@ impl Search<'_> {
             depth_remaining
         };
         // Shallow pruning of the quiet moves: not in check, bounds outside the mate range.
-        let shallow =
-            !in_check && depth_remaining <= SHALLOW_UP_TO_DEPTH && alpha > 0.01 && beta < 0.99;
+        let shallow = !in_check
+            && depth_remaining <= SHALLOW_UP_TO_DEPTH
+            && alpha > -EVAL_LIMIT
+            && beta < EVAL_LIMIT;
         let futility_static =
             (shallow && self.options.techniques.futility).then(|| self.static_value());
-        let mut best_value = if maximizing {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
+        let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
         for (index, action) in ordered.into_iter().enumerate() {
             // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
@@ -345,11 +324,11 @@ impl Search<'_> {
                 let by_count =
                     self.options.techniques.lmp && index >= late_move_limit(depth_remaining);
                 let by_margin = futility_static.is_some_and(|value| {
-                    let margin = FUTILITY_MARGIN_PER_PLY * f64::from(depth_remaining);
+                    let margin = FUTILITY_MARGIN_PER_PLY * depth_remaining;
                     if maximizing {
-                        log_odds(alpha) - log_odds(value) >= margin
+                        alpha - value >= margin
                     } else {
-                        log_odds(value) - log_odds(beta) >= margin
+                        value - beta >= margin
                     }
                 });
                 if by_count || by_margin {
@@ -402,11 +381,11 @@ impl Search<'_> {
             // Mates are stored by their distance from this node, not from the root.
             let dropped = self.memory.table.store(
                 key,
-                self.for_table(best_value, ply),
+                for_table(best_value, ply),
                 best_move,
                 depth_remaining,
-                self.for_table(alpha_orig, ply),
-                self.for_table(beta_orig, ply),
+                for_table(alpha_orig, ply),
+                for_table(beta_orig, ply),
             );
             let counters = &mut self.memory.counters;
             counters.stores += 1;
@@ -421,11 +400,35 @@ impl Search<'_> {
     }
 }
 
+/// A value as the table keeps it: the distance to a mate counts from the node, not from the root.
+/// The map is increasing, so the bounds of the window can go through it as well.
+fn for_table(value: i32, ply: i32) -> i32 {
+    if value >= MATE_BOUND {
+        value + ply
+    } else if value <= -MATE_BOUND {
+        value - ply
+    } else {
+        value
+    }
+}
+
+/// The inverse of [`for_table`] for a node at `ply`.
+fn at_ply(value: i32, ply: i32) -> i32 {
+    if value >= MATE_BOUND {
+        value - ply
+    } else if value <= -MATE_BOUND {
+        value + ply
+    } else {
+        value
+    }
+}
+
 /// What one alpha-beta search found.
 #[derive(Clone, Debug)]
 pub struct SearchResult {
-    /// Value of the root for the player to move there.
-    pub value: f64,
+    /// Value of the root for the player to move there: an evaluation within `±EVAL_LIMIT`, or a
+    /// mate beyond `±MATE_BOUND`.
+    pub value: i32,
     /// Best move of the root, `None` if the root itself was cut.
     pub best: Option<Move>,
     pub nodes: u64,
@@ -464,7 +467,7 @@ pub fn alpha_beta(
         next_clock_check: 0,
         eval: NetState::new(net, &root),
     };
-    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0, true);
+    let (value, best) = search.node(-INFINITE, INFINITE, max_depth, 0, true);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

@@ -10,9 +10,8 @@ use super::memory::*;
 use super::node::alpha_beta;
 use super::options::*;
 use super::ordering::{History, Killers};
-use super::shared_tt::SharedTable;
 use super::stats::*;
-use super::tt::Tt;
+use super::tt::Table;
 use crate::board::GameState;
 use crate::eval::Net;
 
@@ -26,7 +25,7 @@ const SKIP_SIZE: [usize; 6] = [1, 1, 2, 2, 2, 2];
 const SKIP_PHASE: [usize; 6] = [0, 1, 0, 1, 2, 3];
 
 /// The last finished iteration of a thread: depth, value and best move of the root.
-type Report = Mutex<Option<(usize, f64, Move)>>;
+type Report = Mutex<Option<(usize, i32, Move)>>;
 
 /// The work of a helper thread: its own iterative deepening on its own copy of the position,
 /// sharing the table and the history. It never searches shallower than the main thread is, skips
@@ -38,7 +37,7 @@ fn helper(
     index: usize,
     mut state: GameState,
     eval: &Net,
-    table: Arc<SharedTable>,
+    table: Arc<Table>,
     history: History,
     options: &Options,
     max_depth: usize,
@@ -46,7 +45,7 @@ fn helper(
     report: &Report,
 ) -> u64 {
     let mut memory = Memory {
-        table: Tt::Shared(table),
+        table,
         killers: Killers::default(),
         history,
         threads: 1,
@@ -90,19 +89,23 @@ fn helper(
 /// main thread's gives its move a weight of its depth times how far its value is above the lowest
 /// of the voters plus a small margin, so that deeper and better-valued threads count more; the
 /// move with most weight wins and the main thread's move wins a tie.
-fn vote(main: (usize, f64, Option<Move>), reports: &[Report]) -> Option<Move> {
+fn vote(main: (usize, i32, Option<Move>), reports: &[Report]) -> Option<Move> {
     let (main_depth, main_value, main_move) = main;
-    let mut voters: Vec<(usize, f64, Move)> = reports
+    let mut voters: Vec<(usize, i32, Move)> = reports
         .iter()
         .filter_map(|report| *report.lock().unwrap())
         .filter(|(depth, _, _)| *depth >= main_depth)
         .collect();
     let main_move = main_move?;
     voters.insert(0, (main_depth, main_value, main_move));
-    let lowest = voters.iter().map(|v| v.1).fold(f64::INFINITY, f64::min);
-    let mut weights: Vec<(Move, f64)> = Vec::new();
+    let lowest = voters
+        .iter()
+        .map(|v| v.1)
+        .min()
+        .expect("the main thread votes");
+    let mut weights: Vec<(Move, i64)> = Vec::new();
     for (depth, value, mv) in voters {
-        let weight = depth as f64 * (value - lowest + VOTE_MARGIN);
+        let weight = depth as i64 * i64::from(value - lowest + VOTE_MARGIN);
         match weights.iter_mut().find(|(m, _)| *m == mv) {
             Some((_, total)) => *total += weight,
             None => weights.push((mv, weight)),
@@ -117,8 +120,9 @@ fn vote(main: (usize, f64, Option<Move>), reports: &[Report]) -> Option<Move> {
     Some(weights.swap_remove(best).0)
 }
 
-/// Margin of the vote, in expected score: keeps the thread with the lowest value from weighing zero.
-const VOTE_MARGIN: f64 = 0.01;
+/// Margin of the vote, in units of the score: keeps the thread with the lowest value from weighing
+/// zero (about 0.01 of expected score near an even position).
+const VOTE_MARGIN: i32 = 7;
 
 /// Iterative deepening over [`alpha_beta`]: depth 1, 2, ... `max_depth`, returning the move of the
 /// deepest **completed** iteration.
@@ -140,15 +144,12 @@ pub fn iterative_deepening(
     time_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats), String> {
-    let helpers = match &memory.table {
-        Tt::Shared(table) if memory.threads > 1 => Some((table.clone(), memory.threads - 1)),
-        _ => None,
-    };
-    let Some((table, extra)) = helpers else {
+    memory.table.new_search();
+    if memory.threads <= 1 {
         return deepen(state, eval, memory, options, max_depth, time_limit, control)
             .map(|(best, stats, _)| (best, stats));
-    };
-    table.new_search();
+    }
+    let (table, extra) = (memory.table.clone(), memory.threads - 1);
     // Helpers only fill the shared table; the main thread alone decides the move, so the result
     // does not depend on how the threads interleave. They stop when the main thread is done.
     let stop = AtomicBool::new(false);
@@ -224,7 +225,7 @@ fn deepen(
     max_depth: usize,
     time_limit: f64,
     control: &Control,
-) -> Result<(Option<Move>, Stats, Option<f64>), String> {
+) -> Result<(Option<Move>, Stats, Option<i32>), String> {
     let estimate = options.estimator;
     let clock = control.clock;
     let start = clock();
@@ -236,7 +237,7 @@ fn deepen(
     let mut iterations: Vec<IterationInfo> = Vec::new();
     let mut stop_reason = StopReason::MaxDepth;
     let mut stop_predicted = 0.0;
-    let mut last_value: Option<f64> = None;
+    let mut last_value: Option<i32> = None;
 
     for depth in 1..=max_depth {
         // Clock policy: before an iteration, skip it if the estimate says it will not finish in
@@ -314,29 +315,29 @@ mod vote_tests {
         (moves[0], moves[1])
     }
 
-    fn report(depth: usize, value: f64, best: Move) -> Report {
+    fn report(depth: usize, value: i32, best: Move) -> Report {
         Mutex::new(Some((depth, value, best)))
     }
 
     #[test]
     fn the_main_move_wins_when_nobody_else_is_deep_enough() {
         let (a, b) = two_moves();
-        let reports = [report(5, 0.9, b), report(5, 0.9, b)];
-        assert_eq!(vote((6, 0.5, Some(a)), &reports), Some(a));
+        let reports = [report(5, 380, b), report(5, 380, b)];
+        assert_eq!(vote((6, 0, Some(a)), &reports), Some(a));
     }
 
     #[test]
     fn deeper_threads_that_agree_outvote_the_main_move() {
         let (a, b) = two_moves();
-        let reports = [report(7, 0.6, b), report(7, 0.6, b)];
-        assert_eq!(vote((6, 0.6, Some(a)), &reports), Some(b));
+        let reports = [report(7, 70, b), report(7, 70, b)];
+        assert_eq!(vote((6, 70, Some(a)), &reports), Some(b));
     }
 
     #[test]
     fn a_thread_with_no_iteration_does_not_vote() {
         let (a, _) = two_moves();
         let reports = [Mutex::new(None)];
-        assert_eq!(vote((6, 0.6, Some(a)), &reports), Some(a));
-        assert_eq!(vote((0, 0.6, None), &reports), None);
+        assert_eq!(vote((6, 70, Some(a)), &reports), Some(a));
+        assert_eq!(vote((0, 70, None), &reports), None);
     }
 }

@@ -3,9 +3,9 @@
 use shakmaty::{Chess, Color, Position};
 
 use super::features::FeatureSet;
-use super::{for_player, sigmoid};
+use super::{for_player, score, sigmoid};
 
-/// One dense layer: `weights` is row-major `(fan_in, fan_out)`.
+/// One dense layer as the lab writes it: `weights` is row-major `(fan_in, fan_out)`.
 pub struct Layer {
     pub fan_in: usize,
     pub fan_out: usize,
@@ -13,10 +13,26 @@ pub struct Layer {
     pub bias: Vec<f64>,
 }
 
+/// A layer as the engine keeps it: the same layout in `f32`.
+pub(super) struct Dense {
+    pub(super) fan_out: usize,
+    pub(super) weights: Vec<f32>,
+    pub(super) bias: Vec<f32>,
+}
+
+impl Dense {
+    /// The row of input `index`: its `fan_out` weights.
+    pub(super) fn row(&self, index: usize) -> &[f32] {
+        &self.weights[index * self.fan_out..(index + 1) * self.fan_out]
+    }
+}
+
 /// A feed-forward network over sparse inputs; the first layer is the accumulator.
 pub struct Net {
     pub(super) features: FeatureSet,
-    pub(super) layers: Vec<Layer>,
+    pub(super) layers: Vec<Dense>,
+    /// Widest layer before the output: the size of the buffers of an evaluation.
+    pub(super) max_width: usize,
 }
 
 impl Net {
@@ -47,9 +63,22 @@ impl Net {
         if layers.last().map(|l| l.fan_out) != Some(1) {
             return Err("the output layer must have one unit".into());
         }
-        Ok(Net { features, layers })
+        let max_width = layers.iter().map(|l| l.fan_out).max().unwrap_or(1);
+        let single = |values: &[f64]| values.iter().map(|&v| v as f32).collect();
+        let layers = layers
+            .iter()
+            .map(|layer| Dense {
+                fan_out: layer.fan_out,
+                weights: single(&layer.weights),
+                bias: single(&layer.bias),
+            })
+            .collect();
+        Ok(Net {
+            features,
+            layers,
+            max_width,
+        })
     }
-
     /// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`,
     /// each with `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the
     /// networks were the only model carry `"perspective": "side_to_move"`; any other perspective
@@ -104,64 +133,82 @@ impl Net {
         self.features
     }
 
-    /// Network output before the logistic function, for the side to move.
-    pub fn logit(&self, pos: &Chess) -> f64 {
+    /// Network output before the logistic function, for the side to move, from the board (the
+    /// search follows it move by move with [`NetState`](super::NetState)).
+    pub fn logit(&self, pos: &Chess) -> f32 {
         let (mut indices, mut values) = (Vec::with_capacity(40), Vec::with_capacity(40));
         self.features.active(pos, &mut indices, &mut values);
         let first = &self.layers[0];
         let mut hidden = first.bias.clone();
-        for (index, value) in indices.iter().zip(&values) {
-            let row = &first.weights[index * first.fan_out..(index + 1) * first.fan_out];
-            for (h, w) in hidden.iter_mut().zip(row) {
-                *h += w * value;
+        for (&index, &value) in indices.iter().zip(&values) {
+            for (h, w) in hidden.iter_mut().zip(first.row(index)) {
+                *h += w * value as f32;
             }
         }
-        for h in &mut hidden {
+        hidden.resize(self.max_width, 0.0);
+        self.finish(&mut hidden, &mut vec![0.0; self.max_width])
+    }
+
+    /// The rest of the network from the sums of the accumulator, the first values of `hidden`: the
+    /// clip to `[0, 1]`, the hidden layers with ReLU and the output. `hidden` and `spare` hold
+    /// `max_width` values each, so that an evaluation allocates nothing.
+    pub(super) fn finish(&self, hidden: &mut [f32], spare: &mut [f32]) -> f32 {
+        let mut width = self.layers[0].fan_out;
+        for h in &mut hidden[..width] {
             *h = h.clamp(0.0, 1.0);
         }
-        self.finish(hidden)
-    }
-
-    /// The layers after the accumulator, applied to its clipped output.
-    pub(super) fn finish(&self, mut hidden: Vec<f64>) -> f64 {
         let last = self.layers.len() - 1;
         for layer in &self.layers[1..last] {
-            hidden = dense(layer, &hidden, true);
+            let out = &mut spare[..layer.fan_out];
+            out.copy_from_slice(&layer.bias);
+            for (index, &x) in hidden[..width].iter().enumerate() {
+                for (o, w) in out.iter_mut().zip(layer.row(index)) {
+                    *o += x * w;
+                }
+            }
+            for (h, o) in hidden.iter_mut().zip(out.iter()) {
+                *h = o.max(0.0);
+            }
+            width = layer.fan_out;
         }
-        dense(&self.layers[last], &hidden, false)[0]
+        let output = &self.layers[last];
+        output.bias[0] + dot(&hidden[..width], &output.weights)
     }
 
-    /// Expected score of White in `[0, 1]`.
-    pub fn expected_score(&self, pos: &Chess) -> f64 {
-        let score = sigmoid(self.logit(pos));
-        if pos.turn() == Color::Black {
-            1.0 - score
-        } else {
-            score
-        }
+    /// Score of `player` in `pos`, from the board (see [`Net::logit`]).
+    pub fn score(&self, pos: &Chess, player: Color) -> i32 {
+        score(self.logit(pos), pos.turn(), player)
     }
 
-    /// Expected score of `player` in `pos`, in `[0.01, 0.99]`, from the board (the search uses
-    /// [`NetState`], which gives the same value move by move).
+    /// Expected score of `player` in `pos`, in `[0.01, 0.99]`, from the board.
     pub fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        for_player(self.expected_score(pos), player)
+        let mover = sigmoid(f64::from(self.logit(pos)));
+        let white = if pos.turn() == Color::White {
+            mover
+        } else {
+            1.0 - mover
+        };
+        for_player(white, player)
     }
 }
 
-fn dense(layer: &Layer, input: &[f64], relu: bool) -> Vec<f64> {
-    let mut out = layer.bias.clone();
-    for (i, x) in input.iter().enumerate() {
-        let row = &layer.weights[i * layer.fan_out..(i + 1) * layer.fan_out];
-        for (o, w) in out.iter_mut().zip(row) {
-            *o += x * w;
+/// Dot product in eight lanes, so that the compiler can use vector instructions (a single running
+/// sum would have to add the terms one after another).
+fn dot(a: &[f32], b: &[f32]) -> f32 {
+    let mut lanes = [0.0f32; 8];
+    let (chunks_a, chunks_b) = (a.chunks_exact(8), b.chunks_exact(8));
+    let tail: f32 = chunks_a
+        .remainder()
+        .iter()
+        .zip(chunks_b.remainder())
+        .map(|(x, y)| x * y)
+        .sum();
+    for (x, y) in chunks_a.zip(chunks_b) {
+        for lane in 0..8 {
+            lanes[lane] += x[lane] * y[lane];
         }
     }
-    if relu {
-        for o in &mut out {
-            *o = o.max(0.0);
-        }
-    }
-    out
+    lanes.iter().sum::<f32>() + tail
 }
 
 #[cfg(test)]
@@ -189,5 +236,12 @@ mod tests {
     #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
         assert!(Net::from_json(&net_json(10, "")).is_err());
+    }
+
+    #[test]
+    fn the_dot_product_adds_every_term() {
+        let a: Vec<f32> = (0..19).map(|i| i as f32).collect();
+        let b = vec![2.0; 19];
+        assert_eq!(dot(&a, &b), 2.0 * (0..19).sum::<i32>() as f32);
     }
 }

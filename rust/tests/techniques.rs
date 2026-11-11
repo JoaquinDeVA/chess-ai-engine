@@ -25,7 +25,7 @@ fn net() -> Net {
 }
 
 /// Values and moves of the first `count` positions at depth `depth`, one search each.
-fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(f64, Option<String>)> {
+fn plain_values(techniques: Techniques, depth: i32, count: usize) -> Vec<(i32, Option<String>)> {
     let positions = read(root().join("tests/data/positions.json"));
     let net = net();
     let clock = || 0.0;
@@ -88,9 +88,10 @@ fn the_optional_techniques_keep_the_forced_results_and_most_moves() {
     let (mut forced, mut kept, mut same_move) = (0, 0, 0);
     for ((a, move_a), (b, move_b)) in reference.iter().zip(&with) {
         same_move += usize::from(move_a == move_b);
-        if *a > 0.97 || *a < 0.03 {
+        // Beyond 0.97 of expected score (604) is forced; kept if on the same side beyond 0.9 (382).
+        if a.abs() > 604 {
             forced += 1;
-            kept += usize::from((*a > 0.5) == (*b > 0.5) && (b - 0.5).abs() > 0.4);
+            kept += usize::from((*a > 0) == (*b > 0) && b.abs() > 382);
         }
     }
     eprintln!(

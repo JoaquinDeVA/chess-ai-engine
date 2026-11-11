@@ -137,20 +137,20 @@ const HANGING_QUEEN: &str = "4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1";
 fn a_quicker_win_is_worth_more_than_a_slower_one() {
     let one = fixed(MATE_IN_ONE, 3);
     assert_eq!(one.best.as_ref().map(uci_string).as_deref(), Some("a1a8"));
-    assert!((one.value - (1.0 - DEPTH_PREFERENCE_EPSILON)).abs() < 1e-12);
+    assert_eq!(one.value, MATE - 1);
     let two = fixed(MATE_IN_TWO, 4);
-    assert!(two.value > 0.99 && two.value < one.value, "{}", two.value);
+    assert!(
+        two.value > MATE_BOUND && two.value < one.value,
+        "{}",
+        two.value
+    );
 }
 
 #[test]
 fn a_mate_keeps_its_distance_when_it_comes_back_from_the_table() {
     // The deepening reads the mates of the previous iteration from the table at other plies.
     let two = fixed(MATE_IN_TWO, 6);
-    assert!(
-        (two.value - (1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON)).abs() < 1e-12,
-        "{}",
-        two.value
-    );
+    assert_eq!(two.value, MATE - 3);
 }
 
 #[test]
@@ -326,7 +326,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
             techniques: Techniques::all(),
             ..Options::default()
         };
-        let mut memory = Memory::with_threads(1000, 4, 1);
+        let mut memory = Memory::new(4, 1);
         let mut game = state(fen);
         let (best, stats) = iterative_deepening(
             &mut game,
@@ -367,8 +367,7 @@ fn late_move_reductions_still_find_the_forced_mate() {
         ..Techniques::all()
     };
     let result = quiescent(MATE_IN_TWO, 6, with);
-    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
-    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    assert_eq!(result.value, MATE - 3);
 }
 
 #[test]
@@ -378,19 +377,10 @@ fn reverse_futility_keeps_the_forced_mate_and_the_hanging_queen() {
         ..Techniques::all()
     };
     let result = quiescent(MATE_IN_TWO, 6, with);
-    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
-    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    assert_eq!(result.value, MATE - 3);
     let queen = quiescent(HANGING_QUEEN, 3, with);
     let without = quiescent(HANGING_QUEEN, 3, Techniques::all());
     assert_eq!(queen.best, without.best);
-}
-
-#[test]
-fn the_reverse_futility_margin_means_the_same_at_every_level() {
-    use super::pruning::log_odds;
-    // 0.5 -> 0.61 and 0.9 -> 0.934 are the same distance in log-odds (about 0.46).
-    assert!((log_odds(0.61) - log_odds(0.5) - 0.447).abs() < 0.02);
-    assert!((log_odds(0.934) - log_odds(0.9) - 0.472).abs() < 0.03);
 }
 
 #[test]
@@ -401,8 +391,7 @@ fn shallow_pruning_keeps_the_forced_mate_and_the_hanging_queen() {
         ..Techniques::all()
     };
     let result = quiescent(MATE_IN_TWO, 6, with);
-    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
-    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    assert_eq!(result.value, MATE - 3);
     assert_eq!(
         quiescent(HANGING_QUEEN, 3, with).best,
         quiescent(HANGING_QUEEN, 3, Techniques::default()).best
@@ -425,8 +414,7 @@ fn internal_iterative_reduction_keeps_the_forced_mate_and_the_hanging_queen() {
         ..Techniques::all()
     };
     let result = quiescent(MATE_IN_TWO, 6, with);
-    let expected = 1.0 - 3.0 * DEPTH_PREFERENCE_EPSILON;
-    assert!((result.value - expected).abs() < 1e-12, "{}", result.value);
+    assert_eq!(result.value, MATE - 3);
     assert_eq!(
         quiescent(HANGING_QUEEN, 5, with).best,
         quiescent(HANGING_QUEEN, 5, without).best

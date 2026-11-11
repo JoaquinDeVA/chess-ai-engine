@@ -10,12 +10,12 @@ impl Search<'_> {
     /// Value of a horizon node searching only captures and promotions (stand pat, no table).
     pub(super) fn quiescence(
         &mut self,
-        mut alpha: f64,
-        mut beta: f64,
+        mut alpha: i32,
+        mut beta: i32,
         plies_left: u32,
         ply: i32,
         moves: MoveList,
-    ) -> f64 {
+    ) -> i32 {
         let mut best_value = self.static_value(); // nobody is forced to capture
         if plies_left == 0 {
             return best_value;

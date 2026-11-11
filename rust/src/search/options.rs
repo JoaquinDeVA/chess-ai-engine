@@ -7,8 +7,8 @@ use super::iteration_time::{self, Iteration};
 pub const DEFAULT_MIN_DEPTH: usize = 1;
 /// Technical cap of the iterations; the clock stops the deepening long before in a real game.
 pub const MAX_DEPTH: usize = 30;
-/// Weight of the "win faster / lose slower" preference, in utility units per ply.
-pub const DEPTH_PREFERENCE_EPSILON: f64 = 0.0001;
+/// Megabytes of the transposition table by default (the `Hash` option of the protocol).
+pub const DEFAULT_HASH_MB: usize = 64;
 /// Plies of quiescence search of the bots.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 /// Optional techniques the binary and the window switch on by default (see `docs/RESULTS.md`).
@@ -21,7 +21,6 @@ pub struct Options {
     pub min_depth: usize,
     /// Rule that predicts the duration of the next iteration (see [`iteration_time`]).
     pub estimator: fn(&[Iteration]) -> f64,
-    pub epsilon: f64,
     /// Optional techniques of selective search.
     pub techniques: Techniques,
     /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
@@ -98,7 +97,6 @@ impl Default for Options {
             quiescence_plies: DEFAULT_QUIESCENCE_PLIES,
             min_depth: DEFAULT_MIN_DEPTH,
             estimator: iteration_time::geometric_growth,
-            epsilon: DEPTH_PREFERENCE_EPSILON,
             techniques: Techniques::default(),
             node_limit: None,
         }

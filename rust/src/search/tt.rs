@@ -1,12 +1,18 @@
-//! Transposition table.
+//! The transposition table, shared without locks by every thread of a search.
+//!
+//! Each slot is three words: `check = hash ^ value ^ data`, the value and a packed word with the
+//! best move, depth, bound, age and a validity bit. A reader accepts the slot only if the check
+//! matches, so a slot torn by two writers at once is simply ignored (the usual XOR trick). The key
+//! is a 64-bit hash of the position and the two counters, so two different positions can collide
+//! with probability 2^-64 per pair.
 
-use std::collections::{HashMap, VecDeque};
-use std::hash::{BuildHasherDefault, Hasher};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering::Relaxed};
 
 use crate::board::Key;
 
-/// Default maximum number of entries of a table.
-pub const DEFAULT_MAX_TT_ENTRIES: usize = 2_000_000;
+/// Bytes of one slot: three words and one of padding, so that a slot never straddles two cache lines.
+const SLOT_BYTES: usize = 32;
+const VALID: u64 = 1 << 63;
 
 /// What an entry says about the value of the position.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -19,83 +25,132 @@ pub enum Flag {
 /// One entry of the table.
 #[derive(Clone, Copy, Debug)]
 pub struct Entry {
-    pub value: f64,
+    pub value: i32,
     /// Identity of the best move (see `board::move_id`), if any.
     pub best: Option<u32>,
     pub depth: i32,
     pub flag: Flag,
 }
 
-/// The keys are hashes already: use them as they are.
-#[derive(Default)]
-pub struct KeyHasher(u64);
-
-impl Hasher for KeyHasher {
-    fn finish(&self) -> u64 {
-        self.0
-    }
-    fn write(&mut self, _bytes: &[u8]) {
-        unreachable!("only integers are hashed");
-    }
-    fn write_u64(&mut self, value: u64) {
-        self.0 ^= value;
+fn flag_bits(flag: Flag) -> u64 {
+    match flag {
+        Flag::Exact => 0,
+        Flag::LowerBound => 1,
+        Flag::UpperBound => 2,
     }
 }
 
-type Map = HashMap<Key, (Entry, u64), BuildHasherDefault<KeyHasher>>;
+/// The three words of a slot, aligned to half a cache line.
+#[repr(align(32))]
+struct Slot([AtomicU64; 4]);
 
-/// Transposition table of bounded size: when it is full the entries stored longest ago are
-/// dropped (a refreshed entry counts as new), which keeps memory bounded during long games.
+/// Lock-free transposition table with one slot per index.
 pub struct Table {
-    map: Map,
-    order: VecDeque<(Key, u64)>,
-    sequence: u64,
-    capacity: usize,
+    slots: Box<[Slot]>,
+    age: AtomicU8,
 }
 
 impl Table {
-    pub fn new(capacity: usize) -> Table {
+    /// A table of about `megabytes` MB.
+    pub fn with_megabytes(megabytes: usize) -> Table {
+        Table::with_slots((megabytes.max(1) * 1024 * 1024) / SLOT_BYTES)
+    }
+
+    /// A table with `count` slots (at least 1024).
+    pub fn with_slots(count: usize) -> Table {
+        let count = count.max(1024);
+        // SAFETY: a slot of zeros is four atomic words holding 0, a valid (empty) slot. Zeroed
+        // memory comes from the system untouched, so a large table costs nothing until it is used.
+        let slots = unsafe { Box::<[Slot]>::new_zeroed_slice(count).assume_init() };
         Table {
-            map: Map::default(),
-            order: VecDeque::new(),
-            sequence: 0,
-            capacity,
+            slots,
+            age: AtomicU8::new(0),
         }
     }
 
+    /// Mark the start of a new search: old entries become easier to replace.
+    pub fn new_search(&self) {
+        self.age.fetch_add(1, Relaxed);
+    }
+
+    pub fn clear(&self) {
+        for slot in &self.slots {
+            for word in &slot.0 {
+                word.store(0, Relaxed);
+            }
+        }
+    }
+
+    /// Number of valid slots, counted by scanning (slow: for statistics only).
     pub fn len(&self) -> usize {
-        self.map.len()
+        self.slots
+            .iter()
+            .filter(|s| s.0[2].load(Relaxed) & VALID != 0)
+            .count()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
+        self.len() == 0
     }
 
-    pub fn clear(&mut self) {
-        self.map.clear();
-        self.order.clear();
+    fn index(&self, hash: u64) -> usize {
+        ((hash as u128 * self.slots.len() as u128) >> 64) as usize
     }
 
-    pub fn set_capacity(&mut self, capacity: usize) {
-        self.capacity = capacity;
+    fn read(&self, index: usize, hash: u64) -> Option<(Entry, u8)> {
+        let slot = &self.slots[index].0;
+        let (check, value, data) = (
+            slot[0].load(Relaxed),
+            slot[1].load(Relaxed),
+            slot[2].load(Relaxed),
+        );
+        if data & VALID == 0 || check ^ value ^ data != hash {
+            return None;
+        }
+        let best = (data & 0xFFFF) as u32;
+        let flag = match (data >> 24) & 3 {
+            0 => Flag::Exact,
+            1 => Flag::LowerBound,
+            _ => Flag::UpperBound,
+        };
+        let entry = Entry {
+            value: value as u32 as i32,
+            best: if best == 0 { None } else { Some(best - 1) },
+            depth: ((data >> 16) & 0xFF) as i32,
+            flag,
+        };
+        Some((entry, ((data >> 32) & 0xFF) as u8))
     }
 
     pub fn get(&self, key: &Key) -> Option<Entry> {
-        self.map.get(key).map(|(entry, _)| *entry)
+        let hash = *key;
+        self.read(self.index(hash), hash).map(|(entry, _)| entry)
     }
 
-    /// Store a result, classifying it against the original window of the search. Returns the
-    /// depth of the entry of another position dropped to make room, if any.
+    /// Store a result, classifying it against the original window of the search. A slot holding
+    /// a deeper entry of the current search for another position is kept. Returns the depth of the
+    /// entry of another position that was overwritten, if any.
     pub fn store(
-        &mut self,
+        &self,
         key: Key,
-        value: f64,
+        value: i32,
         best: Option<u32>,
         depth: i32,
-        alpha_orig: f64,
-        beta_orig: f64,
+        alpha_orig: i32,
+        beta_orig: i32,
     ) -> Option<i32> {
+        let hash = key;
+        let index = self.index(hash);
+        let age = self.age.load(Relaxed);
         let mut dropped = None;
+        if let Some((old, old_age)) = self.read_any(index) {
+            if old_age == age && old.0 != hash && old.1.depth > depth {
+                return None;
+            }
+            if old.0 != hash {
+                dropped = Some(old.1.depth);
+            }
+        }
         let flag = if value <= alpha_orig {
             Flag::UpperBound
         } else if value >= beta_orig {
@@ -103,90 +158,33 @@ impl Table {
         } else {
             Flag::Exact
         };
-        self.sequence += 1;
-        self.map.insert(
-            key,
-            (
-                Entry {
-                    value,
-                    best,
-                    depth,
-                    flag,
-                },
-                self.sequence,
-            ),
-        );
-        self.order.push_back((key, self.sequence));
-        while self.map.len() > self.capacity {
-            let Some((old, seq)) = self.order.pop_front() else {
-                break;
-            };
-            if self.map.get(&old).is_some_and(|(_, s)| *s == seq) {
-                dropped = self.map.remove(&old).map(|(entry, _)| entry.depth);
-            }
-        }
-        if self.order.len() > 4 * self.map.len() + 1024 {
-            let map = &self.map;
-            self.order
-                .retain(|(key, seq)| map.get(key).is_some_and(|(_, s)| s == seq));
-        }
+        let data = VALID
+            | best.map_or(0, |id| u64::from(id) + 1)
+            | ((depth.clamp(0, 255) as u64) << 16)
+            | (flag_bits(flag) << 24)
+            | ((age as u64) << 32);
+        let value = u64::from(value as u32);
+        let slot = &self.slots[index].0;
+        slot[1].store(value, Relaxed);
+        slot[2].store(data, Relaxed);
+        slot[0].store(hash ^ value ^ data, Relaxed);
         dropped
     }
-}
 
-/// The transposition table of a search: the exact one of a single thread (bounded, oldest entries
-/// dropped first, as in the Python engine) or the lock-free one shared by several threads.
-pub enum Tt {
-    Local(Table),
-    Shared(std::sync::Arc<super::shared_tt::SharedTable>),
-}
-
-impl Tt {
-    pub fn get(&self, key: &Key) -> Option<Entry> {
-        match self {
-            Tt::Local(table) => table.get(key),
-            Tt::Shared(table) => table.get(key),
+    /// The valid slot at `index` whatever its key: `(key hash, entry)` and its age.
+    fn read_any(&self, index: usize) -> Option<((u64, Entry), u8)> {
+        let slot = &self.slots[index].0;
+        let (check, value, data) = (
+            slot[0].load(Relaxed),
+            slot[1].load(Relaxed),
+            slot[2].load(Relaxed),
+        );
+        if data & VALID == 0 {
+            return None;
         }
-    }
-
-    pub fn store(
-        &mut self,
-        key: Key,
-        value: f64,
-        best: Option<u32>,
-        depth: i32,
-        alpha_orig: f64,
-        beta_orig: f64,
-    ) -> Option<i32> {
-        match self {
-            Tt::Local(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),
-            Tt::Shared(table) => table.store(key, value, best, depth, alpha_orig, beta_orig),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        match self {
-            Tt::Local(table) => table.clear(),
-            Tt::Shared(table) => table.clear(),
-        }
-    }
-
-    /// Entries held (an estimate for the shared table).
-    pub fn len(&self) -> usize {
-        match self {
-            Tt::Local(table) => table.len(),
-            Tt::Shared(table) => table.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn set_capacity(&mut self, capacity: usize) {
-        if let Tt::Local(table) = self {
-            table.set_capacity(capacity);
-        }
+        let hash = check ^ value ^ data;
+        self.read(index, hash)
+            .map(|(entry, age)| ((hash, entry), age))
     }
 }
 
@@ -195,30 +193,82 @@ mod tests {
     use super::*;
 
     fn key(n: u64) -> Key {
-        n
+        n.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+    }
+
+    #[test]
+    fn an_entry_comes_back_as_it_was_stored() {
+        let table = Table::with_slots(4096);
+        table.store(key(1), -30_995, Some(1234), 5, -32_000, 32_000);
+        let entry = table.get(&key(1)).unwrap();
+        assert_eq!(
+            (entry.value, entry.best, entry.depth, entry.flag),
+            (-30_995, Some(1234), 5, Flag::Exact)
+        );
+        table.store(key(2), 90, None, 3, -100, 50);
+        let entry = table.get(&key(2)).unwrap();
+        assert_eq!((entry.best, entry.flag), (None, Flag::LowerBound));
+        assert!(table.get(&key(3)).is_none());
     }
 
     #[test]
     fn bounds_are_classified_against_the_original_window() {
-        let mut table = Table::new(10);
-        table.store(key(1), 0.2, None, 3, 0.3, 0.9);
-        table.store(key(2), 0.95, None, 3, 0.3, 0.9);
-        table.store(key(3), 0.5, None, 3, 0.3, 0.9);
+        let table = Table::with_slots(4096);
+        table.store(key(1), -80, None, 3, -50, 200);
+        table.store(key(2), 300, None, 3, -50, 200);
+        table.store(key(3), 10, None, 3, -50, 200);
         assert_eq!(table.get(&key(1)).unwrap().flag, Flag::UpperBound);
         assert_eq!(table.get(&key(2)).unwrap().flag, Flag::LowerBound);
         assert_eq!(table.get(&key(3)).unwrap().flag, Flag::Exact);
     }
 
     #[test]
-    fn the_oldest_entries_are_dropped_and_a_refreshed_one_survives() {
-        let mut table = Table::new(3);
-        for n in 1..=3 {
-            table.store(key(n), 0.5, None, 1, 0.0, 1.0);
-        }
-        table.store(key(1), 0.6, None, 2, 0.0, 1.0); // refresh
-        table.store(key(4), 0.5, None, 1, 0.0, 1.0); // evicts 2, the oldest
-        assert!(table.get(&key(1)).is_some() && table.get(&key(2)).is_none());
-        assert!(table.get(&key(3)).is_some() && table.get(&key(4)).is_some());
-        assert_eq!(table.len(), 3);
+    fn a_deeper_entry_of_the_same_search_is_not_replaced_by_a_shallower_one_of_another_position() {
+        let table = Table::with_slots(1024);
+        // find two keys that share a slot
+        let first = key(1);
+        let slot = table.index(first);
+        let second = (2..100_000u64)
+            .map(key)
+            .find(|k| table.index(*k) == slot)
+            .unwrap();
+        table.store(first, 0, None, 6, -100, 100);
+        table.store(second, 20, None, 2, -100, 100);
+        assert!(table.get(&first).is_some() && table.get(&second).is_none());
+        table.new_search();
+        table.store(second, 20, None, 2, -100, 100);
+        assert!(
+            table.get(&second).is_some(),
+            "an old entry yields to a new search"
+        );
+    }
+
+    #[test]
+    fn threads_writing_the_same_slots_never_produce_a_wrong_entry() {
+        let table = Table::with_slots(1024);
+        let expected = |n: u64| (n % 1000) as i32 - 500;
+        std::thread::scope(|scope| {
+            for thread in 0..8u64 {
+                let table = &table;
+                scope.spawn(move || {
+                    for round in 0..20_000u64 {
+                        let n = (round * 8 + thread) % 5000;
+                        table.store(
+                            key(n),
+                            expected(n),
+                            Some((n % 1000) as u32),
+                            (n % 30) as i32,
+                            -1000,
+                            1000,
+                        );
+                        let probe = (round * 31 + thread) % 5000;
+                        if let Some(entry) = table.get(&key(probe)) {
+                            assert_eq!(entry.value, expected(probe));
+                            assert_eq!(entry.best, Some((probe % 1000) as u32));
+                        }
+                    }
+                });
+            }
+        });
     }
 }

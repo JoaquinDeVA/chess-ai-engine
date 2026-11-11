@@ -1,10 +1,10 @@
 //! Alpha-beta search with iterative deepening.
 //!
-//! The values are expected scores of the root player in `[0, 1]`; terminal values are 1, 0.5 and
-//! 0, nudged by `epsilon` per ply so that quicker wins and slower losses are preferred. The
-//! search keeps a bounded transposition table and killer moves between iterations and between the
-//! moves of a game, and ends every branch at the horizon with a quiescence search over captures
-//! and promotions.
+//! The values are integer scores of the root player: the evaluation of the network in centipawns
+//! of the logistic scale, within `±EVAL_LIMIT`, and a mate `n` plies away as `±(MATE - n)`, so
+//! that quicker wins and slower losses are preferred; a draw is 0. The search keeps a lock-free
+//! transposition table and killer moves between iterations and between the moves of a game, and
+//! ends every branch at the horizon with a quiescence search over captures and promotions.
 
 mod deepening;
 pub mod iteration_time;
@@ -14,13 +14,12 @@ mod options;
 mod ordering;
 mod pruning;
 mod quiescence;
-mod shared_tt;
 mod stats;
-pub mod tt;
+mod tt;
 
 pub use deepening::iterative_deepening;
 pub use memory::*;
-pub use node::{alpha_beta, SearchResult};
+pub use node::{alpha_beta, SearchResult, INFINITE, MATE, MATE_BOUND};
 pub use options::*;
 pub use stats::*;
 

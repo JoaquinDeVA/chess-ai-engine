@@ -106,9 +106,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--model", required=True, type=model_spec_arg, help="model name, or name@tag"
     )
-    parser.add_argument(
-        "--path", type=Path, help="saved model file (default: models/store/artifacts)"
-    )
+    parser.add_argument("--path", type=Path, help="saved model file (default: data/models)")
     parser.add_argument("--raw", type=Path, default=RAW_DIR, help="raw shards directory")
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR, help="sidecar directory")
     parser.add_argument(

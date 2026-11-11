@@ -1,6 +1,6 @@
 """Where the trained models are saved, and the fixed heuristic ``h1``.
 
-A saved model is a ``.npz`` file in :data:`ARTIFACTS_DIR`; :mod:`chess_lab.models.definitions`
+A saved model is a ``.npz`` file in :data:`ARTIFACTS_DIR` (``data/models/``, outside git); :mod:`chess_lab.models.definitions`
 reads and writes it and turns it into a ``_core.Evaluator``.
 """
 
@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from chess_engine import _core
+from chess_engine.paths import ROOT
 
-#: Folder of the trained model files.
-ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+#: Folder of the trained model files (ignored by git: the model cards are the record).
+ARTIFACTS_DIR = ROOT / "data" / "models"
 
 #: Names of the features of ``h1``, in the order the core takes their weights.
 FEATURE_NAMES = (

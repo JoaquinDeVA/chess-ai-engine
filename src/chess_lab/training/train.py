@@ -47,9 +47,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
-    parser.add_argument(
-        "--output", type=Path, help="where to save (default: src/chess_lab/models/store/artifacts)"
-    )
+    parser.add_argument("--output", type=Path, help="where to save (default: data/models)")
     parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--effort", type=int, help="models: effort level 0-100")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")

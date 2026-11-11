@@ -53,8 +53,12 @@ def make_game() -> GamePage:
 
     :return: The game page, with the moves already on the board.
     """
+    real_bot = game_window.UciBot
     game_window.UciBot = NoEngine
-    page = GamePage(MatchSetup(white=PlayerSetup(), black=PlayerSetup(AISettings()), base=None))
+    try:
+        page = GamePage(MatchSetup(white=PlayerSetup(), black=PlayerSetup(AISettings()), base=None))
+    finally:
+        game_window.UciBot = real_bot
     for uci in GAME_MOVES:
         page.model.make_move(chess.Move.from_uci(uci))
     page._refresh()

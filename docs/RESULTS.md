@@ -5,9 +5,8 @@
 > **Read it when:** You want to compare models or techniques, check a claim of the other pages, or repeat a measurement.
 >
 
-All numbers are from this project, on a six-core CPU (see Training data for the positions the models
-are trained on). Commands are run from the repository root. Two engines produced them: the Python engine, until
-2026-10-25, and the Rust engine since (The search in Rust); every section says which
+All numbers are from this project, on a six-core CPU. Commands are run from the repository root. Two engines produced them: the Python engine, until
+2026-10-25, and the Rust engine since (the changelog has its speed-ups); every section says which
 one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162db8` and are in the git history.
 
 ## The short answer
@@ -24,7 +23,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
   10 s + 0.1 s), and the logistic model was retired.
 - **More accurate is not stronger**: the hybrid networks, with the classical terms as inputs, have a higher
   Spearman (0.702 to 0.722 against 0.693) but search about half the nodes per second and lose
-  (`net_hybrid_w32` against `net_pst_w32`, −105.5 ± 25.5 Elo, H0); see Models.
+  (`net_hybrid_w32` against `net_pst_w32`, −105.5 ± 25.5 Elo, H0); see the model table below.
 
 ## Measured and estimated
 
@@ -107,7 +106,7 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 
 ## Search techniques in games
 
-The Rust engine reaches 2 to 3 plies more than the Python one in the same time (The search in Rust). The six techniques on by default before
+The Rust engine reaches 2 to 3 plies more than the Python one in the same time (the changelog has its speed-ups). The six techniques on by default before
 `see` (search techniques) scored 76.5 % against the plain search with the same model in 100
 games at 4 s + 0.05 s, reaching 5.54 plies against 4.68 (`scripts/bench/compare_engine_versions.py --candidate
 incremental,tt_move,history,pvs,aspiration,null_move --openings 50 --base 4 --increment 0.05`, removed in `6162db8`).

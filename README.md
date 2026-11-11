@@ -23,7 +23,7 @@ Every figure has its command or file in [Results](docs/RESULTS.md).
 
 | Finding | Figure | Source |
 |---|---|---|
-| The Rust search is much faster than the Python one it replaced | 8 to 35 times faster to a given depth; 784 k nodes per second | [Results](docs/RESULTS.md#the-short-answer) |
+| Moving the search to Rust made it faster | 2.58x in `uci bench` on one build (304 k to 784 k nodes per second; later speed-ups are in the changelog) | [Changelog](CHANGELOG.md) |
 | Four techniques each won an SPRT against the search without them | null move +97, static exchange evaluation +64, table move first +57, incremental accumulator +35 Elo | [Round robin](docs/RESULTS.md#round-robin-rust-engine-fastchess) |
 | The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games | [Results](docs/RESULTS.md#measured-and-estimated) |
 | More accurate is not stronger | Networks with the classical chess terms as inputs have a higher Spearman but lose by 105.5 ± 25.5 Elo | [Results](docs/RESULTS.md#measured-and-estimated) |

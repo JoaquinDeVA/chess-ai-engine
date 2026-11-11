@@ -117,9 +117,10 @@ def test_every_feature_set_is_mirror_symmetric():
         for board in random_positions(30, seed=7):
             entries = features.active(board)
             mirrored = features.active(board.mirror())
-            assert sorted(zip(*entries, strict=True)) == pytest.approx(
-                sorted(zip(*mirrored, strict=True))
-            )
+            got = sorted(zip(*entries, strict=True))
+            want = sorted(zip(*mirrored, strict=True))
+            assert [i for i, _ in got] == [i for i, _ in want]
+            assert [v for _, v in got] == pytest.approx([v for _, v in want])
 
 
 def test_hybrid_features_put_the_pieces_in_the_king_bucket_and_the_terms_after_them():

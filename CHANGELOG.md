@@ -2,12 +2,16 @@
 
 All notable changes. The newest are first.
 
-## Unreleased
+## 4.0.0 (2026-11-11)
 
 ### Added
 - `uci ttd <depth> <positions> [limit_s]`, the time to a fixed depth over the 20 positions of `rust/bench/middlegame.epd`, with counters of the search (quiescence, table, cuts by killer, repetitions); the tree is unchanged (`uci bench`: 349,598 nodes before and after). See [Measurement](docs/MEASUREMENT.md#time-to-a-depth).
 
 ### Changed
+- **Documentation reduced to four files**: `README.md` is now a front page (what it found, quick start, window screenshots, the path of one move, where the data comes from, commands), and `docs/` keeps only `RESULTS.md` and `MEASUREMENT.md`. The search, techniques, models, data, training, window, architecture and openings pages moved into the private study guide.
+- `src/chess_lab/scripts/capturas_gui.py` saves the window screenshots of the README offscreen (`docs/img/gui-*.png`).
+- The CI test that compared tuples with `pytest.approx` compares indices and values apart, and the workflow actions run on Node 24.
+- The `iir` line was repeated in every release of this file; it now appears once.
 - Internal iterative reduction (`iir`) is on by default: a node of 4 plies or more with no table move is searched one ply shallower. `uci ttd 11` (1 thread): 215,120,644 to 108,502,704 nodes (-49.6 %), median 8.22 s to 4.15 s; SPRT queued. See Internal iterative reduction.
 - Futility pruning (`futility`) and late move pruning (`lmp`) are implemented as switches, **off by default** until their SPRT: `uci ttd 11` nodes 215,120,644 to 144,499,072 (-32.8 %) and to 66,027,302 (-69.3 %). See Futility pruning and Late move pruning.
 - Reverse futility pruning (`rfp`) is on by default: at 6 plies or fewer, a node whose static value is beyond the bound by 0.46 log-odds per ply left (not in check, bounds outside the mate range) returns that value. `uci ttd 11` with `lmr` (1 thread): 324,595,891 to 215,120,644 nodes (-33.7 %), median 11.13 s to 8.58 s; SPRT queued. See Reverse futility pruning.

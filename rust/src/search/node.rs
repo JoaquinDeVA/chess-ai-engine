@@ -2,14 +2,14 @@
 
 use std::sync::atomic::Ordering::Relaxed;
 
-use shakmaty::{Color, Move, MoveList, Position};
+use shakmaty::{Chess, Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
 use super::ordering::{move_to_front, order, order_noisy, see_ge, MAX_KILLERS_PER_DEPTH};
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
-use crate::eval::{EvalState, Evaluator};
+use crate::eval::sparse_net::{Net, NetState};
 
 /// The null move is tried from this depth on.
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
@@ -55,9 +55,15 @@ pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) 
     steps.clamp(0, depth_remaining - 2)
 }
 
+/// Whether `color` has a piece other than pawns and the king in `pos` (otherwise passing the turn
+/// can be the worst thing to do, and a null move is not tried).
+pub(super) fn has_pieces(pos: &Chess, color: Color) -> bool {
+    let board = pos.board();
+    (board.by_color(color) & !(board.pawns() | board.kings())).any()
+}
+
 struct Search<'a> {
     state: &'a mut GameState,
-    eval: &'a dyn Evaluator,
     memory: &'a mut Memory,
     options: &'a Options,
     control: &'a Control<'a>,
@@ -69,8 +75,8 @@ struct Search<'a> {
     truncated: bool,
     /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
     next_clock_check: u64,
-    /// Evaluation that follows the moves, when the technique is on and the evaluator supports it.
-    incremental: Option<Box<dyn EvalState + 'a>>,
+    /// Evaluation that follows the moves of the search.
+    eval: NetState<'a>,
 }
 
 type Outcome = (f64, Option<u32>);
@@ -113,33 +119,19 @@ impl Search<'_> {
     }
 
     fn static_value(&self) -> f64 {
-        match &self.incremental {
-            Some(state) => state.evaluate(self.state.pos(), self.root_player),
-            None => self.eval.evaluate(self.state.pos(), self.root_player),
-        }
+        self.eval.evaluate(self.state.pos(), self.root_player)
     }
 
     /// Play `m` in the game state and in the incremental evaluation.
     fn play(&mut self, m: Move) {
-        if let Some(state) = &mut self.incremental {
-            state.apply(self.state.pos(), &m);
-        }
+        self.eval.apply(self.state.pos(), &m);
         self.state.apply(m);
     }
 
     /// Pass the turn in the game state and in the incremental evaluation.
     fn play_null(&mut self) {
-        if let Some(state) = &mut self.incremental {
-            state.apply_null();
-        }
+        self.eval.apply_null();
         self.state.apply_null();
-    }
-
-    /// Whether `color` has a piece other than pawns and the king (otherwise passing the turn can
-    /// be the worst thing to do, and a null move is not tried).
-    fn has_pieces(&self, color: Color) -> bool {
-        let board = self.state.pos().board();
-        (board.by_color(color) & !(board.pawns() | board.kings())).any()
     }
 
     /// Value of the child just played, searched as the techniques say: the moves after the first
@@ -188,9 +180,7 @@ impl Search<'_> {
     /// Take back the last move played with [`Search::play`].
     fn unplay(&mut self) {
         self.state.undo();
-        if let Some(state) = &mut self.incremental {
-            state.undo();
-        }
+        self.eval.undo();
     }
 
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
@@ -283,25 +273,19 @@ impl Search<'_> {
         killer_ids[..stored.len()].copy_from_slice(stored);
         let killers = &killer_ids[..stored.len()];
         let mover = self.state.turn();
-        let mut ordered = order(&moves, killers, Some((&self.memory.history, mover)));
-        if self.options.techniques.see {
-            // Captures that lose material come after the quiet moves (the order is otherwise kept).
-            let pos = self.state.pos();
-            let mut reordered = MoveList::new();
-            reordered.extend(
+        let ordered = order(&moves, killers, Some((&self.memory.history, mover)));
+        // Captures that lose material come after the quiet moves (the order is otherwise kept).
+        let pos = self.state.pos();
+        let mut ordered: MoveList = ordered
+            .iter()
+            .filter(|m| !m.is_capture() || see_ge(pos, m, 0))
+            .chain(
                 ordered
                     .iter()
-                    .filter(|m| !m.is_capture() || see_ge(pos, m, 0))
-                    .copied(),
-            );
-            reordered.extend(
-                ordered
-                    .iter()
-                    .filter(|m| m.is_capture() && !see_ge(pos, m, 0))
-                    .copied(),
-            );
-            ordered = reordered;
-        }
+                    .filter(|m| m.is_capture() && !see_ge(pos, m, 0)),
+            )
+            .copied()
+            .collect();
         // Helper threads rotate the root moves so they do not all search the same subtree; the
         // table move is not put first there for the same reason.
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
@@ -309,7 +293,7 @@ impl Search<'_> {
             let shift = self.control.rotation % ordered.len();
             ordered.rotate_left(shift);
         }
-        if self.options.techniques.tt_move && !helper_root {
+        if !helper_root {
             move_to_front(&mut ordered, table_move);
         }
         let in_check = self.state.pos().is_check();
@@ -335,12 +319,11 @@ impl Search<'_> {
         // Null move: it needs a pass to be safe (not in check, not at the root, not twice in a
         // row) and pieces on the board, or zugzwang makes passing the best move. Only tried when
         // the static value already beats the bound, so the reduced search rarely wastes time.
-        if self.options.techniques.null_move
-            && allow_null
+        if allow_null
             && ply > 0
             && depth_remaining >= NULL_MOVE_FROM_DEPTH
             && !in_check
-            && self.has_pieces(mover)
+            && has_pieces(self.state.pos(), mover)
         {
             let enough = if maximizing {
                 self.static_value() >= beta
@@ -504,9 +487,9 @@ impl Search<'_> {
             self.prunings += 1;
             return best_value;
         }
-        let see = self.options.techniques.see;
         for action in order_noisy(&moves) {
-            if see && !see_ge(self.state.pos(), &action, 0) {
+            // Captures that lose material are not searched.
+            if !see_ge(self.state.pos(), &action, 0) {
                 continue;
             }
             self.play(action);
@@ -555,44 +538,16 @@ pub struct SearchResult {
 /// it is then flagged as truncated and stores nothing in the table from then on.
 pub fn alpha_beta(
     state: &mut GameState,
-    eval: &dyn Evaluator,
+    net: &Net,
     memory: &mut Memory,
     options: &Options,
     max_depth: i32,
     control: &Control,
-) -> SearchResult {
-    alpha_beta_window(
-        state,
-        eval,
-        memory,
-        options,
-        max_depth,
-        control,
-        (f64::NEG_INFINITY, f64::INFINITY),
-    )
-}
-
-/// [`alpha_beta`] with a window other than the whole interval: a value inside it is exact, one on
-/// its edge (or outside) only says that the true value is on that side.
-pub fn alpha_beta_window(
-    state: &mut GameState,
-    eval: &dyn Evaluator,
-    memory: &mut Memory,
-    options: &Options,
-    max_depth: i32,
-    control: &Control,
-    window: (f64, f64),
 ) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
-    let incremental = if options.techniques.incremental {
-        eval.new_state(&root)
-    } else {
-        None
-    };
     let mut search = Search {
         state,
-        eval,
         memory,
         options,
         control,
@@ -603,9 +558,9 @@ pub fn alpha_beta_window(
         max_ply: 0,
         truncated: false,
         next_clock_check: 0,
-        incremental,
+        eval: NetState::new(net, &root),
     };
-    let (value, best) = search.node(window.0, window.1, max_depth, 0, true);
+    let (value, best) = search.node(f64::NEG_INFINITY, f64::INFINITY, max_depth, 0, true);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

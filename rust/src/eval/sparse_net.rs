@@ -3,7 +3,7 @@
 use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
 
 use super::sparse_features::{FeatureSet, PIECE_INPUTS};
-use super::{for_player, sigmoid, EvalState, Evaluator};
+use super::{for_player, sigmoid};
 
 /// One dense layer: `weights` is row-major `(fan_in, fan_out)`.
 pub struct Layer {
@@ -71,7 +71,10 @@ impl Net {
                 .as_array()
                 .ok_or("model: no weights")?
                 .iter()
-                .map(|w| w.as_f64().ok_or("model: weight is not a number".to_string()))
+                .map(|w| {
+                    w.as_f64()
+                        .ok_or("model: weight is not a number".to_string())
+                })
                 .collect()
         };
         let layers = value["layers"]
@@ -94,6 +97,11 @@ impl Net {
             })
             .collect::<Result<Vec<Layer>, String>>()?;
         Net::new(features, layers)
+    }
+
+    /// The feature set of the inputs.
+    pub fn features(&self) -> FeatureSet {
+        self.features
     }
 
     /// Network output before the logistic function, for the side to move.
@@ -132,6 +140,12 @@ impl Net {
             score
         }
     }
+
+    /// Expected score of `player` in `pos`, in `[0.01, 0.99]`, from the board (the search uses
+    /// [`NetState`], which gives the same value move by move).
+    pub fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
+        for_player(self.expected_score(pos), player)
+    }
 }
 
 fn dense(layer: &Layer, input: &[f64], relu: bool) -> Vec<f64> {
@@ -148,16 +162,6 @@ fn dense(layer: &Layer, input: &[f64], relu: bool) -> Vec<f64> {
         }
     }
     out
-}
-
-impl Evaluator for Net {
-    fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        for_player(self.expected_score(pos), player)
-    }
-
-    fn new_state<'a>(&'a self, pos: &Chess) -> Option<Box<dyn EvalState + 'a>> {
-        Some(Box::new(NetState::new(self, pos)))
-    }
 }
 
 /// Index of a piece among the inputs of one king bucket when `mover` is the side to move: the
@@ -188,7 +192,10 @@ fn slot(color: Color) -> usize {
 /// With king buckets each accumulator uses the rows of its mover's bucket: when that king moves to
 /// another bucket, its accumulator is rebuilt from the board. The classical terms are not pieces:
 /// they are computed and added at every evaluation.
-struct NetState<'a> {
+///
+/// The search calls `apply` for every move it plays and `undo` when it takes it back, and
+/// `evaluate` for the position it is in; the result equals [`Net::evaluate`] up to rounding.
+pub struct NetState<'a> {
     net: &'a Net,
     width: usize,
     acc: Vec<f64>,
@@ -199,7 +206,8 @@ struct NetState<'a> {
 }
 
 impl<'a> NetState<'a> {
-    fn new(net: &'a Net, pos: &Chess) -> NetState<'a> {
+    /// The accumulators of `pos`, built from the board.
+    pub fn new(net: &'a Net, pos: &Chess) -> NetState<'a> {
         let width = net.layers[0].fan_out;
         let mut state = NetState {
             net,
@@ -317,8 +325,9 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, f64); 4], usize, Option<
     }
 }
 
-impl EvalState for NetState<'_> {
-    fn apply(&mut self, pos: &Chess, m: &Move) {
+impl NetState<'_> {
+    /// The side to move in `pos` (the position before the move) plays `m`.
+    pub fn apply(&mut self, pos: &Chess, m: &Move) {
         self.snapshots.extend_from_slice(&self.acc);
         self.bucket_snapshots.push(self.buckets);
         let mover = pos.turn();
@@ -342,20 +351,23 @@ impl EvalState for NetState<'_> {
         }
     }
 
-    fn apply_null(&mut self) {
+    /// The side to move passes (a null move).
+    pub fn apply_null(&mut self) {
         // the accumulators of both sides are kept, so passing changes nothing
         self.snapshots.extend_from_slice(&self.acc);
         self.bucket_snapshots.push(self.buckets);
     }
 
-    fn undo(&mut self) {
+    /// Take back the last move played with `apply` or `apply_null`.
+    pub fn undo(&mut self) {
         let start = self.snapshots.len() - self.acc.len();
         self.acc.copy_from_slice(&self.snapshots[start..]);
         self.snapshots.truncate(start);
         self.buckets = self.bucket_snapshots.pop().expect("a move to undo");
     }
 
-    fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
+    /// Expected score of `player` in `pos`, the position the state is following.
+    pub fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
         let mover = pos.turn();
         let start = slot(mover) * self.width;
         let mut hidden = self.acc[start..start + self.width].to_vec();
@@ -439,7 +451,7 @@ mod tests {
         for start in starts {
             for _ in 0..40 {
                 let mut pos = position_from_fen(start).unwrap();
-                let mut state = net.new_state(&pos).unwrap();
+                let mut state = NetState::new(&net, &pos);
                 let mut trail = Vec::new();
                 for _ in 0..80 {
                     let moves = ordered_moves(&pos);
@@ -518,7 +530,7 @@ mod tests {
         let pos = position_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
         for m in ordered_moves(&pos) {
             let Move::Castle { .. } = m else { continue };
-            let mut state = net.new_state(&pos).unwrap();
+            let mut state = NetState::new(&net, &pos);
             let mut after = pos.clone();
             after.play_unchecked(m);
             let king = |p: &Chess| {

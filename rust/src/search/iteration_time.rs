@@ -13,19 +13,6 @@ const MAX_GROWTH: f64 = 8.0;
 /// Growth assumed when there is nothing to measure it from.
 const DEFAULT_GROWTH: f64 = 4.0;
 
-/// Names of the estimators, as `Options::estimator` takes them.
-pub const NAMES: [&str; 3] = ["never_stop", "fixed_factor", "geometric_growth"];
-
-/// The estimator called `name`, if there is one.
-pub fn get(name: &str) -> Option<fn(&[Iteration]) -> f64> {
-    Some(match name {
-        "never_stop" => never_stop,
-        "fixed_factor" => fixed_factor,
-        "geometric_growth" => geometric_growth,
-        _ => return None,
-    })
-}
-
 fn clamp(value: f64) -> f64 {
     value.clamp(MIN_GROWTH, MAX_GROWTH)
 }
@@ -80,13 +67,5 @@ mod tests {
         // ratios 2 and 8: geometric mean 4
         let predicted = geometric_growth(&[(1.0, 1), (2.0, 2), (16.0, 3)]);
         assert!((predicted - 64.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn every_name_is_registered() {
-        for name in NAMES {
-            assert!(get(name).is_some());
-        }
-        assert!(get("nope").is_none());
     }
 }

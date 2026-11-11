@@ -12,7 +12,6 @@ use shakmaty::Color;
 use crate::board::position_from_fen;
 use crate::eval::sparse_features::FeatureSet;
 use crate::eval::sparse_net::{Layer, Net};
-use crate::eval::{Eval, Evaluator};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
@@ -25,14 +24,10 @@ fn parse_features(name: &str) -> PyResult<FeatureSet> {
 
 /// A Python-owned evaluator backed by a Rust neural network.
 ///
-/// The evaluator stores the network and the feature set needed to expose active sparse features
-/// through [`PyEvaluator::features`].
 #[pyclass(name = "Evaluator", frozen)]
 struct PyEvaluator {
     /// The network.
-    eval: Eval,
-    /// The sparse feature set of the network.
-    features: FeatureSet,
+    net: Net,
 }
 
 #[pymethods]
@@ -60,10 +55,7 @@ impl PyEvaluator {
             })
             .collect();
         let net = Net::new(set, layers).map_err(value_error)?;
-        Ok(PyEvaluator {
-            eval: Eval::Net(net),
-            features: set,
-        })
+        Ok(PyEvaluator { net })
     }
 
     /// Evaluate a FEN position from White's or Black's perspective.
@@ -73,13 +65,13 @@ impl PyEvaluator {
     fn evaluate(&self, fen: &str, white: bool) -> PyResult<f64> {
         let pos = position_from_fen(fen).map_err(value_error)?;
         Ok(self
-            .eval
+            .net
             .evaluate(&pos, if white { Color::White } else { Color::Black }))
     }
 
     /// Return the active sparse feature indices and values for a FEN position.
     fn features(&self, fen: &str) -> PyResult<(Vec<usize>, Vec<f64>)> {
-        let set = self.features;
+        let set = self.net.features();
         let pos = position_from_fen(fen).map_err(value_error)?;
         let (mut indices, mut values) = (Vec::new(), Vec::new());
         set.active(&pos, &mut indices, &mut values);

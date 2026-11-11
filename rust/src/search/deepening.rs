@@ -14,7 +14,7 @@ use super::shared_tt::SharedTable;
 use super::stats::*;
 use super::tt::Tt;
 use crate::board::GameState;
-use crate::eval::Evaluator;
+use crate::eval::sparse_net::Net;
 
 /// Tolerance for finishing a depth that was started within the budget.
 const OVERSHOOT_FACTOR: f64 = 1.15;
@@ -37,7 +37,7 @@ type Report = Mutex<Option<(usize, f64, Move)>>;
 fn helper(
     index: usize,
     mut state: GameState,
-    eval: &dyn Evaluator,
+    eval: &Net,
     table: Arc<SharedTable>,
     history: History,
     options: &Options,
@@ -133,7 +133,7 @@ const VOTE_MARGIN: f64 = 0.01;
 /// those of the main thread and are not used by the helpers' copies.
 pub fn iterative_deepening(
     state: &mut GameState,
-    eval: &dyn Evaluator,
+    eval: &Net,
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
@@ -218,20 +218,14 @@ pub fn iterative_deepening(
 
 fn deepen(
     state: &mut GameState,
-    eval: &dyn Evaluator,
+    eval: &Net,
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
     time_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats, Option<f64>), String> {
-    let estimate = iteration_time::get(&options.estimator).ok_or_else(|| {
-        format!(
-            "unknown estimator {:?}; available: {:?}",
-            options.estimator,
-            iteration_time::NAMES
-        )
-    })?;
+    let estimate = options.estimator;
     let clock = control.clock;
     let start = clock();
     let mut best_move: Option<Move> = None;

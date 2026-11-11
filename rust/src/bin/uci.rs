@@ -13,7 +13,6 @@ use std::time::Instant;
 
 use _core::board::{ordered_moves, uci_string, GameState};
 use _core::eval::sparse_net::Net;
-use _core::eval::{Eval, Evaluator};
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
 use _core::search::tt::DEFAULT_MAX_TT_ENTRIES;
@@ -31,7 +30,7 @@ struct Settings {
     threads: usize,
     hash_mb: usize,
     techniques: Techniques,
-    eval: Arc<Eval>,
+    eval: Arc<Net>,
     /// Opening book (`Book`); off until the option names a file.
     book: Option<OpeningBook>,
     /// Whether the game still follows the book: the first position it lacks ends it.
@@ -66,13 +65,8 @@ struct Job {
 /// A search running in its own thread. It gives the memory back when it ends.
 type Running = (JoinHandle<Memory>, Arc<AtomicBool>);
 
-fn load_model() -> Result<Eval, String> {
-    model_from_json(MODEL_JSON)
-}
-
-/// The network of a model file (see [`Net::from_json`]).
-fn model_from_json(text: &str) -> Result<Eval, String> {
-    Ok(Eval::Net(Net::from_json(text)?))
+fn load_model() -> Result<Net, String> {
+    Net::from_json(MODEL_JSON)
 }
 
 /// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
@@ -118,7 +112,7 @@ fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
 
 /// Searches the job and prints `info` and `bestmove`. A broken position prints an error and
 /// `bestmove 0000`.
-fn think(mut memory: Memory, eval: Arc<Eval>, job: Job) -> Memory {
+fn think(mut memory: Memory, eval: Arc<Net>, job: Job) -> Memory {
     match run_search(&mut memory, &eval, job) {
         Ok(best) => println!("bestmove {best}"),
         Err(error) => println!("info string {error}\nbestmove 0000"),
@@ -126,7 +120,7 @@ fn think(mut memory: Memory, eval: Arc<Eval>, job: Job) -> Memory {
     memory
 }
 
-fn run_search(memory: &mut Memory, eval: &Eval, job: Job) -> Result<String, String> {
+fn run_search(memory: &mut Memory, eval: &Net, job: Job) -> Result<String, String> {
     let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
     let options = Options {
         techniques: job.techniques,
@@ -197,7 +191,7 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
         "Model" => {
             let text = std::fs::read_to_string(value)
                 .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;
-            settings.eval = Arc::new(model_from_json(&text)?);
+            settings.eval = Arc::new(Net::from_json(&text)?);
         }
         "Book" => {
             settings.book = match value {
@@ -257,7 +251,7 @@ const BENCH_DEPTH: usize = 6;
 
 /// Runs `bench_once` `repetitions` times: the node counts (stdout) come from the first run, the
 /// times and the nodes per second (stderr) from all of them, with their median.
-fn bench(eval: &Eval, repetitions: usize) {
+fn bench(eval: &Net, repetitions: usize) {
     let mut seconds: Vec<f64> = Vec::new();
     let mut total_nodes = 0;
     for run in 0..repetitions {
@@ -276,7 +270,7 @@ fn bench(eval: &Eval, repetitions: usize) {
 
 /// Searches the fixed positions one by one with fresh memory and a fixed depth. When `print` is
 /// set, the node counts go to stdout (the same on every run). Returns the total nodes and the time.
-fn bench_once(eval: &Eval, print: bool) -> (u64, f64) {
+fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
     let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
     let started = Instant::now();
     let mut total_nodes = 0;
@@ -330,7 +324,7 @@ fn bench_once(eval: &Eval, print: bool) -> (u64, f64) {
 /// nodes of each and what the search counted over all of them. A position that does not finish
 /// within the limit counts as the limit in the median. `TTD_TABLE=shared` searches with the table
 /// of several threads (64 MB) instead of the one of a single thread.
-fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<(), String> {
+fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result<(), String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
     let fens: Vec<String> = text
         .lines()
@@ -352,7 +346,7 @@ fn time_to_depth(eval: &Eval, depth: usize, path: &str, limit: f64) -> Result<()
         .ok()
         .and_then(|n| n.parse().ok())
         .unwrap_or(DEFAULT_MAX_TT_ENTRIES);
-    // Techniques to measure, comma separated (`TTD_TECHNIQUES=incremental,see`); the default set otherwise.
+    // Techniques to measure, comma separated (`TTD_TECHNIQUES=lmr,futility`); the default set otherwise.
     let names = std::env::var("TTD_TECHNIQUES").unwrap_or_else(|_| DEFAULT_TECHNIQUES.join(","));
     let options = Options {
         techniques: Techniques::from_names(
@@ -508,7 +502,7 @@ fn main() {
             Some(path) => bench(
                 &std::fs::read_to_string(&path)
                     .map_err(|e| e.to_string())
-                    .and_then(|text| model_from_json(&text))
+                    .and_then(|text| Net::from_json(&text))
                     .unwrap_or_else(|e| panic!("bench model {path}: {e}")),
                 repetitions,
             ),
@@ -647,27 +641,21 @@ mod tests {
 
     #[test]
     fn a_network_file_is_loaded_with_or_without_the_old_perspective_field() {
-        assert!(matches!(
-            model_from_json(&net_json(768, "")),
-            Ok(Eval::Net(_))
-        ));
+        assert!(Net::from_json(&net_json(768, "")).is_ok());
         let old = r#""perspective":"side_to_move","#;
-        assert!(matches!(
-            model_from_json(&net_json(768, old)),
-            Ok(Eval::Net(_))
-        ));
+        assert!(Net::from_json(&net_json(768, old)).is_ok());
         let white = r#""perspective":"white","#;
-        assert!(model_from_json(&net_json(768, white)).is_err());
+        assert!(Net::from_json(&net_json(768, white)).is_err());
     }
 
     #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
-        assert!(model_from_json(&net_json(10, "")).is_err());
+        assert!(Net::from_json(&net_json(10, "")).is_err());
     }
 
     #[test]
     fn the_compiled_in_model_is_a_network() {
-        assert!(matches!(load_model(), Ok(Eval::Net(_))));
+        assert!(load_model().is_ok());
     }
 
     fn settings_with_book() -> Settings {

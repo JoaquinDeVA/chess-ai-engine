@@ -35,6 +35,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted |
 | Adding the classical terms to the network makes it weaker | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Measured; H0 accepted, but it mixes quality and speed (the hybrids have no accumulator). At fixed nodes: pending |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
+| The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength is judged by an SPRT [−5, 0] against `v4.0.0`, queued |
 | Several threads search faster | Time to depth 8 on 60 positions (Lazy SMP) | Rust | Measured speed; effect in games not measured |
 | Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo (logistic model) | Rust | Measured; H1 accepted |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |

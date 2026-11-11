@@ -12,6 +12,23 @@ All notable changes. The newest are first.
   becomes `chess_lab.screenshots`. `scripts/` is gone.
 - Trained model files (`.npz`) leave git for `data/models/`; their cards stay in git as the record.
 - The scripts that drive the compute node leave the repo; the retired `match.sh`, `deploy.sh` and `env.sh` are deleted.
+- The search scores in whole centipawns of the logistic scale (`round(logit × 173.7)`, within ±798 for a network)
+  and a mate as 31,000 minus its distance in plies, so a quicker mate is worth more without the old `0.0001` per ply.
+  The `rfp` and `futility` margins are 80 and 120 per ply left (the 0.46 and 0.69 log-odds of before) (`345c3ff`).
+- The network runs in `f32` with a stack of accumulators (a move copies the top frame and updates it, undoing pops
+  it), and one lock-free transposition table serves one thread or many. `uci ttd 11` (one thread, desktop): median
+  5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s. The tree changes (`uci bench 5`: 145,163 to 139,252 nodes); the
+  SPRT [−5, 0] against 4.0.0 is queued.
+- `incremental`, `tt_move`, `null_move` and `see` are always on: the default of the `Techniques` option is now
+  `lmr,rfp,iir`, and the names of the four fixed ones are accepted and ignored (`3b4430c`).
+- `rust/` has one module per concept: network, accumulator, pruning, quiescence, bench (`15eb630`).
+- `uci bench` clears the memory outside its timer, so that the first touch of a fresh table is not counted.
+- `python -m chess_lab.models.export_uci` exports `net_pst_w64@e30` by default, the network the binary embeds.
+- A round robin job can give engine B its own binary (`uci_b` in `queue.json`).
+
+### Removed
+- The `h1` heuristic, from the core and from the laboratory (`fee2c47`).
+- `TTD_TABLE` and `TTD_ENTRIES` of `uci ttd`: there is a single table.
 
 ## 4.0.0 (2026-11-11)
 

@@ -27,7 +27,10 @@ positions of the feature-parity and technique tests), `data/syzygy/` (five 3-pie
 - Command-line modules are imported like any other module; their tests call their functions on a handful of
   synthetic positions.
 - A test that takes more than a few seconds is marked `slow` (`pytest -m "not slow"` skips it).
-- The Rust tests live in `rust/tests/` (`cargo test --release`).
+- The Rust tests are the unit tests of each module plus `rust/tests/techniques.rs` (`cargo test --release`). The
+  search tests (`rust/src/search/tests.rs`) play with a material network and a fake clock, so their values and
+  times depend neither on a trained model nor on the machine. Values are whole centipawns and a mate is
+  `MATE − plies`.
 
 ## Pitfalls
 

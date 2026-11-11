@@ -116,8 +116,9 @@ to a fixed depth with one thread and fresh memory, and prints the nodes and seco
 and what the search counted: branching factor, share of quiescence nodes, cuts by the first move and by each killer
 slot, table hits and the stores that drop another position. It is the instrument for changes that must reach a
 depth sooner; `uci bench` stays the fingerprint of the search (same nodes before and after a change that only
-makes it faster). `TTD_TABLE=shared` searches with the lock-free table of several threads (64 MB) instead of the
-single-thread one, and `TTD_ENTRIES=<n>` sets the entries of that table. The 20 middlegame positions are in `rust/bench/middlegame.epd`.
+makes it faster). Both search with the engine's own 64 MB lock-free table, the one every thread shares; `uci bench`
+clears it outside its timer, so that the first touch of the memory is not counted. The 20 middlegame positions are in
+`rust/bench/middlegame.epd`.
 
 ```bash
 cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/middlegame.epd
@@ -126,7 +127,7 @@ cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/m
 Baseline at `63cace7` plus the counters (`net_pst_w32`, desktop, one thread, 2026-11-10; the runs were made one
 after the other, with the machine idle): depth 9 finished in 20 of 20 positions, 122,806,437 nodes, median 4.30 s
 (1,006,294 nodes/s), branching factor 2.70 from depth 7 to 9, quiescence 22.0 % of the nodes, table hits 3.9 % of
-the probes. With the shared table: 118,614,205 nodes but median 4.58 s (974,990 nodes/s).
+the probes. With the lock-free table, the only one since `345c3ff`: 118,614,205 nodes but median 4.58 s (974,990 nodes/s).
 
 ## How to measure a change
 
@@ -136,15 +137,16 @@ the probes. With the shared table: 118,614,205 nodes but median 4.58 s (974,990 
    silently becomes an A/A:
 
    ```bash
-   printf 'setoption name Techniques value incremental,tt_move,null_move\nquit\n' | rust/target/release/uci   # must print nothing
+   printf 'setoption name Techniques value lmr,iir\nquit\n' | rust/target/release/uci   # must print nothing
    ```
 
-3. Play an SPRT with the change in A only, for example removing `see` (a removal is judged with [−5, 0]: is the
-   simpler engine no worse?):
+3. Play an SPRT with the change in A only, for example removing `rfp` (a removal is judged with [−5, 0]: is the
+   simpler engine no worse?). Only `lmr`, `rfp`, `iir`, `futility` and `lmp` have a switch; the names of the four
+   fixed techniques (`incremental`, `tt_move`, `null_move`, `see`) are accepted and ignored:
 
    ```bash
-   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=incremental,tt_move,null_move \
-       -engine cmd=rust/target/release/uci name=B option.Techniques=incremental,tt_move,null_move,see \
+   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=lmr,iir \
+       -engine cmd=rust/target/release/uci name=B option.Techniques=lmr,rfp,iir \
        -each proto=uci nodes=20000 option.Hash=16 -openings file=data/openings/openings.epd format=epd order=random \
        -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 6000 -games 2 -concurrency 8 -srand 21
    ```

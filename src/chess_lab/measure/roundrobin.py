@@ -12,12 +12,12 @@ keeps the state of its SPRT: never kill it with SIGKILL).
 
 Queue file::
 
-    {"jobs": [{"name": "see_off", "uci": "bin/0123abcd4567/uci", "a": ["option.Techniques=incremental,see"],
-               "b": ["option.Techniques=incremental"], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
+    {"jobs": [{"name": "rfp_off", "uci": "bin/0123abcd4567/uci", "a": ["option.Techniques=lmr,iir"],
+               "b": ["option.Techniques=lmr,rfp,iir"], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
                "elo0": 0, "elo1": 5, "max_rounds": 6000, "chunk_rounds": 100}]}
 
-``uci`` is the binary both engines run, or only A's when the job has ``uci_b`` (the node installs each build in its own ``bin/<hash>/``, so a long match
-keeps its binary when a new one arrives); ``a`` and ``b`` are extra fastchess options of each engine; ``each`` defaults
+``uci`` is the binary both engines run, or only A's when the job names B's in ``uci_b`` (the node installs each build
+in its own ``bin/<hash>/``, so a long match keeps its binary when a new one arrives); ``a`` and ``b`` are extra fastchess options of each engine; ``each`` defaults
 to the screening control. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
 """
 

@@ -61,7 +61,7 @@ option name Threads type spin default 1 min 1 max 64
 option name Book type string default
 option name Tablebase type string default
 option name Model type string default net_pst_w64
-option name Techniques type string default incremental,tt_move,null_move,see,lmr,rfp,iir
+option name Techniques type string default lmr,rfp,iir
 uciok
 readyok
 info depth 8 nodes 1070725 time 1000

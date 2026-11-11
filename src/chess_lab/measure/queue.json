@@ -156,6 +156,110 @@
    "elo1": 5,
    "max_rounds": 6000,
    "chunk_rounds": 400
+  },
+  {
+   "name": "abl_lmr",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "b": [
+    "option.Techniques=rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "abl_rfp",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "b": [
+    "option.Techniques=lmr,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "abl_iir",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "add_futility",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir,futility"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "add_lmp",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir,lmp"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "add_aspiration",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir,aspiration"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "add_history_malus",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir,history_malus"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
+  },
+  {
+   "name": "add_qs_tt",
+   "uci": "bin/db98489bd531/uci",
+   "a": [
+    "option.Techniques=lmr,rfp,iir,qs_tt"
+   ],
+   "b": [
+    "option.Techniques=lmr,rfp,iir"
+   ],
+   "elo0": -5,
+   "elo1": 0,
+   "max_rounds": 6000
   }
  ]
 }

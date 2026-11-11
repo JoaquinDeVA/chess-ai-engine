@@ -4,6 +4,11 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
+### Added
+- `aspiration`, `history_malus` and `qs_tt` are switches again, **off by default**, rewritten on the integer search
+  (aspiration window of ±25 that grows ×4 on a fail). Their SPRT, and those of `lmr`, `rfp`, `iir`, `futility` and
+  `lmp`, each alone against the default `lmr,rfp,iir`, are queued on the round robin node; no result yet.
+
 ### Changed
 - `chess_lab` is organised by stage, `models` → `datasets` → `training` → `measure`. The new `datasets` package holds the
   raw shards, sidecars and split with their six commands, all run as `python -m chess_lab.datasets.<name>`. Fitting

@@ -141,7 +141,7 @@ the probes. With the lock-free table, the only one since `345c3ff`: 118,614,205 
    ```
 
 3. Play an SPRT with the change in A only, for example removing `rfp` (a removal is judged with [−5, 0]: is the
-   simpler engine no worse?). Only `lmr`, `rfp`, `iir`, `futility` and `lmp` have a switch; the names of the four
+   simpler engine no worse?). Only `lmr`, `rfp`, `iir`, `futility`, `lmp`, `aspiration`, `history_malus` and `qs_tt` have a switch; the names of the four
    fixed techniques (`incremental`, `tt_move`, `null_move`, `see`) are accepted and ignored:
 
    ```bash

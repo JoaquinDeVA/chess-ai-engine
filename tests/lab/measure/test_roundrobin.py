@@ -55,6 +55,11 @@ def test_command_first_turn_and_resume(script):
     assert cmd[0] == "./fastchess" and "option.Techniques=see" in cmd and "elo1=5" in cmd
     assert cmd.count("cmd=./bin/ab12/uci") == 2
     assert cmd[cmd.index("-rounds") + 1] == "100"
+    two = script.command(
+        {**job, "uci_b": "bin/cd34/uci"}, 100, 4, Path("c.json"), Path("m.pgn"), False
+    )
+    assert two[two.index("name=A") - 1] == "cmd=./bin/ab12/uci"
+    assert two[two.index("name=B") - 1] == "cmd=./bin/cd34/uci"
     assert script.command(job, 100, 4, Path("c.json"), Path("m.pgn"), resume=True) == [
         "./fastchess",
         "-config",

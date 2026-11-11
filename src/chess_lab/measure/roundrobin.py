@@ -16,7 +16,7 @@ Queue file::
                "b": ["option.Techniques=incremental"], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
                "elo0": 0, "elo1": 5, "max_rounds": 6000, "chunk_rounds": 100}]}
 
-``uci`` is the binary both engines run (the node installs each build in its own ``bin/<hash>/``, so a long match
+``uci`` is the binary both engines run, or only A's when the job has ``uci_b`` (the node installs each build in its own ``bin/<hash>/``, so a long match
 keeps its binary when a new one arrives); ``a`` and ``b`` are extra fastchess options of each engine; ``each`` defaults
 to the screening control. Resuming edits ``rounds`` in the ``config.json`` that fastchess writes on a clean exit.
 """
@@ -106,7 +106,7 @@ def command(
     return [
         "./fastchess",
         *["-engine", f"cmd=./{job['uci']}", "name=A", *job.get("a", [])],
-        *["-engine", f"cmd=./{job['uci']}", "name=B", *job.get("b", [])],
+        *["-engine", f"cmd=./{job.get('uci_b', job['uci'])}", "name=B", *job.get("b", [])],
         *["-each", *job.get("each", DEFAULT_EACH)],
         *["-openings", "file=openings.epd", "format=epd", "order=random"],
         *["-pgnout", f"file={pgn}"],

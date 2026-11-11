@@ -1,8 +1,7 @@
 //! The engine as a UCI program: `uci`, `isready`, `position`, `go`, `stop`, `setoption`, `quit`.
 //!
-//! The window and the tournaments play through this binary. The clock spends a share of the
-//! time left and does not use the increment (`winc`/`binc` are read and ignored: a known defect,
-//! see `docs/`).
+//! The window and the tournaments play through this binary. On a clock each move gets a soft
+//! limit, checked between iterations, and a hard one that cuts the search (see [`clock_budget`]).
 
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -73,19 +72,31 @@ fn load_model() -> Result<Net, String> {
     Net::from_json(MODEL_JSON)
 }
 
-/// Soft budget and hard limit of one move in seconds: 15 % of the time left, between 1.5 and 40 s
-/// and at most half of it; the hard limit is 1.5 times the budget minus 0.3 s.
-fn clock_budget(time_left: f64) -> (f64, f64) {
-    let budget = (time_left * 0.15).clamp(1.5, 40.0).min(time_left * 0.5);
-    (budget, budget * 1.5 - 0.3)
+/// Seconds kept back on every move for the GUI and the pipes, so that the move arrives in time.
+const MOVE_OVERHEAD: f64 = 0.05;
+/// Moves the time left is spread over when `movestogo` does not say (or says more).
+const MOVES_TO_GO: f64 = 20.0;
+
+/// Soft and hard limit of one move in seconds. The base is the time left over the moves to go plus
+/// three quarters of the increment, minus the overhead; the soft limit is 0.6 times the base and the
+/// hard one three times the base, but never more than 40 % of the time left. The search scales the
+/// soft limit by how settled the best move is (see `search::iterative_deepening`).
+fn clock_budget(time_left: f64, increment: f64, moves_to_go: Option<u32>) -> (f64, f64) {
+    let horizon = moves_to_go.map_or(MOVES_TO_GO, |n| f64::from(n.max(1)).min(MOVES_TO_GO));
+    let base = (time_left / horizon + increment * 0.75 - MOVE_OVERHEAD).max(0.01);
+    let hard = (base * 3.0)
+        .min(time_left * 0.4)
+        .min((time_left - MOVE_OVERHEAD).max(0.01));
+    ((base * 0.6).min(hard), hard)
 }
 
 /// The limits of a `go` command. `movetime` wins over the clock; with neither the search runs to
 /// the maximum depth.
 fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
     let (mut depth, mut nodes) = (None, None);
-    let (mut movetime, mut wtime, mut btime): (Option<f64>, Option<f64>, Option<f64>) =
-        (None, None, None);
+    let (mut movetime, mut moves_to_go) = (None, None);
+    let (mut wtime, mut btime, mut winc, mut binc) = (None, None, 0.0, 0.0);
+    let seconds = |ms: &str| ms.parse::<f64>().ok().map(|ms| ms / 1000.0);
     let mut words = args.iter().copied();
     while let Some(key) = words.next() {
         if key == "infinite" {
@@ -95,15 +106,23 @@ fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
         match key {
             "depth" => depth = value.parse().ok(),
             "nodes" => nodes = value.parse().ok(),
-            "movetime" => movetime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
-            "wtime" => wtime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
-            "btime" => btime = value.parse::<f64>().ok().map(|ms| ms / 1000.0),
-            _ => {} // winc and binc: ignored (see the module comment)
+            "movetime" => movetime = seconds(value),
+            "wtime" => wtime = seconds(value),
+            "btime" => btime = seconds(value),
+            "winc" => winc = seconds(value).unwrap_or(0.0),
+            "binc" => binc = seconds(value).unwrap_or(0.0),
+            "movestogo" => moves_to_go = value.parse().ok(),
+            _ => {}
         }
     }
-    let (time_limit, hard_limit) = match (movetime, if white_to_move { wtime } else { btime }) {
+    let (time_left, increment) = if white_to_move {
+        (wtime, winc)
+    } else {
+        (btime, binc)
+    };
+    let (time_limit, hard_limit) = match (movetime, time_left) {
         (Some(seconds), _) => (seconds, seconds),
-        (None, Some(time_left)) => clock_budget(time_left),
+        (None, Some(time_left)) => clock_budget(time_left, increment, moves_to_go),
         (None, None) => (f64::INFINITY, f64::INFINITY),
     };
     Limits {
@@ -396,6 +415,41 @@ fn parse_position(fen: String, rest: &[&str]) -> Position {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn the_clock_spreads_the_time_and_counts_the_increment() {
+        // 60 + 1: base 60/20 + 0.75 - 0.05 = 3.7 s.
+        let (soft, hard) = clock_budget(60.0, 1.0, None);
+        assert!(close(soft, 2.22) && close(hard, 11.1), "{soft} {hard}");
+        // The increment is what keeps the base up when the clock runs low.
+        let (soft, _) = clock_budget(2.0, 1.0, None);
+        assert!(close(soft, 0.6 * 0.8), "{soft}");
+    }
+
+    #[test]
+    fn the_hard_limit_never_eats_the_clock() {
+        for time_left in [0.02, 0.1, 1.0, 5.0] {
+            let (soft, hard) = clock_budget(time_left, 2.0, Some(1));
+            assert!(
+                soft <= hard && hard <= time_left * 0.4 + 0.01,
+                "{time_left}: {hard}"
+            );
+        }
+    }
+
+    #[test]
+    fn movestogo_shortens_the_horizon_and_go_reads_the_side_to_move() {
+        let (soft, _) = clock_budget(60.0, 0.0, Some(10));
+        assert!(close(soft, 0.6 * 5.95), "{soft}");
+        let black = go_limits(&["wtime", "1000", "btime", "60000", "binc", "1000"], false);
+        assert!(close(black.time_limit, 2.22) && close(black.hard_limit, 11.1));
+        let fixed = go_limits(&["movetime", "500", "wtime", "60000"], true);
+        assert!(close(fixed.time_limit, 0.5) && close(fixed.hard_limit, 0.5));
+    }
 
     #[test]
     fn the_compiled_in_model_is_a_network() {

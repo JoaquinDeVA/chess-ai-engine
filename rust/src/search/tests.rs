@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use shakmaty::Color;
 
-use super::iteration_time::{fixed_factor, never_stop};
 use super::pruning::has_pieces;
 use super::*;
 use crate::board::{position_from_fen, uci_string, GameState};
@@ -244,10 +243,7 @@ fn a_search_cut_by_the_clock_stores_nothing() {
 
 #[test]
 fn the_deepening_reports_the_depth_limit() {
-    let options = Options {
-        estimator: never_stop,
-        ..Options::default()
-    };
+    let options = Options::default();
     let (best, stats) = run(START, &options, 4, 1e6, 1e6, 0.0);
     assert!(best.is_some());
     assert_eq!(
@@ -259,29 +255,8 @@ fn the_deepening_reports_the_depth_limit() {
 }
 
 #[test]
-fn the_estimate_cannot_stop_the_deepening_before_min_depth_but_does_after() {
-    // Every reading of the clock takes 0.1 fake seconds, so after the first iteration the
-    // estimate of the next one exceeds what is left of the budget.
-    let options = Options {
-        estimator: fixed_factor,
-        ..Options::default()
-    };
-    let (_, stats) = run(START, &options, 8, 1.0, 1e12, 0.1);
-    assert!(
-        stats.completed_depth >= options.min_depth,
-        "{}",
-        stats.completed_depth
-    );
-    assert_eq!(stats.stop_reason, StopReason::Estimate, "{stats:?}");
-    assert!(stats.stop_predicted > 0.0);
-}
-
-#[test]
 fn an_exhausted_budget_still_completes_min_depth_and_then_stops() {
-    let options = Options {
-        estimator: never_stop,
-        ..Options::default()
-    };
+    let options = Options::default();
     let (_, stats) = run(START, &options, 8, 0.0, 1e12, 1e-3);
     assert_eq!(
         (stats.completed_depth, stats.stop_reason),
@@ -291,16 +266,13 @@ fn an_exhausted_budget_still_completes_min_depth_and_then_stops() {
 
 #[test]
 fn an_iteration_cut_by_the_hard_limit_is_discarded() {
-    let options = Options {
-        estimator: never_stop,
-        ..Options::default()
-    };
+    let options = Options::default();
     // Every reading of the clock takes 0.1 fake seconds, and an iteration of under 2,048 nodes
-    // reads it about five times (the deepening's own readings and the first node): depths 1 to 4
-    // end before 2.2 seconds and depth 5 passes the limit at its first node.
+    // reads it about four times (the deepening's own readings and the first node): depths 1 to 5
+    // end before 2.2 seconds and depth 6 passes the limit at its first node.
     let (best, stats) = run(START, &options, 6, 1e9, 2.2, 0.1);
     assert_eq!(stats.stop_reason, StopReason::Truncated);
-    assert_eq!(stats.completed_depth, 4, "{stats:?}");
+    assert_eq!(stats.completed_depth, 5, "{stats:?}");
     assert!(stats.iterations.last().unwrap().truncated);
     assert!(best.is_some() && !stats.truncated);
 }
@@ -322,7 +294,6 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
     ];
     for fen in positions {
         let options = Options {
-            estimator: never_stop,
             techniques: Techniques::all(),
             ..Options::default()
         };

@@ -4,7 +4,6 @@
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StopReason {
     MaxDepth,
-    Estimate,
     Budget,
     Truncated,
 }
@@ -13,7 +12,6 @@ impl StopReason {
     pub fn as_str(self) -> &'static str {
         match self {
             StopReason::MaxDepth => "max_depth",
-            StopReason::Estimate => "estimate",
             StopReason::Budget => "budget",
             StopReason::Truncated => "truncated",
         }
@@ -39,7 +37,6 @@ pub struct Stats {
     pub completed_depth: usize,
     pub iterations: Vec<IterationInfo>,
     pub stop_reason: StopReason,
-    pub stop_predicted: f64,
 }
 
 /// What the search did, counted over every search made with one [`Memory`](super::Memory) since

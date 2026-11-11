@@ -1,8 +1,6 @@
 //! Settings of a search: limits, techniques and defaults.
 
-use super::iteration_time::{self, Iteration};
-
-/// Iterations that are always completed before the time estimate may stop the deepening: the first,
+/// Iterations that are always completed before the soft time limit may stop the deepening: the first,
 /// so that there is always an answer; after it the clock decides.
 pub const DEFAULT_MIN_DEPTH: usize = 1;
 /// Technical cap of the iterations; the clock stops the deepening long before in a real game.
@@ -19,8 +17,6 @@ pub const DEFAULT_TECHNIQUES: [&str; 3] = ["lmr", "rfp", "iir"];
 pub struct Options {
     pub quiescence_plies: u32,
     pub min_depth: usize,
-    /// Rule that predicts the duration of the next iteration (see [`iteration_time`]).
-    pub estimator: fn(&[Iteration]) -> f64,
     /// Optional techniques of selective search.
     pub techniques: Techniques,
     /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
@@ -118,7 +114,6 @@ impl Default for Options {
         Options {
             quiescence_plies: DEFAULT_QUIESCENCE_PLIES,
             min_depth: DEFAULT_MIN_DEPTH,
-            estimator: iteration_time::geometric_growth,
             techniques: Techniques::default(),
             node_limit: None,
         }

@@ -7,7 +7,6 @@
 //! ends every branch at the horizon with a quiescence search over captures and promotions.
 
 mod deepening;
-pub mod iteration_time;
 mod memory;
 mod node;
 mod options;

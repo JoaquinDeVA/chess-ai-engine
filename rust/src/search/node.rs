@@ -42,6 +42,8 @@ pub(super) struct Search<'a> {
     pub(super) next_clock_check: u64,
     /// Evaluation that follows the moves of the search.
     pub(super) eval: NetState<'a>,
+    /// Nodes spent under each root move, by move id (the clock reads how settled the best one is).
+    pub(super) root_nodes: Vec<(u32, u64)>,
 }
 
 type Outcome = (i32, Option<u32>);
@@ -354,10 +356,15 @@ impl Search<'_> {
                     }
                 }
             }
+            let nodes_before = self.nodes;
             self.play(action);
             let child =
                 self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing, late);
             self.unplay();
+            if ply == 0 {
+                self.root_nodes
+                    .push((move_id(&action), self.nodes - nodes_before));
+            }
             if maximizing {
                 if child > best_value {
                     best_value = child;
@@ -458,6 +465,8 @@ pub struct SearchResult {
     pub max_ply: i32,
     /// Whether the clock or the stop flag cut the search.
     pub truncated: bool,
+    /// Share of the nodes spent under the best move of the root (0 without one).
+    pub best_share: f64,
 }
 
 /// One alpha-beta search of exactly `max_depth` plies.
@@ -509,8 +518,16 @@ pub fn alpha_beta_window(
         truncated: false,
         next_clock_check: 0,
         eval: NetState::new(net, &root),
+        root_nodes: Vec::new(),
     };
     let (value, best) = search.node(alpha, beta, max_depth, 0, true);
+    let best_nodes: u64 = search
+        .root_nodes
+        .iter()
+        .filter(|&&(id, _)| Some(id) == best)
+        .map(|&(_, nodes)| nodes)
+        .sum();
+    let best_share = best_nodes as f64 / search.nodes.max(1) as f64;
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,
@@ -519,5 +536,6 @@ pub fn alpha_beta_window(
         prunings: search.prunings,
         max_ply: search.max_ply,
         truncated: search.truncated,
+        best_share,
     }
 }

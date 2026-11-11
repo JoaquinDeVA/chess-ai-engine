@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex};
 
 use shakmaty::Move;
 
-use super::iteration_time;
 use super::memory::*;
 use super::node::{alpha_beta, alpha_beta_window, SearchResult, INFINITE};
 use super::options::*;
@@ -15,8 +14,26 @@ use super::tt::Table;
 use crate::board::GameState;
 use crate::eval::Net;
 
-/// Tolerance for finishing a depth that was started within the budget.
-const OVERSHOOT_FACTOR: f64 = 1.15;
+/// First completed depth whose best move scales the soft limit (the first ones are noise).
+const SCALE_FROM_DEPTH: usize = 6;
+/// Factor of the soft limit by the completed iterations in a row with the same best move: one that
+/// has just changed gets more time, one that has held for four or more gets less.
+const STABILITY_SCALE: [f64; 5] = [2.5, 1.2, 0.9, 0.8, 0.75];
+/// Factor of the soft limit by the share `f` of the nodes spent under the best move:
+/// `(NODE_SHARE_PIVOT - f) * NODE_SHARE_SCALE`, from 2.0 (f = 0) to 0.68 (f = 1).
+const NODE_SHARE_PIVOT: f64 = 1.5;
+const NODE_SHARE_SCALE: f64 = 1.35;
+
+/// Factor of the soft limit after an iteration of `depth` whose best move has held `stable`
+/// iterations in a row and took `share` of the nodes.
+fn soft_scale(depth: usize, stable: usize, share: f64) -> f64 {
+    if depth < SCALE_FROM_DEPTH {
+        return 1.0;
+    }
+    STABILITY_SCALE[stable.min(STABILITY_SCALE.len() - 1)]
+        * (NODE_SHARE_PIVOT - share)
+        * NODE_SHARE_SCALE
+}
 
 /// First depth searched with an aspiration window (the first iterations are too unstable).
 const ASPIRATION_FROM_DEPTH: i32 = 4;
@@ -178,10 +195,11 @@ const VOTE_MARGIN: i32 = 7;
 /// Iterative deepening over [`alpha_beta`]: depth 1, 2, ... `max_depth`, returning the move of the
 /// deepest **completed** iteration.
 ///
-/// Before starting an iteration the time it would take is estimated from the finished ones and the
-/// loop stops if it does not fit in what is left of `time_limit` (the soft budget). The estimate and
-/// the soft budget are ignored until `min_depth` iterations are complete; only the hard limit can
-/// stop earlier. An iteration cut by the hard limit is discarded unless it is the very first.
+/// After each completed iteration the loop stops if the elapsed time passes `time_limit` (the soft
+/// limit) times [`soft_scale`]: more time when the best move has just changed or shares the nodes
+/// with others, less when it holds and takes most of them. The soft limit is ignored until
+/// `min_depth` iterations are complete; the hard limit (`control.hard_limit`) cuts the tree at any
+/// time. An iteration cut by the hard limit is discarded unless it is the very first.
 ///
 /// With `memory.threads > 1` the other threads search the same position and share the table (Lazy
 /// SMP); the move is always the one of the main thread. `control.stop` and `control.rotation` are
@@ -277,32 +295,18 @@ fn deepen(
     time_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats, Option<i32>), String> {
-    let estimate = options.estimator;
     let clock = control.clock;
     let start = clock();
     let mut best_move: Option<Move> = None;
     let (mut total_nodes, mut total_prunings, mut deepest_ply) = (0u64, 0u64, 0i32);
     let mut completed_depth = 0usize;
     let mut last_truncated = false;
-    let mut history: Vec<iteration_time::Iteration> = Vec::new();
     let mut iterations: Vec<IterationInfo> = Vec::new();
     let mut stop_reason = StopReason::MaxDepth;
-    let mut stop_predicted = 0.0;
+    let mut stable = 0usize;
     let mut last_value: Option<i32> = None;
 
     for depth in 1..=max_depth {
-        // Clock policy: before an iteration, skip it if the estimate says it will not finish in
-        // what is left (the overshoot factor forgives a near miss); never skip before `min_depth`,
-        // so the move always comes from a minimum of real search.
-        let remaining = time_limit - (clock() - start);
-        if depth > options.min_depth && !history.is_empty() {
-            let predicted = estimate(&history);
-            if predicted > remaining * OVERSHOOT_FACTOR {
-                stop_reason = StopReason::Estimate;
-                stop_predicted = predicted;
-                break;
-            }
-        }
         if let Some(progress) = control.progress {
             progress.store(depth, Relaxed);
         }
@@ -336,12 +340,18 @@ fn deepen(
             stop_reason = StopReason::Truncated;
             break;
         }
-        history.push((seconds, result.nodes));
+        stable = if result.best.is_some() && result.best == best_move {
+            stable + 1
+        } else {
+            0
+        };
         last_value = Some(result.value);
         best_move = result.best;
         completed_depth = depth;
-        // The soft budget is also checked after the iteration, since the estimate can be low.
-        if depth >= options.min_depth && clock() - start >= time_limit {
+        // Clock policy: never stop before `min_depth`, so the move always comes from a minimum of
+        // real search; after it, the soft limit scaled by how settled the best move is.
+        let soft = time_limit * soft_scale(depth, stable, result.best_share);
+        if depth >= options.min_depth && clock() - start >= soft {
             stop_reason = StopReason::Budget;
             break;
         }
@@ -355,7 +365,6 @@ fn deepen(
         completed_depth,
         iterations,
         stop_reason,
-        stop_predicted,
     };
     Ok((best_move, stats, last_value))
 }
@@ -376,6 +385,15 @@ mod vote_tests {
 
     fn report(depth: usize, value: i32, best: Move) -> Report {
         Mutex::new(Some((depth, value, best)))
+    }
+
+    #[test]
+    fn the_soft_limit_grows_for_a_new_move_and_shrinks_for_a_settled_one() {
+        assert_eq!(soft_scale(SCALE_FROM_DEPTH - 1, 0, 0.0), 1.0);
+        let fresh = soft_scale(SCALE_FROM_DEPTH, 0, 0.3);
+        let settled = soft_scale(SCALE_FROM_DEPTH, 9, 0.9);
+        assert!((fresh - 2.5 * 1.2 * 1.35).abs() < 1e-9, "{fresh}");
+        assert!(settled < 0.65 && settled < fresh, "{settled}");
     }
 
     #[test]

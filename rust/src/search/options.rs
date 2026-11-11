@@ -48,11 +48,27 @@ pub struct Techniques {
     /// Late move pruning: at a shallow depth, skip the quiet moves beyond a count that grows with
     /// the depth.
     pub lmp: bool,
+    /// Aspiration windows: the root is searched in a narrow window around the previous value and
+    /// again wider when the value falls outside.
+    pub aspiration: bool,
+    /// History malus: the quiet moves tried before the one that cut lose history.
+    pub history_malus: bool,
+    /// Store the value of a horizon node in the table (depth 0) when it has no entry.
+    pub qs_tt: bool,
 }
 
 impl Techniques {
     /// Names of the switches, as `setoption name Techniques` and Python call them.
-    pub const NAMES: [&'static str; 5] = ["lmr", "rfp", "iir", "futility", "lmp"];
+    pub const NAMES: [&'static str; 8] = [
+        "lmr",
+        "rfp",
+        "iir",
+        "futility",
+        "lmp",
+        "aspiration",
+        "history_malus",
+        "qs_tt",
+    ];
     /// Names of the techniques that are always on now. They are still accepted, and ignored, so
     /// that the commands of older matches keep working.
     const ALWAYS_ON: [&'static str; 4] = ["incremental", "tt_move", "null_move", "see"];
@@ -67,6 +83,9 @@ impl Techniques {
                 "iir" => techniques.iir = true,
                 "futility" => techniques.futility = true,
                 "lmp" => techniques.lmp = true,
+                "aspiration" => techniques.aspiration = true,
+                "history_malus" => techniques.history_malus = true,
+                "qs_tt" => techniques.qs_tt = true,
                 fixed if Techniques::ALWAYS_ON.contains(&fixed) => {}
                 other => {
                     return Err(format!(
@@ -87,6 +106,9 @@ impl Techniques {
             iir: true,
             futility: true,
             lmp: true,
+            aspiration: true,
+            history_malus: true,
+            qs_tt: true,
         }
     }
 }

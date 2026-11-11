@@ -7,7 +7,7 @@ use shakmaty::Move;
 
 use super::iteration_time;
 use super::memory::*;
-use super::node::alpha_beta;
+use super::node::{alpha_beta, alpha_beta_window, SearchResult, INFINITE};
 use super::options::*;
 use super::ordering::{History, Killers};
 use super::stats::*;
@@ -17,6 +17,57 @@ use crate::eval::Net;
 
 /// Tolerance for finishing a depth that was started within the budget.
 const OVERSHOOT_FACTOR: f64 = 1.15;
+
+/// First depth searched with an aspiration window (the first iterations are too unstable).
+const ASPIRATION_FROM_DEPTH: i32 = 4;
+/// Half-width of the first aspiration window, in score units.
+const ASPIRATION_DELTA: i32 = 25;
+/// Half-width beyond which the window is the whole interval.
+const ASPIRATION_LIMIT: i32 = 500;
+
+/// One iteration of the deepening: [`alpha_beta`], or, with the aspiration technique, a search in
+/// a narrow window around the previous value that is repeated wider while the value falls outside.
+/// The counters are those of all the searches of the iteration; a search cut by the clock ends it.
+fn iteration(
+    state: &mut GameState,
+    eval: &Net,
+    memory: &mut Memory,
+    options: &Options,
+    depth: i32,
+    control: &Control,
+    previous: Option<i32>,
+) -> SearchResult {
+    let Some(value) =
+        previous.filter(|_| options.techniques.aspiration && depth >= ASPIRATION_FROM_DEPTH)
+    else {
+        return alpha_beta(state, eval, memory, options, depth, control);
+    };
+    let mut delta = ASPIRATION_DELTA;
+    let (mut low, mut high) = (value - delta, value + delta);
+    let (mut nodes, mut prunings, mut max_ply) = (0, 0, 0);
+    loop {
+        let mut result =
+            alpha_beta_window(state, eval, memory, options, depth, control, (low, high));
+        nodes += result.nodes;
+        prunings += result.prunings;
+        max_ply = max_ply.max(result.max_ply);
+        let inside = result.value > low && result.value < high;
+        if result.truncated || inside || (low <= -INFINITE && high >= INFINITE) {
+            result.nodes = nodes;
+            result.prunings = prunings;
+            result.max_ply = max_ply;
+            return result;
+        }
+        delta *= 4;
+        if delta > ASPIRATION_LIMIT {
+            (low, high) = (-INFINITE, INFINITE);
+        } else if result.value <= low {
+            low = value - delta;
+        } else {
+            high = value + delta;
+        }
+    }
+}
 
 /// How many consecutive depths a helper skips and searches in turn, and where its pattern starts
 /// (the first six rows of Stockfish's tables), so that the helpers do not all search the same
@@ -256,7 +307,15 @@ fn deepen(
             progress.store(depth, Relaxed);
         }
         let iteration_start = clock();
-        let result = alpha_beta(state, eval, memory, options, depth as i32, control);
+        let result = iteration(
+            state,
+            eval,
+            memory,
+            options,
+            depth as i32,
+            control,
+            last_value,
+        );
         let seconds = clock() - iteration_start;
         iterations.push(IterationInfo {
             depth,

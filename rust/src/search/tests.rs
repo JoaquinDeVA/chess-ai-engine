@@ -420,3 +420,39 @@ fn internal_iterative_reduction_keeps_the_forced_mate_and_the_hanging_queen() {
         quiescent(HANGING_QUEEN, 5, without).best
     );
 }
+
+#[test]
+fn the_history_malus_and_the_horizon_entries_keep_the_forced_mate_and_the_hanging_queen() {
+    for with in [
+        Techniques {
+            history_malus: true,
+            ..Techniques::default()
+        },
+        Techniques {
+            qs_tt: true,
+            ..Techniques::default()
+        },
+    ] {
+        assert_eq!(quiescent(MATE_IN_TWO, 6, with).value, MATE - 3);
+        assert_eq!(
+            quiescent(HANGING_QUEEN, 4, with).best,
+            quiescent(HANGING_QUEEN, 4, Techniques::default()).best
+        );
+    }
+}
+
+#[test]
+fn aspiration_windows_keep_the_forced_mate_and_the_value_of_a_quiet_position() {
+    let options = |aspiration| Options {
+        techniques: Techniques {
+            aspiration,
+            ..Techniques::default()
+        },
+        ..Options::default()
+    };
+    let (best, _) = run(MATE_IN_TWO, &options(true), 6, 1e9, 1e9, 0.0);
+    assert_eq!(best, run(MATE_IN_TWO, &options(false), 6, 1e9, 1e9, 0.0).0);
+    let (_, with) = run(START, &options(true), 6, 1e9, 1e9, 0.0);
+    let (_, without) = run(START, &options(false), 6, 1e9, 1e9, 0.0);
+    assert_eq!(with.completed_depth, without.completed_depth);
+}

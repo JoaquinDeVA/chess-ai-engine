@@ -186,6 +186,18 @@ impl Search<'_> {
         if depth_remaining <= 0 {
             if self.options.quiescence_plies > 0 {
                 let value = self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves);
+                // Only where the table has nothing: a depth-0 entry must not replace a deeper one.
+                if self.options.techniques.qs_tt && entry.is_none() && !self.truncated && clock_free
+                {
+                    self.memory.table.store(
+                        key,
+                        for_table(value, ply),
+                        None,
+                        0,
+                        for_table(alpha_orig, ply),
+                        for_table(beta_orig, ply),
+                    );
+                }
                 return (value, None);
             }
             return (self.static_value(), None);
@@ -306,6 +318,7 @@ impl Search<'_> {
             (shallow && self.options.techniques.futility).then(|| self.static_value());
         let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
+        let mut failed_quiet: Vec<Move> = Vec::new();
         for (index, action) in ordered.into_iter().enumerate() {
             // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
             // whether the history says the move has cut before.
@@ -372,8 +385,16 @@ impl Search<'_> {
                 self.memory.killers.record(depth_remaining, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
+                    if self.options.techniques.history_malus {
+                        for failed in &failed_quiet {
+                            self.memory.history.penalise(mover, failed, depth_remaining);
+                        }
+                    }
                 }
                 break;
+            }
+            if !action.is_capture() && !action.is_promotion() {
+                failed_quiet.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
@@ -451,6 +472,28 @@ pub fn alpha_beta(
     max_depth: i32,
     control: &Control,
 ) -> SearchResult {
+    alpha_beta_window(
+        state,
+        net,
+        memory,
+        options,
+        max_depth,
+        control,
+        (-INFINITE, INFINITE),
+    )
+}
+
+/// [`alpha_beta`] inside the window `(alpha, beta)` of the root: the value is exact only if it
+/// falls strictly inside.
+pub fn alpha_beta_window(
+    state: &mut GameState,
+    net: &Net,
+    memory: &mut Memory,
+    options: &Options,
+    max_depth: i32,
+    control: &Control,
+    (alpha, beta): (i32, i32),
+) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
     let mut search = Search {
@@ -467,7 +510,7 @@ pub fn alpha_beta(
         next_clock_check: 0,
         eval: NetState::new(net, &root),
     };
-    let (value, best) = search.node(-INFINITE, INFINITE, max_depth, 0, true);
+    let (value, best) = search.node(alpha, beta, max_depth, 0, true);
     let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,

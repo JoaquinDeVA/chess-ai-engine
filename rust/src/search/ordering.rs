@@ -214,6 +214,11 @@ impl History {
         self.add(color, m, depth * depth);
     }
 
+    /// A quiet move was tried with `depth` plies left and a later move caused the cut-off.
+    pub fn penalise(&self, color: Color, m: &Move, depth: i32) {
+        self.add(color, m, -depth * depth);
+    }
+
     fn add(&self, color: Color, m: &Move, amount: i32) {
         let score = &self.scores[History::slot(color, m)];
         if (score.fetch_add(amount, Relaxed) + amount).abs() > HISTORY_LIMIT {

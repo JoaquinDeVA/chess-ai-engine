@@ -1,82 +1,38 @@
-//! The search of one node: alpha-beta with its pruning techniques, and the quiescence search.
+//! The search of one node: alpha-beta with the table, the move order and the techniques of
+//! `pruning.rs`.
 
 use std::sync::atomic::Ordering::Relaxed;
 
-use shakmaty::{Chess, Color, Move, MoveList, Position};
+use shakmaty::{Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order, order_noisy, see_ge, MAX_KILLERS_PER_DEPTH};
+use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
+use super::pruning::*;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
-use crate::eval::sparse_net::{Net, NetState};
+use crate::eval::{Net, NetState};
 
-/// The null move is tried from this depth on.
-const NULL_MOVE_FROM_DEPTH: i32 = 3;
-const IIR_FROM_DEPTH: i32 = 4;
 /// The clock is read once every this many nodes: reading it costs about as much as a node.
 const CLOCK_EVERY_NODES: u64 = 2048;
 /// Width of the window of the scouts of the principal variation search.
 const SCOUT_EPSILON: f64 = 1e-9;
-/// Late move reductions start at this depth and at this position in the move order.
-const LMR_FROM_DEPTH: i32 = 3;
-const LMR_FROM_INDEX: usize = 3;
 
-/// Reverse futility pruning works up to this depth, and prunes when the static value is beyond the
-/// bound by `RFP_MARGIN_PER_PLY` log-odds per ply left: 80 centipawns of the plan on the usual
-/// logistic scale (`80 · ln 10 / 400`).
-const RFP_UP_TO_DEPTH: i32 = 6;
-const RFP_MARGIN_PER_PLY: f64 = 0.46;
-
-/// Log-odds of an expected score, to measure distances that mean the same at 0.5 and at 0.9.
-pub(super) fn log_odds(p: f64) -> f64 {
-    (p / (1.0 - p)).ln()
-}
-
-/// Futility pruning and late move pruning work up to this depth. The futility margin is
-/// `FUTILITY_MARGIN_PER_PLY` log-odds per ply left (120 centipawns on the usual logistic scale,
-/// `120 · ln 10 / 400`); late move pruning skips the quiet moves from the `3 + depth²`-th on.
-const SHALLOW_UP_TO_DEPTH: i32 = 3;
-const FUTILITY_MARGIN_PER_PLY: f64 = 0.69;
-
-/// Quiet moves a node of `depth_remaining` plies tries before late move pruning skips the rest.
-pub(super) fn late_move_limit(depth_remaining: i32) -> usize {
-    3 + (depth_remaining * depth_remaining) as usize
-}
-
-/// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
-/// the history says the move has cut before, and never so many that the search falls below one ply.
-pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) -> i32 {
-    if depth_remaining < LMR_FROM_DEPTH || index < LMR_FROM_INDEX {
-        return 0;
-    }
-    let raw = 0.75 + f64::from(depth_remaining).ln() * (index as f64).ln() / 2.25;
-    let steps = raw as i32 - i32::from(good_history);
-    steps.clamp(0, depth_remaining - 2)
-}
-
-/// Whether `color` has a piece other than pawns and the king in `pos` (otherwise passing the turn
-/// can be the worst thing to do, and a null move is not tried).
-pub(super) fn has_pieces(pos: &Chess, color: Color) -> bool {
-    let board = pos.board();
-    (board.by_color(color) & !(board.pawns() | board.kings())).any()
-}
-
-struct Search<'a> {
-    state: &'a mut GameState,
-    memory: &'a mut Memory,
-    options: &'a Options,
-    control: &'a Control<'a>,
-    root_player: Color,
-    max_depth: i32,
-    nodes: u64,
-    prunings: u64,
-    max_ply: i32,
-    truncated: bool,
+pub(super) struct Search<'a> {
+    pub(super) state: &'a mut GameState,
+    pub(super) memory: &'a mut Memory,
+    pub(super) options: &'a Options,
+    pub(super) control: &'a Control<'a>,
+    pub(super) root_player: Color,
+    pub(super) max_depth: i32,
+    pub(super) nodes: u64,
+    pub(super) prunings: u64,
+    pub(super) max_ply: i32,
+    pub(super) truncated: bool,
     /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
-    next_clock_check: u64,
+    pub(super) next_clock_check: u64,
     /// Evaluation that follows the moves of the search.
-    eval: NetState<'a>,
+    pub(super) eval: NetState<'a>,
 }
 
 type Outcome = (f64, Option<u32>);
@@ -110,7 +66,7 @@ impl Search<'_> {
     }
 
     /// Utility of a finished game, nudged so that quicker wins and slower losses are preferred.
-    fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> f64 {
+    pub(super) fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> f64 {
         match winner {
             Some(color) if color == self.root_player => 1.0 - ply as f64 * self.options.epsilon,
             Some(_) => ply as f64 * self.options.epsilon,
@@ -118,12 +74,12 @@ impl Search<'_> {
         }
     }
 
-    fn static_value(&self) -> f64 {
+    pub(super) fn static_value(&self) -> f64 {
         self.eval.evaluate(self.state.pos(), self.root_player)
     }
 
     /// Play `m` in the game state and in the incremental evaluation.
-    fn play(&mut self, m: Move) {
+    pub(super) fn play(&mut self, m: Move) {
         self.eval.apply(self.state.pos(), &m);
         self.state.apply(m);
     }
@@ -178,7 +134,7 @@ impl Search<'_> {
     }
 
     /// Take back the last move played with [`Search::play`].
-    fn unplay(&mut self) {
+    pub(super) fn unplay(&mut self) {
         self.state.undo();
         self.eval.undo();
     }
@@ -462,58 +418,6 @@ impl Search<'_> {
             }
         }
         (best_value, best_move)
-    }
-
-    /// Value of a horizon node searching only captures and promotions (stand pat, no table).
-    fn quiescence(
-        &mut self,
-        mut alpha: f64,
-        mut beta: f64,
-        plies_left: u32,
-        ply: i32,
-        moves: MoveList,
-    ) -> f64 {
-        let mut best_value = self.static_value(); // nobody is forced to capture
-        if plies_left == 0 {
-            return best_value;
-        }
-        let maximizing = self.state.turn() == self.root_player;
-        if maximizing {
-            alpha = alpha.max(best_value);
-        } else {
-            beta = beta.min(best_value);
-        }
-        if alpha >= beta {
-            self.prunings += 1;
-            return best_value;
-        }
-        for action in order_noisy(&moves) {
-            // Captures that lose material are not searched.
-            if !see_ge(self.state.pos(), &action, 0) {
-                continue;
-            }
-            self.play(action);
-            self.nodes += 1;
-            self.memory.counters.quiescence_nodes += 1;
-            let child_moves = ordered_moves(self.state.pos());
-            let value = match self.state.outcome(&child_moves) {
-                Some(winner) => self.terminal_utility(winner, ply + 1),
-                None => self.quiescence(alpha, beta, plies_left - 1, ply + 1, child_moves),
-            };
-            self.unplay();
-            if maximizing {
-                best_value = best_value.max(value);
-                alpha = alpha.max(best_value);
-            } else {
-                best_value = best_value.min(value);
-                beta = beta.min(best_value);
-            }
-            if alpha >= beta {
-                self.prunings += 1;
-                break;
-            }
-        }
-        best_value
     }
 }
 

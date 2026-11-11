@@ -2,7 +2,7 @@
 //!
 //! This module exposes the evaluators and the configuration metadata needed by the laboratory.
 //! The search, opening book and endgame tablebases run only in the UCI binary
-//! (`src/bin/uci.rs`); Python reads the corresponding defaults from this module.
+//! (`src/bin/uci/`); Python reads the corresponding defaults from this module.
 
 use numpy::{PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -10,8 +10,8 @@ use pyo3::prelude::*;
 use shakmaty::Color;
 
 use crate::board::position_from_fen;
-use crate::eval::sparse_features::FeatureSet;
-use crate::eval::sparse_net::{Layer, Net};
+use crate::eval::FeatureSet;
+use crate::eval::{Layer, Net};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
@@ -97,10 +97,7 @@ mod _core {
             crate::search::DEFAULT_TECHNIQUES.to_vec(),
         )?;
         module.add("TECHNIQUES", crate::search::Techniques::NAMES.to_vec())?;
-        module.add(
-            "FEATURE_SETS",
-            crate::eval::sparse_features::FeatureSet::NAMES.to_vec(),
-        )?;
+        module.add("FEATURE_SETS", crate::eval::FeatureSet::NAMES.to_vec())?;
         Ok(())
     }
 }

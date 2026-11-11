@@ -5,11 +5,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use shakmaty::Color;
 
 use super::iteration_time::{fixed_factor, never_stop};
-use super::node::has_pieces;
+use super::pruning::has_pieces;
 use super::*;
 use crate::board::{position_from_fen, uci_string, GameState};
-use crate::eval::sparse_features::FeatureSet;
-use crate::eval::sparse_net::{Layer, Net};
+use crate::eval::FeatureSet;
+use crate::eval::{Layer, Net};
 
 /// A network that sees only material: the side to move's expected score is
 /// `sigmoid((own - opponent) / 20)`, with pawn 1, knight and bishop 3, rook 5 and queen 9.
@@ -351,7 +351,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
 
 #[test]
 fn late_move_reductions_follow_the_depth_and_the_position_in_the_order() {
-    use super::node::reduction;
+    use super::pruning::reduction;
     assert_eq!(reduction(3, 2, false), 0, "too early in the order");
     assert_eq!(reduction(2, 9, false), 0, "too shallow");
     assert_eq!(reduction(3, 3, false), 1);
@@ -387,7 +387,7 @@ fn reverse_futility_keeps_the_forced_mate_and_the_hanging_queen() {
 
 #[test]
 fn the_reverse_futility_margin_means_the_same_at_every_level() {
-    use super::node::log_odds;
+    use super::pruning::log_odds;
     // 0.5 -> 0.61 and 0.9 -> 0.934 are the same distance in log-odds (about 0.46).
     assert!((log_odds(0.61) - log_odds(0.5) - 0.447).abs() < 0.02);
     assert!((log_odds(0.934) - log_odds(0.9) - 0.472).abs() < 0.03);
@@ -411,7 +411,7 @@ fn shallow_pruning_keeps_the_forced_mate_and_the_hanging_queen() {
 
 #[test]
 fn late_move_pruning_allows_more_quiet_moves_the_deeper_the_node() {
-    use super::node::late_move_limit;
+    use super::pruning::late_move_limit;
     assert_eq!(late_move_limit(1), 4);
     assert_eq!(late_move_limit(2), 7);
     assert_eq!(late_move_limit(3), 12);

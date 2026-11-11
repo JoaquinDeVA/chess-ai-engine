@@ -1,7 +1,12 @@
 //! Evaluation: the sparse network, which returns the expected score of a player in `[0.01, 0.99]`.
 
-pub mod sparse_features;
-pub mod sparse_net;
+mod accumulator;
+pub mod features;
+mod net;
+
+pub use accumulator::NetState;
+pub use features::FeatureSet;
+pub use net::{Layer, Net};
 
 use shakmaty::Color;
 

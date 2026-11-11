@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use _core::board::GameState;
-use _core::eval::sparse_net::Net;
+use _core::eval::Net;
 use _core::search::{alpha_beta, Control, Memory, Options, Techniques};
 use serde_json::Value;
 

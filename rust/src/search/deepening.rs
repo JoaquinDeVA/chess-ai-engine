@@ -14,7 +14,7 @@ use super::shared_tt::SharedTable;
 use super::stats::*;
 use super::tt::Tt;
 use crate::board::GameState;
-use crate::eval::sparse_net::Net;
+use crate::eval::Net;
 
 /// Tolerance for finishing a depth that was started within the budget.
 const OVERSHOOT_FACTOR: f64 = 1.15;

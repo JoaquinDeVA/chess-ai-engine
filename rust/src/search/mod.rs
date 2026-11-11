@@ -11,8 +11,10 @@ pub mod iteration_time;
 mod memory;
 mod node;
 mod options;
-pub mod ordering;
-pub mod shared_tt;
+mod ordering;
+mod pruning;
+mod quiescence;
+mod shared_tt;
 mod stats;
 pub mod tt;
 

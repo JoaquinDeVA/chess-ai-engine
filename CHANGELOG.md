@@ -15,7 +15,7 @@ All notable changes. The newest are first.
   and scaled by how long the best move has held and by the share of the nodes it took (×0.51 to ×5.1, the hard limit
   still caps it), and a hard limit of three times the base, at most 40 % of the time left. Before, a move took 15 % of
   the time left (9 s on the first move of 60 + 1) and the increment was ignored. The rule that predicted the next
-  iteration is gone. The SPRT [0, 5] at 60 + 1 against the old manager is running; no result yet.
+  iteration is gone. Against the old manager (SPRT [0, 5] at 60 + 1, `data/results/matches/tm_vs_legacy/`) it scored 54.56 % in 1,020 games, +31.8 ± 17.3 Elo, LLR +1.53 of ±2.94: stopped by hand without a verdict, with no losses on time.
 - `chess_lab` is organised by stage, `models` → `datasets` → `training` → `measure`. The new `datasets` package holds the
   raw shards, sidecars and split with their six commands, all run as `python -m chess_lab.datasets.<name>`. Fitting
   (`epochs`, `neural`) moves to `training`, `export_uci_model` becomes `chess_lab.models.export_uci`, the round robin and

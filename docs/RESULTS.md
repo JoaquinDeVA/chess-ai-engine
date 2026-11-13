@@ -91,6 +91,7 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 | `q_m05_vs_quiet` | quiet model with 0.5 % of the mates against the quiet model | 60 s + 1 s, SPRT [0, 5] | 280 | 43.75 % | −44 ± 36 | −0.59 | no verdict (round cap) |
 | `q30_vs_quiet` | quiet model with 30 M positions against the quiet model | 60 s + 1 s, SPRT [0, 5] | 240 | 53.33 % | +23 ± 41 | +0.22 | no verdict (stopped by hand) |
 | `reloj_nuevo` | new clock against the old clock, same model and techniques | 60 s + 1 s, SPRT [0, 5] | 720 | 40.83 % | −64 ± 24 | −2.06 | no verdict (stopped by hand); the new clock is worse |
+| `tm_vs_legacy` | new time manager (soft and hard limit, increment, scaling by best-move stability and node share) against the old one (`1e3b203`), same model and techniques | 60 s + 1 s, SPRT [0, 5], `Hash` 16, one thread | 1,020 | 54.56 % | +31.8 ± 17.3 | +1.53 | no verdict (stopped by hand at 1,030 games; figures as of the last report, 1,020 games; 441-348-231, 0 losses on time) |
 | `see_vs_base` | default + `see` against default | 10 s + 0.1 s, 300 games (screening) | 300 | 56.83 % | +47.8 ± 34.3 | - | screening only |
 | `see_sprt` | default + `see` against default | 60 s + 1 s, SPRT [0, 5] | 160 | 55.94 % | +41.5 ± 46.1 | +0.30 | no verdict (stopped by hand) |
 | `see_sprt10` | default + `see` against default | 60 s + 1 s, SPRT [0, 10] | 282 | 57.27 % | +50.9 ± 38.6 | +1.13 | no verdict (stopped by hand at 303 games; Elo as of the last report, 282 games) |

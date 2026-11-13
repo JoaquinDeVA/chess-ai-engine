@@ -268,7 +268,7 @@ fn an_exhausted_budget_still_completes_min_depth_and_then_stops() {
 fn an_iteration_the_hard_limit_would_cut_is_not_started() {
     let options = Options::default();
     // Every reading of the clock takes 0.1 fake seconds, and an iteration of under 2,048 nodes
-    // reads it about four times: depths 1 to 5 end before 2.2 seconds. After the last one, 2.5
+    // reads it about four times: depths 1 to 5 end before 2.2 seconds. After the last one, 3.5
     // times its duration no longer fits under the limit, so depth 6 is not started and nothing
     // is thrown away.
     let (best, stats) = run(START, &options, 6, 1e9, 2.2, 0.1);
@@ -344,4 +344,15 @@ fn the_pruning_and_reductions_keep_the_forced_mate_and_the_hanging_queen() {
             Some("d2d5")
         );
     }
+}
+
+#[test]
+fn an_iteration_that_would_end_far_past_the_soft_limit_is_not_started() {
+    let options = Options::default();
+    // Same fake clock, a soft limit of 0.2 s and a far hard limit: after min_depth the soft limit
+    // is passed, so the search stops there, and no iteration is cut.
+    let (best, stats) = run(START, &options, 8, 0.2, 1e9, 0.1);
+    assert_eq!(stats.stop_reason, StopReason::Budget);
+    assert!(stats.iterations.iter().all(|it| !it.truncated));
+    assert!(best.is_some());
 }

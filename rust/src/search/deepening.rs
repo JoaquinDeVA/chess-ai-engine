@@ -14,8 +14,12 @@ use super::tt::Table;
 use crate::board::GameState;
 use crate::eval::Net;
 
-/// Time of an iteration over the time of the one before it, rounded down (measured: 2.5 to 4).
-const NEXT_ITERATION_COST: f64 = 2.5;
+/// Time of an iteration over the time of the one before it, rounded down (measured: median 2.4,
+/// 46 % above 2.5, 23 % above 4).
+const NEXT_ITERATION_COST: f64 = 3.5;
+/// An iteration is not started either when it would end more than this many times past the scaled
+/// soft limit: it would spend far more than the move was given (the cut it risks is the hard one).
+const SOFT_OVERRUN: f64 = 4.0;
 /// First completed depth whose best move scales the soft limit (the first ones are noise).
 const SCALE_FROM_DEPTH: usize = 6;
 /// Factor of the soft limit by the completed iterations in a row with the same best move: one that
@@ -299,9 +303,11 @@ fn deepen(
             break;
         }
         // An iteration costs about `NEXT_ITERATION_COST` times the last one. One that the hard limit
-        // would cut is not started: its work is thrown away.
+        // would cut is not started (its work is thrown away), nor one that would end `SOFT_OVERRUN`
+        // times past the soft limit.
+        let predicted_end = clock() - control.start + seconds * NEXT_ITERATION_COST;
         if depth >= options.min_depth
-            && clock() - control.start + seconds * NEXT_ITERATION_COST >= control.hard_limit
+            && (predicted_end >= control.hard_limit || predicted_end > soft * SOFT_OVERRUN)
         {
             stop_reason = StopReason::Budget;
             break;

@@ -83,11 +83,11 @@ fn load_model() -> Result<Net, String> {
 
 /// Seconds kept back on every move for the GUI and the pipes, so that the move arrives in time.
 const MOVE_OVERHEAD: f64 = 0.05;
-/// Moves the time left is spread over when `movestogo` does not say (or says more): 50 on the first
-/// move, one fewer every two moves, never fewer than 20. A long horizon at the start keeps the clock
+/// Moves the time left is spread over when `movestogo` does not say (or says more): 59 on the first
+/// move, one fewer every move, never fewer than 20. A long horizon at the start keeps the clock
 /// for the middlegame instead of spending it on the opening.
 fn horizon(move_number: u32) -> f64 {
-    (50.0 - f64::from(move_number) / 2.0).max(20.0)
+    (60.0 - f64::from(move_number)).max(20.0)
 }
 /// Share of the base that is the soft limit. The search scales it by 2.0 on average (stability and
 /// node share), so the moves end up using about 0.8 of the base.
@@ -434,9 +434,9 @@ mod tests {
         // 60 + 1 at move 60 (horizon 20): base 60/20 + 0.75 - 0.05 = 3.7 s.
         let (soft, hard) = clock_budget(60.0, 1.0, None, 60);
         assert!(close(soft, 1.48) && close(hard, 11.1), "{soft} {hard}");
-        // Early on the horizon is longer, so the first moves take less: 60/50 + 0.7 = 1.9 s.
+        // Early on the horizon is longer, so the first moves take less: 60/59 + 0.7 = 1.7 s.
         let (soft, _) = clock_budget(60.0, 1.0, None, 1);
-        assert!(close(soft, 0.4 * (60.0 / 49.5 + 0.7)), "{soft}");
+        assert!(close(soft, 0.4 * (60.0 / 59.0 + 0.7)), "{soft}");
         // The increment is what keeps the base up when the clock runs low.
         let (soft, _) = clock_budget(2.0, 1.0, None, 60);
         assert!(close(soft, 0.4 * 0.8), "{soft}");

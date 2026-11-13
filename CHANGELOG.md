@@ -15,6 +15,11 @@ All notable changes. The newest are first.
   still caps it), and a hard limit of three times the base, at most 40 % of the time left. Before, a move took 15 % of
   the time left (9 s on the first move of 60 + 1) and the increment was ignored. The rule that predicted the next
   iteration is gone. Against the old manager (SPRT [0, 5] at 60 + 1, `data/results/matches/tm_vs_legacy/`) it scored 54.56 % in 1,020 games, +31.8 ± 17.3 Elo, LLR +1.53 of ±2.94: stopped by hand without a verdict, with no losses on time.
+- The clock budget spreads the time over `max(20, 50 − move/2)` moves instead of 20, the soft limit is 0.4 of the
+  base instead of 0.6, and an iteration is not started when 2.5 times the last one would no longer fit under the hard
+  limit, so the hard limit no longer throws one away. In one 300 + 3 game the engine still has 173 s on the clock at
+  move 30 (49 s before) and the cut iterations fall from 8.5 % of the time to 1 search in 58. One game, not an Elo
+  measurement: no SPRT has been run for this change.
 - `chess_lab` is organised by stage, `models` → `datasets` → `training` → `measure`. The new `datasets` package holds the
   raw shards, sidecars and split with their six commands, all run as `python -m chess_lab.datasets.<name>`. Fitting
   (`epochs`, `neural`) moves to `training`, `export_uci_model` becomes `chess_lab.models.export_uci`, the round robin and

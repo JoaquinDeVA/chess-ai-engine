@@ -196,14 +196,9 @@ impl Net {
 /// sum would have to add the terms one after another).
 fn dot(a: &[f32], b: &[f32]) -> f32 {
     let mut lanes = [0.0f32; 8];
-    let (chunks_a, chunks_b) = (a.chunks_exact(8), b.chunks_exact(8));
-    let tail: f32 = chunks_a
-        .remainder()
-        .iter()
-        .zip(chunks_b.remainder())
-        .map(|(x, y)| x * y)
-        .sum();
-    for (x, y) in chunks_a.zip(chunks_b) {
+    let ((chunks_a, rest_a), (chunks_b, rest_b)) = (a.as_chunks::<8>(), b.as_chunks::<8>());
+    let tail: f32 = rest_a.iter().zip(rest_b).map(|(x, y)| x * y).sum();
+    for (x, y) in chunks_a.iter().zip(chunks_b) {
         for lane in 0..8 {
             lanes[lane] += x[lane] * y[lane];
         }

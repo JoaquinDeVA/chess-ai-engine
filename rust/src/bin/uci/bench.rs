@@ -21,78 +21,88 @@ const BENCH_DEPTH: usize = 6;
 
 /// Runs `bench_once` `repetitions` times: the node counts (stdout) come from the first run, the
 /// times and the nodes per second (stderr) from all of them, with their median.
-pub fn bench(eval: &Net, repetitions: usize) {
-    let mut seconds: Vec<f64> = Vec::new();
-    let mut total_nodes = 0;
+pub fn bench(network: &Net, repetitions: usize) {
+    let mut elapsed_seconds: Vec<f64> = Vec::new();
+    let mut total_nodes = 0u64;
     for run in 0..repetitions {
-        let (nodes, elapsed) = bench_once(eval, run == 0);
-        total_nodes = nodes;
-        seconds.push(elapsed);
+        let (nodes, elapsed) = bench_once(network, run == 0);
+        total_nodes = nodes; //Son iguales todas las ejecuciones, solo varía el tiempo
+        elapsed_seconds.push(elapsed);
     }
-    seconds.sort_by(f64::total_cmp);
-    let median = seconds[seconds.len() / 2];
+    elapsed_seconds.sort_by(f64::total_cmp);
+    let median = elapsed_seconds[elapsed_seconds.len() / 2];
     eprintln!(
         "runs {repetitions} min {:.3} s median {median:.3} s nps(median) {:.0}",
-        seconds[0],
+        elapsed_seconds[0],
         total_nodes as f64 / median
     );
 }
 
-/// Searches the fixed positions one by one with cleared memory and a fixed depth. When `print` is
-/// set, the node counts go to stdout (the same on every run). Returns the total nodes and the time
-/// of the searches: the table is cleared outside the clock, as a game does it once and not per
-/// move (clearing also brings its pages into memory, which a fresh table would do mid-search).
-fn bench_once(eval: &Net, print: bool) -> (u64, f64) {
+/// Searches the fixed positions one by one with cleared memory and a fixed depth. When
+/// `print_positions` is set, the node counts go to stdout (the same on every run). Returns the
+/// total nodes and the time of the searches: the table is cleared outside the clock, as a game does
+/// it once and not per move (clearing also brings its pages into memory, which a fresh table would
+/// do mid-search).
+fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
+    
     let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
+    let search_options = Options {
+        techniques,
+        ..Options::default()
+    };
+    let unlimited_clock = || 0.0;
+    let search_control = Control {
+        start: 0.0,
+        hard_limit: f64::INFINITY,
+        clock: &unlimited_clock,
+        stop: None,
+        progress: None,
+        rotation: 0,
+    };
     let mut memory = Memory::new(1, DEFAULT_HASH_MB);
-    let mut seconds = 0.0;
-    let mut total_nodes = 0;
+    let mut elapsed_seconds = 0.0;
+    let mut total_nodes = 0u64;
     let mut nodes_by_depth = [0u64; BENCH_DEPTH + 1];
-    for fen in BENCH_FENS {
+
+    for position_fen in BENCH_FENS {
         memory.clear();
         memory.counters = Counters::default();
-        let mut state = GameState::from_moves(fen, &[]).expect("bench position is valid");
-        let options = Options {
-            techniques,
-            ..Options::default()
-        };
-        let clock = || 0.0;
-        let control = Control {
-            start: 0.0,
-            hard_limit: f64::INFINITY,
-            clock: &clock,
-            stop: None,
-            progress: None,
-            rotation: 0,
-        };
-        let started = Instant::now();
-        let (best, stats) = search::iterative_deepening(
-            &mut state,
-            eval,
+        let mut game_state =
+            GameState::from_moves(position_fen, &[]).expect("bench position is valid");
+
+        let search_started = Instant::now();
+        let (best_move, stats) = search::iterative_deepening(
+            &mut game_state,
+            network,
             &mut memory,
-            &options,
+            &search_options,
             BENCH_DEPTH,
             f64::INFINITY,
-            &control,
+            &search_control,
         )
         .expect("bench search");
-        seconds += started.elapsed().as_secs_f64();
-        let best = best.as_ref().map_or("0000".to_string(), uci_string);
-        if print {
-            println!("{fen} nodes {} bestmove {best}", stats.nodes_visited);
+
+        elapsed_seconds += search_started.elapsed().as_secs_f64();
+        let best_move_uci = best_move.as_ref().map_or("0000".to_string(), uci_string);
+        if print_positions {
+            println!(
+                "{position_fen} nodes {} bestmove {best_move_uci}",
+                stats.nodes_visited
+            );
         }
         total_nodes += stats.nodes_visited;
-        for iteration in &stats.iterations {
-            nodes_by_depth[iteration.depth] += iteration.nodes;
+        for depth_stats in &stats.iterations {
+            nodes_by_depth[depth_stats.depth] += depth_stats.nodes;
         }
     }
-    if print {
+
+    if print_positions {
         println!("total nodes {total_nodes}");
         for (depth, nodes) in nodes_by_depth.iter().enumerate().skip(1) {
             println!("depth {depth} nodes {nodes}");
         }
     }
-    (total_nodes, seconds)
+    (total_nodes, elapsed_seconds)
 }
 
 /// `uci ttd <depth> <positions> [limit_s]`: searches every position of the file (one FEN per line,

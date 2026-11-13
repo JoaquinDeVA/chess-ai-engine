@@ -13,9 +13,9 @@ engine, and the node and depth counts only explain the result.
 
 ## The instrument
 
-- **Two copies of the same binary.** fastchess plays the UCI binary against itself, engine A with the change
-  switched on through a UCI option (`option.Techniques=...`) and engine B without it. Everything else is equal:
-  machine, time control, `Hash`, threads.
+- **Two builds of the same engine.** fastchess plays engine A, the binary built with the change, against engine B,
+  the binary built just before it (or one binary against itself with a different UCI option, such as `Model`).
+  Everything else is equal: machine, time control, `Hash`, threads.
 - **Paired openings.** Every game starts from a position of the opening suite and every position is
   played twice with the colours swapped, so a lopsided opening favours both engines equally. A pair scores 0, ½,
   1, 1½ or 2 points for A.
@@ -132,27 +132,19 @@ the probes. With the lock-free table, the only one since `345c3ff`: 118,614,205 
 ## How to measure a change
 
 1. Build the binary (`cargo build --release --bin uci` in `rust/`) and the opening suite (Openings).
-2. Check that the binary accepts the technique list. A misspelt name stops nothing: the binary answers
-   `info string unknown technique ...` and keeps the default set, fastchess does not show that line, and the match
-   silently becomes an A/A:
+2. Keep the binary of the commit before the change (for example `git worktree add /tmp/base HEAD~1` and build it
+   there): the search has no switches, so the change is measured binary against binary.
+3. Play an SPRT with the new binary as A, for example removing a technique (a removal is judged with [−5, 0]: is the
+   simpler engine no worse?; an addition with [0, 5]):
 
    ```bash
-   printf 'setoption name Techniques value lmr,iir\nquit\n' | rust/target/release/uci   # must print nothing
-   ```
-
-3. Play an SPRT with the change in A only, for example removing `rfp` (a removal is judged with [−5, 0]: is the
-   simpler engine no worse?). Only `lmr`, `rfp`, `iir`, `futility`, `lmp`, `aspiration`, `history_malus` and `qs_tt` have a switch; the names of the four
-   fixed techniques (`incremental`, `tt_move`, `null_move`, `see`) are accepted and ignored:
-
-   ```bash
-   fastchess -engine cmd=rust/target/release/uci name=A option.Techniques=lmr,iir \
-       -engine cmd=rust/target/release/uci name=B option.Techniques=lmr,rfp,iir \
+   fastchess -engine cmd=rust/target/release/uci name=A \
+       -engine cmd=/tmp/base/rust/target/release/uci name=B \
        -each proto=uci nodes=20000 option.Hash=16 -openings file=data/openings/openings.epd format=epd order=random \
        -sprt elo0=-5 elo1=0 alpha=0.05 beta=0.05 model=normalized -rounds 6000 -games 2 -concurrency 8 -srand 21
    ```
 
-4. Write the final block of fastchess, the command and the verdict in the technique's page; if it changes the
-   default, also in [Results](RESULTS.md) and the [changelog](../CHANGELOG.md).
+4. Write the final block of fastchess, the command and the verdict in [Results](RESULTS.md) and the [changelog](../CHANGELOG.md).
 
 ## Several SPRTs in turns
 

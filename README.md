@@ -27,10 +27,10 @@ Every figure has its command or file in [Results](docs/RESULTS.md).
 | Four techniques each won an SPRT against the search without them | null move +97, static exchange evaluation +64, table move first +57, incremental accumulator +35 Elo | [Round robin](docs/RESULTS.md#round-robin-rust-engine-fastchess) |
 | The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games | [Results](docs/RESULTS.md#measured-and-estimated) |
 | More accurate is not stronger | Networks with the classical chess terms as inputs have a higher Spearman but lose by 105.5 ± 25.5 Elo | [Results](docs/RESULTS.md#measured-and-estimated) |
-| Five search techniques reached no verdict and were retired | `pvs`, `aspiration`, `history`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
+| Six search techniques reached no verdict and were retired | `pvs`, `history`, `lmp`, `aspiration`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
 
-The engine that plays is the Rust UCI binary with the **Piece-square network, width 64** (`net_pst_w64`) and seven
-search techniques on by default. The one measurement still open is that `net_pst_w64` has no match against its
+The engine that plays is the Rust UCI binary with the **Piece-square network, width 64** (`net_pst_w64`) and eight
+search techniques, all fixed. The one measurement still open is that `net_pst_w64` has no match against its
 predecessor: see [Results](docs/RESULTS.md#the-short-answer).
 
 ## Quick start
@@ -61,7 +61,6 @@ option name Threads type spin default 1 min 1 max 64
 option name Book type string default
 option name Tablebase type string default
 option name Model type string default net_pst_w64
-option name Techniques type string default lmr,rfp,iir
 uciok
 readyok
 info depth 8 nodes 1070725 time 1000

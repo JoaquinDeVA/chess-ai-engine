@@ -4,12 +4,11 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
-### Added
-- `aspiration`, `history_malus` and `qs_tt` are switches again, **off by default**, rewritten on the integer search
-  (aspiration window of ±25 that grows ×4 on a fail). Their SPRT, and those of `lmr`, `rfp`, `iir`, `futility` and
-  `lmp`, each alone against the default `lmr,rfp,iir`, are queued on the round robin node; no result yet.
-
 ### Changed
+- `lmr`, `rfp`, `iir` and `futility` are a fixed part of the search, like `incremental`, `tt_move`, `null_move` and
+  `see`: eight techniques, none optional. `uci bench 5`: 139,252 to 106,583 nodes (−23.5 %), median 0.115 s to
+  0.091 s. `futility` enters without a verdict; the SPRTs of the four at 60 s + 1 s keep running only to confirm
+  ([Results](docs/RESULTS.md#search-techniques-at-60-s--1-s)).
 - New time management in `uci`. Each move gets a base of the time left over 20 moves (or `movestogo`) plus three
   quarters of the increment, minus 50 ms for the GUI; a soft limit of 0.6 times the base, checked between iterations
   and scaled by how long the best move has held and by the share of the nodes it took (×0.51 to ×5.1, the hard limit
@@ -30,14 +29,17 @@ All notable changes. The newest are first.
   it), and one lock-free transposition table serves one thread or many. `uci ttd 11` (one thread, desktop): median
   5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s. The tree changes (`uci bench 5`: 145,163 to 139,252 nodes); the
   SPRT [−5, 0] against 4.0.0 is queued.
-- `incremental`, `tt_move`, `null_move` and `see` are always on: the default of the `Techniques` option is now
-  `lmr,rfp,iir`, and the names of the four fixed ones are accepted and ignored (`3b4430c`).
 - `rust/` has one module per concept: network, accumulator, pruning, quiescence, bench (`15eb630`).
 - `uci bench` clears the memory outside its timer, so that the first touch of a fresh table is not counted.
 - `python -m chess_lab.models.export_uci` exports `net_pst_w64@e30` by default, the network the binary embeds.
 - A round robin job can give engine B its own binary (`uci_b` in `queue.json`).
 
 ### Removed
+- `lmp`, `aspiration`, `history_malus` and `qs_tt`: each one added to `lmr,rfp,iir` reached no verdict at 60 s + 1 s
+  (LLR −0.48, 0.01, 0.07 and −0.06 of ±2.94 after 600, 600, 236 and 200 games) and the SPRTs were stopped.
+- The switches: the UCI option `Techniques`, `TTD_TECHNIQUES` of `uci ttd`, `_core.TECHNIQUES` and
+  `_core.DEFAULT_TECHNIQUES`, and the technique boxes of the settings dialog. A change is now measured by playing two
+  binaries (`uci_b` in `queue.json`).
 - The `h1` heuristic, from the core and from the laboratory (`fee2c47`).
 - `TTD_TABLE` and `TTD_ENTRIES` of `uci ttd`: there is a single table.
 

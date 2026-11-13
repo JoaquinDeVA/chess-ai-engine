@@ -11,12 +11,13 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 
 ## The short answer
 
-- **The engine that plays is the Rust UCI binary** with seven search techniques on by default. Four won an SPRT
-  against the set without them: incremental accumulator, table move, null move and static exchange evaluation
-  (+35.5 to +97.4 Elo, "Round robin" below). `lmr`, `rfp` and `iir` were switched on later by their node count at
-  a fixed depth (`uci ttd 11`, see the [changelog](../CHANGELOG.md)); their SPRT is queued. An earlier `lmr` lost
-  8.6 ± 6.1 Elo at 20,000 nodes per move (`lmr_nodes` below), so that conflict is still open. Five others (`pvs`,
-  `aspiration`, `history`, `history_malus`, `qs_tt`) reached no verdict and were retired in `efb595e`.
+- **The engine that plays is the Rust UCI binary** with eight search techniques, all fixed (none can be switched
+  off). Four won an SPRT against the set without them: incremental accumulator, table move, null move and static
+  exchange evaluation (+35.5 to +97.4 Elo, "Round robin" below). `lmr`, `rfp`, `iir` and `futility` were added by
+  their node count at a fixed depth; their SPRTs at 60 s + 1 s lean towards keeping them but have no verdict yet
+  ("Search techniques at 60 s + 1 s" below). An earlier `lmr` lost 8.6 ± 6.1 Elo at 20,000 nodes per move
+  (`lmr_nodes` below), so that conflict is still open. Six others (`pvs`, `history`, `lmp`, `aspiration`,
+  `history_malus`, `qs_tt`) reached no verdict and were retired.
 - **The model that plays is the Piece-square network, width 64 (`net_pst_w64`)**, the default of the binary since
   `4d8dfc4`. There is no SPRT of it against `net_pst_w32`, the model it replaced; that one beat the
   Piece-square-and-terms logistic model (`linear_pst_terms@e30`) by +165.1 ± 32.9 Elo (SPRT [0, 5], 504 games at
@@ -32,6 +33,8 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | Each of the four default techniques makes the engine stronger | SPRT [−5, 0] removing it from the default set of then, 710 to 1,690 games at 10 s + 0.1 s ("Round robin" below) | Rust | Measured; H1 accepted for each. The set of four has no SPRT against the set of seven |
 | `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 2.21); retired |
+| `lmr`, `rfp`, `iir` and `futility` make the engine stronger | SPRT [−5, 0] at 60 s + 1 s, 400 to 600 games each ("Search techniques at 60 s + 1 s" below) | Rust | Not yet: +34.9 to +62.3 Elo, LLR 0.68 to 1.27, still running; fixed in the engine meanwhile |
+| `lmp`, `aspiration`, `history_malus` and `qs_tt` help on top of `lmr,rfp,iir` | Same SPRTs, 200 to 600 games each | Rust | Not shown: LLR −0.48 to 0.07, stopped; retired |
 | The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted |
 | Adding the classical terms to the network makes it weaker | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Measured; H0 accepted, but it mixes quality and speed (the hybrids have no accumulator). At fixed nodes: pending |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
@@ -70,6 +73,29 @@ The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `
 of the hybrid and king-bucket networks (2026-11-09), against networks that had it, so they mixed quality with speed. They
 are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`src/chess_lab/measure/queue.json`).
 The files stay in `data/results/roundrobin/`.
+
+## Search techniques at 60 s + 1 s
+
+From 2026-11-11 the compute node plays one SPRT [−5, 0] per technique at 60 s + 1 s in a new round robin, with
+the binary `db98489bd531` (the last one with switches) on both sides, `Hash` 16, one thread. `abl_` removes one
+technique from the default set of then, `lmr,rfp,iir` (A is the full set, so a positive Elo is what the technique
+gains); `add_` adds one to it. On 2026-11-13 the four `add_` jobs that did not move were stopped and their techniques
+retired; the other four keep running only to confirm, while the engine already has them fixed. Files: the round
+robin's `results/<job>/llr.csv` on the compute node (games, LLR, Elo and error after each turn).
+
+| job | A against B | games | Elo (95 %) | LLR | state |
+|---|---|---|---|---|---|
+| `abl_lmr_60s` | `lmr,rfp,iir` against `rfp,iir` | 600 | +46.0 ± 26.2 | +1.27 | running; `lmr` fixed |
+| `abl_rfp_60s` | `lmr,rfp,iir` against `lmr,iir` | 400 | +62.3 ± 31.4 | +1.13 | running; `rfp` fixed |
+| `abl_iir_60s` | `lmr,rfp,iir` against `lmr,rfp` | 400 | +34.9 ± 30.8 | +0.68 | running; `iir` fixed |
+| `add_futility_60s` | `lmr,rfp,iir,futility` against `lmr,rfp,iir` | 400 | +44.5 ± 32.0 | +0.82 | running; `futility` fixed |
+| `add_lmp_60s` | `lmr,rfp,iir,lmp` against `lmr,rfp,iir` | 600 | −19.1 ± 24.5 | −0.48 | stopped; retired |
+| `add_aspiration_60s` | `lmr,rfp,iir,aspiration` against `lmr,rfp,iir` | 600 | −1.7 ± 23.9 | +0.01 | stopped; retired |
+| `add_history_malus_60s` | `lmr,rfp,iir,history_malus` against `lmr,rfp,iir` | 236 | +4.4 ± 39.2 | +0.07 | stopped; retired |
+| `add_qs_tt_60s` | `lmr,rfp,iir,qs_tt` against `lmr,rfp,iir` | 200 | −8.7 ± 43.7 | −0.06 | stopped; retired |
+
+The engine with the eight fixed techniques has no SPRT against the one with switches; `uci bench 5` counts 23.5 %
+fewer nodes (139,252 to 106,583).
 
 ## Engine matches (Rust engine, fastchess)
 

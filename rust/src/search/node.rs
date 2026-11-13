@@ -158,7 +158,9 @@ impl Search<'_> {
         self.memory.counters.table_probes += 1;
         if let Some(entry) = entry {
             self.memory.counters.table_hits += 1;
-            if clock_free && entry.depth >= depth_remaining {
+            // A restricted root is never cut by the table: its move may be one the list excludes.
+            let restricted_root = ply == 0 && self.options.root_moves.is_some();
+            if clock_free && entry.depth >= depth_remaining && !restricted_root {
                 let value = at_ply(entry.value, ply);
                 match entry.flag {
                     Flag::Exact => {

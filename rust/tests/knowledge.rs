@@ -34,9 +34,9 @@ fn root_moves(tables: &EndgameTablebase, fen: &str) -> Option<Vec<String>> {
 #[test]
 fn the_three_piece_tables_keep_only_the_moves_that_hold_the_result() {
     let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
-    // The rook wins; Rb2 hands it to the king (a draw), Ra8 keeps the win.
+    // The rook wins; Rb2 hands it to the king (a draw); only the fastest win is left.
     let moves = root_moves(&tables, "8/8/8/8/8/2k5/R7/4K3 w - - 0 1").unwrap();
-    assert!(moves.contains(&"a2a8".to_string()), "{moves:?}");
+    assert!(moves.contains(&"a2a4".to_string()), "{moves:?}");
     assert!(!moves.contains(&"a2b2".to_string()), "{moves:?}");
     // Lost for black: no move changes it, none is stalemate, and the king can walk away.
     let moves = root_moves(&tables, "8/k7/8/8/8/8/3KQ3/8 b - - 0 1").unwrap();
@@ -61,8 +61,8 @@ fn positions_the_tables_do_not_cover_give_no_moves() {
 }
 
 #[test]
-fn a_winning_capture_stays_among_the_moves_and_a_throw_away_does_not() {
-    // Game FHRCwTDL, move 69: Qxa2 wins, so does Qa1 (the loop of the game), but Qb8 draws.
+fn a_winning_capture_stays_among_the_moves_and_a_draw_does_not() {
+    // Game FHRCwTDL, move 69: Qxa2 wins and zeroes the counter; Qb8 draws.
     let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
     let moves = root_moves(&tables, "8/8/8/2k5/8/8/pQ5K/8 w - - 2 69").unwrap();
     assert!(moves.contains(&"b2a2".to_string()), "{moves:?}");
@@ -70,11 +70,10 @@ fn a_winning_capture_stays_among_the_moves_and_a_throw_away_does_not() {
 }
 
 #[test]
-fn the_move_that_keeps_both_queens_is_among_the_winning_moves() {
-    // Game FHRCwTDL, move 65: Qxa3+ and Qc7+ both win, but Qc7+ Kxc7 throws a queen away; the tables
-    // list both and leave the choice to the search.
+fn a_winning_move_that_throws_a_queen_away_is_not_among_the_fastest() {
+    // Game FHRCwTDL, move 65: Qxa3+ and Qc7+ both win, but Qc7+ Kxc7 throws a queen away and counts
+    // as progress only because the capture zeroes the counter. Qxa3+ is the one left.
     let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
     let moves = root_moves(&tables, "6Q1/8/3k4/8/8/p7/7K/2Q5 w - - 3 65").unwrap();
-    assert!(moves.contains(&"c1a3".to_string()), "{moves:?}");
-    assert!(moves.contains(&"c1c7".to_string()), "{moves:?}");
+    assert_eq!(moves, ["c1a3"]);
 }

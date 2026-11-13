@@ -208,58 +208,6 @@
    "elo0": -5,
    "elo1": 0,
    "max_rounds": 6000
-  },
-  {
-   "name": "add_lmp",
-   "uci": "bin/db98489bd531/uci",
-   "a": [
-    "option.Techniques=lmr,rfp,iir,lmp"
-   ],
-   "b": [
-    "option.Techniques=lmr,rfp,iir"
-   ],
-   "elo0": -5,
-   "elo1": 0,
-   "max_rounds": 6000
-  },
-  {
-   "name": "add_aspiration",
-   "uci": "bin/db98489bd531/uci",
-   "a": [
-    "option.Techniques=lmr,rfp,iir,aspiration"
-   ],
-   "b": [
-    "option.Techniques=lmr,rfp,iir"
-   ],
-   "elo0": -5,
-   "elo1": 0,
-   "max_rounds": 6000
-  },
-  {
-   "name": "add_history_malus",
-   "uci": "bin/db98489bd531/uci",
-   "a": [
-    "option.Techniques=lmr,rfp,iir,history_malus"
-   ],
-   "b": [
-    "option.Techniques=lmr,rfp,iir"
-   ],
-   "elo0": -5,
-   "elo1": 0,
-   "max_rounds": 6000
-  },
-  {
-   "name": "add_qs_tt",
-   "uci": "bin/db98489bd531/uci",
-   "a": [
-    "option.Techniques=lmr,rfp,iir,qs_tt"
-   ],
-   "b": [
-    "option.Techniques=lmr,rfp,iir"
-   ],
-   "elo0": -5,
-   "elo1": 0,
-   "max_rounds": 6000
   }
  ]
 }

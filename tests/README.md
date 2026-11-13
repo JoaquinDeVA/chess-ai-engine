@@ -16,7 +16,7 @@ The folders mirror the source: a test sits where the code it checks sits.
 
 Shared pieces: `conftest.py` (fixtures, a material stub model, and a guard that fails the run if a test
 overwrites a shipped model file), `paths.py` (`ROOT`, `POSITIONS`, `SYZYGY`), `data/positions.json` (the
-positions of the feature-parity and technique tests), `data/syzygy/` (five 3-piece tables) and
+positions of the feature-parity tests), `data/syzygy/` (five 3-piece tables) and
 `lab/models/positions.py` (the positions and raw-shard rows of the model tests).
 
 ## Rules
@@ -27,7 +27,7 @@ positions of the feature-parity and technique tests), `data/syzygy/` (five 3-pie
 - Command-line modules are imported like any other module; their tests call their functions on a handful of
   synthetic positions.
 - A test that takes more than a few seconds is marked `slow` (`pytest -m "not slow"` skips it).
-- The Rust tests are the unit tests of each module plus `rust/tests/techniques.rs` (`cargo test --release`). The
+- The Rust tests are the unit tests of each module (`cargo test --release`). The
   search tests (`rust/src/search/tests.rs`) play with a material network and a fake clock, so their values and
   times depend neither on a trained model nor on the machine. Values are whole centipawns and a mate is
   `MATE − plies`.

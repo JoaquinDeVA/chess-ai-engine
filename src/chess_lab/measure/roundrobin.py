@@ -12,8 +12,8 @@ keeps the state of its SPRT: never kill it with SIGKILL).
 
 Queue file::
 
-    {"jobs": [{"name": "rfp_off", "uci": "bin/0123abcd4567/uci", "a": ["option.Techniques=lmr,iir"],
-               "b": ["option.Techniques=lmr,rfp,iir"], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
+    {"jobs": [{"name": "new_vs_old", "uci": "bin/0123abcd4567/uci", "uci_b": "bin/89abcdef0123/uci",
+               "a": [], "b": [], "each": ["tc=10+0.1", "proto=uci", "option.Hash=16"],
                "elo0": 0, "elo1": 5, "max_rounds": 6000, "chunk_rounds": 100}]}
 
 ``uci`` is the binary both engines run, or only A's when the job names B's in ``uci_b`` (the node installs each build

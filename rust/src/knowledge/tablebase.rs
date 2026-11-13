@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use shakmaty::{Chess, Move, Position};
+use shakmaty::{Chess, Move, Position, Role};
 use shakmaty_syzygy::Tablebase;
 
 use crate::board::ordered_moves;
@@ -47,7 +47,8 @@ impl EndgameTablebase {
     }
 
     /// Sort key (higher is better) of a position reached by our move, seen from the opponent.
-    fn rank(&self, after: &Chess) -> Option<(i32, i32)> {
+    /// A zeroing move that keeps a clean win is ranked at DTZ zero.
+    fn rank(&self, after: &Chess, zeroing: bool) -> Option<(i32, i32)> {
         if after.is_checkmate() {
             return Some((3, 0));
         }
@@ -55,7 +56,11 @@ impl EndgameTablebase {
             return Some((0, 0));
         }
         let wdl = -(self.tables.probe_wdl_after_zeroing(after).ok()? as i32); // for the side that moved
-        let dtz = self.tables.probe_dtz(after).ok()?.ignore_rounding().0.abs();
+        let dtz = if wdl == 2 && zeroing {
+            0
+        } else {
+            self.tables.probe_dtz(after).ok()?.ignore_rounding().0.abs()
+        };
         Some(match wdl {
             2 => (2, -dtz),
             1 => (1, -dtz),
@@ -81,7 +86,8 @@ impl EndgameTablebase {
         for m in moves {
             let mut after = pos.clone();
             after.play_unchecked(m);
-            let key = self.rank(&after)?;
+            let zeroing = m.role() == Role::Pawn || m.is_capture();
+            let key = self.rank(&after, zeroing)?;
             if best.as_ref().is_none_or(|(_, k)| key > *k) {
                 best = Some((m, key));
             }

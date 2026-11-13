@@ -36,3 +36,23 @@ fn the_three_piece_tables_play_the_winning_move() {
         assert_eq!(got.as_deref(), Some(expected), "{fen}");
     }
 }
+
+#[test]
+fn a_winning_capture_comes_before_a_move_with_a_smaller_dtz() {
+    // Qxa2 leaves a mate in sixteen (DTZ 16 after it); Qa1 has DTZ 2 and loops forever.
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    let fen = "8/8/8/2k5/8/8/pQ5K/8 w - - 2 69";
+    let pos = position_from_fen(fen).unwrap();
+    let got = tables.best_move(&pos).map(|m| uci_string(&m));
+    assert_eq!(got.as_deref(), Some("b2a2"));
+}
+
+#[test]
+fn the_tables_do_not_hang_a_queen_to_shorten_the_dtz() {
+    // Game FHRCwTDL, move 65: Qc7+ Kxc7 zeroes the counter at once (DTZ 1) but throws a queen away;
+    // Qxa3+ captures the pawn and keeps both queens.
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    let pos = position_from_fen("6Q1/8/3k4/8/8/p7/7K/2Q5 w - - 3 65").unwrap();
+    let got = tables.best_move(&pos).map(|m| uci_string(&m));
+    assert_eq!(got.as_deref(), Some("c1a3"));
+}

@@ -4,6 +4,12 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
+### Fixed
+- Endgame tables no longer loop or hang material: a winning capture, pawn move or promotion is now
+  ranked first (DTZ 0) instead of by the DTZ of the position it leaves. A live game had repeated
+  `Qb2`/`Qa1` instead of taking a free pawn and gave up a queen with `Qc7+ Kxc7`. Covered by two
+  tests on the positions of that game.
+
 ### Changed
 - Killer moves are now indexed by search ply instead of remaining depth, so IIR, LMR and null-move
   reductions reuse the same killer slot for the same layer of the tree. No strength or tree

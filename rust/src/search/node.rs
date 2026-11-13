@@ -188,18 +188,6 @@ impl Search<'_> {
         if depth_remaining <= 0 {
             if self.options.quiescence_plies > 0 {
                 let value = self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves);
-                // Only where the table has nothing: a depth-0 entry must not replace a deeper one.
-                if self.options.techniques.qs_tt && entry.is_none() && !self.truncated && clock_free
-                {
-                    self.memory.table.store(
-                        key,
-                        for_table(value, ply),
-                        None,
-                        0,
-                        for_table(alpha_orig, ply),
-                        for_table(beta_orig, ply),
-                    );
-                }
                 return (value, None);
             }
             return (self.static_value(), None);
@@ -252,8 +240,7 @@ impl Search<'_> {
         let in_check = self.state.pos().is_check();
         // Reverse futility: a static value far beyond the bound, in a window of no width and not in
         // check, is taken as the value of the node.
-        if self.options.techniques.rfp
-            && ply > 0
+        if ply > 0
             && depth_remaining <= RFP_UP_TO_DEPTH
             && !in_check
             && beta - alpha <= SCOUT
@@ -302,30 +289,24 @@ impl Search<'_> {
         }
         // Internal iterative reduction: with no table move the order is poor, so search one ply
         // less; the next iteration, with the move stored, goes deeper.
-        let depth_remaining = if self.options.techniques.iir
-            && table_move.is_none()
-            && ply > 0
-            && depth_remaining >= IIR_FROM_DEPTH
-        {
-            depth_remaining - 1
-        } else {
-            depth_remaining
-        };
+        let depth_remaining =
+            if table_move.is_none() && ply > 0 && depth_remaining >= IIR_FROM_DEPTH {
+                depth_remaining - 1
+            } else {
+                depth_remaining
+            };
         // Shallow pruning of the quiet moves: not in check, bounds outside the mate range.
         let shallow = !in_check
             && depth_remaining <= SHALLOW_UP_TO_DEPTH
             && alpha > -EVAL_LIMIT
             && beta < EVAL_LIMIT;
-        let futility_static =
-            (shallow && self.options.techniques.futility).then(|| self.static_value());
+        let futility_static = shallow.then(|| self.static_value());
         let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
-        let mut failed_quiet: Vec<Move> = Vec::new();
         for (index, action) in ordered.into_iter().enumerate() {
             // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
             // whether the history says the move has cut before.
-            let late = (self.options.techniques.lmr
-                && !in_check
+            let late = (!in_check
                 && !action.is_capture()
                 && !action.is_promotion()
                 && !killers.contains(&move_id(&action)))
@@ -336,9 +317,7 @@ impl Search<'_> {
                 && !action.is_promotion()
                 && !killers.contains(&move_id(&action))
             {
-                let by_count =
-                    self.options.techniques.lmp && index >= late_move_limit(depth_remaining);
-                let by_margin = futility_static.is_some_and(|value| {
+                let futile = futility_static.is_some_and(|value| {
                     let margin = FUTILITY_MARGIN_PER_PLY * depth_remaining;
                     if maximizing {
                         alpha - value >= margin
@@ -346,7 +325,7 @@ impl Search<'_> {
                         value - beta >= margin
                     }
                 });
-                if by_count || by_margin {
+                if futile {
                     // A move that gives check is never skipped.
                     self.play(action);
                     let gives_check = self.state.pos().is_check();
@@ -392,16 +371,8 @@ impl Search<'_> {
                 self.memory.killers.record(depth_remaining, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
-                    if self.options.techniques.history_malus {
-                        for failed in &failed_quiet {
-                            self.memory.history.penalise(mover, failed, depth_remaining);
-                        }
-                    }
                 }
                 break;
-            }
-            if !action.is_capture() && !action.is_promotion() {
-                failed_quiet.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.
@@ -481,28 +452,6 @@ pub fn alpha_beta(
     max_depth: i32,
     control: &Control,
 ) -> SearchResult {
-    alpha_beta_window(
-        state,
-        net,
-        memory,
-        options,
-        max_depth,
-        control,
-        (-INFINITE, INFINITE),
-    )
-}
-
-/// [`alpha_beta`] inside the window `(alpha, beta)` of the root: the value is exact only if it
-/// falls strictly inside.
-pub fn alpha_beta_window(
-    state: &mut GameState,
-    net: &Net,
-    memory: &mut Memory,
-    options: &Options,
-    max_depth: i32,
-    control: &Control,
-    (alpha, beta): (i32, i32),
-) -> SearchResult {
     let root_player = state.turn();
     let root = state.pos().clone();
     let mut search = Search {
@@ -520,7 +469,7 @@ pub fn alpha_beta_window(
         eval: NetState::new(net, &root),
         root_nodes: Vec::new(),
     };
-    let (value, best) = search.node(alpha, beta, max_depth, 0, true);
+    let (value, best) = search.node(-INFINITE, INFINITE, max_depth, 0, true);
     let best_nodes: u64 = search
         .root_nodes
         .iter()

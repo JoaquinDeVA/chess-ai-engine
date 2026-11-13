@@ -4,9 +4,7 @@ use std::time::Instant;
 
 use _core::board::{uci_string, GameState};
 use _core::eval::Net;
-use _core::search::{
-    self, Control, Counters, Memory, Options, Techniques, DEFAULT_HASH_MB, DEFAULT_TECHNIQUES,
-};
+use _core::search::{self, Control, Counters, Memory, Options, DEFAULT_HASH_MB};
 
 /// Positions of `bench`: a fixed set, so that the node counts are a fingerprint of the search.
 const BENCH_FENS: [&str; 6] = [
@@ -44,12 +42,7 @@ pub fn bench(network: &Net, repetitions: usize) {
 /// it once and not per move (clearing also brings its pages into memory, which a fresh table would
 /// do mid-search).
 fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
-    
-    let techniques = Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques");
-    let search_options = Options {
-        techniques,
-        ..Options::default()
-    };
+    let search_options = Options::default();
     let unlimited_clock = || 0.0;
     let search_control = Control {
         start: 0.0,
@@ -125,17 +118,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
     if fens.is_empty() {
         return Err(format!("{path}: no positions"));
     }
-    // Techniques to measure, comma separated (`TTD_TECHNIQUES=lmr,futility`); the default set otherwise.
-    let names = std::env::var("TTD_TECHNIQUES").unwrap_or_else(|_| DEFAULT_TECHNIQUES.join(","));
-    let options = Options {
-        techniques: Techniques::from_names(
-            &names
-                .split(',')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>(),
-        )?,
-        ..Options::default()
-    };
+    let options = Options::default();
     let mut counters = Counters::default();
     let mut seconds: Vec<f64> = Vec::new();
     let (mut total_nodes, mut total_seconds, mut finished) = (0u64, 0.0, 0);

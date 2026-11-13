@@ -14,9 +14,7 @@ use _core::board::{ordered_moves, uci_string, GameState};
 use _core::eval::Net;
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
-use _core::search::{
-    self, Control, Memory, Options, Techniques, DEFAULT_HASH_MB, DEFAULT_TECHNIQUES,
-};
+use _core::search::{self, Control, Memory, Options, DEFAULT_HASH_MB};
 use shakmaty::Color;
 
 use bench::{bench, time_to_depth};
@@ -32,7 +30,6 @@ const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 
 struct Settings {
     threads: usize,
     hash_mb: usize,
-    techniques: Techniques,
     eval: Arc<Net>,
     /// Opening book (`Book`); off until the option names a file.
     book: Option<OpeningBook>,
@@ -61,7 +58,6 @@ struct Limits {
 struct Job {
     position: Position,
     limits: Limits,
-    techniques: Techniques,
     stop: Arc<AtomicBool>,
 }
 
@@ -146,7 +142,6 @@ fn think(mut memory: Memory, eval: Arc<Net>, job: Job) -> Memory {
 fn run_search(memory: &mut Memory, eval: &Net, job: Job) -> Result<String, String> {
     let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
     let options = Options {
-        techniques: job.techniques,
         node_limit: job.limits.nodes,
         ..Options::default()
     };
@@ -229,14 +224,6 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
                 path => Some(EndgameTablebase::open(Path::new(path))?),
             };
         }
-        "Techniques" => {
-            settings.techniques = Techniques::from_names(
-                &value
-                    .split(',')
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>(),
-            )?
-        }
         other => return Err(format!("unknown option {other:?}")),
     }
     Ok(name == "Hash" || name == "Threads")
@@ -299,7 +286,6 @@ fn main() {
     let mut settings = Settings {
         threads: 1,
         hash_mb: DEFAULT_HASH_MB,
-        techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).expect("default techniques"),
         eval: eval.clone(),
         book: None,
         in_book: false,
@@ -326,10 +312,6 @@ fn main() {
                 println!("option name Book type string default");
                 println!("option name Tablebase type string default");
                 println!("option name Model type string default {MODEL_NAME}");
-                println!(
-                    "option name Techniques type string default {}",
-                    DEFAULT_TECHNIQUES.join(",")
-                );
                 println!("uciok");
             }
             "isready" => println!("readyok"),
@@ -373,7 +355,6 @@ fn main() {
                 let job = Job {
                     position: position.clone(),
                     limits: go_limits(args, white),
-                    techniques: settings.techniques,
                     stop: Arc::new(AtomicBool::new(false)),
                 };
                 let stop = job.stop.clone();
@@ -465,7 +446,6 @@ mod tests {
         Settings {
             threads: 1,
             hash_mb: 1,
-            techniques: Techniques::from_names(&DEFAULT_TECHNIQUES).unwrap(),
             eval: Arc::new(load_model().unwrap()),
             book: Some(OpeningBook::from_entries([(key, "e2e4".to_string())])),
             in_book: true,

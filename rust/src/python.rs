@@ -92,11 +92,6 @@ mod _core {
         // Keep these values sourced from Rust so Python tooling uses the same defaults as the
         // engine instead of maintaining a second copy.
         module.add("MAX_DEPTH", crate::search::MAX_DEPTH)?;
-        module.add(
-            "DEFAULT_TECHNIQUES",
-            crate::search::DEFAULT_TECHNIQUES.to_vec(),
-        )?;
-        module.add("TECHNIQUES", crate::search::Techniques::NAMES.to_vec())?;
         module.add("FEATURE_SETS", crate::eval::FeatureSet::NAMES.to_vec())?;
         Ok(())
     }

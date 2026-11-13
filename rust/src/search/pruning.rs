@@ -1,5 +1,6 @@
-//! Constants and formulas of the pruning and reduction techniques: the null move (always on) and
-//! the five optional ones (LMR, RFP, IIR, futility and late move pruning).
+//! Constants and formulas of the pruning and reduction techniques: null move, late move
+//! reductions (LMR), reverse futility pruning (RFP), internal iterative reduction (IIR) and
+//! futility pruning.
 
 use shakmaty::{Chess, Color, Position};
 
@@ -16,16 +17,10 @@ const LMR_FROM_INDEX: usize = 3;
 pub(super) const RFP_UP_TO_DEPTH: i32 = 6;
 pub(super) const RFP_MARGIN_PER_PLY: i32 = 80;
 
-/// Futility pruning and late move pruning work up to this depth. The futility margin is
-/// `FUTILITY_MARGIN_PER_PLY` per ply left (it was 0.69 log-odds, the same 120 centipawns); late
-/// move pruning skips the quiet moves from the `3 + depth²`-th on.
+/// Futility pruning works up to this depth, with a margin of `FUTILITY_MARGIN_PER_PLY` per ply left
+/// (it was 0.69 log-odds, the same 120 centipawns).
 pub(super) const SHALLOW_UP_TO_DEPTH: i32 = 3;
 pub(super) const FUTILITY_MARGIN_PER_PLY: i32 = 120;
-
-/// Quiet moves a node of `depth_remaining` plies tries before late move pruning skips the rest.
-pub(super) fn late_move_limit(depth_remaining: i32) -> usize {
-    3 + (depth_remaining * depth_remaining) as usize
-}
 
 /// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
 /// the history says the move has cut before, and never so many that the search falls below one ply.

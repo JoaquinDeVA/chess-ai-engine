@@ -100,11 +100,10 @@ fn run(
     (best.as_ref().map(uci_string), stats)
 }
 
-/// One search of `depth` plies with the material network, `quiescence_plies` and `techniques`.
-fn search(fen: &str, depth: i32, quiescence_plies: u32, techniques: Techniques) -> SearchResult {
+/// One search of `depth` plies with the material network and `quiescence_plies`.
+fn search(fen: &str, depth: i32, quiescence_plies: u32) -> SearchResult {
     let options = Options {
         quiescence_plies,
-        techniques,
         ..Options::default()
     };
     alpha_beta(
@@ -119,12 +118,12 @@ fn search(fen: &str, depth: i32, quiescence_plies: u32, techniques: Techniques) 
 
 /// A fixed-depth search without quiescence.
 fn fixed(fen: &str, depth: i32) -> SearchResult {
-    search(fen, depth, 0, Techniques::default())
+    search(fen, depth, 0)
 }
 
-/// Fixed-depth search with quiescence of 4 plies and the given techniques.
-fn quiescent(fen: &str, depth: i32, techniques: Techniques) -> SearchResult {
-    search(fen, depth, 4, techniques)
+/// Fixed-depth search with quiescence of 4 plies.
+fn quiescent(fen: &str, depth: i32) -> SearchResult {
+    search(fen, depth, 4)
 }
 
 const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -137,7 +136,8 @@ fn a_quicker_win_is_worth_more_than_a_slower_one() {
     let one = fixed(MATE_IN_ONE, 3);
     assert_eq!(one.best.as_ref().map(uci_string).as_deref(), Some("a1a8"));
     assert_eq!(one.value, MATE - 1);
-    let two = fixed(MATE_IN_TWO, 4);
+    // Depth 6, not 4: late move reductions search the quiet mating rook move a ply shallower.
+    let two = fixed(MATE_IN_TWO, 6);
     assert!(
         two.value > MATE_BOUND && two.value < one.value,
         "{}",
@@ -198,7 +198,7 @@ fn quiescence_sees_the_recapture_at_the_horizon() {
     // only the gain, with quiescence it sees the loss of the queen.
     let fen = "4k3/8/3p4/4p3/8/8/4Q3/4K3 w - - 0 1";
     let plain = fixed(fen, 1);
-    let with = quiescent(fen, 1, Techniques::default());
+    let with = quiescent(fen, 1);
     assert_ne!(
         plain.best.as_ref().map(uci_string),
         with.best.as_ref().map(uci_string)
@@ -209,7 +209,7 @@ fn quiescence_sees_the_recapture_at_the_horizon() {
 #[test]
 fn see_keeps_the_obvious_capture() {
     // A queen hangs: the search takes it.
-    let result = quiescent(HANGING_QUEEN, 3, Techniques::default());
+    let result = quiescent(HANGING_QUEEN, 3);
     assert_eq!(
         result.best.as_ref().map(uci_string).as_deref(),
         Some("d2d5")
@@ -293,10 +293,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
         "8/2k5/8/3Pp3/8/8/8/4K3 w - e6 0 1",
     ];
     for fen in positions {
-        let options = Options {
-            techniques: Techniques::all(),
-            ..Options::default()
-        };
+        let options = Options::default();
         let mut memory = Memory::new(4, 1);
         let mut game = state(fen);
         let (best, stats) = iterative_deepening(
@@ -332,98 +329,18 @@ fn late_move_reductions_follow_the_depth_and_the_position_in_the_order() {
 }
 
 #[test]
-fn late_move_reductions_still_find_the_forced_mate() {
-    let with = Techniques {
-        lmr: true,
-        ..Techniques::all()
-    };
-    let result = quiescent(MATE_IN_TWO, 6, with);
-    assert_eq!(result.value, MATE - 3);
-}
-
-#[test]
-fn reverse_futility_keeps_the_forced_mate_and_the_hanging_queen() {
-    let with = Techniques {
-        rfp: true,
-        ..Techniques::all()
-    };
-    let result = quiescent(MATE_IN_TWO, 6, with);
-    assert_eq!(result.value, MATE - 3);
-    let queen = quiescent(HANGING_QUEEN, 3, with);
-    let without = quiescent(HANGING_QUEEN, 3, Techniques::all());
-    assert_eq!(queen.best, without.best);
-}
-
-#[test]
-fn shallow_pruning_keeps_the_forced_mate_and_the_hanging_queen() {
-    let with = Techniques {
-        futility: true,
-        lmp: true,
-        ..Techniques::all()
-    };
-    let result = quiescent(MATE_IN_TWO, 6, with);
-    assert_eq!(result.value, MATE - 3);
-    assert_eq!(
-        quiescent(HANGING_QUEEN, 3, with).best,
-        quiescent(HANGING_QUEEN, 3, Techniques::default()).best
-    );
-}
-
-#[test]
-fn late_move_pruning_allows_more_quiet_moves_the_deeper_the_node() {
-    use super::pruning::late_move_limit;
-    assert_eq!(late_move_limit(1), 4);
-    assert_eq!(late_move_limit(2), 7);
-    assert_eq!(late_move_limit(3), 12);
-}
-
-#[test]
-fn internal_iterative_reduction_keeps_the_forced_mate_and_the_hanging_queen() {
-    let with = Techniques::all();
-    let without = Techniques {
-        iir: false,
-        ..Techniques::all()
-    };
-    let result = quiescent(MATE_IN_TWO, 6, with);
-    assert_eq!(result.value, MATE - 3);
-    assert_eq!(
-        quiescent(HANGING_QUEEN, 5, with).best,
-        quiescent(HANGING_QUEEN, 5, without).best
-    );
-}
-
-#[test]
-fn the_history_malus_and_the_horizon_entries_keep_the_forced_mate_and_the_hanging_queen() {
-    for with in [
-        Techniques {
-            history_malus: true,
-            ..Techniques::default()
-        },
-        Techniques {
-            qs_tt: true,
-            ..Techniques::default()
-        },
-    ] {
-        assert_eq!(quiescent(MATE_IN_TWO, 6, with).value, MATE - 3);
+fn the_pruning_and_reductions_keep_the_forced_mate_and_the_hanging_queen() {
+    // LMR, RFP, IIR and futility all work in these searches: none may lose a mate in two or a
+    // free queen.
+    assert_eq!(quiescent(MATE_IN_TWO, 6).value, MATE - 3);
+    for depth in [3, 5] {
         assert_eq!(
-            quiescent(HANGING_QUEEN, 4, with).best,
-            quiescent(HANGING_QUEEN, 4, Techniques::default()).best
+            quiescent(HANGING_QUEEN, depth)
+                .best
+                .as_ref()
+                .map(uci_string)
+                .as_deref(),
+            Some("d2d5")
         );
     }
-}
-
-#[test]
-fn aspiration_windows_keep_the_forced_mate_and_the_value_of_a_quiet_position() {
-    let options = |aspiration| Options {
-        techniques: Techniques {
-            aspiration,
-            ..Techniques::default()
-        },
-        ..Options::default()
-    };
-    let (best, _) = run(MATE_IN_TWO, &options(true), 6, 1e9, 1e9, 0.0);
-    assert_eq!(best, run(MATE_IN_TWO, &options(false), 6, 1e9, 1e9, 0.0).0);
-    let (_, with) = run(START, &options(true), 6, 1e9, 1e9, 0.0);
-    let (_, without) = run(START, &options(false), 6, 1e9, 1e9, 0.0);
-    assert_eq!(with.completed_depth, without.completed_depth);
 }

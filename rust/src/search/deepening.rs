@@ -14,6 +14,8 @@ use super::tt::Table;
 use crate::board::GameState;
 use crate::eval::Net;
 
+/// Time of an iteration over the time of the one before it, rounded down (measured: 2.5 to 4).
+const NEXT_ITERATION_COST: f64 = 2.5;
 /// First completed depth whose best move scales the soft limit (the first ones are noise).
 const SCALE_FROM_DEPTH: usize = 6;
 /// Factor of the soft limit by the completed iterations in a row with the same best move: one that
@@ -293,6 +295,14 @@ fn deepen(
         // real search; after it, the soft limit scaled by how settled the best move is.
         let soft = time_limit * soft_scale(depth, stable, result.best_share);
         if depth >= options.min_depth && clock() - start >= soft {
+            stop_reason = StopReason::Budget;
+            break;
+        }
+        // An iteration costs about `NEXT_ITERATION_COST` times the last one. One that the hard limit
+        // would cut is not started: its work is thrown away.
+        if depth >= options.min_depth
+            && clock() - control.start + seconds * NEXT_ITERATION_COST >= control.hard_limit
+        {
             stop_reason = StopReason::Budget;
             break;
         }

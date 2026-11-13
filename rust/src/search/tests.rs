@@ -265,15 +265,16 @@ fn an_exhausted_budget_still_completes_min_depth_and_then_stops() {
 }
 
 #[test]
-fn an_iteration_cut_by_the_hard_limit_is_discarded() {
+fn an_iteration_the_hard_limit_would_cut_is_not_started() {
     let options = Options::default();
     // Every reading of the clock takes 0.1 fake seconds, and an iteration of under 2,048 nodes
-    // reads it about four times (the deepening's own readings and the first node): depths 1 to 5
-    // end before 2.2 seconds and depth 6 passes the limit at its first node.
+    // reads it about four times: depths 1 to 5 end before 2.2 seconds. After the last one, 2.5
+    // times its duration no longer fits under the limit, so depth 6 is not started and nothing
+    // is thrown away.
     let (best, stats) = run(START, &options, 6, 1e9, 2.2, 0.1);
-    assert_eq!(stats.stop_reason, StopReason::Truncated);
-    assert_eq!(stats.completed_depth, 5, "{stats:?}");
-    assert!(stats.iterations.last().unwrap().truncated);
+    assert_eq!(stats.stop_reason, StopReason::Budget);
+    assert!(stats.completed_depth >= options.min_depth, "{stats:?}");
+    assert!(stats.iterations.iter().all(|it| !it.truncated));
     assert!(best.is_some() && !stats.truncated);
 }
 

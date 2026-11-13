@@ -46,6 +46,19 @@ struct Position {
     moves: Vec<String>,
 }
 
+impl Position {
+    /// Full move number of the position to search: the one in the root FEN plus the moves played.
+    fn move_number(&self) -> u32 {
+        let mut fields = self.fen.split_whitespace().skip(1);
+        let black = fields.next() == Some("b");
+        let first = fields
+            .nth(3)
+            .and_then(|n| n.parse::<u32>().ok())
+            .unwrap_or(1);
+        first + (self.moves.len() as u32 + u32::from(black)) / 2
+    }
+}
+
 /// What one `go` asks for. Times are in seconds.
 struct Limits {
     depth: usize,
@@ -70,25 +83,40 @@ fn load_model() -> Result<Net, String> {
 
 /// Seconds kept back on every move for the GUI and the pipes, so that the move arrives in time.
 const MOVE_OVERHEAD: f64 = 0.05;
-/// Moves the time left is spread over when `movestogo` does not say (or says more).
-const MOVES_TO_GO: f64 = 20.0;
+/// Moves the time left is spread over when `movestogo` does not say (or says more): 50 on the first
+/// move, one fewer every two moves, never fewer than 20. A long horizon at the start keeps the clock
+/// for the middlegame instead of spending it on the opening.
+fn horizon(move_number: u32) -> f64 {
+    (50.0 - f64::from(move_number) / 2.0).max(20.0)
+}
+/// Share of the base that is the soft limit. The search scales it by 2.0 on average (stability and
+/// node share), so the moves end up using about 0.8 of the base.
+const SOFT_SHARE: f64 = 0.4;
 
 /// Soft and hard limit of one move in seconds. The base is the time left over the moves to go plus
-/// three quarters of the increment, minus the overhead; the soft limit is 0.6 times the base and the
-/// hard one three times the base, but never more than 40 % of the time left. The search scales the
+/// three quarters of the increment, minus the overhead; the soft limit is `SOFT_SHARE` of the base and the
+/// hard one three times the base, but never more than 40 % of the time left. `move_number` is the
+/// full move of the game (see `horizon`). The search scales the
 /// soft limit by how settled the best move is (see `search::iterative_deepening`).
-fn clock_budget(time_left: f64, increment: f64, moves_to_go: Option<u32>) -> (f64, f64) {
-    let horizon = moves_to_go.map_or(MOVES_TO_GO, |n| f64::from(n.max(1)).min(MOVES_TO_GO));
+fn clock_budget(
+    time_left: f64,
+    increment: f64,
+    moves_to_go: Option<u32>,
+    move_number: u32,
+) -> (f64, f64) {
+    let horizon = moves_to_go.map_or(horizon(move_number), |n| {
+        f64::from(n.max(1)).min(horizon(move_number))
+    });
     let base = (time_left / horizon + increment * 0.75 - MOVE_OVERHEAD).max(0.01);
     let hard = (base * 3.0)
         .min(time_left * 0.4)
         .min((time_left - MOVE_OVERHEAD).max(0.01));
-    ((base * 0.6).min(hard), hard)
+    ((base * SOFT_SHARE).min(hard), hard)
 }
 
 /// The limits of a `go` command. `movetime` wins over the clock; with neither the search runs to
 /// the maximum depth.
-fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
+fn go_limits(args: &[&str], white_to_move: bool, move_number: u32) -> Limits {
     let (mut depth, mut nodes) = (None, None);
     let (mut movetime, mut moves_to_go) = (None, None);
     let (mut wtime, mut btime, mut winc, mut binc) = (None, None, 0.0, 0.0);
@@ -118,7 +146,7 @@ fn go_limits(args: &[&str], white_to_move: bool) -> Limits {
     };
     let (time_limit, hard_limit) = match (movetime, time_left) {
         (Some(seconds), _) => (seconds, seconds),
-        (None, Some(time_left)) => clock_budget(time_left, increment, moves_to_go),
+        (None, Some(time_left)) => clock_budget(time_left, increment, moves_to_go, move_number),
         (None, None) => (f64::INFINITY, f64::INFINITY),
     };
     Limits {
@@ -354,7 +382,7 @@ fn main() {
                     .map_or(true, |state| state.turn() == Color::White);
                 let job = Job {
                     position: position.clone(),
-                    limits: go_limits(args, white),
+                    limits: go_limits(args, white, position.move_number()),
                     stop: Arc::new(AtomicBool::new(false)),
                 };
                 let stop = job.stop.clone();
@@ -403,18 +431,21 @@ mod tests {
 
     #[test]
     fn the_clock_spreads_the_time_and_counts_the_increment() {
-        // 60 + 1: base 60/20 + 0.75 - 0.05 = 3.7 s.
-        let (soft, hard) = clock_budget(60.0, 1.0, None);
-        assert!(close(soft, 2.22) && close(hard, 11.1), "{soft} {hard}");
+        // 60 + 1 at move 60 (horizon 20): base 60/20 + 0.75 - 0.05 = 3.7 s.
+        let (soft, hard) = clock_budget(60.0, 1.0, None, 60);
+        assert!(close(soft, 1.48) && close(hard, 11.1), "{soft} {hard}");
+        // Early on the horizon is longer, so the first moves take less: 60/50 + 0.7 = 1.9 s.
+        let (soft, _) = clock_budget(60.0, 1.0, None, 1);
+        assert!(close(soft, 0.4 * (60.0 / 49.5 + 0.7)), "{soft}");
         // The increment is what keeps the base up when the clock runs low.
-        let (soft, _) = clock_budget(2.0, 1.0, None);
-        assert!(close(soft, 0.6 * 0.8), "{soft}");
+        let (soft, _) = clock_budget(2.0, 1.0, None, 60);
+        assert!(close(soft, 0.4 * 0.8), "{soft}");
     }
 
     #[test]
     fn the_hard_limit_never_eats_the_clock() {
         for time_left in [0.02, 0.1, 1.0, 5.0] {
-            let (soft, hard) = clock_budget(time_left, 2.0, Some(1));
+            let (soft, hard) = clock_budget(time_left, 2.0, Some(1), 1);
             assert!(
                 soft <= hard && hard <= time_left * 0.4 + 0.01,
                 "{time_left}: {hard}"
@@ -424,11 +455,15 @@ mod tests {
 
     #[test]
     fn movestogo_shortens_the_horizon_and_go_reads_the_side_to_move() {
-        let (soft, _) = clock_budget(60.0, 0.0, Some(10));
-        assert!(close(soft, 0.6 * 5.95), "{soft}");
-        let black = go_limits(&["wtime", "1000", "btime", "60000", "binc", "1000"], false);
-        assert!(close(black.time_limit, 2.22) && close(black.hard_limit, 11.1));
-        let fixed = go_limits(&["movetime", "500", "wtime", "60000"], true);
+        let (soft, _) = clock_budget(60.0, 0.0, Some(10), 1);
+        assert!(close(soft, 0.4 * 5.95), "{soft}");
+        let black = go_limits(
+            &["wtime", "1000", "btime", "60000", "binc", "1000"],
+            false,
+            60,
+        );
+        assert!(close(black.time_limit, 1.48) && close(black.hard_limit, 11.1));
+        let fixed = go_limits(&["movetime", "500", "wtime", "60000"], true, 1);
         assert!(close(fixed.time_limit, 0.5) && close(fixed.hard_limit, 0.5));
     }
 

@@ -5,6 +5,9 @@ All notable changes. The newest are first.
 ## Unreleased
 
 ### Changed
+- Killer moves are now indexed by search ply instead of remaining depth, so IIR, LMR and null-move
+  reductions reuse the same killer slot for the same layer of the tree. No strength or tree
+  measurement has been run yet.
 - Late move reductions now also probe eligible late quiet moves in null-window nodes; the full-window
   re-search remains part of PVS only when the parent has a full window. The search-technique module
   and its reduction names now describe their responsibilities explicitly; no strength or tree

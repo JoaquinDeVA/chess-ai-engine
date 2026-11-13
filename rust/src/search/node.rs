@@ -7,7 +7,7 @@ use shakmaty::{Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
+use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_PLY};
 use super::search_techniques::*;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
@@ -212,8 +212,8 @@ impl Search<'_> {
         }
 
         let maximizing = self.state.turn() == self.root_player;
-        let mut killer_ids = [0u32; MAX_KILLERS_PER_DEPTH];
-        let stored = self.memory.killers.get(depth_remaining);
+        let mut killer_ids = [0u32; MAX_KILLERS_PER_PLY];
+        let stored = self.memory.killers.get(ply);
         killer_ids[..stored.len()].copy_from_slice(stored);
         let killers = &killer_ids[..stored.len()];
         let mover = self.state.turn();
@@ -371,7 +371,7 @@ impl Search<'_> {
                         counters.killer_cuts[slot] += 1;
                     }
                 }
-                self.memory.killers.record(depth_remaining, action);
+                self.memory.killers.record(ply, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
                 }

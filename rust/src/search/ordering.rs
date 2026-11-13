@@ -7,40 +7,38 @@ use shakmaty::{Chess, Color, Move, MoveList, Position, Role, Square};
 
 use crate::board::{is_noisy, move_id};
 
-/// Number of killer moves remembered per depth.
-pub const MAX_KILLERS_PER_DEPTH: usize = 3;
+/// Number of killer moves remembered per ply.
+pub const MAX_KILLERS_PER_PLY: usize = 3;
 
-/// Killer moves by remaining depth, identified by their squares and promotion (as `chess.Move`
+/// Killer moves by ply, identified by their squares and promotion (as `chess.Move`
 /// compares them), not by what they capture.
 #[derive(Default)]
 pub struct Killers {
-    by_depth: Vec<Vec<u32>>,
+    by_ply: Vec<Vec<u32>>,
 }
 
 impl Killers {
     pub fn clear(&mut self) {
-        self.by_depth.clear();
+        self.by_ply.clear();
     }
 
-    pub fn get(&self, depth: i32) -> &[u32] {
-        self.by_depth
-            .get(depth as usize)
-            .map_or(&[], |v| v.as_slice())
+    pub fn get(&self, ply: i32) -> &[u32] {
+        self.by_ply.get(ply as usize).map_or(&[], |v| v.as_slice())
     }
 
-    /// Remember `m` as a killer of `depth` (at most three per depth).
-    pub fn record(&mut self, depth: i32, m: Move) {
-        let depth = depth as usize;
-        if self.by_depth.len() <= depth {
-            self.by_depth.resize_with(depth + 1, Vec::new);
+    /// Remember `m` as a killer of `ply` (at most three per ply).
+    pub fn record(&mut self, ply: i32, m: Move) {
+        let ply = ply as usize;
+        if self.by_ply.len() <= ply {
+            self.by_ply.resize_with(ply + 1, Vec::new);
         }
-        let moves = &mut self.by_depth[depth];
+        let moves = &mut self.by_ply[ply];
         let id = move_id(&m);
         if moves.contains(&id) {
             return;
         }
         moves.push(id);
-        if moves.len() > MAX_KILLERS_PER_DEPTH {
+        if moves.len() > MAX_KILLERS_PER_PLY {
             moves.remove(0);
         }
     }
@@ -365,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn killers_keep_three_per_depth_without_repeats() {
+    fn killers_keep_three_per_ply_without_repeats() {
         let mut killers = Killers::default();
         let moves: Vec<Move> = (0..5)
             .map(|i| quiet(Square::new(i), Square::new(i + 16)))

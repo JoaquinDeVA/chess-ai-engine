@@ -1,4 +1,4 @@
-//! Constants and formulas of the pruning and reduction techniques: null move, late move
+//! Constants and formulas of the search techniques: null move, late move
 //! reductions (LMR), reverse futility pruning (RFP), internal iterative reduction (IIR) and
 //! futility pruning.
 
@@ -24,12 +24,16 @@ pub(super) const FUTILITY_MARGIN_PER_PLY: i32 = 120;
 
 /// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
 /// the history says the move has cut before, and never so many that the search falls below one ply.
-pub(super) fn reduction(depth_remaining: i32, index: usize, good_history: bool) -> i32 {
+pub(super) fn late_move_reduction(
+    depth_remaining: i32,
+    index: usize,
+    favorable_history: bool,
+) -> i32 {
     if depth_remaining < LMR_FROM_DEPTH || index < LMR_FROM_INDEX {
         return 0;
     }
     let raw = 0.75 + f64::from(depth_remaining).ln() * (index as f64).ln() / 2.25;
-    let steps = raw as i32 - i32::from(good_history);
+    let steps = raw as i32 - i32::from(favorable_history);
     steps.clamp(0, depth_remaining - 2)
 }
 

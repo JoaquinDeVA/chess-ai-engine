@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use shakmaty::Color;
 
-use super::pruning::has_pieces;
+use super::search_techniques::has_pieces;
 use super::*;
 use crate::board::{position_from_fen, uci_string, GameState};
 use crate::eval::FeatureSet;
@@ -320,17 +320,29 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
 
 #[test]
 fn late_move_reductions_follow_the_depth_and_the_position_in_the_order() {
-    use super::pruning::reduction;
-    assert_eq!(reduction(3, 2, false), 0, "too early in the order");
-    assert_eq!(reduction(2, 9, false), 0, "too shallow");
-    assert_eq!(reduction(3, 3, false), 1);
-    assert_eq!(reduction(6, 10, false), 2);
-    assert_eq!(reduction(6, 10, true), 1, "good history: one ply less");
-    assert_eq!(reduction(3, 100, false), 1, "never below one ply of search");
+    use super::search_techniques::late_move_reduction;
+    assert_eq!(
+        late_move_reduction(3, 2, false),
+        0,
+        "too early in the order"
+    );
+    assert_eq!(late_move_reduction(2, 9, false), 0, "too shallow");
+    assert_eq!(late_move_reduction(3, 3, false), 1);
+    assert_eq!(late_move_reduction(6, 10, false), 2);
+    assert_eq!(
+        late_move_reduction(6, 10, true),
+        1,
+        "favorable history: one ply less"
+    );
+    assert_eq!(
+        late_move_reduction(3, 100, false),
+        1,
+        "never below one ply of search"
+    );
 }
 
 #[test]
-fn the_pruning_and_reductions_keep_the_forced_mate_and_the_hanging_queen() {
+fn the_search_techniques_keep_the_forced_mate_and_the_hanging_queen() {
     // LMR, RFP, IIR and futility all work in these searches: none may lose a mate in two or a
     // free queen.
     assert_eq!(quiescent(MATE_IN_TWO, 6).value, MATE - 3);

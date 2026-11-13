@@ -11,8 +11,8 @@ mod memory;
 mod node;
 mod options;
 mod ordering;
-mod pruning;
 mod quiescence;
+mod search_techniques;
 mod stats;
 mod tt;
 

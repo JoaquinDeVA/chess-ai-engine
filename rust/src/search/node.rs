@@ -1,5 +1,5 @@
 //! The search of one node: alpha-beta with the table, the move order and the techniques of
-//! `pruning.rs`.
+//! `search_techniques.rs`.
 
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -8,15 +8,15 @@ use shakmaty::{Color, Move, MoveList, Position};
 use super::memory::*;
 use super::options::*;
 use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_DEPTH};
-use super::pruning::*;
+use super::search_techniques::*;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
 use crate::eval::{Net, NetState, EVAL_LIMIT};
 
 /// The clock is read once every this many nodes: reading it costs about as much as a node.
 const CLOCK_EVERY_NODES: u64 = 2048;
-/// Width of the window of the scouts of the principal variation search: one unit of the score.
-const SCOUT: i32 = 1;
+/// Width of the null window used by principal variation search: one unit of the score.
+const NULL_WINDOW_WIDTH: i32 = 1;
 
 /// A bound beyond every value, the window of the root.
 pub const INFINITE: i32 = 32_000;
@@ -75,42 +75,45 @@ impl Search<'_> {
         self.state.apply_null();
     }
 
-    /// Value of the child just played, searched as the techniques say: the moves after the first
-    /// with a window of no width, and again with the whole window when the cheaper search says the
-    /// move is better than the best so far.
-    fn child_value(
+    /// Search a child with principal variation search and late move reductions.
+    fn search_child(
         &mut self,
         index: usize,
         (alpha, beta): (i32, i32),
         depth_remaining: i32,
         ply: i32,
         maximizing: bool,
-        late: Option<bool>,
+        late_quiet: Option<bool>,
     ) -> i32 {
         let (low, high) = if maximizing {
-            (alpha, alpha + SCOUT)
+            (alpha, alpha + NULL_WINDOW_WIDTH)
         } else {
-            (beta - SCOUT, beta)
+            (beta - NULL_WINDOW_WIDTH, beta)
         };
-        let narrow = beta - alpha > SCOUT;
-        if index > 0 && depth_remaining >= 2 && narrow {
+        let has_full_window = beta - alpha > NULL_WINDOW_WIDTH;
+        if index > 0 && depth_remaining >= 2 {
             // A late quiet move that gives no check is searched shallower first; if even so it
             // improves on the best move, it is searched again to the full depth.
-            let reduction = match late {
-                Some(good_history) if !self.state.pos().is_check() => {
-                    reduction(depth_remaining, index, good_history)
+            let reduction_plies = match late_quiet {
+                Some(favorable_history) if !self.state.pos().is_check() => {
+                    late_move_reduction(depth_remaining, index, favorable_history)
                 }
                 _ => 0,
             };
-            if reduction > 0 {
-                let (shallow, _) =
-                    self.node(low, high, depth_remaining - 1 - reduction, ply + 1, true);
+            if reduction_plies > 0 {
+                let (shallow, _) = self.node(
+                    low,
+                    high,
+                    depth_remaining - 1 - reduction_plies,
+                    ply + 1,
+                    true,
+                );
                 if (shallow <= alpha && maximizing) || (shallow >= beta && !maximizing) {
                     return shallow;
                 }
             }
             let (scout, _) = self.node(low, high, depth_remaining - 1, ply + 1, true);
-            if scout > alpha && scout < beta && !self.truncated {
+            if scout > alpha && scout < beta && !self.truncated && has_full_window {
                 return self.node(alpha, beta, depth_remaining - 1, ply + 1, true).0;
             }
             return scout;
@@ -243,7 +246,7 @@ impl Search<'_> {
         if ply > 0
             && depth_remaining <= RFP_UP_TO_DEPTH
             && !in_check
-            && beta - alpha <= SCOUT
+            && beta - alpha <= NULL_WINDOW_WIDTH
             // A bound in the range of the mates is not one a static value can judge.
             && alpha > -EVAL_LIMIT
             && beta < EVAL_LIMIT
@@ -272,9 +275,9 @@ impl Search<'_> {
                 // If passing the turn already cuts, playing a move will too: prune.
                 let reduction = if depth_remaining >= 6 { 3 } else { 2 };
                 let (low, high) = if maximizing {
-                    (beta - SCOUT, beta)
+                    (beta - NULL_WINDOW_WIDTH, beta)
                 } else {
-                    (alpha, alpha + SCOUT)
+                    (alpha, alpha + NULL_WINDOW_WIDTH)
                 };
                 self.play_null();
                 let (value, _) =
@@ -338,7 +341,7 @@ impl Search<'_> {
             let nodes_before = self.nodes;
             self.play(action);
             let child =
-                self.child_value(index, (alpha, beta), depth_remaining, ply, maximizing, late);
+                self.search_child(index, (alpha, beta), depth_remaining, ply, maximizing, late);
             self.unplay();
             if ply == 0 {
                 self.root_nodes

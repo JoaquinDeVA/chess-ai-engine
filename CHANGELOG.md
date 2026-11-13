@@ -5,6 +5,10 @@ All notable changes. The newest are first.
 ## Unreleased
 
 ### Changed
+- Late move reductions now also probe eligible late quiet moves in null-window nodes; the full-window
+  re-search remains part of PVS only when the parent has a full window. The search-technique module
+  and its reduction names now describe their responsibilities explicitly; no strength or tree
+  measurement has been run yet.
 - `lmr`, `rfp`, `iir` and `futility` are a fixed part of the search, like `incremental`, `tt_move`, `null_move` and
   `see`: eight techniques, none optional. `uci bench 5`: 139,252 to 106,583 nodes (−23.5 %), median 0.115 s to
   0.091 s. `futility` enters without a verdict; the SPRTs of the four at 60 s + 1 s keep running only to confirm

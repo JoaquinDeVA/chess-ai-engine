@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use _core::board::{ordered_moves, uci_string, GameState};
+use _core::board::{move_id, ordered_moves, uci_string, GameState};
 use _core::eval::Net;
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
@@ -72,6 +72,8 @@ struct Job {
     position: Position,
     limits: Limits,
     stop: Arc<AtomicBool>,
+    /// Ids (`move_id`) of the only root moves to search; `None` searches them all.
+    root_moves: Option<Vec<u32>>,
 }
 
 /// A search running in its own thread. It gives the memory back when it ends.
@@ -171,6 +173,7 @@ fn run_search(memory: &mut Memory, eval: &Net, job: Job) -> Result<String, Strin
     let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
     let options = Options {
         node_limit: job.limits.nodes,
+        root_moves: job.root_moves,
         ..Options::default()
     };
     let origin = Instant::now();
@@ -257,10 +260,9 @@ fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
     Ok(name == "Hash" || name == "Threads")
 }
 
-/// The move the book or the tablebases give for the position, with the name of its source. The book
-/// is followed while it has the position; the first miss ends it until the next game. `None` leaves
-/// the move to the search.
-fn known_move(settings: &mut Settings, position: &Position) -> Option<(String, &'static str)> {
+/// The move the book gives for the position. The book is followed while it has the position; the
+/// first miss ends it until the next game. `None` leaves the move to the search.
+fn known_move(settings: &mut Settings, position: &Position) -> Option<String> {
     let state = GameState::from_moves(&position.fen, &position.moves).ok()?;
     if settings.in_book {
         let found = settings
@@ -268,12 +270,22 @@ fn known_move(settings: &mut Settings, position: &Position) -> Option<(String, &
             .as_ref()
             .and_then(|book| book.lookup(state.pos()));
         match found {
-            Some(m) => return Some((uci_string(&m), "book")),
+            Some(m) => return Some(uci_string(&m)),
             None => settings.in_book = false,
         }
     }
-    let m = settings.tablebase.as_ref()?.best_move(state.pos())?;
-    Some((uci_string(&m), "tablebase"))
+    None
+}
+
+/// The root moves the endgame tables allow, as UCI strings and as ids for the search. `None` when
+/// the tables are off or do not cover the position.
+fn tablebase_moves(settings: &Settings, position: &Position) -> Option<(Vec<String>, Vec<u32>)> {
+    let state = GameState::from_moves(&position.fen, &position.moves).ok()?;
+    let moves = settings.tablebase.as_ref()?.root_moves(state.pos())?;
+    Some((
+        moves.iter().map(uci_string).collect(),
+        moves.iter().map(move_id).collect(),
+    ))
 }
 
 fn main() {
@@ -374,16 +386,25 @@ fn main() {
             },
             "go" => {
                 finish(&mut running, &mut memory);
-                if let Some((best, source)) = known_move(&mut settings, &position) {
-                    println!("info string {source}\nbestmove {best}");
+                if let Some(best) = known_move(&mut settings, &position) {
+                    println!("info string book\nbestmove {best}");
                     continue;
                 }
+                // The tables say which moves keep the result; the search chooses among them.
+                let root_moves = match tablebase_moves(&settings, &position) {
+                    Some((names, _)) if names.len() == 1 => {
+                        println!("info string tablebase\nbestmove {}", names[0]);
+                        continue;
+                    }
+                    found => found.map(|(_, ids)| ids),
+                };
                 let white = GameState::from_moves(&position.fen, &position.moves)
                     .map_or(true, |state| state.turn() == Color::White);
                 let job = Job {
                     position: position.clone(),
                     limits: go_limits(args, white, position.move_number()),
                     stop: Arc::new(AtomicBool::new(false)),
+                    root_moves,
                 };
                 let stop = job.stop.clone();
                 let memory_for_thread = memory.take().expect("memory is back after finish");
@@ -495,10 +516,7 @@ mod tests {
             fen: START_FEN.into(),
             moves: vec![],
         };
-        assert_eq!(
-            known_move(&mut settings, &start),
-            Some(("e2e4".to_string(), "book"))
-        );
+        assert_eq!(known_move(&mut settings, &start), Some("e2e4".to_string()));
         let off_book = Position {
             fen: START_FEN.into(),
             moves: vec!["a2a3".into()],

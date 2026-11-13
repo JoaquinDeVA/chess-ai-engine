@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use shakmaty::{Chess, Move, Position, Role};
+use shakmaty::{Chess, Move, Position};
 use shakmaty_syzygy::Tablebase;
 
 use crate::board::ordered_moves;
@@ -46,35 +46,24 @@ impl EndgameTablebase {
             .map(|w| w as i32)
     }
 
-    /// Sort key (higher is better) of a position reached by our move, seen from the opponent.
-    /// A zeroing move that keeps a clean win is ranked at DTZ zero.
-    fn rank(&self, after: &Chess, zeroing: bool) -> Option<(i32, i32)> {
+    /// Result of a position reached by our move, for the side that moved: 3 mate, 2 win, 1 win that
+    /// the 50-move rule spoils, 0 draw, -1 loss that the rule saves, -2 loss. `None` if a table is
+    /// missing.
+    fn result_after(&self, after: &Chess) -> Option<i32> {
         if after.is_checkmate() {
-            return Some((3, 0));
+            return Some(3);
         }
         if after.is_stalemate() || after.is_insufficient_material() {
-            return Some((0, 0));
+            return Some(0);
         }
-        let wdl = -(self.tables.probe_wdl_after_zeroing(after).ok()? as i32); // for the side that moved
-        let dtz = if wdl == 2 && zeroing {
-            0
-        } else {
-            self.tables.probe_dtz(after).ok()?.ignore_rounding().0.abs()
-        };
-        Some(match wdl {
-            2 => (2, -dtz),
-            1 => (1, -dtz),
-            0 => (0, 0),
-            -1 => (-1, dtz),
-            _ => (-2, dtz),
-        })
+        Some(-(self.tables.probe_wdl_after_zeroing(after).ok()? as i32))
     }
 
-    /// Best move according to the tables: moves are ranked by the result they keep, then by the
-    /// distance to zeroing (a winning move wins soonest, a losing one resists longest); a move that
-    /// mates comes first. Ties go to the first move in UCI order. `None` when the position is not
-    /// covered, has no legal move or a needed table is missing.
-    pub fn best_move(&self, pos: &Chess) -> Option<Move> {
+    /// The moves that keep the best result the tables give (a mate, else a win, else a draw, else the
+    /// longest resistance), in the order of `ordered_moves`. The search chooses among them: the tables
+    /// say which moves do not throw the result away, not which one makes progress. `None` when the
+    /// position is not covered, has no legal move or a needed table is missing.
+    pub fn root_moves(&self, pos: &Chess) -> Option<Vec<Move>> {
         if !self.covers(pos) {
             return None;
         }
@@ -82,16 +71,20 @@ impl EndgameTablebase {
         if moves.is_empty() || pos.is_insufficient_material() || pos.halfmoves() >= 150 {
             return None;
         }
-        let mut best: Option<(Move, (i32, i32))> = None;
-        for m in moves {
+        let mut results = Vec::with_capacity(moves.len());
+        for m in &moves {
             let mut after = pos.clone();
-            after.play_unchecked(m);
-            let zeroing = m.role() == Role::Pawn || m.is_capture();
-            let key = self.rank(&after, zeroing)?;
-            if best.as_ref().is_none_or(|(_, k)| key > *k) {
-                best = Some((m, key));
-            }
+            after.play_unchecked(*m);
+            results.push(self.result_after(&after)?);
         }
-        best.map(|(m, _)| m)
+        let best = *results.iter().max()?;
+        Some(
+            moves
+                .into_iter()
+                .zip(results)
+                .filter(|&(_, result)| result == best)
+                .map(|(m, _)| m)
+                .collect(),
+        )
     }
 }

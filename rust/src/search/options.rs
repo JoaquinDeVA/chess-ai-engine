@@ -18,6 +18,9 @@ pub struct Options {
     /// Nodes an iteration may visit before it is cut (`None`: no limit). Each iteration counts
     /// its own nodes, so a fixed-node search is deterministic whatever the machine.
     pub node_limit: Option<u64>,
+    /// Ids (`board::move_id`) of the only moves the root may play (`None`: all of them). The endgame
+    /// tables use it to leave out the moves that throw the result away.
+    pub root_moves: Option<Vec<u32>>,
 }
 
 impl Default for Options {
@@ -26,6 +29,7 @@ impl Default for Options {
             quiescence_plies: DEFAULT_QUIESCENCE_PLIES,
             min_depth: DEFAULT_MIN_DEPTH,
             node_limit: None,
+            root_moves: None,
         }
     }
 }

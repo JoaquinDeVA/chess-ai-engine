@@ -24,35 +24,57 @@ fn the_book_returns_the_entry_of_a_position_and_nothing_else() {
     assert!(book.lookup(&other).is_none());
 }
 
-#[test]
-fn the_three_piece_tables_play_the_winning_move() {
-    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
-    for (fen, expected) in [
-        ("8/6R1/8/8/8/8/3k1K2/8 w - - 0 1", "g7g3"),
-        ("8/k7/8/8/8/8/3KQ3/8 b - - 0 1", "a7b6"),
-    ] {
-        let pos = position_from_fen(fen).unwrap();
-        let got = tables.best_move(&pos).map(|m| uci_string(&m));
-        assert_eq!(got.as_deref(), Some(expected), "{fen}");
-    }
-}
-
-#[test]
-fn a_winning_capture_comes_before_a_move_with_a_smaller_dtz() {
-    // Qxa2 leaves a mate in sixteen (DTZ 16 after it); Qa1 has DTZ 2 and loops forever.
-    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
-    let fen = "8/8/8/2k5/8/8/pQ5K/8 w - - 2 69";
+/// The moves the tables leave to the search, in UCI.
+fn root_moves(tables: &EndgameTablebase, fen: &str) -> Option<Vec<String>> {
     let pos = position_from_fen(fen).unwrap();
-    let got = tables.best_move(&pos).map(|m| uci_string(&m));
-    assert_eq!(got.as_deref(), Some("b2a2"));
+    let moves = tables.root_moves(&pos)?;
+    Some(moves.iter().map(uci_string).collect())
 }
 
 #[test]
-fn the_tables_do_not_hang_a_queen_to_shorten_the_dtz() {
-    // Game FHRCwTDL, move 65: Qc7+ Kxc7 zeroes the counter at once (DTZ 1) but throws a queen away;
-    // Qxa3+ captures the pawn and keeps both queens.
+fn the_three_piece_tables_keep_only_the_moves_that_hold_the_result() {
     let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
-    let pos = position_from_fen("6Q1/8/3k4/8/8/p7/7K/2Q5 w - - 3 65").unwrap();
-    let got = tables.best_move(&pos).map(|m| uci_string(&m));
-    assert_eq!(got.as_deref(), Some("c1a3"));
+    // The rook wins; Rb2 hands it to the king (a draw), Ra8 keeps the win.
+    let moves = root_moves(&tables, "8/8/8/8/8/2k5/R7/4K3 w - - 0 1").unwrap();
+    assert!(moves.contains(&"a2a8".to_string()), "{moves:?}");
+    assert!(!moves.contains(&"a2b2".to_string()), "{moves:?}");
+    // Lost for black: no move changes it, none is stalemate, and the king can walk away.
+    let moves = root_moves(&tables, "8/k7/8/8/8/8/3KQ3/8 b - - 0 1").unwrap();
+    assert!(moves.contains(&"a7b6".to_string()), "{moves:?}");
+}
+
+#[test]
+fn a_mate_in_one_is_the_only_move_left() {
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    let moves = root_moves(&tables, "7k/8/6K1/8/8/8/Q7/8 w - - 0 1").unwrap();
+    assert_eq!(moves, ["a2a8"]);
+}
+
+#[test]
+fn positions_the_tables_do_not_cover_give_no_moves() {
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    assert!(root_moves(
+        &tables,
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    )
+    .is_none());
+}
+
+#[test]
+fn a_winning_capture_stays_among_the_moves_and_a_throw_away_does_not() {
+    // Game FHRCwTDL, move 69: Qxa2 wins, so does Qa1 (the loop of the game), but Qb8 draws.
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    let moves = root_moves(&tables, "8/8/8/2k5/8/8/pQ5K/8 w - - 2 69").unwrap();
+    assert!(moves.contains(&"b2a2".to_string()), "{moves:?}");
+    assert!(!moves.contains(&"b2b8".to_string()), "{moves:?}");
+}
+
+#[test]
+fn the_move_that_keeps_both_queens_is_among_the_winning_moves() {
+    // Game FHRCwTDL, move 65: Qxa3+ and Qc7+ both win, but Qc7+ Kxc7 throws a queen away; the tables
+    // list both and leave the choice to the search.
+    let tables = EndgameTablebase::open(&root().join("tests/data/syzygy")).unwrap();
+    let moves = root_moves(&tables, "6Q1/8/3k4/8/8/p7/7K/2Q5 w - - 3 65").unwrap();
+    assert!(moves.contains(&"c1a3".to_string()), "{moves:?}");
+    assert!(moves.contains(&"c1c7".to_string()), "{moves:?}");
 }

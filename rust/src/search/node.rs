@@ -230,6 +230,17 @@ impl Search<'_> {
             )
             .copied()
             .collect();
+        if let (0, Some(allowed)) = (ply, &self.options.root_moves) {
+            let kept: MoveList = ordered
+                .iter()
+                .filter(|m| allowed.contains(&move_id(m)))
+                .copied()
+                .collect();
+            // A list that matches no legal move is a mistake of the caller: search everything.
+            if !kept.is_empty() {
+                ordered = kept;
+            }
+        }
         // Helper threads rotate the root moves so they do not all search the same subtree; the
         // table move is not put first there for the same reason.
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;

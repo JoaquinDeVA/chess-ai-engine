@@ -368,3 +368,43 @@ fn an_iteration_that_would_end_far_past_the_soft_limit_is_not_started() {
     assert!(stats.iterations.iter().all(|it| !it.truncated));
     assert!(best.is_some());
 }
+
+/// Ids of the legal moves of `fen` whose UCI string is in `names`.
+fn ids(fen: &str, names: &[&str]) -> Vec<u32> {
+    let state = state(fen);
+    crate::board::ordered_moves(state.pos())
+        .iter()
+        .filter(|m| names.contains(&uci_string(m).as_str()))
+        .map(crate::board::move_id)
+        .collect()
+}
+
+#[test]
+fn the_root_only_searches_the_moves_it_is_given() {
+    let fen = MATE_IN_ONE;
+    let search_with = |root_moves: Option<Vec<u32>>| {
+        let options = Options {
+            root_moves,
+            ..Options::default()
+        };
+        alpha_beta(
+            &mut state(fen),
+            &material(),
+            &mut Memory::default(),
+            &options,
+            2,
+            &control(f64::INFINITY, &no_time),
+        )
+        .best
+        .as_ref()
+        .map(uci_string)
+    };
+    assert_eq!(search_with(None).as_deref(), Some("a1a8"));
+    // Mate is left out of the list, so another listed move is played.
+    let allowed = ids(fen, &["a1a2", "a1b1"]);
+    assert_eq!(allowed.len(), 2);
+    let best = search_with(Some(allowed)).unwrap();
+    assert!(best == "a1a2" || best == "a1b1");
+    // A list that matches no legal move is ignored.
+    assert_eq!(search_with(Some(vec![u32::MAX])).as_deref(), Some("a1a8"));
+}

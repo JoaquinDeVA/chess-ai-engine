@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional
 
 import chess
 
@@ -24,7 +24,6 @@ def _ms(seconds: float) -> int:
 class UciEngine:
     """One engine process, driven in UCI; a game keeps its table between moves.
 
-    :param techniques: Techniques of selective search to switch on.
     :param threads: Threads that search.
     :param book: Opening book the engine follows, or None for none.
     :param tablebase: Folder of the endgame tablebases the engine plays, or None for none.
@@ -32,7 +31,6 @@ class UciEngine:
 
     def __init__(
         self,
-        techniques: Sequence[str],
         threads: int,
         book: Optional[Path] = None,
         tablebase: Optional[Path] = None,
@@ -47,7 +45,6 @@ class UciEngine:
         self._send("uci")
         self._wait_for("uciok")
         self._send(f"setoption name Threads value {threads}")
-        self._send(f"setoption name Techniques value {','.join(techniques)}")
         if book is not None:
             self._send(f"setoption name Book value {book}")
         if tablebase is not None:
@@ -99,7 +96,6 @@ class UciBot:
     def __init__(self, settings):
         self.settings = settings
         self.engine = UciEngine(
-            settings.techniques,
             settings.threads,
             book=BOOK if settings.opening_book and BOOK.exists() else None,
             tablebase=TABLEBASE if settings.tablebase and TABLEBASE.exists() else None,

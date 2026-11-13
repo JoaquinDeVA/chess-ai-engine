@@ -2,13 +2,10 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional
 
 from chess_engine import _core
 from chess_engine.uci import NO_CLOCK_MOVE_TIME
-
-#: Techniques of selective search the AI players use by default, the binary's own.
-DEFAULT_TECHNIQUES = tuple(_core.DEFAULT_TECHNIQUES)
 
 #: Threads an AI gets by default against a person, at most.
 DEFAULT_THREADS = max(1, min(4, os.cpu_count() or 1))
@@ -27,7 +24,6 @@ class AISettings:
     :param move_time: Seconds per move, or None to spend a share of the clock.
     :param opening_book: Play the book while the game follows it.
     :param tablebase: Play endings of up to five pieces from the tables.
-    :param techniques: Selective-search techniques to switch on.
     :param threads: Threads that search.
     """
 
@@ -35,7 +31,6 @@ class AISettings:
     move_time: Optional[float] = NO_CLOCK_MOVE_TIME
     opening_book: bool = True
     tablebase: bool = True
-    techniques: Tuple[str, ...] = DEFAULT_TECHNIQUES
     threads: int = DEFAULT_THREADS
 
 

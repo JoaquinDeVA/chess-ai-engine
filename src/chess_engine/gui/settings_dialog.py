@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from chess_engine import _core
 from chess_engine.gui.settings import MAX_SETTABLE_DEPTH, AISettings
 from chess_engine.uci import NO_CLOCK_MOVE_TIME
 
@@ -55,15 +54,9 @@ class AISettingsDialog(QDialog):
         self.threads = QSpinBox()
         self.threads.setRange(1, 64)
         self.threads.setValue(current.threads)
-        self.techniques = {}
         advanced = QGroupBox("Advanced")
         advanced_form = QFormLayout(advanced)
         advanced_form.addRow("Search threads", self.threads)
-        for technique in _core.TECHNIQUES:
-            box = QCheckBox(technique)
-            box.setChecked(technique in current.techniques)
-            self.techniques[technique] = box
-            advanced_form.addRow(box)
         advanced.setVisible(False)
         toggle = QPushButton("Advanced…")
         toggle.setCheckable(True)
@@ -91,7 +84,6 @@ class AISettingsDialog(QDialog):
             move_time=self.move_time.value() if self.fixed_time.isChecked() else None,
             opening_book=self.book.isChecked(),
             tablebase=self.tablebase.isChecked(),
-            techniques=tuple(name for name, box in self.techniques.items() if box.isChecked()),
             threads=self.threads.value(),
         )
 

@@ -9,7 +9,6 @@ from chess_engine.gui.game_model import (
     ai_accepts_draw,
 )
 from chess_engine.gui.settings import (
-    DEFAULT_TECHNIQUES,
     AISettings,
     MatchSetup,
     PlayerSetup,
@@ -138,7 +137,6 @@ def test_pgn_has_the_names_and_the_result():
 
 
 def test_setup_names_and_defaults():
-    assert AISettings().techniques == DEFAULT_TECHNIQUES
     setup = MatchSetup()
     assert setup.white.is_human and setup.has_humans() and setup.white.label == "You"
     assert not MatchSetup(PlayerSetup(AISettings()), PlayerSetup(AISettings())).has_humans()

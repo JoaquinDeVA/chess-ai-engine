@@ -43,7 +43,7 @@ def test_limits_fixed_time_or_clock(bot):
 def test_the_engine_plays_the_book_it_is_given(tmp_path):
     book = tmp_path / "book.json"
     book.write_text(json.dumps({chess.STARTING_FEN: "d2d4"}))
-    engine = UciEngine([], 1, book=book)
+    engine = UciEngine(1, book=book)
     try:
         assert engine.bestmove(chess.Board(), "movetime 200") == chess.Move.from_uci("d2d4")
     finally:

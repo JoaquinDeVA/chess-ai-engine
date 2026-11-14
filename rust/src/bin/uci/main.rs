@@ -12,6 +12,7 @@ mod clock;
 mod engine;
 mod limits;
 mod position;
+mod search_job;
 
 /// Selects the executable mode from process arguments.
 ///

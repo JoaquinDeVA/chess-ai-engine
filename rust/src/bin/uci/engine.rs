@@ -1,23 +1,21 @@
 use std::io::{self, BufRead};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::Instant;
 
-use _core::board::{move_id, ordered_moves, uci_string};
+use _core::board::{move_id, uci_string};
 use _core::eval::Net;
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
-use _core::search::{self, Control, Memory, Options, DEFAULT_HASH_MB};
+use _core::search::{Memory, DEFAULT_HASH_MB};
 use shakmaty::Color;
 
-use crate::limits::{parse_go, SearchLimits};
+use crate::limits::parse_go;
 use crate::position::{self, Position};
+use crate::search_job::RunningSearch;
 
 pub const MODEL_NAME: &str = "net_pst_w64";
 const MODEL_JSON: &str = include_str!("../../../models/net_pst_w64.json");
-const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+pub(crate) const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /// Settings changed with `setoption`.
 struct EngineSettings {
@@ -28,15 +26,6 @@ struct EngineSettings {
     in_book: bool,
     tablebase: Option<EndgameTablebase>,
 }
-
-struct SearchJob {
-    position: Position,
-    limits: SearchLimits,
-    stop: Arc<AtomicBool>,
-    root_moves: Option<Vec<u32>>,
-}
-
-type RunningSearch = (JoinHandle<Memory>, Arc<AtomicBool>);
 
 pub fn load_model() -> Result<Net, String> {
     Net::from_json(MODEL_JSON)
@@ -95,6 +84,7 @@ impl UciEngine {
             "position" => self.set_position(args),
             "go" => self.start_search(args),
             "stop" => self.stop_search(),
+            "ponderhit" => self.ponder_hit(),
             "quit" => {
                 self.stop_search();
                 self.finish_search();
@@ -109,6 +99,7 @@ impl UciEngine {
         println!("id name chess_core");
         println!("option name Hash type spin default {DEFAULT_HASH_MB} min 1 max 65536");
         println!("option name Threads type spin default 1 min 1 max 64");
+        println!("option name Ponder type check default false");
         println!("option name Book type string default");
         println!("option name Tablebase type string default");
         println!("option name Model type string default {MODEL_NAME}");
@@ -148,6 +139,11 @@ impl UciEngine {
                     .parse::<usize>()
                     .map_err(|_| "Threads needs a number")?
                     .max(1)
+            }
+            "Ponder" => {
+                value
+                    .parse::<bool>()
+                    .map_err(|_| "Ponder needs true or false")?;
             }
             "Model" if value == MODEL_NAME => self.settings.eval = Arc::new(load_model()?),
             "Model" => {
@@ -195,43 +191,53 @@ impl UciEngine {
 
     fn start_search(&mut self, args: &[&str]) {
         self.finish_search();
-        if let Some(best) = self.book_move() {
-            println!("info string book\nbestmove {best}");
-            return;
-        }
-        let root_moves = match self.tablebase_root_moves() {
-            Some((names, _)) if names.len() == 1 => {
-                println!("info string tablebase\nbestmove {}", names[0]);
-                return;
-            }
-            found => found.map(|(_, ids)| ids),
-        };
         let white_to_move = self
             .position
             .state()
             .map_or(true, |state| state.turn() == Color::White);
-        let job = SearchJob {
-            position: self.position.clone(),
-            limits: parse_go(args, white_to_move, self.position.move_number()),
-            stop: Arc::new(AtomicBool::new(false)),
-            root_moves,
+        let limits = parse_go(args, white_to_move, self.position.move_number());
+        if !limits.ponder {
+            if let Some(best) = self.book_move() {
+                println!("info string book\nbestmove {best}");
+                return;
+            }
+        }
+        let root_moves = if limits.ponder {
+            None
+        } else {
+            match self.tablebase_root_moves() {
+                Some((names, _)) if names.len() == 1 => {
+                    println!("info string tablebase\nbestmove {}", names[0]);
+                    return;
+                }
+                found => found.map(|(_, ids)| ids),
+            }
         };
-        let stop = job.stop.clone();
         let memory = self.memory.take().expect("memory is back after finish");
-        let eval = self.settings.eval.clone();
-        let handle = std::thread::spawn(move || search_job(memory, eval, job));
-        self.running = Some((handle, stop));
+        self.running = Some(RunningSearch::start(
+            memory,
+            self.settings.eval.clone(),
+            self.position.clone(),
+            limits,
+            root_moves,
+        ));
     }
 
     fn stop_search(&self) {
-        if let Some((_, stop)) = &self.running {
-            stop.store(true, Relaxed);
+        if let Some(search) = &self.running {
+            search.stop();
+        }
+    }
+
+    fn ponder_hit(&self) {
+        if let Some(search) = &self.running {
+            search.ponder_hit();
         }
     }
 
     fn finish_search(&mut self) {
-        if let Some((handle, _)) = self.running.take() {
-            self.memory = Some(handle.join().expect("search thread panicked"));
+        if let Some(search) = self.running.take() {
+            self.memory = Some(search.finish());
         }
     }
 
@@ -259,52 +265,4 @@ impl UciEngine {
             moves.iter().map(move_id).collect(),
         ))
     }
-}
-
-fn search_job(mut memory: Memory, eval: Arc<Net>, job: SearchJob) -> Memory {
-    match run_search(&mut memory, &eval, job) {
-        Ok(best) => println!("bestmove {best}"),
-        Err(error) => println!("info string {error}\nbestmove 0000"),
-    }
-    memory
-}
-
-fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<String, String> {
-    let mut state = job.position.state()?;
-    let options = Options {
-        node_limit: job.limits.node_limit,
-        root_moves: job.root_moves,
-        ..Options::default()
-    };
-    let origin = Instant::now();
-    let clock = || origin.elapsed().as_secs_f64();
-    let control = Control {
-        start: 0.0,
-        hard_limit: job.limits.hard_time,
-        clock: &clock,
-        stop: Some(&job.stop),
-        progress: None,
-        rotation: 0,
-    };
-    let (best, stats) = search::iterative_deepening(
-        &mut state,
-        eval,
-        memory,
-        &options,
-        job.limits.max_depth,
-        job.limits.soft_time,
-        &control,
-    )?;
-    println!(
-        "info depth {} nodes {} time {}",
-        stats.completed_depth,
-        stats.nodes_visited,
-        (clock() * 1000.0) as u64
-    );
-    Ok(match best {
-        Some(mv) => uci_string(&mv),
-        None => ordered_moves(state.pos())
-            .first()
-            .map_or("0000".to_string(), uci_string),
-    })
 }

@@ -8,11 +8,14 @@ pub struct SearchLimits {
     pub node_limit: Option<u64>,
     pub soft_time: f64,
     pub hard_time: f64,
+    pub ponder: bool,
+    pub resume_soft_time: f64,
+    pub resume_hard_time: f64,
 }
 
 /// Parses the UCI `go` arguments for the side to move.
 pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchLimits {
-    let (mut depth, mut nodes) = (None, None);
+    let (mut depth, mut nodes, mut ponder) = (None, None, false);
     let (mut move_time, mut moves_to_go) = (None, None);
     let (mut white_time, mut black_time, mut white_increment, mut black_increment) =
         (None, None, 0.0, 0.0);
@@ -20,6 +23,10 @@ pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchL
     let mut words = args.iter().copied();
     while let Some(key) = words.next() {
         if key == "infinite" {
+            continue;
+        }
+        if key == "ponder" {
+            ponder = true;
             continue;
         }
         let Some(value) = words.next() else { break };
@@ -41,7 +48,7 @@ pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchL
     } else {
         (black_time, black_increment)
     };
-    let (soft_time, hard_time) = match (move_time, time_left) {
+    let (resume_soft_time, resume_hard_time) = match (move_time, time_left) {
         (Some(seconds), _) => (seconds, seconds),
         (None, Some(seconds)) => {
             let budget = allocate_time(seconds, increment, moves_to_go, move_number);
@@ -49,11 +56,19 @@ pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchL
         }
         (None, None) => (f64::INFINITY, f64::INFINITY),
     };
+    let (soft_time, hard_time) = if ponder {
+        (f64::INFINITY, f64::INFINITY)
+    } else {
+        (resume_soft_time, resume_hard_time)
+    };
     SearchLimits {
         max_depth: depth.unwrap_or(MAX_DEPTH).max(1),
         node_limit: nodes,
         soft_time,
         hard_time,
+        ponder,
+        resume_soft_time,
+        resume_hard_time,
     }
 }
 
@@ -76,5 +91,19 @@ mod tests {
 
         let fixed = parse_go(&["movetime", "500", "wtime", "60000"], true, 1);
         assert!(close(fixed.soft_time, 0.5) && close(fixed.hard_time, 0.5));
+    }
+
+    #[test]
+    fn ponder_ignores_clock_limits() {
+        let limits = parse_go(
+            &[
+                "ponder", "wtime", "1000", "btime", "60000", "movetime", "500",
+            ],
+            true,
+            1,
+        );
+        assert!(limits.ponder);
+        assert!(limits.soft_time.is_infinite() && limits.hard_time.is_infinite());
+        assert!(close(limits.resume_soft_time, 0.5));
     }
 }

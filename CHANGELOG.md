@@ -4,6 +4,9 @@ All notable changes. The newest are first.
 
 ## Unreleased
 
+### Added
+- UCI pondering: the `Ponder` option, `go ponder` and `ponderhit`, and a `ponder` move in `bestmove` taken from the transposition table. A search started with `go ponder` keeps its `bestmove` until `ponderhit` or `stop`, even if it ends by itself, and only the first `ponderhit` sets the real time budget. The soft limit is scaled only over that budget, not over the time already spent pondering. Covered by two tests in `search_job.rs`; no strength measurement yet.
+
 ### Fixed
 - Endgame tables no longer loop or hang material: a winning capture, pawn move or promotion is now
   ranked first (DTZ 0) instead of by the DTZ of the position it leaves. A live game had repeated

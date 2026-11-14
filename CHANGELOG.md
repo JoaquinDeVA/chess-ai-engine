@@ -14,6 +14,7 @@ All notable changes. The newest are first.
   tests on the positions of that game.
 
 ### Changed
+- The search is split into `alpha_beta/`, `ordering/` and `deepening/` modules (one concept per file), and a node now hands out its moves lazily with a move picker (table move, good captures with SEE on demand, killers, countermove, quiet moves by history, losing captures) instead of ordering all of them first. Same tree: `uci bench 1` is 77,589 nodes and `uci ttd 9 rust/bench/middlegame.epd` 3,989,480 nodes before and after; nodes per second about 17 % to 21 % higher in three alternated A/B runs (median of 5 runs each, one machine).
 - Detailed search counters (cuts by move, table hits, evictions) are compiled only with `--features search-diagnostics`; `uci ttd` and `uci bench` print zeros for them otherwise. Same tree: `uci ttd 9 rust/bench/middlegame.epd 30` is 3,989,480 nodes before and after; nodes per second 1,010,980 to 1,007,256 (−0.4 % ± 0.6 %, 12 alternated runs each): no measurable speed difference.
 - The UCI binary is split into `engine`, `clock`, `limits` and `position` modules; no behaviour change.
 History scores use gravity (bounded by 16384, no halving of the table) and the quiet moves tried before a cut lose score; about 28 % fewer nodes at depth 9, to be confirmed by the match

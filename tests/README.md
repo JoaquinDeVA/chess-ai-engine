@@ -28,7 +28,7 @@ positions of the feature-parity tests), `data/syzygy/` (five 3-piece tables) and
   synthetic positions.
 - A test that takes more than a few seconds is marked `slow` (`pytest -m "not slow"` skips it).
 - The Rust tests are the unit tests of each module (`cargo test --release`). The
-  search tests (`rust/src/search/tests.rs`) play with a material network and a fake clock, so their values and
+  search tests (`rust/src/search/tests/`) play with a material network and a fake clock, so their values and
   times depend neither on a trained model nor on the machine. Values are whole centipawns and a mate is
   `MATE − plies`.
 

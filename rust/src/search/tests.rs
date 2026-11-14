@@ -61,11 +61,63 @@ fn control(hard_limit: f64, clock: Clock<'_>) -> Control<'_> {
     Control {
         start: 0.0,
         hard_limit,
+        dynamic_hard_limit: None,
+        dynamic_soft_limit: None,
+        dynamic_budget_start: None,
         clock,
         stop: None,
         progress: None,
         rotation: 0,
     }
+}
+
+#[test]
+fn dynamic_limits_are_visible_to_an_active_search() {
+    let hard = AtomicU64::new(f64::INFINITY.to_bits());
+    let soft = AtomicU64::new(f64::INFINITY.to_bits());
+    let control = Control {
+        start: 0.0,
+        hard_limit: f64::INFINITY,
+        dynamic_hard_limit: Some(&hard),
+        dynamic_soft_limit: Some(&soft),
+        dynamic_budget_start: None,
+        clock: &no_time,
+        stop: None,
+        progress: None,
+        rotation: 0,
+    };
+    hard.store(2.0f64.to_bits(), Ordering::Release);
+    soft.store(1.0f64.to_bits(), Ordering::Release);
+    assert_eq!(control.current_hard_limit(), 2.0);
+    assert_eq!(control.current_soft_limit(f64::INFINITY), 1.0);
+}
+
+#[test]
+fn the_scale_applies_to_the_budget_and_not_to_the_time_before_it() {
+    let hard = AtomicU64::new(f64::INFINITY.to_bits());
+    let soft = AtomicU64::new(3.8f64.to_bits());
+    let begin = AtomicU64::new(2.3f64.to_bits());
+    let control = Control {
+        start: 0.0,
+        hard_limit: f64::INFINITY,
+        dynamic_hard_limit: Some(&hard),
+        dynamic_soft_limit: Some(&soft),
+        dynamic_budget_start: Some(&begin),
+        clock: &no_time,
+        stop: None,
+        progress: None,
+        rotation: 0,
+    };
+    // Budget 1.5 s from second 2.3.
+    assert!((control.scaled_soft_limit(f64::INFINITY, 1.0) - 3.8).abs() < 1e-9);
+    assert!((control.scaled_soft_limit(f64::INFINITY, 2.0) - 5.3).abs() < 1e-9);
+    assert!((control.scaled_soft_limit(f64::INFINITY, 0.5) - 3.05).abs() < 1e-9);
+    // Without a start the whole limit is the budget.
+    let plain = Control {
+        dynamic_budget_start: None,
+        ..control
+    };
+    assert!((plain.scaled_soft_limit(f64::INFINITY, 0.5) - 1.9).abs() < 1e-9);
 }
 
 fn state(fen: &str) -> GameState {

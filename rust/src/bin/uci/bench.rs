@@ -47,6 +47,9 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
     let search_control = Control {
         start: 0.0,
         hard_limit: f64::INFINITY,
+        dynamic_hard_limit: None,
+        dynamic_soft_limit: None,
+        dynamic_budget_start: None,
         clock: &unlimited_clock,
         stop: None,
         progress: None,
@@ -132,6 +135,9 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
         let control = Control {
             start: 0.0,
             hard_limit: limit,
+            dynamic_hard_limit: None,
+            dynamic_soft_limit: None,
+            dynamic_budget_start: None,
             clock: &clock,
             stop: None,
             progress: None,

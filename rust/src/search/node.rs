@@ -224,7 +224,7 @@ impl Search<'_> {
             .is_some_and(|limit| self.nodes >= limit);
         let out_of_time = self.nodes >= self.next_clock_check && {
             self.next_clock_check = self.nodes + CLOCK_EVERY_NODES;
-            (self.control.clock)() - self.control.start >= self.control.hard_limit
+            (self.control.clock)() - self.control.start >= self.control.current_hard_limit()
         };
         if stopped || out_of_nodes || out_of_time || self.truncated {
             self.truncated = true;

@@ -195,6 +195,9 @@ pub fn iterative_deepening(
                 let helper_control = Control {
                     start: control.start,
                     hard_limit: control.hard_limit,
+                    dynamic_hard_limit: control.dynamic_hard_limit,
+                    dynamic_soft_limit: control.dynamic_soft_limit,
+                    dynamic_budget_start: control.dynamic_budget_start,
                     clock: control.clock,
                     stop: Some(stop),
                     progress: Some(progress),
@@ -220,6 +223,9 @@ pub fn iterative_deepening(
         let main_control = Control {
             start: control.start,
             hard_limit: control.hard_limit,
+            dynamic_hard_limit: control.dynamic_hard_limit,
+            dynamic_soft_limit: control.dynamic_soft_limit,
+            dynamic_budget_start: control.dynamic_budget_start,
             clock: control.clock,
             stop: control.stop,
             progress: Some(&progress),
@@ -308,7 +314,8 @@ fn deepen(
         completed_depth = depth;
         // Clock policy: never stop before `min_depth`, so the move always comes from a minimum of
         // real search; after it, the soft limit scaled by how settled the best move is.
-        let soft = time_limit * soft_scale(depth, stable, result.best_share);
+        let soft =
+            control.scaled_soft_limit(time_limit, soft_scale(depth, stable, result.best_share));
         if depth >= options.min_depth && clock() - start >= soft {
             stop_reason = StopReason::Budget;
             break;
@@ -318,7 +325,8 @@ fn deepen(
         // times past the soft limit.
         let predicted_end = clock() - control.start + seconds * NEXT_ITERATION_COST;
         if depth >= options.min_depth
-            && (predicted_end >= control.hard_limit || predicted_end > soft * SOFT_OVERRUN)
+            && (predicted_end >= control.current_hard_limit()
+                || predicted_end > soft * SOFT_OVERRUN)
         {
             stop_reason = StopReason::Budget;
             break;

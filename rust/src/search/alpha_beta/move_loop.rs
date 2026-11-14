@@ -24,13 +24,21 @@ impl Search<'_> {
         table_move: Option<u32>,
         futility_value: Option<i32>,
     ) -> Outcome {
-        let killers = node_moves.killers();
+        let NodeMoves {
+            mut picker,
+            killer_ids,
+            killer_count,
+        } = node_moves;
+        let killers = &killer_ids[..killer_count];
         let (ply, mover, maximizing) = (context.ply, context.mover, context.maximizing);
         let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
         // Quiet moves searched without a cut, to be penalized when a later move cuts.
         let mut failed = MoveList::new();
-        for (index, action) in node_moves.moves.iter().copied().enumerate() {
+        let mut tried = 0;
+        while let Some(action) = picker.next(self.state.pos()) {
+            let index = tried;
+            tried += 1;
             let id = move_id(&action);
             // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
             // whether the history says the move has cut before.

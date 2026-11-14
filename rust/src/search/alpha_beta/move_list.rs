@@ -4,25 +4,21 @@ use shakmaty::MoveList;
 
 use super::{NodeContext, Search};
 use crate::board::move_id;
-use crate::search::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_PLY};
+use crate::search::ordering::{move_to_front, MovePicker, MAX_KILLERS_PER_PLY};
 
-/// The ordered moves of a node and the killers of its ply (they are not reduced or pruned).
+/// The moves of a node, handed out in the order they are tried, and the killers of its ply (they
+/// are not reduced or pruned).
 pub(super) struct NodeMoves {
-    pub(super) moves: MoveList,
-    killer_ids: [u32; MAX_KILLERS_PER_PLY],
-    killer_count: usize,
-}
-
-impl NodeMoves {
-    pub(super) fn killers(&self) -> &[u32] {
-        &self.killer_ids[..self.killer_count]
-    }
+    pub(super) picker: MovePicker,
+    pub(super) killer_ids: [u32; MAX_KILLERS_PER_PLY],
+    pub(super) killer_count: usize,
 }
 
 impl Search<'_> {
-    /// The legal `moves` ordered: killers, countermove, history, and the captures that lose
-    /// material after the quiet ones. The root keeps only the moves it is allowed; helper threads
-    /// rotate the root; everywhere else the table move goes first.
+    /// The legal `moves` in the order they are tried: table move, captures that do not lose
+    /// material, killers, countermove, quiet moves by history, and the losing captures. The root
+    /// keeps only the moves it is allowed; helper threads rotate the root instead of putting the
+    /// table move first.
     pub(super) fn node_moves(
         &self,
         context: &NodeContext,
@@ -38,49 +34,44 @@ impl Search<'_> {
             .memory
             .countermoves
             .get(context.mover, context.previous);
-        let ordered = order(
+        let restricted = context.ply == 0 && self.options.root_moves.is_some();
+        let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
+        let listed = restricted || helper_root;
+        let mut picker = MovePicker::new(
             moves,
             &killer_ids[..killer_count],
-            counter,
-            Some((&self.memory.history, context.mover)),
+            (counter, if listed { None } else { table_move }),
+            (&self.memory.history, context.mover),
             context
                 .previous_piece_to
                 .map(|previous| (&self.memory.continuation, previous)),
         );
-        // Captures that lose material come after the quiet moves (the order is otherwise kept).
-        let pos = self.state.pos();
-        let mut ordered: MoveList = ordered
-            .iter()
-            .filter(|m| !m.is_capture() || see_ge(pos, m, 0))
-            .chain(
-                ordered
+        if listed {
+            let pos = self.state.pos();
+            let mut ordered: MoveList = std::iter::from_fn(|| picker.next(pos)).collect();
+            if let (0, Some(allowed)) = (context.ply, &self.options.root_moves) {
+                let kept: MoveList = ordered
                     .iter()
-                    .filter(|m| m.is_capture() && !see_ge(pos, m, 0)),
-            )
-            .copied()
-            .collect();
-        if let (0, Some(allowed)) = (context.ply, &self.options.root_moves) {
-            let kept: MoveList = ordered
-                .iter()
-                .filter(|m| allowed.contains(&move_id(m)))
-                .copied()
-                .collect();
-            // A list that matches no legal move is a mistake of the caller: search everything.
-            if !kept.is_empty() {
-                ordered = kept;
+                    .filter(|m| allowed.contains(&move_id(m)))
+                    .copied()
+                    .collect();
+                // A list that matches no legal move is a mistake of the caller: search everything.
+                if !kept.is_empty() {
+                    ordered = kept;
+                }
             }
-        }
-        // Helper threads rotate the root moves so they do not all search the same subtree; the
-        // table move is not put first there for the same reason.
-        let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
-        if helper_root {
-            let shift = self.control.rotation % ordered.len();
-            ordered.rotate_left(shift);
-        } else {
-            move_to_front(&mut ordered, table_move);
+            // Helper threads rotate the root moves so they do not all search the same subtree;
+            // the table move is not put first there for the same reason.
+            if helper_root {
+                let shift = self.control.rotation % ordered.len();
+                ordered.rotate_left(shift);
+            } else {
+                move_to_front(&mut ordered, table_move);
+            }
+            picker.replace_with(ordered);
         }
         NodeMoves {
-            moves: ordered,
+            picker,
             killer_ids,
             killer_count,
         }

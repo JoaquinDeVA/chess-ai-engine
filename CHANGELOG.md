@@ -11,6 +11,8 @@ All notable changes. The newest are first.
   tests on the positions of that game.
 
 ### Changed
+- Detailed search counters (cuts by move, table hits, evictions) are compiled only with `--features search-diagnostics`; `uci ttd` and `uci bench` print zeros for them otherwise. Same tree: `uci ttd 9 rust/bench/middlegame.epd 30` is 3,989,480 nodes before and after; nodes per second 992,743 to 1,015,517 (+2.3 %), inside the ±2 % run-to-run spread, so not a proven speed-up.
+- The UCI binary is split into `engine`, `clock`, `limits` and `position` modules; no behaviour change.
 History scores use gravity (bounded by 16384, no halving of the table) and the quiet moves tried before a cut lose score; about 28 % fewer nodes at depth 9, to be confirmed by the match
 Quiet moves are also ordered by a history of cuts that depends on the opponent's last move (continuation history, by piece and target square); about 5 % fewer nodes at depth 9, 4 % lower nodes per second
 Quiet moves are tried after the killers in a table of replies: the move that last cut after each opponent move (countermove heuristic); about 4 % fewer nodes at depth 9

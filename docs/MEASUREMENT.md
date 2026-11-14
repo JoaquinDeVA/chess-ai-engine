@@ -125,9 +125,9 @@ cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/m
 ```
 
 The counters beyond nodes, prunings and depth (cuts by move, table hits, evictions) are compiled out by default; build
-with `--features search-diagnostics` to read them. Check on 2026-11-14 (`uci ttd 9 bench/middlegame.epd 30`, one thread, three
-alternated runs): 3,989,480 nodes with and without the counters; nodes per second 992,743 before, 1,015,517 now, 997,618 with
-diagnostics, within the ±2 % spread between runs.
+with `--features search-diagnostics` to read them. Check on 2026-11-14 (`uci ttd 9 bench/middlegame.epd 30`, one thread, laptop, 12 alternated runs per
+version): 3,989,480 nodes with and without the counters; nodes per second 1,010,980 before, 1,007,256 now (−0.4 % ± 0.6 %),
+1,014,098 with diagnostics (+0.3 % ± 0.5 %): no measurable speed difference.
 
 Baseline at `63cace7` plus the counters (`net_pst_w32`, desktop, one thread, 2026-11-10; the runs were made one
 after the other, with the machine idle): depth 9 finished in 20 of 20 positions, 122,806,437 nodes, median 4.30 s

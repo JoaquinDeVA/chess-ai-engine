@@ -1,6 +1,7 @@
 """Tests of the shared fit plumbing: encoding, its cache, the workers and the epoch loop."""
 
 import os
+import threading
 import time
 
 import numpy as np
@@ -133,3 +134,24 @@ def test_an_epoch_without_rows_is_refused():
             snapshot=lambda: None,
             initial_best=None,
         )
+
+
+def test_prefetched_keeps_order_and_applies_prepare():
+    assert list(epochs._prefetched(range(20), lambda n: n * 2)) == [n * 2 for n in range(20)]
+
+
+def test_prefetched_raises_the_error_of_the_reading_thread():
+    def frames():
+        yield 1
+        raise RuntimeError("bad frame")
+
+    with pytest.raises(RuntimeError, match="bad frame"):
+        list(epochs._prefetched(frames(), lambda n: n))
+
+
+def test_prefetched_thread_ends_when_the_consumer_stops_early():
+    before = threading.active_count()
+    items = epochs._prefetched(iter(range(1000)), lambda n: n)
+    assert next(items) == 0
+    items.close()
+    assert threading.active_count() == before

@@ -8,6 +8,8 @@ import functools
 import math
 import multiprocessing
 import os
+import queue
+import threading
 import time
 from collections import deque
 from collections.abc import Iterable, Iterator
@@ -35,6 +37,9 @@ DEFAULT_FIT_CONFIG: Dict[str, Any] = {
 #: Thread-count variables pinned to 1 in the featurization workers (the BLAS threads of
 #: numpy would otherwise oversubscribe the cores).
 _THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+
+#: Frames the reading thread keeps ready ahead of the training step.
+_PREFETCH_DEPTH = 3
 
 EncodedFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
@@ -93,6 +98,7 @@ def run_epochs(
     set_lr: Callable[[float], None],
     snapshot: Callable[[], Any],
     initial_best: Any,
+    prepare: Callable[[EncodedFrame], Any] = lambda encoded: encoded,
 ) -> Tuple[Dict[str, Any], Any]:
     """Epoch loop shared by the models: encoded frames, decay or patience, best-epoch state.
 
@@ -105,12 +111,15 @@ def run_epochs(
     :param cfg: Fit configuration (``max_epochs``, ``workers``, ``patience``, ``lr_decay``...).
     :param started: ``time.perf_counter()`` at the start of the fit, for ``seconds``.
     :param frames: Given the pool (or None), the encoded frames of one epoch.
-    :param train_batch: Trains on one encoded frame; returns ``(loss_sum, rows)``.
+    :param train_batch: Trains on one prepared frame; returns ``(loss_sum, rows)``.
     :param validation_loss: Mean validation loss with the current weights.
     :param get_lr: Current learning rate.
     :param set_lr: Sets the learning rate.
     :param snapshot: State to keep when an epoch is the best so far.
     :param initial_best: State to return if no epoch improves on infinity.
+    :param prepare: Turns an encoded frame into what ``train_batch`` takes. It runs, like the
+        reading of the frames, in a thread ahead of the training step, so the step does not wait
+        for them.
     :return: ``(summary, best_state)``; the summary has ``epochs``, ``best_epoch``,
         ``train_losses``, ``val_losses``, ``lr_history``, ``train_rows``, ``seconds``, ``config``.
     :raises ValueError: If an epoch yields no rows or a validation loss is not finite.
@@ -128,8 +137,8 @@ def run_epochs(
         for epoch in range(1, int(cfg["max_epochs"]) + 1):
             loss_sum, rows_seen = 0.0, 0
             lr_history.append(get_lr())
-            for encoded in frames(executor):
-                frame_loss, frame_rows = train_batch(encoded)
+            for prepared in _prefetched(frames(executor), prepare):
+                frame_loss, frame_rows = train_batch(prepared)
                 loss_sum += frame_loss
                 rows_seen += frame_rows
             if rows_seen == 0:
@@ -173,6 +182,49 @@ def run_epochs(
         "config": cfg,
     }
     return summary, best_state
+
+
+def _prefetched(frames: Iterable[EncodedFrame], prepare: Callable[[EncodedFrame], Any]) -> Iterator:
+    """``prepare`` of each frame, in order, computed by a thread up to a few frames ahead.
+
+    Reading from the cache and the padding release the GIL, so they overlap with the training
+    step. An error in the thread is raised here; if the consumer stops early the thread ends.
+    """
+    ready: queue.Queue = queue.Queue(maxsize=_PREFETCH_DEPTH)
+    stop = threading.Event()
+    done = object()
+
+    def put(item: Any) -> bool:
+        while not stop.is_set():
+            try:
+                ready.put(item, timeout=0.1)
+                return True
+            except queue.Full:
+                pass
+        return False
+
+    def produce() -> None:
+        try:
+            for frame in frames:
+                if not put(prepare(frame)):
+                    return
+            put(done)
+        except BaseException as error:  # handed to the consumer
+            put(error)
+
+    thread = threading.Thread(target=produce, daemon=True)
+    thread.start()
+    try:
+        while True:
+            item = ready.get()
+            if item is done:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+    finally:
+        stop.set()
+        thread.join()
 
 
 def _resolve(item: Tuple[int, Any], cache_dir: Optional[Path]) -> EncodedFrame:

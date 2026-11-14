@@ -258,8 +258,8 @@ def fit_stream(
     )
     val_index, val_value, val_y = _padded(encode_frame(features, rep, validation), width)
 
-    def train_batch(encoded: EncodedFrame) -> Tuple[float, int]:
-        index, value, targets = _padded(encoded, width)
+    def train_batch(padded: Tuple[np.ndarray, np.ndarray, np.ndarray]) -> Tuple[float, int]:
+        index, value, targets = padded
         loss_sum = 0.0
         for start in range(0, len(targets), batch_size):
             stop = min(len(targets), start + batch_size)
@@ -282,6 +282,7 @@ def fit_stream(
             features, rep, batches, int(cfg["workers"]), executor, cache_dir
         ),
         train_batch=train_batch,
+        prepare=lambda encoded: _padded(encoded, width),
         validation_loss=validation_loss,
         get_lr=lambda: float(network.optimizer.learning_rate.numpy()),
         set_lr=network.optimizer.learning_rate.assign,

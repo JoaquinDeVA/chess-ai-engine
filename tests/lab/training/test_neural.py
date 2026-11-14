@@ -10,6 +10,9 @@ import pytest
 
 from chess_lab.models.definitions import (
     NeuralEvalModel,
+    NnK4ThreatsW64BothModel,
+    NnK4W64BothModel,
+    NnThreatsW64BothModel,
     NnW64BothModel,
     NnW64x16Model,
     get_model_class,
@@ -44,8 +47,18 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     (w0, b0), *rest = model.layers
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
     if model.perspective:
-        # the rival's view: every piece in the other block of its square
-        rival = np.roll(x, 384)
+        # the rival's view: every piece in the other block of its square, in the bucket of the
+        # rival's king; the dense entries have no rival view
+        features = features_of(model)
+        king = board.king(not board.turn)
+        if board.turn == chess.WHITE:
+            king = chess.square_mirror(king)
+        pieces = getattr(features, "buckets", 1) * 768
+        shift = features.bucket(king) * 768 if hasattr(features, "bucket") else 0
+        rival = np.zeros_like(x)
+        for index, value in zip(indices, values, strict=True):
+            if index < pieces:
+                rival[shift + (index % 768 + 384) % 768] += value
         h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
     for weights, bias in rest[:-1]:
         h = np.maximum(h @ weights + bias, 0.0)
@@ -72,7 +85,10 @@ def test_both_perspectives_double_the_input_of_the_second_layer():
     assert model.count_parameters() == 768 * 64 + 64 + 128 + 1
 
 
-@pytest.mark.parametrize("model_class", [NnW64x16Model, NnW64BothModel])
+BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel, NnK4W64BothModel, NnK4ThreatsW64BothModel]
+
+
+@pytest.mark.parametrize("model_class", [NnW64x16Model, *BOTH_MODELS])
 def test_core_score_matches_a_dense_numpy_reference(model_class):
     model = random_net(seed=6, model_class=model_class)
     evaluator = model.evaluator()
@@ -82,16 +98,21 @@ def test_core_score_matches_a_dense_numpy_reference(model_class):
         )
 
 
-def test_the_training_graph_computes_what_the_core_does():
+@pytest.mark.parametrize("model_class", BOTH_MODELS)
+def test_the_training_graph_computes_what_the_core_does(model_class):
     from chess_lab.training.epochs import encode_frame
     from chess_lab.training.neural import _assign, _keras_network, _padded, _training_keras
 
-    model = random_net(seed=5, model_class=NnW64BothModel)
+    model = random_net(seed=5, model_class=model_class)
+    features = features_of(model)
+    width = features.max_entries()
     keras = _training_keras()
-    network, parts = _keras_network(keras, [w.shape for w, _ in model.layers], 32, 0.0, True)
+    network, parts = _keras_network(
+        keras, [w.shape for w, _ in model.layers], width, 0.0, True, getattr(features, "buckets", 1)
+    )
     _assign(parts, model.layers)
-    boards = random_positions(8, seed=9)
-    index, value, _ = _padded(encode_frame(features_of(model), Representation(), frame(boards)), 32)
+    boards = random_positions(40, seed=9)
+    index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)
     logits = np.asarray(network.predict([index, value], verbose=0)).reshape(-1)
     for board, logit in zip(boards, logits, strict=True):
         assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)

@@ -427,11 +427,9 @@ mod tests {
         check_incremental(FeatureSet::Slotted);
     }
 
-    /// Both sides' accumulators feed the second layer, which is twice as wide as the accumulator.
-    #[test]
-    fn incremental_equals_full_both_perspectives() {
-        let features = FeatureSet::Slotted;
-        let net = Net::with_perspective(
+    /// A network whose second layer reads both sides' accumulators (twice as wide as one).
+    fn both_net(features: FeatureSet) -> Net {
+        Net::with_perspective(
             features,
             vec![
                 layer(features.size(), 16, 1),
@@ -439,8 +437,38 @@ mod tests {
                 layer(8, 1, 3),
             ],
         )
-        .unwrap();
-        check_net(&net, features);
+        .unwrap()
+    }
+
+    #[test]
+    fn incremental_equals_full_both_perspectives() {
+        let features = FeatureSet::Slotted;
+        check_net(&both_net(features), features);
+    }
+
+    /// Each side's view uses the bucket of its own king, and a king that changes bucket rebuilds
+    /// its accumulator.
+    #[test]
+    fn incremental_equals_full_both_perspectives_with_king_buckets() {
+        for features in [
+            FeatureSet::Bucketed { file_groups: 2 },
+            FeatureSet::Hybrid { file_groups: 4 },
+            FeatureSet::Threats { file_groups: 2 },
+        ] {
+            let (_, bucket_changes, _) = check_net(&both_net(features), features);
+            assert!(bucket_changes > 100, "{bucket_changes}");
+        }
+    }
+
+    #[test]
+    fn incremental_equals_full_threats() {
+        check_incremental(FeatureSet::Threats { file_groups: 0 });
+    }
+
+    #[test]
+    fn incremental_equals_full_threats_k4() {
+        let (_, bucket_changes, _) = check_incremental(FeatureSet::Threats { file_groups: 2 });
+        assert!(bucket_changes > 100, "{bucket_changes}");
     }
 
     #[test]

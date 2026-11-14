@@ -45,9 +45,9 @@ impl Net {
     }
 
     /// A network whose second layer reads both sides' accumulators, which share the first layer's
-    /// weights (`layers[1].fan_in` is twice the accumulator width). Only the slotted inputs, where
-    /// the rival's view of a piece is the other block of the same square, can be seen from both
-    /// sides.
+    /// weights (`layers[1].fan_in` is twice the accumulator width). The rival's view of a piece is
+    /// the other block of the same square, in the bucket of the rival's king; the dense inputs
+    /// (terms, threats) are the mover's alone and only reach the mover's half.
     pub fn with_perspective(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
         Net::build(features, layers, true)
     }
@@ -62,9 +62,6 @@ impl Net {
                 layers[0].fan_in,
                 features.size()
             ));
-        }
-        if perspective && features != FeatureSet::Slotted {
-            return Err("both perspectives need the slotted inputs".into());
         }
         for (position, pair) in layers.windows(2).enumerate() {
             let wanted = if perspective && position == 0 {
@@ -173,13 +170,16 @@ impl Net {
             }
         }
         if self.perspective {
-            // the rival's view: every piece in the other block of its square
+            // the rival's view: every piece in the other block of its square, in the bucket of
+            // the rival's king; the dense inputs have no rival view
             hidden.extend_from_slice(&first.bias);
-            for (&index, &value) in indices.iter().zip(&values) {
-                for (h, w) in hidden[width..]
-                    .iter_mut()
-                    .zip(first.row((index + OPPONENT_PIECE_BLOCK) % PIECE_INPUTS))
-                {
+            let rival = !pos.turn();
+            let king = pos.board().king_of(rival).expect("a king per side");
+            let shift = self.features.king_bucket(rival, king) * PIECE_INPUTS;
+            let pieces = self.features.piece_input_count();
+            for (&index, &value) in indices.iter().zip(&values).filter(|(&i, _)| i < pieces) {
+                let seen = shift + (index % PIECE_INPUTS + OPPONENT_PIECE_BLOCK) % PIECE_INPUTS;
+                for (h, w) in hidden[width..].iter_mut().zip(first.row(seen)) {
                     *h += w * value as f32;
                 }
             }
@@ -281,6 +281,7 @@ mod tests {
         let last = r#"{"fan_in":4,"fan_out":1,"weights":[1.0,1.0,1.0,1.0],"bias":[0.0]}"#;
         let text = format!(r#"{{"features":"pst_slotted",{both}"layers":[{first},{last}]}}"#);
         assert!(Net::from_json(&text).is_ok());
+        // the dense inputs make the first layer wider than the 768 pieces of this file
         assert!(Net::from_json(&text.replace("pst_slotted", "pst_hybrid")).is_err());
     }
 

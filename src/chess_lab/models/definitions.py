@@ -247,6 +247,45 @@ class NnW64BothModel(NeuralEvalModel):
     )
 
 
+class NnThreatsW64BothModel(NeuralEvalModel):
+    """Slotted inputs plus five threat inputs, seen from both sides, a shared 64 accumulator."""
+
+    name = "net_pst_threats_w64_both"
+    feature_set = "pst_threats"
+    hidden = (64,)
+    perspective = True
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides plus 5 threat "
+        "inputs of the mover, one shared 64 accumulator, 128-1 (2 layers)"
+    )
+
+
+class NnK4W64BothModel(NeuralEvalModel):
+    """Piece squares in 4 king buckets seen from both sides, a shared 64 accumulator."""
+
+    name = "net_pst_k4_w64_both"
+    feature_set = "pst_k4"
+    hidden = (64,)
+    perspective = True
+    architecture = (
+        "Sparse network: 4 king buckets of 768 piece-square inputs seen from both sides, each "
+        "side in the bucket of its own king, one shared 64 accumulator, 128-1 (2 layers)"
+    )
+
+
+class NnK4ThreatsW64BothModel(NeuralEvalModel):
+    """King buckets and threat inputs, seen from both sides, a shared 64 accumulator."""
+
+    name = "net_pst_k4_threats_w64_both"
+    feature_set = "pst_k4_threats"
+    hidden = (64,)
+    perspective = True
+    architecture = (
+        "Sparse network: 4 king buckets of 768 piece-square inputs seen from both sides plus 5 "
+        "threat inputs of the mover, one shared 64 accumulator, 128-1 (2 layers)"
+    )
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
     cls.name: cls
@@ -255,6 +294,9 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnW64Model,
         NnW64x16Model,
         NnW64BothModel,
+        NnThreatsW64BothModel,
+        NnK4W64BothModel,
+        NnK4ThreatsW64BothModel,
         NnHybridW32Model,
         NnHybridW64Model,
         NnHybridW128Model,

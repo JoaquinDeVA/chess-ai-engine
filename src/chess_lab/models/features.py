@@ -179,6 +179,74 @@ def _term_entries(board: chess.Board, base: int) -> Tuple[List[int], List[float]
     return indices, values
 
 
+#: Material value of each piece type for the capture gains; the king outweighs any gain.
+_ROLE_VALUE = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 100,
+}
+#: Number of threat inputs.
+THREAT_COUNT = 5
+_GAIN_SCALE = 9.0
+_EN_PRISE_SCALE = 4.0
+
+
+def _en_prise(board: chess.Board, attacker: chess.Color) -> Tuple[int, int]:
+    """What ``attacker`` can win at once on the board as it stands.
+
+    A piece (kings aside) of the other side that ``attacker`` attacks gains its value when no
+    piece defends it, else its value minus that of the cheapest attacker when that is positive.
+    Attacks are those of the board as it stands: no x-rays, pins or en passant.
+
+    :param board: The position.
+    :param attacker: The side that captures.
+    :return: ``(best gain, number of pieces it wins something on)``.
+    """
+    best = count = 0
+    for square in chess.scan_forward(board.occupied_co[not attacker] & ~board.kings):
+        attackers = board.attackers_mask(attacker, square)
+        if not attackers:
+            continue
+        target = _ROLE_VALUE[board.piece_type_at(square)]
+        if board.attackers_mask(not attacker, square):
+            cheapest = min(
+                _ROLE_VALUE[board.piece_type_at(s)] for s in chess.scan_forward(attackers)
+            )
+            gain = target - cheapest
+        else:
+            gain = target
+        if gain > 0:
+            best = max(best, gain)
+            count += 1
+    return best, count
+
+
+def _threat_entries(board: chess.Board, base: int) -> Tuple[List[int], List[float]]:
+    """The five threat inputs, from ``base`` on.
+
+    In order: the best capture of the side to move, the best capture of its rival (both over
+    ``9``), the number of rival pieces the mover wins something on, the number of the mover's
+    pieces the rival does (both over ``4``), and ``1`` when the mover is in check.
+
+    :param board: The position.
+    :param base: Index of the first threat entry.
+    :return: Two parallel lists of :data:`THREAT_COUNT` entries.
+    """
+    mover_gain, mover_count = _en_prise(board, board.turn)
+    rival_gain, rival_count = _en_prise(board, not board.turn)
+    values = [
+        mover_gain / _GAIN_SCALE,
+        rival_gain / _GAIN_SCALE,
+        mover_count / _EN_PRISE_SCALE,
+        rival_count / _EN_PRISE_SCALE,
+        1.0 if board.is_check() else 0.0,
+    ]
+    return list(range(base, base + THREAT_COUNT)), values
+
+
 #: Offset of the opponent's piece block in :class:`SlottedPstFeatures`.
 _OPPONENT_PIECE_BLOCK = 6 * 64
 
@@ -272,8 +340,14 @@ class HybridPstFeatures(SlottedPstFeatures):
 
     @property
     def _term_count(self) -> int:
-        """Number of term entries: two per term, or none without terms."""
+        """Number of dense entries: two per classical term, or none without terms."""
         return 2 * len(TERM_NAMES) if self.terms else 0
+
+    def _dense_entries(self, board: chess.Board) -> Tuple[List[int], List[float]]:
+        """The dense entries that follow the piece squares (the classical terms, if any)."""
+        if not self.terms:
+            return [], []
+        return _term_entries(board, self._term_base)
 
     def max_entries(self) -> int:
         """Pieces and the term entries.
@@ -301,11 +375,9 @@ class HybridPstFeatures(SlottedPstFeatures):
             king = chess.square_mirror(king)
         shift = self.bucket(king) * 2 * _OPPONENT_PIECE_BLOCK
         indices = [index + shift for index in indices]
-        if not self.terms:
-            return indices, values
-        term_indices, term_values = _term_entries(board, self._term_base)
-        indices.extend(term_indices)
-        values.extend(term_values)
+        dense_indices, dense_values = self._dense_entries(board)
+        indices.extend(dense_indices)
+        values.extend(dense_values)
         return indices, values
 
 
@@ -340,6 +412,38 @@ class Kings4PstFeatures(HybridPstFeatures):
     terms = False
 
 
+class ThreatsPstFeatures(HybridPstFeatures):
+    """Piece squares per king bucket plus five threat inputs instead of the classical terms.
+
+    The threats are the best capture of each side, the pieces each side has en prise and the
+    check flag (:func:`_threat_entries`); they stand for what a search of captures would see.
+
+    :cvar name: ``"pst_threats"``, with no king buckets.
+    """
+
+    name = "pst_threats"
+    terms = False
+
+    @property
+    def _term_count(self) -> int:
+        """Number of threat entries."""
+        return THREAT_COUNT
+
+    def _dense_entries(self, board: chess.Board) -> Tuple[List[int], List[float]]:
+        """The threat entries after the piece squares."""
+        return _threat_entries(board, self._term_base)
+
+
+class Threats4PstFeatures(ThreatsPstFeatures):
+    """:class:`ThreatsPstFeatures` with 4 king buckets (2 file groups by 2 rank groups).
+
+    :cvar name: ``"pst_k4_threats"``.
+    """
+
+    name = "pst_k4_threats"
+    file_groups = 2
+
+
 #: Every feature set by its name, the one the saved models and the core refer to.
 FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
     features.name: features
@@ -349,6 +453,8 @@ FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
         HybridKings4PstFeatures(),
         HybridKings8PstFeatures(),
         Kings4PstFeatures(),
+        ThreatsPstFeatures(),
+        Threats4PstFeatures(),
     )
 }
 

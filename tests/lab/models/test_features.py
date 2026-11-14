@@ -167,3 +167,30 @@ def test_king_bucket_features_have_the_pieces_in_the_king_bucket_and_no_terms():
     assert values == [1.0] * 32
     assert features.bucket(chess.D1) == 0
     assert features.bucket(chess.E4) == 3
+
+
+@pytest.mark.parametrize(
+    ("fen", "expected"),
+    [
+        (chess.STARTING_FEN, [0, 0, 0, 0, 0]),
+        # the pawn wins the undefended queen (9); the queen wins the undefended pawn (1)
+        ("4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1", [1, 1 / 9, 0.25, 0.25, 0]),
+        # the pawn takes a rook defended by a pawn: 5 - 1
+        ("4k3/8/4p3/3r4/4P3/8/8/4K3 w - - 0 1", [4 / 9, 0, 0.25, 0, 0]),
+        # the king takes the undefended rook (5) and is in check
+        ("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", [5 / 9, 0, 0.25, 0, 1]),
+    ],
+)
+def test_threat_inputs_follow_the_hand_checked_positions(fen, expected):
+    features = FEATURE_SETS["pst_threats"]
+    indices, values = features.active(chess.Board(fen))
+    assert indices[-5:] == list(range(768, 773))
+    assert values[-5:] == pytest.approx(expected)
+
+
+def test_threat_sets_have_the_piece_buckets_and_five_dense_entries():
+    for name, buckets in (("pst_threats", 1), ("pst_k4_threats", 4)):
+        features = FEATURE_SETS[name]
+        assert features.size() == 768 * buckets + 5
+        assert features.max_entries() == 37
+        assert features.bucket(chess.E1) == {1: 0, 4: 2}[buckets]

@@ -13,6 +13,10 @@ pub(super) const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 /// Inputs of one king bucket: one per piece, colour and square.
 pub const PIECE_INPUTS: usize = 2 * OPPONENT_PIECE_BLOCK;
 const TERM_COUNT: usize = 11;
+/// Dense threat inputs: two best capture gains, two en-prise counts and the check flag.
+const THREAT_COUNT: usize = 5;
+const GAIN_SCALE: f64 = 9.0;
+const EN_PRISE_SCALE: f64 = 4.0;
 const PAWN_SCALE: f64 = 4.0;
 const MOBILITY_SCALE: f64 = 10.0;
 const SHIELD_SCALE: f64 = 3.0;
@@ -27,16 +31,21 @@ pub enum FeatureSet {
     Hybrid { file_groups: usize },
     /// `pst_k4`: slotted inputs per king bucket, without the classical terms.
     Bucketed { file_groups: usize },
+    /// `pst_threats`, `pst_k4_threats`: slotted inputs per king bucket plus five threat inputs
+    /// (best capture of each side, pieces en prise of each side, mover in check).
+    Threats { file_groups: usize },
 }
 
 impl FeatureSet {
     /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 5] = [
+    pub const NAMES: [&'static str; 7] = [
         "pst_slotted",
         "pst_hybrid",
         "pst_hybrid_k4",
         "pst_hybrid_k8",
         "pst_k4",
+        "pst_threats",
+        "pst_k4_threats",
     ];
 
     /// The feature set called `name` in the saved models.
@@ -47,6 +56,8 @@ impl FeatureSet {
             "pst_hybrid_k4" => FeatureSet::Hybrid { file_groups: 2 },
             "pst_hybrid_k8" => FeatureSet::Hybrid { file_groups: 4 },
             "pst_k4" => FeatureSet::Bucketed { file_groups: 2 },
+            "pst_threats" => FeatureSet::Threats { file_groups: 0 },
+            "pst_k4_threats" => FeatureSet::Threats { file_groups: 2 },
             _ => return None,
         })
     }
@@ -59,12 +70,17 @@ impl FeatureSet {
                 buckets(file_groups) * PIECE_INPUTS + 2 * TERM_COUNT
             }
             FeatureSet::Bucketed { file_groups } => buckets(file_groups) * PIECE_INPUTS,
+            FeatureSet::Threats { file_groups } => {
+                buckets(file_groups) * PIECE_INPUTS + THREAT_COUNT
+            }
         }
     }
 
     /// Bucket of the inputs when `owner` moves with its king on `king` (always 0 without buckets).
     pub fn king_bucket(self, owner: Color, king: Square) -> usize {
-        let (FeatureSet::Hybrid { file_groups } | FeatureSet::Bucketed { file_groups }) = self
+        let (FeatureSet::Hybrid { file_groups }
+        | FeatureSet::Bucketed { file_groups }
+        | FeatureSet::Threats { file_groups }) = self
         else {
             return 0;
         };
@@ -79,15 +95,35 @@ impl FeatureSet {
         }
     }
 
-    /// Whether the set has inputs that are not single pieces (the classical terms).
+    /// Whether the set has dense inputs that are not single pieces (the classical terms or the
+    /// threats); they are computed from the board at every evaluation.
     pub fn has_terms(self) -> bool {
-        matches!(self, FeatureSet::Hybrid { .. })
+        matches!(self, FeatureSet::Hybrid { .. } | FeatureSet::Threats { .. })
     }
 
-    /// The inputs that are not single pieces (the classical terms), appended to the vectors.
+    /// Number of piece inputs: those below this index are pieces, the rest are dense.
+    pub fn piece_input_count(self) -> usize {
+        self.size() - self.dense_count()
+    }
+
+    fn dense_count(self) -> usize {
+        match self {
+            FeatureSet::Hybrid { .. } => 2 * TERM_COUNT,
+            FeatureSet::Threats { .. } => THREAT_COUNT,
+            _ => 0,
+        }
+    }
+
+    /// The dense inputs (classical terms or threats), appended to the vectors.
     pub fn term_inputs(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-        if let FeatureSet::Hybrid { file_groups } = self {
-            terms(pos, buckets(file_groups) * PIECE_INPUTS, indices, values);
+        match self {
+            FeatureSet::Hybrid { file_groups } => {
+                terms(pos, buckets(file_groups) * PIECE_INPUTS, indices, values)
+            }
+            FeatureSet::Threats { file_groups } => {
+                threats(pos, buckets(file_groups) * PIECE_INPUTS, indices, values)
+            }
+            _ => {}
         }
     }
 
@@ -97,9 +133,9 @@ impl FeatureSet {
         values.clear();
         match self {
             FeatureSet::Slotted => slotted(pos, indices, values),
-            FeatureSet::Hybrid { .. } | FeatureSet::Bucketed { .. } => {
-                bucketed(pos, self, indices, values)
-            }
+            FeatureSet::Hybrid { .. }
+            | FeatureSet::Bucketed { .. }
+            | FeatureSet::Threats { .. } => bucketed(pos, self, indices, values),
         }
     }
 }
@@ -317,6 +353,65 @@ fn terms(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f6
     }
 }
 
+/// Material value of a role for the capture gains; the king is worth more than any gain.
+fn role_value(role: Role) -> i32 {
+    match role {
+        Role::Pawn => 1,
+        Role::Knight | Role::Bishop => 3,
+        Role::Rook => 5,
+        Role::Queen => 9,
+        Role::King => 100,
+    }
+}
+
+/// What `attacker` can win at once: the best gain over the pieces (kings aside) of the other side
+/// that it attacks, and how many of them it wins something on. A piece gains its value when no
+/// piece defends it, else its value minus that of the cheapest attacker when that is positive.
+/// Attacks are those on the board as it stands: no x-rays, pins or en passant.
+fn en_prise(pos: &Chess, attacker: Color) -> (i32, i32) {
+    let board = pos.board();
+    let occupied = board.occupied();
+    let (mut best, mut count) = (0, 0);
+    for square in board.by_color(!attacker) & !board.kings() {
+        let attackers = board.attacks_to(square, attacker, occupied);
+        if attackers.is_empty() {
+            continue;
+        }
+        let target = role_value(board.role_at(square).expect("occupied"));
+        let gain = if board.attacks_to(square, !attacker, occupied).any() {
+            let cheapest = attackers
+                .into_iter()
+                .map(|from| role_value(board.role_at(from).expect("occupied")))
+                .min()
+                .expect("an attacker");
+            target - cheapest
+        } else {
+            target
+        };
+        if gain > 0 {
+            best = best.max(gain);
+            count += 1;
+        }
+    }
+    (best, count)
+}
+
+/// The threat inputs from `base` on: the mover's best capture, the rival's, the pieces each side
+/// has en prise to the other, and whether the mover is in check.
+fn threats(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+    let mover = pos.turn();
+    let (mover_gain, mover_count) = en_prise(pos, mover);
+    let (rival_gain, rival_count) = en_prise(pos, !mover);
+    indices.extend(base..base + THREAT_COUNT);
+    values.extend([
+        f64::from(mover_gain) / GAIN_SCALE,
+        f64::from(rival_gain) / GAIN_SCALE,
+        f64::from(mover_count) / EN_PRISE_SCALE,
+        f64::from(rival_count) / EN_PRISE_SCALE,
+        if pos.is_check() { 1.0 } else { 0.0 },
+    ]);
+}
+
 /// One entry per piece: the mover's pieces in the first block, the opponent's in the second, each
 /// colour seen from its own home rank.
 fn slotted(pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
@@ -356,4 +451,69 @@ fn bucketed(pos: &Chess, set: FeatureSet, indices: &mut Vec<usize>, values: &mut
         *index += shift;
     }
     set.term_inputs(pos, indices, values);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::position_from_fen;
+
+    /// The five threat inputs of a position, in order.
+    fn threat_values(fen: &str) -> Vec<f64> {
+        let pos = position_from_fen(fen).unwrap();
+        let (mut indices, mut values) = (Vec::new(), Vec::new());
+        threats(&pos, 0, &mut indices, &mut values);
+        assert_eq!(indices, (0..THREAT_COUNT).collect::<Vec<_>>());
+        values
+    }
+
+    fn assert_close(actual: &[f64], wanted: &[f64]) {
+        for (a, w) in actual.iter().zip(wanted) {
+            assert!((a - w).abs() < 1e-12, "{actual:?} != {wanted:?}");
+        }
+    }
+
+    #[test]
+    fn nothing_is_en_prise_at_the_start() {
+        let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        assert_close(&threat_values(start), &[0.0; 5]);
+    }
+
+    #[test]
+    fn an_undefended_piece_gains_its_whole_value() {
+        // the pawn on e4 takes the queen; the queen takes the pawn
+        let values = threat_values("4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1");
+        assert_close(&values, &[1.0, 1.0 / 9.0, 0.25, 0.25, 0.0]);
+    }
+
+    #[test]
+    fn a_defended_piece_gains_the_difference_with_the_cheapest_attacker() {
+        // the pawn takes a rook that a pawn defends: 5 - 1
+        let values = threat_values("4k3/8/4p3/3r4/4P3/8/8/4K3 w - - 0 1");
+        assert_close(&values, &[4.0 / 9.0, 0.0, 0.25, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_check_sets_the_flag_and_the_king_can_take_what_is_undefended() {
+        let values = threat_values("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1");
+        assert_close(&values, &[5.0 / 9.0, 0.0, 0.25, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn the_pawn_cache_returns_what_the_count_computes() {
+        for fen in [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "4k3/p7/8/1P6/8/8/PP4P1/4K3 w - - 0 1",
+            "4k3/8/8/8/8/8/8/4K3 w - - 0 1",
+        ] {
+            let pos = position_from_fen(fen).unwrap();
+            let wanted = (
+                pawn_counts(&pos, Color::White),
+                pawn_counts(&pos, Color::Black),
+            );
+            // the second call is served by the cache
+            assert_eq!(cached_pawn_counts(&pos), wanted);
+            assert_eq!(cached_pawn_counts(&pos), wanted);
+        }
+    }
 }

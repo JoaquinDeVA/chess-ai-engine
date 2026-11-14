@@ -36,6 +36,8 @@ _INTRA_OP_THREADS = 2
 #: Inputs of one side of the slotted features, and the offset between the two sides' blocks.
 _INPUTS_PER_SIDE = 768
 _OPPONENT_BLOCK = 384
+#: First row of the rival's king inside a bucket (rival block, 5 piece types of 64 before it).
+_RIVAL_KING_ROWS = _OPPONENT_BLOCK + 5 * 64
 #: Rows per call of the validation forward pass.
 _PREDICT_BATCH = 4096
 
@@ -121,9 +123,18 @@ def _accumulator_class(keras: Any) -> type:
     class SparseAccumulator(keras.layers.Layer):
         """Value-weighted sum of the rows of a table, clipped to ``[0, 1]``."""
 
-        def __init__(self, rows: int, units: int, l2: float, both: bool = False, **kwargs: Any):
+        def __init__(
+            self,
+            rows: int,
+            units: int,
+            l2: float,
+            both: bool = False,
+            buckets: int = 1,
+            **kwargs: Any,
+        ):
             super().__init__(**kwargs)
             self.rows, self.units, self.l2, self.both = rows, units, l2, both
+            self.buckets = buckets
 
         def build(self, _input_shape: Any) -> None:
             # L2(c) penalises c * sum(w**2); half the coefficient gives gradient l2 * w.
@@ -145,17 +156,38 @@ def _accumulator_class(keras: Any) -> type:
             mover = self._sum(index, value)
             if not self.both:
                 return mover
-            # The rival's view of a piece is the other block of the same square; feature ``i`` is
-            # index ``i + 1`` and index 0 is padding.
-            swapped = (index - 1 + _OPPONENT_BLOCK) % _INPUTS_PER_SIDE + 1
-            rival = self._sum(keras.ops.where(index > 0, swapped, 0), value)
+            # The rival's view of a piece is the other block of the same square, in the bucket of
+            # the rival's king; the dense entries (past the pieces) have no rival view. Feature
+            # ``i`` is index ``i + 1`` and index 0 is padding.
+            feature = index - 1
+            piece = keras.ops.logical_and(index > 0, feature < self.buckets * _INPUTS_PER_SIDE)
+            within = keras.ops.mod(feature, _INPUTS_PER_SIDE)
+            swapped = keras.ops.mod(within + _OPPONENT_BLOCK, _INPUTS_PER_SIDE)
+            shift = 0
+            if self.buckets > 1:
+                # The rival king is the entry of the rival block's king rows (704 to 767), whose
+                # square is already seen from the rival's home rank.
+                is_king = keras.ops.logical_and(piece, within >= _RIVAL_KING_ROWS)
+                king = keras.ops.sum(keras.ops.where(is_king, within - _RIVAL_KING_ROWS, 0), axis=1)
+                width = 8 // (self.buckets // 2)
+                bucket = 2 * (keras.ops.mod(king, 8) // width) + keras.ops.cast(
+                    king // 8 >= 2, "int32"
+                )
+                shift = keras.ops.expand_dims(bucket * _INPUTS_PER_SIDE, -1)
+            rival_index = keras.ops.where(piece, shift + swapped + 1, 0)
+            rival = self._sum(rival_index, keras.ops.where(piece, value, 0.0))
             return keras.ops.concatenate([mover, rival], axis=-1)
 
     return SparseAccumulator
 
 
 def _keras_network(
-    keras: Any, shapes: Sequence[Tuple[int, int]], width: int, l2: float, both: bool = False
+    keras: Any,
+    shapes: Sequence[Tuple[int, int]],
+    width: int,
+    l2: float,
+    both: bool = False,
+    buckets: int = 1,
 ) -> Tuple[Any, List[Any]]:
     """The training network, with the layers of ``shapes``.
 
@@ -164,10 +196,16 @@ def _keras_network(
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
     :param both: Whether the second layer reads the accumulators of both sides, one table.
+    :param buckets: King buckets of the piece squares (the rival's view needs them).
     :return: The model (inputs: indices, values; output: logit) and its weight layers in order.
     """
     accumulator = _accumulator_class(keras)(
-        rows=shapes[0][0] + 1, units=shapes[0][1], l2=l2, both=both, name="accumulator"
+        rows=shapes[0][0] + 1,
+        units=shapes[0][1],
+        l2=l2,
+        both=both,
+        buckets=buckets,
+        name="accumulator",
     )
     index_in = keras.Input(shape=(width,), dtype="int32")
     value_in = keras.Input(shape=(width,), dtype="float32")
@@ -249,7 +287,12 @@ def fit_stream(
     width = features.max_entries()
     batch_size = int(cfg["batch_size"])
     network, parts = _keras_network(
-        keras, [w.shape for w, _ in model.layers], width, float(cfg["l2"]), model.perspective
+        keras,
+        [w.shape for w, _ in model.layers],
+        width,
+        float(cfg["l2"]),
+        model.perspective,
+        getattr(features, "buckets", 1),
     )
     _assign(parts, model.layers)
     network.compile(

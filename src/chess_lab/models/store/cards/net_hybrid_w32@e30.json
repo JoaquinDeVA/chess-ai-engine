@@ -5,22 +5,22 @@
   "parameters": 25345,
   "accuracy": {
     "all": {
-      "spearman": 0.7015375498646944,
-      "mae": 0.11514171897204102,
+      "spearman": 0.7015375361769663,
+      "mae": 0.11514171974972988,
       "n": 200000,
       "best_move_agreement": 0.2145,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.7740604767500354,
-      "mae": 0.09220648183442855,
+      "spearman": 0.7740604555702435,
+      "mae": 0.09220648255782757,
       "n": 138657,
       "best_move_agreement": 0.0593128390596745,
       "agreement_n": 13825
     },
     "non_quiet": {
-      "spearman": 0.5733470991383457,
-      "mae": 0.16698351307715378,
+      "spearman": 0.5733471062694081,
+      "mae": 0.166983513977557,
       "n": 61343,
       "best_move_agreement": 0.5619433198380567,
       "agreement_n": 6175
@@ -32,10 +32,10 @@
     }
   },
   "cost": {
-    "us_per_eval": 2.79,
+    "us_per_eval": 2.93,
     "samples": 1000,
-    "date": "2026-11-10",
-    "commit": "d2c029b+dirty"
+    "date": "2026-11-14",
+    "commit": "24835ae+dirty"
   },
   "size_kb": 199.7,
   "status": "current",
@@ -46,6 +46,26 @@
       "k": 0.00368208,
       "perspective": "side_to_move",
       "mate_keep": 0.1
+    }
+  },
+  "ordering": {
+    "all": {
+      "tau": 0.09818668335576822,
+      "top1": 0.236,
+      "top3": 0.4272,
+      "positions": 5000
+    },
+    "quiet": {
+      "tau": 0.06962621352316103,
+      "top1": 0.12221587664191891,
+      "top3": 0.2601370645345517,
+      "positions": 3502
+    },
+    "non_quiet": {
+      "tau": 0.16509076738353315,
+      "top1": 0.5020026702269693,
+      "top3": 0.8177570093457944,
+      "positions": 1498
     }
   }
 }

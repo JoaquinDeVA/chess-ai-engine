@@ -15,9 +15,9 @@ const LMR_FROM_DEPTH: i32 = 3;
 const LMR_FROM_INDEX: usize = 3;
 
 /// Reverse futility pruning works up to this depth, and prunes when the static value is beyond the
-/// bound by `RFP_MARGIN_PER_PLY` per ply left (it was 0.46 log-odds, the same 80 centipawns).
+/// bound by `RFP_MARGIN_PER_PLY` per ply left (60 centipawns; it was 80).
 pub(super) const RFP_UP_TO_DEPTH: i32 = 6;
-pub(super) const RFP_MARGIN_PER_PLY: i32 = 80;
+pub(super) const RFP_MARGIN_PER_PLY: i32 = 60;
 
 /// Futility pruning works up to this depth, with a margin of `FUTILITY_MARGIN_PER_PLY` per ply left
 /// (it was 0.69 log-odds, the same 120 centipawns).

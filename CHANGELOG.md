@@ -11,6 +11,7 @@ All notable changes. The newest are first.
   tests on the positions of that game.
 
 ### Changed
+- Reverse futility pruning now prunes from 60 centipawns per ply left instead of 80. `uci ttd 9 rust/bench/middlegame.epd 30`: 7,099,976 to 6,450,756 nodes (−9.1 %); SPRT `rfp_margin_60` (10+0.2) queued. Raising the depth limit to 7 left the tree unchanged at depth 9 (the margin of 560 is rarely reached), so it was not tested.
 - The null-move reduction now grows with the depth (2 plies from depth 3, one more every four) and with how far the static value is beyond the bound (one ply per 200 centipawns, two at most), instead of 2 or 3 by depth alone. `uci ttd 9 rust/bench/middlegame.epd 30`: 7,416,608 to 7,099,976 nodes (−4.3 %); SPRT `null_r_by_eval` (10+0.2) queued.
 - Endgame tables no longer choose the move: they restrict the root of the search to the moves that
   keep the best result and, in a win, have the lowest DTZ; a single move is played without

@@ -8,7 +8,7 @@ use shakmaty::Move;
 use super::memory::*;
 use super::node::alpha_beta;
 use super::options::*;
-use super::ordering::{Countermoves, History, Killers};
+use super::ordering::{ContinuationHistory, Countermoves, History, Killers};
 use super::stats::*;
 use super::tt::Table;
 use crate::board::GameState;
@@ -62,6 +62,7 @@ fn helper(
     eval: &Net,
     table: Arc<Table>,
     history: History,
+    continuation: ContinuationHistory,
     options: &Options,
     max_depth: usize,
     control: &Control,
@@ -71,6 +72,7 @@ fn helper(
         table,
         killers: Killers::default(),
         history,
+        continuation,
         countermoves: Countermoves::default(),
         threads: 1,
         counters: Counters::default(),
@@ -183,10 +185,12 @@ pub fn iterative_deepening(
     let copies: Vec<GameState> = (0..extra).map(|_| state.clone()).collect();
     let reports: Vec<Report> = (0..extra).map(|_| Mutex::new(None)).collect();
     let history = memory.history.clone();
+    let continuation = memory.continuation.clone();
     let result = std::thread::scope(|scope| {
         for (index, copy) in copies.into_iter().enumerate() {
             let (table, stop, nodes, progress) = (table.clone(), &stop, &helper_nodes, &progress);
-            let (history, report) = (history.clone(), &reports[index]);
+            let (history, continuation, report) =
+                (history.clone(), continuation.clone(), &reports[index]);
             scope.spawn(move || {
                 let helper_control = Control {
                     start: control.start,
@@ -203,6 +207,7 @@ pub fn iterative_deepening(
                         eval,
                         table,
                         history,
+                        continuation,
                         options,
                         max_depth,
                         &helper_control,

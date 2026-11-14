@@ -7,7 +7,7 @@ use shakmaty::{Color, Move, MoveList, Position};
 
 use super::memory::*;
 use super::options::*;
-use super::ordering::{move_to_front, order, see_ge, MAX_KILLERS_PER_PLY};
+use super::ordering::{move_to_front, order, piece_to, see_ge, MAX_KILLERS_PER_PLY};
 use super::search_techniques::*;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
@@ -45,7 +45,7 @@ pub(super) struct Search<'a> {
     /// Nodes spent under each root move, by move id (the clock reads how settled the best one is).
     pub(super) root_nodes: Vec<(u32, u64)>,
     /// The moves played from the root to this node, `None` for a passed turn.
-    pub(super) played: Vec<Option<u32>>,
+    pub(super) played: Vec<Option<(u32, usize)>>,
 }
 
 type Outcome = (i32, Option<u32>);
@@ -68,7 +68,7 @@ impl Search<'_> {
     /// Play `m` in the game state and in the incremental evaluation.
     pub(super) fn play(&mut self, m: Move) {
         self.eval.apply(self.state.pos(), &m);
-        self.played.push(Some(move_id(&m)));
+        self.played.push(Some((move_id(&m), piece_to(&m))));
         self.state.apply(m);
     }
 
@@ -230,13 +230,17 @@ impl Search<'_> {
         killer_ids[..stored.len()].copy_from_slice(stored);
         let killers = &killer_ids[..stored.len()];
         let mover = self.state.turn();
-        let previous = self.played.last().copied().flatten();
+        let (previous, previous_piece_to) = match self.played.last().copied().flatten() {
+            Some((id, piece_to)) => (Some(id), Some(piece_to)),
+            None => (None, None),
+        };
         let counter = self.memory.countermoves.get(mover, previous);
         let ordered = order(
             &moves,
             killers,
             counter,
             Some((&self.memory.history, mover)),
+            previous_piece_to.map(|previous| (&self.memory.continuation, previous)),
         );
         // Captures that lose material come after the quiet moves (the order is otherwise kept).
         let pos = self.state.pos();
@@ -406,6 +410,11 @@ impl Search<'_> {
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
                     self.memory.countermoves.record(mover, previous, &action);
+                    if let Some(previous) = previous_piece_to {
+                        self.memory
+                            .continuation
+                            .reward(mover, previous, &action, depth_remaining);
+                    }
                 }
                 break;
             }

@@ -11,6 +11,7 @@ All notable changes. The newest are first.
   tests on the positions of that game.
 
 ### Changed
+Quiet moves are also ordered by a history of cuts that depends on the opponent's last move (continuation history, by piece and target square); about 5 % fewer nodes at depth 9, 4 % lower nodes per second
 Quiet moves are tried after the killers in a table of replies: the move that last cut after each opponent move (countermove heuristic); about 4 % fewer nodes at depth 9
 - Futility pruning now uses 90 centipawns per ply left instead of 120. `uci ttd 9 rust/bench/middlegame.epd 30`: 6,450,756 to 6,071,291 nodes (−5.9 %); SPRT `futility_margin_90` (10+0.2) queued. Extending it to depth 4 changed the tree by 0.02 % and was not tested.
 - Reverse futility pruning now prunes from 60 centipawns per ply left instead of 80. `uci ttd 9 rust/bench/middlegame.epd 30`: 7,099,976 to 6,450,756 nodes (−9.1 %); SPRT `rfp_margin_60` (10+0.2) queued. Raising the depth limit to 7 left the tree unchanged at depth 9 (the margin of 560 is rarely reached), so it was not tested.

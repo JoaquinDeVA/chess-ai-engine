@@ -259,6 +259,57 @@ impl History {
     }
 }
 
+/// Piece-and-target squares: 6 roles by 64 squares.
+pub const PIECE_TO: usize = 6 * 64;
+
+/// Index of a move by the piece that moves and where it lands.
+pub fn piece_to(m: &Move) -> usize {
+    (m.role() as usize - 1) * 64 + m.to() as usize
+}
+
+/// How often a quiet move (piece and target) caused a cut-off right after the opponent's move
+/// (piece and target), weighted by depth. Shared by the threads like [`History`].
+#[derive(Clone)]
+pub struct ContinuationHistory {
+    scores: Arc<[AtomicI32]>,
+}
+
+impl Default for ContinuationHistory {
+    fn default() -> ContinuationHistory {
+        ContinuationHistory {
+            scores: (0..2 * PIECE_TO * PIECE_TO)
+                .map(|_| AtomicI32::new(0))
+                .collect(),
+        }
+    }
+}
+
+impl ContinuationHistory {
+    fn slot(color: Color, previous: usize, m: &Move) -> usize {
+        (usize::from(color == Color::Black) * PIECE_TO + previous) * PIECE_TO + piece_to(m)
+    }
+
+    pub fn clear(&self) {
+        for score in self.scores.iter() {
+            score.store(0, Relaxed);
+        }
+    }
+
+    pub fn score(&self, color: Color, previous: usize, m: &Move) -> i32 {
+        self.scores[ContinuationHistory::slot(color, previous, m)].load(Relaxed)
+    }
+
+    /// A quiet move caused a cut-off with `depth` plies left, right after the move `previous`.
+    pub fn reward(&self, color: Color, previous: usize, m: &Move, depth: i32) {
+        let score = &self.scores[ContinuationHistory::slot(color, previous, m)];
+        if (score.fetch_add(depth * depth, Relaxed) + depth * depth).abs() > HISTORY_LIMIT {
+            for score in self.scores.iter() {
+                score.store(score.load(Relaxed) / 2, Relaxed);
+            }
+        }
+    }
+}
+
 /// Put the move with the given identity first, if it is among `moves`.
 pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
     if let Some(id) = id {
@@ -289,6 +340,7 @@ pub fn order(
     killers: &[u32],
     counter: Option<u32>,
     history: Option<(&History, Color)>,
+    continuation: Option<(&ContinuationHistory, usize)>,
 ) -> MoveList {
     let is_killer = |m: &Move| killers.contains(&move_id(m));
     let mut ordered = MoveList::new();
@@ -328,7 +380,8 @@ pub fn order(
     if let Some((history, color)) = history {
         let others = &mut ordered[others_start..];
         for (key, m) in keys.iter_mut().zip(others.iter()) {
-            *key = history.score(color, m);
+            *key = history.score(color, m)
+                + continuation.map_or(0, |(cont, previous)| cont.score(color, previous, m));
         }
         let count = others.len();
         sort_descending(others, &mut keys[..count]);
@@ -451,6 +504,7 @@ mod tests {
             &[move_id(&a)],
             None,
             Some((&history, Color::White)),
+            None,
         );
         assert_eq!(ordered.as_slice(), &[a, c, b]);
         assert_eq!(
@@ -483,6 +537,7 @@ mod tests {
         let ordered = order(
             &[a, queen_takes_pawn, b, pawn_takes_queen],
             &[move_id(&b)],
+            None,
             None,
             None,
         );

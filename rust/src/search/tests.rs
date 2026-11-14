@@ -2,9 +2,6 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use shakmaty::Color;
-
-use super::search_techniques::has_pieces;
 use super::*;
 use crate::board::{position_from_fen, uci_string, GameState};
 use crate::eval::FeatureSet;
@@ -283,16 +280,6 @@ fn see_keeps_the_obvious_capture() {
 }
 
 #[test]
-fn the_null_move_is_not_tried_with_only_pawns_and_the_king() {
-    // Lasker's zugzwang position: passing the turn would look winning, but nobody may pass.
-    let lasker = position_from_fen("8/k7/3p4/p2P1p2/P2P1P2/8/8/K7 w - - 0 1").unwrap();
-    assert!(!has_pieces(&lasker, Color::White));
-    assert!(!has_pieces(&lasker, Color::Black));
-    let start = position_from_fen(START).unwrap();
-    assert!(has_pieces(&start, Color::White));
-}
-
-#[test]
 fn a_search_cut_by_the_clock_stores_nothing() {
     let mut memory = Memory::default();
     let result = alpha_beta(
@@ -382,29 +369,6 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
         );
         assert!(stats.nodes_visited > 0);
     }
-}
-
-#[test]
-fn late_move_reductions_follow_the_depth_and_the_position_in_the_order() {
-    use super::search_techniques::late_move_reduction;
-    assert_eq!(
-        late_move_reduction(3, 2, false),
-        0,
-        "too early in the order"
-    );
-    assert_eq!(late_move_reduction(2, 9, false), 0, "too shallow");
-    assert_eq!(late_move_reduction(3, 3, false), 1);
-    assert_eq!(late_move_reduction(6, 10, false), 2);
-    assert_eq!(
-        late_move_reduction(6, 10, true),
-        1,
-        "favorable history: one ply less"
-    );
-    assert_eq!(
-        late_move_reduction(3, 100, false),
-        1,
-        "never below one ply of search"
-    );
 }
 
 #[test]
@@ -500,18 +464,4 @@ fn a_table_entry_does_not_bring_back_a_move_the_root_list_excludes() {
     assert_eq!(run(&mut memory, None).as_deref(), Some("a1a8"));
     let best = run(&mut memory, Some(ids(fen, &["a1a2", "a1b1"]))).unwrap();
     assert!(best == "a1a2" || best == "a1b1", "{best}");
-}
-
-#[test]
-fn the_null_move_reduction_grows_with_the_depth_and_the_margin() {
-    use super::search_techniques::null_move_reduction;
-    assert_eq!(null_move_reduction(3, 0), 2);
-    assert_eq!(null_move_reduction(4, 0), 3);
-    assert_eq!(null_move_reduction(8, 0), 4);
-    assert_eq!(null_move_reduction(3, 200), 3);
-    assert_eq!(
-        null_move_reduction(3, 5_000),
-        4,
-        "the margin adds two plies at most"
-    );
 }

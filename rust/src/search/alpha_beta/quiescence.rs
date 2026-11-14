@@ -2,10 +2,10 @@
 
 use shakmaty::{MoveList, Position};
 
-use super::node::Search;
-use super::ordering::{order_noisy, see_ge};
-use super::scores::INFINITE;
+use super::Search;
 use crate::board::ordered_moves;
+use crate::search::ordering::{order_noisy, see_ge};
+use crate::search::scores::INFINITE;
 
 impl Search<'_> {
     /// Value of a horizon node: forced evasions in check, otherwise captures and promotions.

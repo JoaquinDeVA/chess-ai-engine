@@ -2,6 +2,8 @@
 //! from the side to move. The network scores them. The features and their order are those of
 //! `chess_lab/models/features.py`.
 
+use std::cell::RefCell;
+
 use shakmaty::attacks::{bishop_attacks, knight_attacks, queen_attacks, rook_attacks};
 use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 
@@ -141,6 +143,52 @@ fn pawn_ahead(enemy_pawns: Bitboard, color: Color, square: Square) -> bool {
     (enemy_pawns & files & Bitboard(ahead)).any()
 }
 
+/// Entries of the pawn-structure cache (a power of two).
+const PAWN_CACHE_BITS: u32 = 14;
+
+/// Passed, doubled and isolated pawns of both colours for one placement of the pawns.
+#[derive(Clone, Copy, Default)]
+struct PawnEntry {
+    white: u64,
+    black: u64,
+    /// White's then Black's `(passed, doubled, isolated)`. An all-zero entry is the right answer
+    /// for the key `(0, 0)`, so an empty table needs no validity flag.
+    counts: [i32; 6],
+}
+
+thread_local! {
+    /// Direct-mapped cache of the pawn terms: they depend on the pawns alone, which change far
+    /// less often than the pieces.
+    static PAWN_CACHE: RefCell<Vec<PawnEntry>> =
+        RefCell::new(vec![PawnEntry::default(); 1 << PAWN_CACHE_BITS]);
+}
+
+/// White's and Black's passed, doubled and isolated pawns, from the cache when the pawns were seen.
+fn cached_pawn_counts(pos: &Chess) -> ((i32, i32, i32), (i32, i32, i32)) {
+    let board = pos.board();
+    let white = (board.pawns() & board.white()).0;
+    let black = (board.pawns() & board.black()).0;
+    let hash = (white ^ black.rotate_left(32)).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    let slot = (hash >> (64 - PAWN_CACHE_BITS)) as usize;
+    PAWN_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        let entry = &mut cache[slot];
+        if entry.white != white || entry.black != black {
+            let (w, b) = (
+                pawn_counts(pos, Color::White),
+                pawn_counts(pos, Color::Black),
+            );
+            *entry = PawnEntry {
+                white,
+                black,
+                counts: [w.0, w.1, w.2, b.0, b.1, b.2],
+            };
+        }
+        let c = entry.counts;
+        ((c[0], c[1], c[2]), (c[3], c[4], c[5]))
+    })
+}
+
 /// Passed, doubled and isolated pawns of one colour.
 fn pawn_counts(pos: &Chess, color: Color) -> (i32, i32, i32) {
     let board = pos.board();
@@ -243,8 +291,7 @@ fn piece_terms(pos: &Chess, color: Color) -> [f64; 8] {
 /// `base` on.
 fn terms(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let tapered = phase(pos);
-    let white = pawn_counts(pos, Color::White);
-    let black = pawn_counts(pos, Color::Black);
+    let (white, black) = cached_pawn_counts(pos);
     let mut terms = [0.0f64; TERM_COUNT];
     terms[0] = (white.0 - black.0) as f64 / PAWN_SCALE;
     terms[1] = (white.1 - black.1) as f64 / PAWN_SCALE;

@@ -146,10 +146,11 @@ fn a_quicker_win_is_worth_more_than_a_slower_one() {
 }
 
 #[test]
+#[cfg(feature = "search-summary")]
 fn check_extends_the_search_by_one_ply() {
     let result = fixed("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", 1);
     assert!(result.best.is_some());
-    assert!(result.max_ply >= 2);
+    assert!(result.report.max_ply >= 2);
 }
 
 #[test]

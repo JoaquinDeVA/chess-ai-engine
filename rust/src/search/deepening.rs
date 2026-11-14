@@ -75,7 +75,7 @@ fn helper(
         continuation,
         countermoves: Countermoves::default(),
         threads: 1,
-        counters: Counters::default(),
+        diagnostics: Default::default(),
     };
     let (size, phase) = (
         SKIP_SIZE[index % SKIP_SIZE.len()],
@@ -259,7 +259,9 @@ fn deepen(
     let clock = control.clock;
     let start = clock();
     let mut best_move: Option<Move> = None;
-    let (mut total_nodes, mut total_prunings, mut deepest_ply) = (0u64, 0u64, 0i32);
+    let mut total_nodes = 0u64;
+    #[cfg(feature = "search-summary")]
+    let (mut total_prunings, mut deepest_ply) = (0u64, 0i32);
     let mut completed_depth = 0usize;
     let mut last_truncated = false;
     let mut iterations: Vec<IterationInfo> = Vec::new();
@@ -281,9 +283,12 @@ fn deepen(
             truncated: result.truncated,
         });
         total_nodes += result.nodes;
-        total_prunings += result.prunings;
+        #[cfg(feature = "search-summary")]
+        {
+            total_prunings += result.report.prunings;
+            deepest_ply = deepest_ply.max(result.report.max_ply);
+        }
         last_truncated = result.truncated;
-        deepest_ply = deepest_ply.max(result.max_ply);
 
         // A cut iteration is discarded: its value comes from a search that stopped half way.
         if result.truncated {
@@ -322,7 +327,9 @@ fn deepen(
 
     let stats = Stats {
         nodes_visited: total_nodes,
+        #[cfg(feature = "search-summary")]
         pruning_count: total_prunings,
+        #[cfg(feature = "search-summary")]
         max_depth_reached: deepest_ply,
         truncated: last_truncated && best_move.is_none(),
         completed_depth,

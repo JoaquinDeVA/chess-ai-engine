@@ -35,7 +35,10 @@ impl Search<'_> {
                 beta = beta.min(value);
             }
             if alpha >= beta {
-                self.prunings += 1;
+                #[cfg(feature = "search-summary")]
+                {
+                    self.prunings += 1;
+                }
                 return value;
             }
             value
@@ -47,7 +50,7 @@ impl Search<'_> {
             }
             self.play(action);
             self.nodes += 1;
-            self.memory.counters.quiescence_nodes += 1;
+            self.memory.diagnostics.quiescence_node();
             let child_moves = ordered_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
                 Some(winner) => self.terminal_utility(winner, ply + 1),
@@ -68,7 +71,10 @@ impl Search<'_> {
                 beta = beta.min(best_value);
             }
             if alpha >= beta {
-                self.prunings += 1;
+                #[cfg(feature = "search-summary")]
+                {
+                    self.prunings += 1;
+                }
                 break;
             }
         }

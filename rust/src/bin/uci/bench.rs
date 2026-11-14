@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use _core::board::{uci_string, GameState};
 use _core::eval::Net;
-use _core::search::{self, Control, Counters, Memory, Options, DEFAULT_HASH_MB};
+use _core::search::{self, Control, Memory, Options, SearchDiagnostics, DEFAULT_HASH_MB};
 
 /// Positions of `bench`: a fixed set, so that the node counts are a fingerprint of the search.
 const BENCH_FENS: [&str; 6] = [
@@ -59,7 +59,7 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
 
     for position_fen in BENCH_FENS {
         memory.clear();
-        memory.counters = Counters::default();
+        memory.diagnostics = SearchDiagnostics::default();
         let mut game_state =
             GameState::from_moves(position_fen, &[]).expect("bench position is valid");
 
@@ -119,13 +119,13 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
         return Err(format!("{path}: no positions"));
     }
     let options = Options::default();
-    let mut counters = Counters::default();
+    let mut diagnostics = SearchDiagnostics::default();
     let mut seconds: Vec<f64> = Vec::new();
     let (mut total_nodes, mut total_seconds, mut finished) = (0u64, 0.0, 0);
     let mut nodes_by_depth = vec![0u64; depth + 1];
     for (number, fen) in fens.iter().enumerate() {
         let mut memory = Memory::new(1, DEFAULT_HASH_MB);
-        memory.counters = counters;
+        memory.diagnostics = diagnostics;
         let mut state = GameState::from_moves(fen, &[])?;
         let origin = Instant::now();
         let clock = || origin.elapsed().as_secs_f64();
@@ -147,7 +147,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
             &control,
         )?;
         let elapsed = clock();
-        counters = memory.counters;
+        diagnostics = memory.diagnostics;
         let done = stats.completed_depth >= depth;
         if done {
             finished += 1;
@@ -188,7 +188,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
             depth - 2
         );
     }
-    let c = counters;
+    let c = diagnostics.snapshot();
     println!(
         "quiescence nodes {:.1} %",
         percent(c.quiescence_nodes, total_nodes)

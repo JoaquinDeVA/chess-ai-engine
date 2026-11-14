@@ -9,6 +9,8 @@ use super::memory::*;
 use super::options::*;
 use super::ordering::{move_to_front, order, piece_to, see_ge, MAX_KILLERS_PER_PLY};
 use super::search_techniques::*;
+#[cfg(feature = "search-summary")]
+use super::stats::SearchReport;
 use super::tt::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
 use crate::eval::{Net, NetState, EVAL_LIMIT};
@@ -35,7 +37,9 @@ pub(super) struct Search<'a> {
     pub(super) root_player: Color,
     pub(super) max_depth: i32,
     pub(super) nodes: u64,
+    #[cfg(feature = "search-summary")]
     pub(super) prunings: u64,
+    #[cfg(feature = "search-summary")]
     pub(super) max_ply: i32,
     pub(super) truncated: bool,
     /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
@@ -145,7 +149,10 @@ impl Search<'_> {
         // narrowed below by the table and by the moves.
         let (alpha_orig, beta_orig) = (alpha, beta);
         self.nodes += 1;
-        self.max_ply = self.max_ply.max(ply);
+        #[cfg(feature = "search-summary")]
+        {
+            self.max_ply = self.max_ply.max(ply);
+        }
 
         let in_check = self.state.pos().is_check();
         let depth_remaining = if in_check && depth_remaining > 0 {
@@ -166,28 +173,28 @@ impl Search<'_> {
             self.memory.table.get(&key)
         };
         let table_move = entry.and_then(|e| e.best);
-        self.memory.counters.table_probes += 1;
+        self.memory.diagnostics.table_probe();
         if let Some(entry) = entry {
-            self.memory.counters.table_hits += 1;
+            self.memory.diagnostics.table_hit();
             // A restricted root is never cut by the table: its move may be one the list excludes.
             let restricted_root = ply == 0 && self.options.root_moves.is_some();
             if clock_free && entry.depth >= depth_remaining && !restricted_root {
                 let value = at_ply(entry.value, ply);
                 match entry.flag {
                     Flag::Exact => {
-                        self.memory.counters.table_cuts += 1;
+                        self.memory.diagnostics.table_cut();
                         return (value, entry.best);
                     }
                     Flag::LowerBound => alpha = alpha.max(value),
                     Flag::UpperBound => beta = beta.min(value),
                 }
                 if alpha >= beta {
-                    self.memory.counters.table_cuts += 1;
+                    self.memory.diagnostics.table_cut();
                     return (value, entry.best);
                 }
             }
         }
-        let repetitions_before = self.memory.counters.repetition_draws;
+        let repetitions_before = self.memory.diagnostics.repetition_draws();
 
         let moves = ordered_moves(self.state.pos());
         if let Some(winner) = self.state.outcome(&moves) {
@@ -197,7 +204,7 @@ impl Search<'_> {
                 && !pos.is_insufficient_material()
                 && pos.halfmoves() < 100
             {
-                self.memory.counters.repetition_draws += 1;
+                self.memory.diagnostics.repetition_draw();
             }
             return (self.terminal_utility(winner, ply), None);
         }
@@ -398,16 +405,15 @@ impl Search<'_> {
             // Cutoff: quiet moves that cut are remembered (killers, history) to be tried earlier
             // in sibling nodes; captures are already ordered first.
             if alpha >= beta {
-                self.prunings += 1;
-                let counters = &mut self.memory.counters;
-                counters.cuts += 1;
-                counters.first_move_cuts += u64::from(index == 0);
-                let id = move_id(&action);
-                if !action.is_capture() && table_move != Some(id) {
-                    if let Some(slot) = killers.iter().position(|&killer| killer == id) {
-                        counters.killer_cuts[slot] += 1;
-                    }
+                #[cfg(feature = "search-summary")]
+                {
+                    self.prunings += 1;
                 }
+                let id = move_id(&action);
+                let killer_slot = (!action.is_capture() && table_move != Some(id))
+                    .then(|| killers.iter().position(|&killer| killer == id))
+                    .flatten();
+                self.memory.diagnostics.cutoff(index == 0, killer_slot);
                 self.memory.killers.record(ply, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
@@ -438,14 +444,10 @@ impl Search<'_> {
                 for_table(alpha_orig, ply),
                 for_table(beta_orig, ply),
             );
-            let counters = &mut self.memory.counters;
-            counters.stores += 1;
-            counters.stores_over_repetition +=
-                u64::from(counters.repetition_draws > repetitions_before);
-            if let Some(depth) = dropped {
-                counters.evictions += 1;
-                counters.deeper_evictions += u64::from(depth > depth_remaining);
-            }
+            let over_repetition = self.memory.diagnostics.repetition_draws() > repetitions_before;
+            self.memory
+                .diagnostics
+                .store(over_repetition, dropped, depth_remaining);
         }
         (best_value, best_move)
     }
@@ -483,13 +485,12 @@ pub struct SearchResult {
     /// Best move of the root, `None` if the root itself was cut.
     pub best: Option<Move>,
     pub nodes: u64,
-    pub prunings: u64,
-    /// Deepest ply reached.
-    pub max_ply: i32,
     /// Whether the clock or the stop flag cut the search.
     pub truncated: bool,
     /// Share of the nodes spent under the best move of the root (0 without one).
     pub best_share: f64,
+    #[cfg(feature = "search-summary")]
+    pub report: SearchReport,
 }
 
 /// One alpha-beta search of exactly `max_depth` plies.
@@ -514,7 +515,9 @@ pub fn alpha_beta(
         root_player,
         max_depth,
         nodes: 0,
+        #[cfg(feature = "search-summary")]
         prunings: 0,
+        #[cfg(feature = "search-summary")]
         max_ply: 0,
         truncated: false,
         next_clock_check: 0,
@@ -535,9 +538,12 @@ pub fn alpha_beta(
         value,
         best,
         nodes: search.nodes,
-        prunings: search.prunings,
-        max_ply: search.max_ply,
         truncated: search.truncated,
         best_share,
+        #[cfg(feature = "search-summary")]
+        report: SearchReport {
+            prunings: search.prunings,
+            max_ply: search.max_ply,
+        },
     }
 }

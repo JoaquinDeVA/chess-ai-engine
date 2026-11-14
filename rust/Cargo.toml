@@ -10,8 +10,14 @@ name = "_core"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = ["search-summary"]
 # The Python bindings; off for `cargo test`, which links the plain library.
 python = ["dep:pyo3", "dep:numpy"]
+# Basic search results are always part of the search API. This feature documents the
+# production/reporting build used by the UCI engine.
+search-summary = []
+# Detailed counters are for `bench` and `ttd`; they are not needed to choose a move.
+search-diagnostics = ["search-summary"]
 
 [dependencies]
 shakmaty = "0.30"

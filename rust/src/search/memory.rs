@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use super::options::DEFAULT_HASH_MB;
 use super::ordering::{ContinuationHistory, Countermoves, History, Killers};
-use super::stats::Counters;
+use super::stats::SearchDiagnostics;
 use super::tt::Table;
 
 /// What a game keeps between two moves: the transposition table and the killer moves, and how
@@ -18,7 +18,7 @@ pub struct Memory {
     pub continuation: ContinuationHistory,
     pub countermoves: Countermoves,
     pub threads: usize,
-    pub counters: Counters,
+    pub diagnostics: SearchDiagnostics,
 }
 
 impl Memory {
@@ -31,7 +31,7 @@ impl Memory {
             continuation: ContinuationHistory::default(),
             countermoves: Countermoves::default(),
             threads: threads.max(1),
-            counters: Counters::default(),
+            diagnostics: SearchDiagnostics::default(),
         }
     }
 

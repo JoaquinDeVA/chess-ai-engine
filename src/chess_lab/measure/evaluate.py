@@ -14,10 +14,14 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 from chess_engine import _core
+from chess_lab.datasets.build_move_ranking import OUT as RANKING_TABLE
 from chess_lab.datasets.sidecar import load_sample
 from chess_lab.datasets.split import TEST
 from chess_lab.measure.judge import judge
+from chess_lab.measure.ranking import judge_ranking
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
@@ -108,6 +112,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=AGREEMENT_ROWS,
         help="sample rows used for best-move agreement (lower it for slow models)",
     )
+    parser.add_argument(
+        "--ranking",
+        type=Path,
+        default=RANKING_TABLE,
+        help="move-ranking test set (build_move_ranking); skipped when the file does not exist",
+    )
     return parser.parse_args(argv)
 
 
@@ -127,6 +137,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
     print(f"Evaluating {args.model} ...")
     sections.update(sample_benchmark(evaluator, args.raw, args.sidecar, args.agreement_n))
+    if args.ranking.exists():
+        sections["ordering"] = judge_ranking(evaluator, pd.read_parquet(args.ranking))
     saved = args.path or artifact_path(args.model)
     if saved.exists():
         sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
@@ -144,6 +156,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         f" / {accuracy['non_quiet']['best_move_agreement']:.4f}"
     )
     print(f"  us per eval: {cost['us_per_eval']}")
+    if "ordering" in sections:
+        for name, part in sections["ordering"].items():
+            print(
+                f"  ordering ({name}, {part['positions']} positions): tau {part['tau']:.4f}, "
+                f"top1 {part['top1']:.4f}, top3 {part['top3']:.4f}"
+            )
     return 0
 
 

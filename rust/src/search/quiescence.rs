@@ -2,8 +2,9 @@
 
 use shakmaty::{MoveList, Position};
 
-use super::node::{Search, INFINITE};
+use super::node::Search;
 use super::ordering::{order_noisy, see_ge};
+use super::scores::INFINITE;
 use crate::board::ordered_moves;
 
 impl Search<'_> {

@@ -5,12 +5,13 @@ use std::sync::{Arc, Mutex};
 
 use shakmaty::Move;
 
-use super::memory::*;
+use super::control::Control;
+use super::memory::Memory;
 use super::node::alpha_beta;
 use super::options::*;
 use super::ordering::{ContinuationHistory, Countermoves, History, Killers};
 use super::stats::*;
-use super::tt::Table;
+use super::transposition_table::Table;
 use crate::board::GameState;
 use crate::eval::Net;
 

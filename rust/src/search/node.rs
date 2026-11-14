@@ -5,13 +5,15 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use shakmaty::{Color, Move, MoveList, Position};
 
-use super::memory::*;
+use super::control::Control;
+use super::memory::Memory;
 use super::options::*;
 use super::ordering::{move_to_front, order, piece_to, see_ge, MAX_KILLERS_PER_PLY};
+use super::scores::{at_ply, for_table, INFINITE, MATE};
 use super::search_techniques::*;
 #[cfg(feature = "search-summary")]
 use super::stats::SearchReport;
-use super::tt::Flag;
+use super::transposition_table::Flag;
 use crate::board::{move_id, ordered_moves, GameState};
 use crate::eval::{Net, NetState, EVAL_LIMIT};
 
@@ -19,15 +21,6 @@ use crate::eval::{Net, NetState, EVAL_LIMIT};
 const CLOCK_EVERY_NODES: u64 = 2048;
 /// Width of the null window used by principal variation search: one unit of the score.
 const NULL_WINDOW_WIDTH: i32 = 1;
-
-/// A bound beyond every value, the window of the root.
-pub const INFINITE: i32 = 32_000;
-/// Value of a mate on the board; a mate `n` plies from the root is worth `MATE - n` to the winner,
-/// so a quicker mate is preferred one unit per ply.
-pub const MATE: i32 = 31_000;
-/// Values from here out are mates: no line is longer than `MATE - MATE_BOUND` plies, and every
-/// evaluation is within `EVAL_LIMIT`, far below.
-pub const MATE_BOUND: i32 = MATE - 1_000;
 
 pub(super) struct Search<'a> {
     pub(super) state: &'a mut GameState,
@@ -456,29 +449,6 @@ impl Search<'_> {
                 .store(over_repetition, dropped, depth_remaining);
         }
         (best_value, best_move)
-    }
-}
-
-/// A value as the table keeps it: the distance to a mate counts from the node, not from the root.
-/// The map is increasing, so the bounds of the window can go through it as well.
-fn for_table(value: i32, ply: i32) -> i32 {
-    if value >= MATE_BOUND {
-        value + ply
-    } else if value <= -MATE_BOUND {
-        value - ply
-    } else {
-        value
-    }
-}
-
-/// The inverse of [`for_table`] for a node at `ply`.
-fn at_ply(value: i32, ply: i32) -> i32 {
-    if value >= MATE_BOUND {
-        value - ply
-    } else if value <= -MATE_BOUND {
-        value + ply
-    } else {
-        value
     }
 }
 

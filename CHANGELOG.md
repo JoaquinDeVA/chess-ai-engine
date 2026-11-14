@@ -16,6 +16,9 @@ All notable changes. The newest are first.
   searching. In 100 self-play wins from random positions (three seeds, 20 ms per move, against the
   tables) the engine mates in all 100 with no repetition, and the live game's `Qc7+ Kxc7` is no
   longer an option. Some sacrifices that the DTZ counts as progress remain.
+- Check positions now receive one extra search ply, and quiescence searches all legal evasions
+  without stand pat or SEE when the side to move is in check. No strength or tree measurement has
+  been run yet.
 - Killer moves are now indexed by search ply instead of remaining depth, so IIR, LMR and null-move
   reductions reuse the same killer slot for the same layer of the tree. No strength or tree
   measurement has been run yet.

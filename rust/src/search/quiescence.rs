@@ -1,13 +1,13 @@
 //! The quiescence search: at the horizon, only captures and promotions that do not lose material.
 
-use shakmaty::MoveList;
+use shakmaty::{MoveList, Position};
 
-use super::node::Search;
+use super::node::{Search, INFINITE};
 use super::ordering::{order_noisy, see_ge};
 use crate::board::ordered_moves;
 
 impl Search<'_> {
-    /// Value of a horizon node searching only captures and promotions (stand pat, no table).
+    /// Value of a horizon node: forced evasions in check, otherwise captures and promotions.
     pub(super) fn quiescence(
         &mut self,
         mut alpha: i32,
@@ -16,23 +16,33 @@ impl Search<'_> {
         ply: i32,
         moves: MoveList,
     ) -> i32 {
-        let mut best_value = self.static_value(); // nobody is forced to capture
-        if plies_left == 0 {
-            return best_value;
-        }
+        let in_check = self.state.pos().is_check();
         let maximizing = self.state.turn() == self.root_player;
-        if maximizing {
-            alpha = alpha.max(best_value);
+        let mut best_value = if in_check {
+            if maximizing {
+                -INFINITE
+            } else {
+                INFINITE
+            }
         } else {
-            beta = beta.min(best_value);
-        }
-        if alpha >= beta {
-            self.prunings += 1;
-            return best_value;
-        }
-        for action in order_noisy(&moves) {
-            // Captures that lose material are not searched.
-            if !see_ge(self.state.pos(), &action, 0) {
+            let value = self.static_value();
+            if plies_left == 0 {
+                return value;
+            }
+            if maximizing {
+                alpha = alpha.max(value);
+            } else {
+                beta = beta.min(value);
+            }
+            if alpha >= beta {
+                self.prunings += 1;
+                return value;
+            }
+            value
+        };
+        let candidates = if in_check { moves } else { order_noisy(&moves) };
+        for action in candidates {
+            if !in_check && !see_ge(self.state.pos(), &action, 0) {
                 continue;
             }
             self.play(action);
@@ -41,7 +51,13 @@ impl Search<'_> {
             let child_moves = ordered_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
                 Some(winner) => self.terminal_utility(winner, ply + 1),
-                None => self.quiescence(alpha, beta, plies_left - 1, ply + 1, child_moves),
+                None => self.quiescence(
+                    alpha,
+                    beta,
+                    plies_left.saturating_sub(1),
+                    ply + 1,
+                    child_moves,
+                ),
             };
             self.unplay();
             if maximizing {

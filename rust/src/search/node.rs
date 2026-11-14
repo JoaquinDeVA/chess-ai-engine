@@ -142,6 +142,12 @@ impl Search<'_> {
         self.nodes += 1;
         self.max_ply = self.max_ply.max(ply);
 
+        let in_check = self.state.pos().is_check();
+        let depth_remaining = if in_check && depth_remaining > 0 {
+            depth_remaining + 1
+        } else {
+            depth_remaining
+        };
         // Order of the checks: the table first (it can end the node for free), then game end and
         // horizon, then the clock, and only then the techniques that cost a search.
         let key = self.state.key();
@@ -253,7 +259,6 @@ impl Search<'_> {
         if !helper_root {
             move_to_front(&mut ordered, table_move);
         }
-        let in_check = self.state.pos().is_check();
         // Reverse futility: a static value far beyond the bound, in a window of no width and not in
         // check, is taken as the value of the node.
         if ply > 0

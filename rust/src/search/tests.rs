@@ -146,6 +146,19 @@ fn a_quicker_win_is_worth_more_than_a_slower_one() {
 }
 
 #[test]
+fn check_extends_the_search_by_one_ply() {
+    let result = fixed("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", 1);
+    assert!(result.best.is_some());
+    assert!(result.max_ply >= 2);
+}
+
+#[test]
+fn quiescence_searches_evasions_when_in_check() {
+    let result = quiescent("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", 0);
+    assert!(result.nodes > 1);
+}
+
+#[test]
 fn a_mate_keeps_its_distance_when_it_comes_back_from_the_table() {
     // The deepening reads the mates of the previous iteration from the table at other plies.
     let two = fixed(MATE_IN_TWO, 6);

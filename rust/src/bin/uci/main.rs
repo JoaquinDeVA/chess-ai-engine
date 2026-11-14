@@ -1,540 +1,87 @@
-//! The engine as a UCI program: `uci`, `isready`, `position`, `go`, `stop`, `setoption`, `quit`.
-//!
-//! The window and the tournaments play through this binary. On a clock each move gets a soft
-//! limit, checked between iterations, and a hard one that cuts the search (see [`clock_budget`]).
+//! Entry point for the UCI engine and its standalone measurement tools.
 
-use std::io::{self, BufRead};
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::Instant;
 
-use _core::board::{move_id, ordered_moves, uci_string, GameState};
 use _core::eval::Net;
-use _core::knowledge::book::OpeningBook;
-use _core::knowledge::tablebase::EndgameTablebase;
-use _core::search::{self, Control, Memory, Options, DEFAULT_HASH_MB};
-use shakmaty::Color;
 
 use bench::{bench, time_to_depth};
+use engine::{load_model, UciEngine};
 
 mod bench;
+mod clock;
+mod engine;
+mod limits;
+mod position;
 
-/// The model compiled in (`rust/models/`, written by `chess_lab.models.export_uci`).
-const MODEL_JSON: &str = include_str!("../../../models/net_pst_w64.json");
-const MODEL_NAME: &str = "net_pst_w64";
-const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-/// Settings changed with `setoption`.
-struct Settings {
-    threads: usize,
-    hash_mb: usize,
-    eval: Arc<Net>,
-    /// Opening book (`Book`); off until the option names a file.
-    book: Option<OpeningBook>,
-    /// Whether the game still follows the book: the first position it lacks ends it.
-    in_book: bool,
-    /// Endgame tablebases (`Tablebase`); off until the option names a directory.
-    tablebase: Option<EndgameTablebase>,
-}
-
-/// The position as the GUI sent it: the root FEN and the moves played from it.
-#[derive(Clone)]
-struct Position {
-    fen: String,
-    moves: Vec<String>,
-}
-
-impl Position {
-    /// Full move number of the position to search: the one in the root FEN plus the moves played.
-    fn move_number(&self) -> u32 {
-        let mut fields = self.fen.split_whitespace().skip(1);
-        let black = fields.next() == Some("b");
-        let first = fields
-            .nth(3)
-            .and_then(|n| n.parse::<u32>().ok())
-            .unwrap_or(1);
-        first + (self.moves.len() as u32 + u32::from(black)) / 2
-    }
-}
-
-/// What one `go` asks for. Times are in seconds.
-struct Limits {
-    depth: usize,
-    nodes: Option<u64>,
-    time_limit: f64,
-    hard_limit: f64,
-}
-
-/// Everything a search thread needs, moved into it.
-struct Job {
-    position: Position,
-    limits: Limits,
-    stop: Arc<AtomicBool>,
-    /// Ids (`move_id`) of the only root moves to search; `None` searches them all.
-    root_moves: Option<Vec<u32>>,
-}
-
-/// A search running in its own thread. It gives the memory back when it ends.
-type Running = (JoinHandle<Memory>, Arc<AtomicBool>);
-
-fn load_model() -> Result<Net, String> {
-    Net::from_json(MODEL_JSON)
-}
-
-/// Seconds kept back on every move for the GUI and the pipes, so that the move arrives in time.
-const MOVE_OVERHEAD: f64 = 0.05;
-/// Moves the time left is spread over when `movestogo` does not say (or says more): 59 on the first
-/// move, one fewer every move, never fewer than 20. A long horizon at the start keeps the clock
-/// for the middlegame instead of spending it on the opening.
-fn horizon(move_number: u32) -> f64 {
-    (60.0 - f64::from(move_number)).max(20.0)
-}
-/// Share of the base that is the soft limit. The search scales it by 2.0 on average (stability and
-/// node share), so the moves end up using about 0.8 of the base.
-const SOFT_SHARE: f64 = 0.4;
-
-/// Soft and hard limit of one move in seconds. The base is the time left over the moves to go plus
-/// three quarters of the increment, minus the overhead; the soft limit is `SOFT_SHARE` of the base and the
-/// hard one three times the base, but never more than 40 % of the time left. `move_number` is the
-/// full move of the game (see `horizon`). The search scales the
-/// soft limit by how settled the best move is (see `search::iterative_deepening`).
-fn clock_budget(
-    time_left: f64,
-    increment: f64,
-    moves_to_go: Option<u32>,
-    move_number: u32,
-) -> (f64, f64) {
-    let horizon = moves_to_go.map_or(horizon(move_number), |n| {
-        f64::from(n.max(1)).min(horizon(move_number))
-    });
-    let base = (time_left / horizon + increment * 0.75 - MOVE_OVERHEAD).max(0.01);
-    let hard = (base * 3.0)
-        .min(time_left * 0.4)
-        .min((time_left - MOVE_OVERHEAD).max(0.01));
-    ((base * SOFT_SHARE).min(hard), hard)
-}
-
-/// The limits of a `go` command. `movetime` wins over the clock; with neither the search runs to
-/// the maximum depth.
-fn go_limits(args: &[&str], white_to_move: bool, move_number: u32) -> Limits {
-    let (mut depth, mut nodes) = (None, None);
-    let (mut movetime, mut moves_to_go) = (None, None);
-    let (mut wtime, mut btime, mut winc, mut binc) = (None, None, 0.0, 0.0);
-    let seconds = |ms: &str| ms.parse::<f64>().ok().map(|ms| ms / 1000.0);
-    let mut words = args.iter().copied();
-    while let Some(key) = words.next() {
-        if key == "infinite" {
-            continue;
-        }
-        let Some(value) = words.next() else { break };
-        match key {
-            "depth" => depth = value.parse().ok(),
-            "nodes" => nodes = value.parse().ok(),
-            "movetime" => movetime = seconds(value),
-            "wtime" => wtime = seconds(value),
-            "btime" => btime = seconds(value),
-            "winc" => winc = seconds(value).unwrap_or(0.0),
-            "binc" => binc = seconds(value).unwrap_or(0.0),
-            "movestogo" => moves_to_go = value.parse().ok(),
-            _ => {}
-        }
-    }
-    let (time_left, increment) = if white_to_move {
-        (wtime, winc)
-    } else {
-        (btime, binc)
-    };
-    let (time_limit, hard_limit) = match (movetime, time_left) {
-        (Some(seconds), _) => (seconds, seconds),
-        (None, Some(time_left)) => clock_budget(time_left, increment, moves_to_go, move_number),
-        (None, None) => (f64::INFINITY, f64::INFINITY),
-    };
-    Limits {
-        depth: depth.unwrap_or(search::MAX_DEPTH).max(1),
-        nodes,
-        time_limit,
-        hard_limit,
-    }
-}
-
-/// Searches the job and prints `info` and `bestmove`. A broken position prints an error and
-/// `bestmove 0000`.
-fn think(mut memory: Memory, eval: Arc<Net>, job: Job) -> Memory {
-    match run_search(&mut memory, &eval, job) {
-        Ok(best) => println!("bestmove {best}"),
-        Err(error) => println!("info string {error}\nbestmove 0000"),
-    }
-    memory
-}
-
-fn run_search(memory: &mut Memory, eval: &Net, job: Job) -> Result<String, String> {
-    let mut state = GameState::from_moves(&job.position.fen, &job.position.moves)?;
-    let options = Options {
-        node_limit: job.limits.nodes,
-        root_moves: job.root_moves,
-        ..Options::default()
-    };
-    let origin = Instant::now();
-    let clock = || origin.elapsed().as_secs_f64();
-    let control = Control {
-        start: 0.0,
-        hard_limit: job.limits.hard_limit,
-        clock: &clock,
-        stop: Some(&job.stop),
-        progress: None,
-        rotation: 0,
-    };
-    let (best, stats) = search::iterative_deepening(
-        &mut state,
-        eval,
-        memory,
-        &options,
-        job.limits.depth,
-        job.limits.time_limit,
-        &control,
-    )?;
-    println!(
-        "info depth {} nodes {} time {}",
-        stats.completed_depth,
-        stats.nodes_visited,
-        (clock() * 1000.0) as u64
-    );
-    Ok(match best {
-        Some(m) => uci_string(&m),
-        // A search cut before its first move still owes a legal move.
-        None => ordered_moves(state.pos())
-            .first()
-            .map_or("0000".to_string(), uci_string),
-    })
-}
-
-/// Waits for a running search and takes its memory back.
-fn finish(running: &mut Option<Running>, memory: &mut Option<Memory>) {
-    if let Some((handle, _)) = running.take() {
-        *memory = Some(handle.join().expect("search thread panicked"));
-    }
-}
-
-fn new_memory(settings: &Settings) -> Memory {
-    Memory::new(settings.threads, settings.hash_mb)
-}
-
-fn set_option(settings: &mut Settings, args: &[&str]) -> Result<bool, String> {
-    let text = args.join(" ");
-    let (name, value) = match text.split_once(" value ") {
-        Some((name, value)) => (name, value.trim()),
-        None => (text.as_str(), ""),
-    };
-    let name = name.strip_prefix("name ").unwrap_or(name).trim();
-    match name {
-        "Hash" => settings.hash_mb = value.parse().map_err(|_| "Hash needs a number")?,
-        "Threads" => {
-            settings.threads = value
-                .parse::<usize>()
-                .map_err(|_| "Threads needs a number")?
-                .max(1)
-        }
-        "Model" if value == MODEL_NAME => settings.eval = Arc::new(load_model()?),
-        "Model" => {
-            let text = std::fs::read_to_string(value)
-                .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;
-            settings.eval = Arc::new(Net::from_json(&text)?);
-        }
-        "Book" => {
-            settings.book = match value {
-                "" => None,
-                path => Some(OpeningBook::load(Path::new(path))?),
-            };
-            settings.in_book = settings.book.is_some();
-        }
-        "Tablebase" => {
-            settings.tablebase = match value {
-                "" => None,
-                path => Some(EndgameTablebase::open(Path::new(path))?),
-            };
-        }
-        other => return Err(format!("unknown option {other:?}")),
-    }
-    Ok(name == "Hash" || name == "Threads")
-}
-
-/// The move the book gives for the position. The book is followed while it has the position; the
-/// first miss ends it until the next game. `None` leaves the move to the search.
-fn known_move(settings: &mut Settings, position: &Position) -> Option<String> {
-    let state = GameState::from_moves(&position.fen, &position.moves).ok()?;
-    if settings.in_book {
-        let found = settings
-            .book
-            .as_ref()
-            .and_then(|book| book.lookup(state.pos()));
-        match found {
-            Some(m) => return Some(uci_string(&m)),
-            None => settings.in_book = false,
-        }
-    }
-    None
-}
-
-/// The root moves the endgame tables allow, as UCI strings and as ids for the search. `None` when
-/// the tables are off or do not cover the position.
-fn tablebase_moves(settings: &Settings, position: &Position) -> Option<(Vec<String>, Vec<u32>)> {
-    let state = GameState::from_moves(&position.fen, &position.moves).ok()?;
-    let moves = settings.tablebase.as_ref()?.root_moves(state.pos())?;
-    Some((
-        moves.iter().map(uci_string).collect(),
-        moves.iter().map(move_id).collect(),
-    ))
-}
-
+/// Selects the executable mode from process arguments.
+///
+/// The executable name is argument 0 and the mode is argument 1:
+///
+/// ```text
+/// uci bench [repetitions] [model.json]
+/// uci ttd <depth> <positions> [limit_s]
+/// uci
+/// ```
+///
+/// `bench` measures fixed-position search performance, `ttd` measures the time to reach a
+/// depth for one FEN per line, and no mode starts the interactive UCI protocol on `stdin`.
 fn main() {
     let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
-    // uci ttd <depth> <positions> [limit_s]
-    if std::env::args().nth(1).as_deref() == Some("ttd") {
-        let args: Vec<String> = std::env::args().skip(2).collect();
-        let depth = args.first().and_then(|depth| depth.parse().ok());
-        let limit = args.get(2).map_or(Some(f64::INFINITY), |s| s.parse().ok());
-        let result = match (depth, args.get(1), limit) {
-            (Some(depth), Some(path), Some(limit)) => time_to_depth(&eval, depth, path, limit),
-            _ => Err("usage: uci ttd <depth> <positions> [limit_s]".to_string()),
-        };
-        if let Err(error) = result {
-            eprintln!("{error}");
-            std::process::exit(1);
-        }
-        return;
+    match std::env::args().nth(1).as_deref() {
+        Some("ttd") => run_time_to_depth(&eval),
+        Some("bench") => run_bench(&eval),
+        _ => UciEngine::new(eval).run(),
     }
-    // uci bench [repetitions] [model.json]
-    if std::env::args().nth(1).as_deref() == Some("bench") {
-        let repetitions = std::env::args()
-            .nth(2)
-            .and_then(|n| n.parse().ok())
-            .unwrap_or(5);
-        match std::env::args().nth(3) {
-            Some(path) => bench(
-                &std::fs::read_to_string(&path)
-                    .map_err(|e| e.to_string())
-                    .and_then(|text| Net::from_json(&text))
-                    .unwrap_or_else(|e| panic!("bench model {path}: {e}")),
-                repetitions,
-            ),
-            None => bench(&eval, repetitions),
-        }
-        return;
-    }
-    let mut settings = Settings {
-        threads: 1,
-        hash_mb: DEFAULT_HASH_MB,
-        eval: eval.clone(),
-        book: None,
-        in_book: false,
-        tablebase: None,
-    };
-    let mut memory = Some(new_memory(&settings));
-    let mut position = Position {
-        fen: START_FEN.to_string(),
-        moves: Vec::new(),
-    };
-    let mut running: Option<Running> = None;
-
-    for line in io::stdin().lock().lines() {
-        let line = line.expect("stdin is readable");
-        let words: Vec<&str> = line.split_whitespace().collect();
-        let Some((&command, args)) = words.split_first() else {
-            continue;
-        };
-        match command {
-            "uci" => {
-                println!("id name chess_core");
-                println!("option name Hash type spin default {DEFAULT_HASH_MB} min 1 max 65536");
-                println!("option name Threads type spin default 1 min 1 max 64");
-                println!("option name Book type string default");
-                println!("option name Tablebase type string default");
-                println!("option name Model type string default {MODEL_NAME}");
-                println!("uciok");
-            }
-            "isready" => println!("readyok"),
-            "ucinewgame" => {
-                finish(&mut running, &mut memory);
-                settings.in_book = settings.book.is_some();
-                if let Some(memory) = memory.as_mut() {
-                    memory.clear();
-                }
-            }
-            "setoption" => {
-                finish(&mut running, &mut memory);
-                match set_option(&mut settings, args) {
-                    Ok(true) => memory = Some(new_memory(&settings)),
-                    Ok(false) => {}
-                    Err(error) => println!("info string {error}"),
-                }
-            }
-            "eval" => match GameState::from_moves(&position.fen, &position.moves) {
-                Ok(state) => println!(
-                    "info string eval {:.6}",
-                    settings.eval.evaluate(state.pos(), Color::White)
-                ),
-                Err(error) => println!("info string {error}"),
-            },
-            "position" => match args.first() {
-                Some(&"startpos") => position = parse_position(START_FEN.into(), &args[1..]),
-                Some(&"fen") if args.len() >= 7 => {
-                    position = parse_position(args[1..7].join(" "), &args[7..])
-                }
-                _ => println!("info string position needs startpos or fen"),
-            },
-            "go" => {
-                finish(&mut running, &mut memory);
-                if let Some(best) = known_move(&mut settings, &position) {
-                    println!("info string book\nbestmove {best}");
-                    continue;
-                }
-                // The tables say which moves keep the result; the search chooses among them.
-                let root_moves = match tablebase_moves(&settings, &position) {
-                    Some((names, _)) if names.len() == 1 => {
-                        println!("info string tablebase\nbestmove {}", names[0]);
-                        continue;
-                    }
-                    found => found.map(|(_, ids)| ids),
-                };
-                let white = GameState::from_moves(&position.fen, &position.moves)
-                    .map_or(true, |state| state.turn() == Color::White);
-                let job = Job {
-                    position: position.clone(),
-                    limits: go_limits(args, white, position.move_number()),
-                    stop: Arc::new(AtomicBool::new(false)),
-                    root_moves,
-                };
-                let stop = job.stop.clone();
-                let memory_for_thread = memory.take().expect("memory is back after finish");
-                let eval = settings.eval.clone();
-                let handle = std::thread::spawn(move || think(memory_for_thread, eval, job));
-                running = Some((handle, stop));
-            }
-            "stop" => {
-                if let Some((_, stop)) = &running {
-                    stop.store(true, Relaxed);
-                }
-            }
-            "quit" => {
-                if let Some((_, stop)) = &running {
-                    stop.store(true, Relaxed);
-                }
-                finish(&mut running, &mut memory);
-                return;
-            }
-            _ => {}
-        }
-    }
-    // End of input: the pending search still answers, so piped scripts get their `bestmove`.
-    finish(&mut running, &mut memory);
 }
 
-/// The position with the moves that follow the optional `moves` keyword.
-fn parse_position(fen: String, rest: &[&str]) -> Position {
-    let moves = rest
-        .iter()
-        .skip_while(|word| **word != "moves")
-        .skip(1)
-        .map(|word| word.to_string())
-        .collect();
-    Position { fen, moves }
+/// Runs the `ttd` tool.
+///
+/// Arguments begin at process argument 2 because argument 0 is the executable and argument 1 is
+/// `ttd`:
+///
+/// ```text
+/// uci ttd <depth> <positions> [limit_s]
+/// ```
+///
+/// `<depth>` is the target search depth, `<positions>` is a file containing one FEN per line, and
+/// `[limit_s]` is an optional per-position time limit in seconds.
+fn run_time_to_depth(eval: &Net) {
+    let args: Vec<String> = std::env::args().skip(2).collect();
+    let depth = args.first().and_then(|depth| depth.parse().ok());
+    let limit = args.get(2).map_or(Some(f64::INFINITY), |s| s.parse().ok());
+    let result = match (depth, args.get(1), limit) {
+        (Some(depth), Some(path), Some(limit)) => time_to_depth(eval, depth, path, limit),
+        _ => Err("usage: uci ttd <depth> <positions> [limit_s]".to_string()),
+    };
+    if let Err(error) = result {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn close(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-9
-    }
-
-    #[test]
-    fn the_clock_spreads_the_time_and_counts_the_increment() {
-        // 60 + 1 at move 60 (horizon 20): base 60/20 + 0.75 - 0.05 = 3.7 s.
-        let (soft, hard) = clock_budget(60.0, 1.0, None, 60);
-        assert!(close(soft, 1.48) && close(hard, 11.1), "{soft} {hard}");
-        // Early on the horizon is longer, so the first moves take less: 60/59 + 0.7 = 1.7 s.
-        let (soft, _) = clock_budget(60.0, 1.0, None, 1);
-        assert!(close(soft, 0.4 * (60.0 / 59.0 + 0.7)), "{soft}");
-        // The increment is what keeps the base up when the clock runs low.
-        let (soft, _) = clock_budget(2.0, 1.0, None, 60);
-        assert!(close(soft, 0.4 * 0.8), "{soft}");
-    }
-
-    #[test]
-    fn the_hard_limit_never_eats_the_clock() {
-        for time_left in [0.02, 0.1, 1.0, 5.0] {
-            let (soft, hard) = clock_budget(time_left, 2.0, Some(1), 1);
-            assert!(
-                soft <= hard && hard <= time_left * 0.4 + 0.01,
-                "{time_left}: {hard}"
-            );
-        }
-    }
-
-    #[test]
-    fn movestogo_shortens_the_horizon_and_go_reads_the_side_to_move() {
-        let (soft, _) = clock_budget(60.0, 0.0, Some(10), 1);
-        assert!(close(soft, 0.4 * 5.95), "{soft}");
-        let black = go_limits(
-            &["wtime", "1000", "btime", "60000", "binc", "1000"],
-            false,
-            60,
-        );
-        assert!(close(black.time_limit, 1.48) && close(black.hard_limit, 11.1));
-        let fixed = go_limits(&["movetime", "500", "wtime", "60000"], true, 1);
-        assert!(close(fixed.time_limit, 0.5) && close(fixed.hard_limit, 0.5));
-    }
-
-    #[test]
-    fn the_compiled_in_model_is_a_network() {
-        assert!(load_model().is_ok());
-    }
-
-    fn settings_with_book() -> Settings {
-        let start = Position {
-            fen: START_FEN.into(),
-            moves: vec![],
-        };
-        let key = _core::knowledge::book::position_key(&start.fen);
-        Settings {
-            threads: 1,
-            hash_mb: 1,
-            eval: Arc::new(load_model().unwrap()),
-            book: Some(OpeningBook::from_entries([(key, "e2e4".to_string())])),
-            in_book: true,
-            tablebase: None,
-        }
-    }
-
-    #[test]
-    fn the_book_answers_until_the_first_miss() {
-        let mut settings = settings_with_book();
-        let start = Position {
-            fen: START_FEN.into(),
-            moves: vec![],
-        };
-        assert_eq!(known_move(&mut settings, &start), Some("e2e4".to_string()));
-        let off_book = Position {
-            fen: START_FEN.into(),
-            moves: vec!["a2a3".into()],
-        };
-        assert_eq!(known_move(&mut settings, &off_book), None);
-        // After the miss the book stays closed, even for a position it has.
-        assert!(!settings.in_book);
-        assert_eq!(known_move(&mut settings, &start), None);
-    }
-
-    #[test]
-    fn without_book_or_tables_the_search_decides() {
-        let mut settings = settings_with_book();
-        settings.book = None;
-        let start = Position {
-            fen: START_FEN.into(),
-            moves: vec![],
-        };
-        assert_eq!(known_move(&mut settings, &start), None);
+/// Runs the `bench` tool.
+///
+/// Arguments begin at process argument 2 because argument 0 is the executable and argument 1 is
+/// `bench`:
+///
+/// ```text
+/// uci bench [repetitions] [model.json]
+/// ```
+///
+/// `[repetitions]` defaults to 5. `[model.json]`, when present, replaces the compiled-in network.
+fn run_bench(eval: &Net) {
+    let repetitions = std::env::args()
+        .nth(2)
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(5);
+    match std::env::args().nth(3) {
+        Some(path) => bench(
+            &std::fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|text| Net::from_json(&text))
+                .unwrap_or_else(|e| panic!("bench model {path}: {e}")),
+            repetitions,
+        ),
+        None => bench(eval, repetitions),
     }
 }

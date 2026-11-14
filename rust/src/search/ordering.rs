@@ -210,8 +210,10 @@ pub fn see_ge(pos: &Chess, m: &Move, threshold: i32) -> bool {
 
 /// Largest identity of a move (`board::move_id`) plus one.
 const MOVE_IDS: usize = 1 << 15;
-/// Value above which the history scores are halved.
-const HISTORY_LIMIT: i32 = 1 << 24;
+/// Bound of the history scores: a bonus pushes a score less the closer it is to it.
+const HISTORY_LIMIT: i32 = 1 << 14;
+/// Value above which the continuation history scores are halved.
+const CONTINUATION_LIMIT: i32 = 1 << 24;
 
 /// How often each quiet move (by mover and `move_id`) caused a cut-off, weighted by depth. A clone
 /// is another handle to the same scores: the threads of a search share them, with relaxed atomics
@@ -249,13 +251,17 @@ impl History {
         self.add(color, m, depth * depth);
     }
 
+    /// A quiet move was tried before the one that cut, and failed to.
+    pub fn penalize(&self, color: Color, m: &Move, depth: i32) {
+        self.add(color, m, -depth * depth);
+    }
+
+    /// Move the score towards the bonus, the more slowly the closer it is to `HISTORY_LIMIT`
+    /// (history gravity): the scores stay inside `±HISTORY_LIMIT` with no halving of the table.
     fn add(&self, color: Color, m: &Move, amount: i32) {
         let score = &self.scores[History::slot(color, m)];
-        if (score.fetch_add(amount, Relaxed) + amount).abs() > HISTORY_LIMIT {
-            for score in self.scores.iter() {
-                score.store(score.load(Relaxed) / 2, Relaxed);
-            }
-        }
+        let old = score.load(Relaxed);
+        score.store(old + amount - old * amount.abs() / HISTORY_LIMIT, Relaxed);
     }
 }
 
@@ -302,7 +308,7 @@ impl ContinuationHistory {
     /// A quiet move caused a cut-off with `depth` plies left, right after the move `previous`.
     pub fn reward(&self, color: Color, previous: usize, m: &Move, depth: i32) {
         let score = &self.scores[ContinuationHistory::slot(color, previous, m)];
-        if (score.fetch_add(depth * depth, Relaxed) + depth * depth).abs() > HISTORY_LIMIT {
+        if (score.fetch_add(depth * depth, Relaxed) + depth * depth).abs() > CONTINUATION_LIMIT {
             for score in self.scores.iter() {
                 score.store(score.load(Relaxed) / 2, Relaxed);
             }

@@ -341,6 +341,8 @@ impl Search<'_> {
         let futility_static = shallow.then(|| self.static_value());
         let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
+        // Quiet moves searched without a cut, to be penalized when a later move cuts.
+        let mut failed = MoveList::new();
         for (index, action) in ordered.into_iter().enumerate() {
             // Reducible: a quiet move, not a killer, in a node that is not in check. `Some` carries
             // whether the history says the move has cut before.
@@ -409,6 +411,9 @@ impl Search<'_> {
                 self.memory.killers.record(ply, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
+                    for tried in &failed {
+                        self.memory.history.penalize(mover, tried, depth_remaining);
+                    }
                     self.memory.countermoves.record(mover, previous, &action);
                     if let Some(previous) = previous_piece_to {
                         self.memory
@@ -417,6 +422,9 @@ impl Search<'_> {
                     }
                 }
                 break;
+            }
+            if !action.is_capture() && !action.is_promotion() {
+                failed.push(action);
             }
         }
         // A cut search has partial values, so it must not be stored as if it were exact.

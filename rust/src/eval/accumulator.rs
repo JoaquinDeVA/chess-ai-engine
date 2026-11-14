@@ -248,6 +248,11 @@ impl NetState<'_> {
         let width = self.width;
         let start = (2 * self.top + slot(pos.turn())) * width;
         self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
+        if net.perspective {
+            // the rival's accumulator follows the mover's: both views, one shared first layer
+            let rival = (2 * self.top + slot(!pos.turn())) * width;
+            self.hidden[width..2 * width].copy_from_slice(&self.stack[rival..rival + width]);
+        }
         if net.features.has_terms() {
             self.term_indices.clear();
             self.term_values.clear();
@@ -309,7 +314,10 @@ mod tests {
     /// and again after taking every move back; returns the moves checked, the king moves that
     /// changed bucket and the castlings.
     fn check_incremental(features: FeatureSet) -> (usize, usize, usize) {
-        let net = net(features);
+        check_net(&net(features), features)
+    }
+
+    fn check_net(net: &Net, features: FeatureSet) -> (usize, usize, usize) {
         let mut seed = 12345u64;
         let mut pick = |n: usize| {
             seed = seed
@@ -326,7 +334,7 @@ mod tests {
         for start in starts {
             for _ in 0..40 {
                 let mut pos = position_from_fen(start).unwrap();
-                let mut state = NetState::new(&net, &pos);
+                let mut state = NetState::new(net, &pos);
                 let mut trail = Vec::new();
                 for _ in 0..80 {
                     let moves = ordered_moves(&pos);
@@ -365,6 +373,22 @@ mod tests {
     #[test]
     fn incremental_equals_full_slotted() {
         check_incremental(FeatureSet::Slotted);
+    }
+
+    /// Both sides' accumulators feed the second layer, which is twice as wide as the accumulator.
+    #[test]
+    fn incremental_equals_full_both_perspectives() {
+        let features = FeatureSet::Slotted;
+        let net = Net::with_perspective(
+            features,
+            vec![
+                layer(features.size(), 16, 1),
+                layer(32, 8, 2),
+                layer(8, 1, 3),
+            ],
+        )
+        .unwrap();
+        check_net(&net, features);
     }
 
     #[test]

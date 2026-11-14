@@ -2,7 +2,7 @@
 
 use shakmaty::{Chess, Color, Position};
 
-use super::features::FeatureSet;
+use super::features::{FeatureSet, OPPONENT_PIECE_BLOCK, PIECE_INPUTS};
 use super::{for_player, score, sigmoid};
 
 /// One dense layer as the lab writes it: `weights` is row-major `(fan_in, fan_out)`.
@@ -33,11 +33,26 @@ pub struct Net {
     pub(super) layers: Vec<Dense>,
     /// Widest layer before the output: the size of the buffers of an evaluation.
     pub(super) max_width: usize,
+    /// Whether the second layer reads the accumulators of both sides (the mover's, then the
+    /// rival's, 2 * width values) instead of the mover's alone.
+    pub(super) perspective: bool,
 }
 
 impl Net {
-    /// A network, checking the shapes of its layers.
+    /// A network of the side to move alone, checking the shapes of its layers.
     pub fn new(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
+        Net::build(features, layers, false)
+    }
+
+    /// A network whose second layer reads both sides' accumulators, which share the first layer's
+    /// weights (`layers[1].fan_in` is twice the accumulator width). Only the slotted inputs, where
+    /// the rival's view of a piece is the other block of the same square, can be seen from both
+    /// sides.
+    pub fn with_perspective(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
+        Net::build(features, layers, true)
+    }
+
+    fn build(features: FeatureSet, layers: Vec<Layer>, perspective: bool) -> Result<Net, String> {
         if layers.len() < 2 {
             return Err("a network needs an accumulator and an output layer".into());
         }
@@ -48,8 +63,16 @@ impl Net {
                 features.size()
             ));
         }
-        for pair in layers.windows(2) {
-            if pair[0].fan_out != pair[1].fan_in {
+        if perspective && features != FeatureSet::Slotted {
+            return Err("both perspectives need the slotted inputs".into());
+        }
+        for (position, pair) in layers.windows(2).enumerate() {
+            let wanted = if perspective && position == 0 {
+                2 * pair[0].fan_out
+            } else {
+                pair[0].fan_out
+            };
+            if wanted != pair[1].fan_in {
                 return Err("consecutive layers do not fit".into());
             }
         }
@@ -63,7 +86,10 @@ impl Net {
         if layers.last().map(|l| l.fan_out) != Some(1) {
             return Err("the output layer must have one unit".into());
         }
-        let max_width = layers.iter().map(|l| l.fan_out).max().unwrap_or(1);
+        let mut max_width = layers.iter().map(|l| l.fan_out).max().unwrap_or(1);
+        if perspective {
+            max_width = max_width.max(2 * layers[0].fan_out);
+        }
         let single = |values: &[f64]| values.iter().map(|&v| v as f32).collect();
         let layers = layers
             .iter()
@@ -77,24 +103,24 @@ impl Net {
             features,
             layers,
             max_width,
+            perspective,
         })
     }
     /// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`,
     /// each with `fan_in`, `fan_out`, row-major `weights` and `bias`. Files written before the
     /// networks were the only model carry `"perspective": "side_to_move"`; any other perspective
-    /// is refused.
+    /// is refused; `"both"` makes the second layer read both sides' accumulators.
     pub fn from_json(text: &str) -> Result<Net, String> {
         let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
         let features = value["features"]
             .as_str()
             .and_then(FeatureSet::from_name)
             .ok_or("model: unknown features")?;
-        if value
-            .get("perspective")
-            .is_some_and(|p| *p != "side_to_move")
-        {
-            return Err("model: only the side-to-move perspective is supported".into());
-        }
+        let perspective = match value.get("perspective").map(|p| p.as_str()) {
+            None | Some(Some("side_to_move")) => false,
+            Some(Some("both")) => true,
+            _ => return Err("model: the perspective must be side_to_move or both".into()),
+        };
         let numbers = |value: &serde_json::Value| -> Result<Vec<f64>, String> {
             value
                 .as_array()
@@ -125,7 +151,7 @@ impl Net {
                 })
             })
             .collect::<Result<Vec<Layer>, String>>()?;
-        Net::new(features, layers)
+        Net::build(features, layers, perspective)
     }
 
     /// The feature set of the inputs.
@@ -139,10 +165,23 @@ impl Net {
         let (mut indices, mut values) = (Vec::with_capacity(40), Vec::with_capacity(40));
         self.features.active(pos, &mut indices, &mut values);
         let first = &self.layers[0];
+        let width = first.fan_out;
         let mut hidden = first.bias.clone();
         for (&index, &value) in indices.iter().zip(&values) {
             for (h, w) in hidden.iter_mut().zip(first.row(index)) {
                 *h += w * value as f32;
+            }
+        }
+        if self.perspective {
+            // the rival's view: every piece in the other block of its square
+            hidden.extend_from_slice(&first.bias);
+            for (&index, &value) in indices.iter().zip(&values) {
+                for (h, w) in hidden[width..]
+                    .iter_mut()
+                    .zip(first.row((index + OPPONENT_PIECE_BLOCK) % PIECE_INPUTS))
+                {
+                    *h += w * value as f32;
+                }
             }
         }
         hidden.resize(self.max_width, 0.0);
@@ -154,6 +193,9 @@ impl Net {
     /// `max_width` values each, so that an evaluation allocates nothing.
     pub(super) fn finish(&self, hidden: &mut [f32], spare: &mut [f32]) -> f32 {
         let mut width = self.layers[0].fan_out;
+        if self.perspective {
+            width *= 2;
+        }
         for h in &mut hidden[..width] {
             *h = h.clamp(0.0, 1.0);
         }
@@ -226,6 +268,20 @@ mod tests {
         assert!(Net::from_json(&net_json(768, old)).is_ok());
         let white = r#""perspective":"white","#;
         assert!(Net::from_json(&net_json(768, white)).is_err());
+    }
+
+    #[test]
+    fn both_perspectives_need_a_second_layer_twice_as_wide() {
+        let both = r#""perspective":"both","#;
+        assert!(Net::from_json(&net_json(768, both)).is_err());
+        let first = format!(
+            r#"{{"fan_in":768,"fan_out":2,"weights":{:?},"bias":[0.0,0.0]}}"#,
+            vec![0.0; 768 * 2]
+        );
+        let last = r#"{"fan_in":4,"fan_out":1,"weights":[1.0,1.0,1.0,1.0],"bias":[0.0]}"#;
+        let text = format!(r#"{{"features":"pst_slotted",{both}"layers":[{first},{last}]}}"#);
+        assert!(Net::from_json(&text).is_ok());
+        assert!(Net::from_json(&text.replace("pst_slotted", "pst_hybrid")).is_err());
     }
 
     #[test]

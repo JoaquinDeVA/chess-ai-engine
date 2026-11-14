@@ -33,6 +33,9 @@ _ACCUMULATOR_STD = 0.05
 _INIT_SEED = 0
 #: Intra-op threads of the training process; the other cores feed the featurization pool.
 _INTRA_OP_THREADS = 2
+#: Inputs of one side of the slotted features, and the offset between the two sides' blocks.
+_INPUTS_PER_SIDE = 768
+_OPPONENT_BLOCK = 384
 #: Rows per call of the validation forward pass.
 _PREDICT_BATCH = 4096
 
@@ -45,9 +48,7 @@ def new_model(model_class: type, rep: Optional[Representation] = None) -> Neural
     :return: The model, with ``rep`` saved as a dictionary.
     """
     rep = rep if rep is not None else Representation()
-    sizes = (features_of(model_class).size(), *model_class.hidden, 1)
-    shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
-    return model_class(layers=_initial_layers(shapes), rep=rep.to_dict())
+    return model_class(layers=_initial_layers(model_class.layer_shapes()), rep=rep.to_dict())
 
 
 def _initial_layers(shapes: Sequence[Tuple[int, int]]) -> List[Layer]:
@@ -120,9 +121,9 @@ def _accumulator_class(keras: Any) -> type:
     class SparseAccumulator(keras.layers.Layer):
         """Value-weighted sum of the rows of a table, clipped to ``[0, 1]``."""
 
-        def __init__(self, rows: int, units: int, l2: float, **kwargs: Any):
+        def __init__(self, rows: int, units: int, l2: float, both: bool = False, **kwargs: Any):
             super().__init__(**kwargs)
-            self.rows, self.units, self.l2 = rows, units, l2
+            self.rows, self.units, self.l2, self.both = rows, units, l2, both
 
         def build(self, _input_shape: Any) -> None:
             # L2(c) penalises c * sum(w**2); half the coefficient gives gradient l2 * w.
@@ -134,17 +135,27 @@ def _accumulator_class(keras: Any) -> type:
             )
             self.bias = self.add_weight(name="bias", shape=(self.units,), initializer="zeros")
 
-        def call(self, inputs: Any) -> Any:
-            index, value = inputs
+        def _sum(self, index: Any, value: Any) -> Any:
             rows = keras.ops.take(self.table, index, axis=0)
             total = keras.ops.sum(rows * keras.ops.expand_dims(value, -1), axis=1)
             return keras.ops.clip(total + self.bias, 0.0, 1.0)
+
+        def call(self, inputs: Any) -> Any:
+            index, value = inputs
+            mover = self._sum(index, value)
+            if not self.both:
+                return mover
+            # The rival's view of a piece is the other block of the same square; feature ``i`` is
+            # index ``i + 1`` and index 0 is padding.
+            swapped = (index - 1 + _OPPONENT_BLOCK) % _INPUTS_PER_SIDE + 1
+            rival = self._sum(keras.ops.where(index > 0, swapped, 0), value)
+            return keras.ops.concatenate([mover, rival], axis=-1)
 
     return SparseAccumulator
 
 
 def _keras_network(
-    keras: Any, shapes: Sequence[Tuple[int, int]], width: int, l2: float
+    keras: Any, shapes: Sequence[Tuple[int, int]], width: int, l2: float, both: bool = False
 ) -> Tuple[Any, List[Any]]:
     """The training network, with the layers of ``shapes``.
 
@@ -152,10 +163,11 @@ def _keras_network(
     :param shapes: ``(fan_in, fan_out)`` of every weight layer, accumulator first.
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
+    :param both: Whether the second layer reads the accumulators of both sides, one table.
     :return: The model (inputs: indices, values; output: logit) and its weight layers in order.
     """
     accumulator = _accumulator_class(keras)(
-        rows=shapes[0][0] + 1, units=shapes[0][1], l2=l2, name="accumulator"
+        rows=shapes[0][0] + 1, units=shapes[0][1], l2=l2, both=both, name="accumulator"
     )
     index_in = keras.Input(shape=(width,), dtype="int32")
     value_in = keras.Input(shape=(width,), dtype="float32")
@@ -237,7 +249,7 @@ def fit_stream(
     width = features.max_entries()
     batch_size = int(cfg["batch_size"])
     network, parts = _keras_network(
-        keras, [w.shape for w, _ in model.layers], width, float(cfg["l2"])
+        keras, [w.shape for w, _ in model.layers], width, float(cfg["l2"]), model.perspective
     )
     _assign(parts, model.layers)
     network.compile(

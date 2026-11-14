@@ -10,6 +10,7 @@ import pytest
 
 from chess_lab.models.definitions import (
     NeuralEvalModel,
+    NnW64BothModel,
     NnW64x16Model,
     get_model_class,
     load_evaluator,
@@ -21,9 +22,11 @@ from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 
 
-def random_net(seed: int = 0, rep: Representation | None = None) -> NeuralEvalModel:
-    """A ``net_pst_w64x16`` with random layers, so that scores are not trivially 0.5."""
-    model = new_model(NnW64x16Model, rep or Representation())
+def random_net(
+    seed: int = 0, rep: Representation | None = None, model_class: type = NnW64x16Model
+) -> NeuralEvalModel:
+    """A network with random layers, so that scores are not trivially 0.5."""
+    model = new_model(model_class, rep or Representation())
     rng = np.random.default_rng(seed)
     model.layers = [
         (rng.normal(0.0, 0.3, size=weights.shape), rng.normal(0.0, 0.1, size=bias.shape))
@@ -40,6 +43,10 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
         x[index] += value
     (w0, b0), *rest = model.layers
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
+    if model.perspective:
+        # the rival's view: every piece in the other block of its square
+        rival = np.roll(x, 384)
+        h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
     for weights, bias in rest[:-1]:
         h = np.maximum(h @ weights + bias, 0.0)
     last_weights, last_bias = rest[-1]
@@ -58,8 +65,16 @@ def test_net_has_the_documented_layer_shapes_and_parameter_count():
     assert NnW64x16Model.hidden == (64, 16)
 
 
-def test_core_score_matches_a_dense_numpy_reference():
-    model = random_net(seed=6)
+def test_both_perspectives_double_the_input_of_the_second_layer():
+    model = new_model(NnW64BothModel, Representation())
+    assert [weights.shape for weights, _ in model.layers] == [(768, 64), (128, 1)]
+    assert model.perspective and not NnW64x16Model.perspective
+    assert model.count_parameters() == 768 * 64 + 64 + 128 + 1
+
+
+@pytest.mark.parametrize("model_class", [NnW64x16Model, NnW64BothModel])
+def test_core_score_matches_a_dense_numpy_reference(model_class):
+    model = random_net(seed=6, model_class=model_class)
     evaluator = model.evaluator()
     for board in random_positions(10, seed=8):
         assert evaluator.evaluate(board.fen(), board.turn) == pytest.approx(
@@ -67,8 +82,24 @@ def test_core_score_matches_a_dense_numpy_reference():
         )
 
 
-def test_mirror_complement_holds_for_random_weights():
-    model = random_net(seed=3)
+def test_the_training_graph_computes_what_the_core_does():
+    from chess_lab.training.epochs import encode_frame
+    from chess_lab.training.neural import _assign, _keras_network, _padded, _training_keras
+
+    model = random_net(seed=5, model_class=NnW64BothModel)
+    keras = _training_keras()
+    network, parts = _keras_network(keras, [w.shape for w, _ in model.layers], 32, 0.0, True)
+    _assign(parts, model.layers)
+    boards = random_positions(8, seed=9)
+    index, value, _ = _padded(encode_frame(features_of(model), Representation(), frame(boards)), 32)
+    logits = np.asarray(network.predict([index, value], verbose=0)).reshape(-1)
+    for board, logit in zip(boards, logits, strict=True):
+        assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
+
+
+@pytest.mark.parametrize("model_class", [NnW64x16Model, NnW64BothModel])
+def test_mirror_complement_holds_for_random_weights(model_class):
+    model = random_net(seed=3, model_class=model_class)
     for board in random_positions(20, seed=11):
         assert white_score_of(model, board) == pytest.approx(
             1.0 - white_score_of(model, board.mirror())

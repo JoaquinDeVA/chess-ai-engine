@@ -47,7 +47,10 @@ def export_payload(model: NeuralEvalModel) -> Dict[str, Any]:
         }
         for w, b in model.layers
     ]
-    return {"features": model.feature_set, "layers": layers}
+    payload: Dict[str, Any] = {"features": model.feature_set, "layers": layers}
+    if model.perspective:
+        payload["perspective"] = "both"
+    return payload
 
 
 def main(argv: Optional[List[str]] = None) -> int:

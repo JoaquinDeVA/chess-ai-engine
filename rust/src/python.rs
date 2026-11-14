@@ -36,10 +36,15 @@ impl PyEvaluator {
     ///
     /// Each layer is a Python `(weights, bias)` pair. Weights are copied into Rust-owned storage;
     /// the first layer consumes the feature accumulator produced by the selected feature set.
+    ///
+    /// With `perspective` the second layer reads the accumulators of both sides, which share the
+    /// first layer (see `Net::with_perspective`).
     #[staticmethod]
+    #[pyo3(signature = (features, layers, perspective=false))]
     fn network(
         features: &str,
         layers: Vec<(PyReadonlyArray2<f64>, PyReadonlyArray1<f64>)>,
+        perspective: bool,
     ) -> PyResult<PyEvaluator> {
         let set = parse_features(features)?;
         let layers = layers
@@ -54,7 +59,12 @@ impl PyEvaluator {
                 }
             })
             .collect();
-        let net = Net::new(set, layers).map_err(value_error)?;
+        let net = if perspective {
+            Net::with_perspective(set, layers)
+        } else {
+            Net::new(set, layers)
+        }
+        .map_err(value_error)?;
         Ok(PyEvaluator { net })
     }
 

@@ -36,12 +36,29 @@ class NeuralEvalModel:
     :cvar feature_set: Name of the feature set, one of ``_core.FEATURE_SETS``.
     :cvar architecture: One-line description of the architecture, for the model card.
     :cvar hidden: Sizes of the hidden layers, the first being the accumulator.
+    :cvar perspective: Whether the second layer reads the accumulators of both sides (the mover's,
+        then the rival's, over the same first-layer weights): its input is ``2 * hidden[0]`` wide.
     """
 
     name: ClassVar[str]
     feature_set: ClassVar[str]
     architecture: ClassVar[str] = ""
     hidden: ClassVar[Tuple[int, ...]] = ()
+    perspective: ClassVar[bool] = False
+
+    @classmethod
+    def layer_shapes(cls) -> List[Tuple[int, int]]:
+        """``(fan_in, fan_out)`` of every weight layer, accumulator first.
+
+        :return: One pair per layer; with both perspectives the second layer has twice the inputs.
+        """
+        from .features import FEATURE_SETS
+
+        sizes = (FEATURE_SETS[cls.feature_set].size(), *cls.hidden, 1)
+        shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
+        if cls.perspective:
+            shapes[1] = (2 * shapes[1][0], shapes[1][1])
+        return shapes
 
     def __init__(self, layers: Sequence[Layer], rep: Optional[Dict[str, Any]] = None):
         self.rep: Dict[str, Any] = dict(rep) if rep else {}
@@ -75,7 +92,7 @@ class NeuralEvalModel:
             (np.ascontiguousarray(weights), np.ascontiguousarray(bias))
             for weights, bias in self.layers
         ]
-        return _core.Evaluator.network(self.feature_set, layers)
+        return _core.Evaluator.network(self.feature_set, layers, self.perspective)
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "NeuralEvalModel":
@@ -110,6 +127,8 @@ class NeuralEvalModel:
                     f"{path}: layer {position} has shapes {weights.shape} and {bias.shape}, "
                     f"expected {fan_out} outputs"
                 )
+        if cls.perspective and layers[1][0].shape[0] != 2 * cls.hidden[0]:
+            raise ValueError(f"{path}: the second layer must read both perspectives")
         return cls(layers=layers, rep=meta["rep"])
 
     def save(self, path: Optional[Path] = None) -> Path:
@@ -215,6 +234,19 @@ class NnK4W64Model(NeuralEvalModel):
     architecture = "Sparse network: 4 king buckets of 768 piece-square inputs, 64-1 (2 layers)"
 
 
+class NnW64BothModel(NeuralEvalModel):
+    """Slotted inputs seen from both sides, a shared 64 accumulator, one output."""
+
+    name = "net_pst_w64_both"
+    feature_set = "pst_slotted"
+    hidden = (64,)
+    perspective = True
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
+        "64 accumulator, 128-1 (2 layers)"
+    )
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
     cls.name: cls
@@ -222,6 +254,7 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnW32Model,
         NnW64Model,
         NnW64x16Model,
+        NnW64BothModel,
         NnHybridW32Model,
         NnHybridW64Model,
         NnHybridW128Model,

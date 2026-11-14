@@ -7,7 +7,7 @@ use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
 
 /// Phase of the start position (sum of the phase weights of all pieces).
 const MAX_PHASE: usize = 24;
-const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
+pub(super) const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 /// Inputs of one king bucket: one per piece, colour and square.
 pub const PIECE_INPUTS: usize = 2 * OPPONENT_PIECE_BLOCK;
 const TERM_COUNT: usize = 11;

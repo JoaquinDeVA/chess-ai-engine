@@ -69,6 +69,11 @@ impl Search<'_> {
         self.eval.score(self.state.pos(), self.root_player)
     }
 
+    /// The static value of the node, evaluated once for all the techniques that ask for it.
+    fn cached_static_value(&mut self, cache: &mut Option<i32>) -> i32 {
+        *cache.get_or_insert_with(|| self.static_value())
+    }
+
     /// Play `m` in the game state and in the incremental evaluation.
     pub(super) fn play(&mut self, m: Move) {
         self.eval.apply(self.state.pos(), &m);
@@ -231,6 +236,7 @@ impl Search<'_> {
             return (self.static_value(), None);
         }
 
+        let mut static_cache: Option<i32> = None;
         let maximizing = self.state.turn() == self.root_player;
         let mut killer_ids = [0u32; MAX_KILLERS_PER_PLY];
         let stored = self.memory.killers.get(ply);
@@ -292,7 +298,7 @@ impl Search<'_> {
             && alpha > -EVAL_LIMIT
             && beta < EVAL_LIMIT
         {
-            let value = self.static_value();
+            let value = self.cached_static_value(&mut static_cache);
             let margin = RFP_MARGIN_PER_PLY * depth_remaining;
             if (maximizing && value - beta >= margin) || (!maximizing && alpha - value >= margin) {
                 return (value, None);
@@ -307,7 +313,7 @@ impl Search<'_> {
             && !in_check
             && has_pieces(self.state.pos(), mover)
         {
-            let value = self.static_value();
+            let value = self.cached_static_value(&mut static_cache);
             let margin = if maximizing {
                 value - beta
             } else {
@@ -345,7 +351,7 @@ impl Search<'_> {
             && depth_remaining <= SHALLOW_UP_TO_DEPTH
             && alpha > -EVAL_LIMIT
             && beta < EVAL_LIMIT;
-        let futility_static = shallow.then(|| self.static_value());
+        let futility_static = shallow.then(|| self.cached_static_value(&mut static_cache));
         let mut best_value = if maximizing { -INFINITE } else { INFINITE };
         let mut best_move = None;
         // Quiet moves searched without a cut, to be penalized when a later move cuts.
@@ -374,9 +380,9 @@ impl Search<'_> {
                 });
                 if futile {
                     // A move that gives check is never skipped.
-                    self.play(action);
-                    let gives_check = self.state.pos().is_check();
-                    self.unplay();
+                    let mut after = self.state.pos().clone();
+                    after.play_unchecked(action);
+                    let gives_check = after.is_check();
                     if !gives_check {
                         continue;
                     }

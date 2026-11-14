@@ -107,21 +107,6 @@ impl<'a> NetState<'a> {
         }
     }
 
-    /// Add (`add`) or remove a piece from the accumulator of `mover`.
-    fn toggle(&mut self, mover: Color, piece: Piece, square: Square, add: bool) {
-        let row = self.row(mover, piece, square);
-        let acc = self.acc(mover);
-        if add {
-            for (a, w) in acc.iter_mut().zip(row) {
-                *a += w;
-            }
-        } else {
-            for (a, w) in acc.iter_mut().zip(row) {
-                *a -= w;
-            }
-        }
-    }
-
     /// Step up one frame, copying the current one into it.
     fn push(&mut self) {
         let frame = 2 * self.width;
@@ -206,23 +191,74 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
     }
 }
 
+/// Adds to `lanes` the dot product of `acc` clipped to `[0, 1]` with `weights`, eight lanes at a
+/// time (the length is a multiple of 8).
+#[inline(always)]
+fn clipped_dot(acc: &[f32], weights: &[f32], lanes: &mut [f32; 8]) {
+    for (x, w) in acc.chunks_exact(8).zip(weights.chunks_exact(8)) {
+        for lane in 0..8 {
+            lanes[lane] += x[lane].clamp(0.0, 1.0) * w[lane];
+        }
+    }
+}
+
 impl NetState<'_> {
     /// The side to move in `pos` (the position before the move) plays `m`.
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
-        self.push();
         let mover = pos.turn();
         let (pieces, count, king) = changes(mover, m);
         // a king that enters another bucket rebuilds its own accumulator from the board
         let moved_bucket = king
             .map(|king| self.net.features.king_bucket(mover, king))
             .filter(|&bucket| bucket != self.buckets[self.top][slot(mover)]);
-        for &(piece, square, add) in &pieces[..count] {
+        // step up one frame, writing the new accumulators straight from the old ones
+        let frame = 2 * self.width;
+        if (self.top + 2) * frame > self.stack.len() {
+            self.stack.resize(self.stack.len() * 2, 0.0);
+            self.buckets.resize(self.buckets.len() * 2, [0; 2]);
+        }
+        self.buckets[self.top + 1] = self.buckets[self.top];
+        let width = self.width;
+        let layer = &self.net.layers[0];
+        {
+            let (head, tail) = self.stack.split_at_mut((self.top + 1) * frame);
+            let old = &head[self.top * frame..];
+            let new = &mut tail[..frame];
             for side in [Color::White, Color::Black] {
-                if side != mover || moved_bucket.is_none() {
-                    self.toggle(side, piece, square, add);
+                let at = slot(side) * width;
+                let (o, n) = (&old[at..at + width], &mut new[at..at + width]);
+                if side == mover && moved_bucket.is_some() {
+                    n.copy_from_slice(o);
+                    continue;
+                }
+                let bucket = self.buckets[self.top][slot(side)];
+                let mut rows = [o; 4];
+                for (k, &(piece, square, _)) in pieces[..count].iter().enumerate() {
+                    let index =
+                        bucket * PIECE_INPUTS + input_index(side, piece.color, piece.role, square);
+                    rows[k] = &layer.row(index)[..width];
+                }
+                // the pieces alternate: take off, put on, take off, put on
+                match count {
+                    2 => {
+                        for i in 0..width {
+                            n[i] = o[i] - rows[0][i] + rows[1][i];
+                        }
+                    }
+                    3 => {
+                        for i in 0..width {
+                            n[i] = o[i] - rows[0][i] + rows[1][i] - rows[2][i];
+                        }
+                    }
+                    _ => {
+                        for i in 0..width {
+                            n[i] = o[i] - rows[0][i] + rows[1][i] - rows[2][i] + rows[3][i];
+                        }
+                    }
                 }
             }
         }
+        self.top += 1;
         if let Some(bucket) = moved_bucket {
             self.buckets[self.top][slot(mover)] = bucket;
             let mut after = pos.clone();
@@ -247,6 +283,22 @@ impl NetState<'_> {
         let net = self.net;
         let width = self.width;
         let start = (2 * self.top + slot(pos.turn())) * width;
+        if net.layers.len() == 2 && !net.features.has_terms() && width.is_multiple_of(8) {
+            // one output layer straight over the accumulators: no copy, no intermediate buffer
+            let out = &net.layers[1];
+            let own = &self.stack[start..start + width];
+            let mut lanes = [0.0f32; 8];
+            clipped_dot(own, &out.weights[..width], &mut lanes);
+            if net.perspective {
+                let rival = (2 * self.top + slot(!pos.turn())) * width;
+                clipped_dot(
+                    &self.stack[rival..rival + width],
+                    &out.weights[width..2 * width],
+                    &mut lanes,
+                );
+            }
+            return out.bias[0] + lanes.iter().sum::<f32>();
+        }
         self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
         if net.perspective {
             // the rival's accumulator follows the mover's: both views, one shared first layer

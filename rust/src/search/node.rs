@@ -284,14 +284,15 @@ impl Search<'_> {
             && !in_check
             && has_pieces(self.state.pos(), mover)
         {
-            let enough = if maximizing {
-                self.static_value() >= beta
+            let value = self.static_value();
+            let margin = if maximizing {
+                value - beta
             } else {
-                self.static_value() <= alpha
+                alpha - value
             };
-            if enough {
+            if margin >= 0 {
                 // If passing the turn already cuts, playing a move will too: prune.
-                let reduction = if depth_remaining >= 6 { 3 } else { 2 };
+                let reduction = null_move_reduction(depth_remaining, margin);
                 let (low, high) = if maximizing {
                     (beta - NULL_WINDOW_WIDTH, beta)
                 } else {

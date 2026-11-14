@@ -11,6 +11,7 @@ All notable changes. The newest are first.
   tests on the positions of that game.
 
 ### Changed
+- The null-move reduction now grows with the depth (2 plies from depth 3, one more every four) and with how far the static value is beyond the bound (one ply per 200 centipawns, two at most), instead of 2 or 3 by depth alone. `uci ttd 9 rust/bench/middlegame.epd 30`: 7,416,608 to 7,099,976 nodes (−4.3 %); SPRT `null_r_by_eval` (10+0.2) queued.
 - Endgame tables no longer choose the move: they restrict the root of the search to the moves that
   keep the best result and, in a win, have the lowest DTZ; a single move is played without
   searching. In 100 self-play wins from random positions (three seeds, 20 ms per move, against the

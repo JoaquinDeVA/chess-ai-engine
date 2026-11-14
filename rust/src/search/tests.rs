@@ -448,3 +448,17 @@ fn a_table_entry_does_not_bring_back_a_move_the_root_list_excludes() {
     let best = run(&mut memory, Some(ids(fen, &["a1a2", "a1b1"]))).unwrap();
     assert!(best == "a1a2" || best == "a1b1", "{best}");
 }
+
+#[test]
+fn the_null_move_reduction_grows_with_the_depth_and_the_margin() {
+    use super::search_techniques::null_move_reduction;
+    assert_eq!(null_move_reduction(3, 0), 2);
+    assert_eq!(null_move_reduction(4, 0), 3);
+    assert_eq!(null_move_reduction(8, 0), 4);
+    assert_eq!(null_move_reduction(3, 200), 3);
+    assert_eq!(
+        null_move_reduction(3, 5_000),
+        4,
+        "the margin adds two plies at most"
+    );
+}

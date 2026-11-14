@@ -6,6 +6,8 @@ use shakmaty::{Chess, Color, Position};
 
 /// The null move is tried from this depth on.
 pub(super) const NULL_MOVE_FROM_DEPTH: i32 = 3;
+/// Centipawns beyond the bound that deepen the null-move reduction by one ply.
+const NULL_MOVE_MARGIN_STEP: i32 = 200;
 /// Internal iterative reduction works from this depth on.
 pub(super) const IIR_FROM_DEPTH: i32 = 4;
 /// Late move reductions start at this depth and at this position in the move order.
@@ -35,6 +37,12 @@ pub(super) fn late_move_reduction(
     let raw = 0.75 + f64::from(depth_remaining).ln() * (index as f64).ln() / 2.25;
     let steps = raw as i32 - i32::from(favorable_history);
     steps.clamp(0, depth_remaining - 2)
+}
+
+/// Plies the null-move search is reduced: 2 from depth 3, one more every four plies of depth, and one
+/// more per `NULL_MOVE_MARGIN_STEP` by which the static value is beyond the bound (two at most).
+pub(super) fn null_move_reduction(depth_remaining: i32, margin: i32) -> i32 {
+    2 + depth_remaining / 4 + (margin / NULL_MOVE_MARGIN_STEP).clamp(0, 2)
 }
 
 /// Whether `color` has a piece other than pawns and the king in `pos` (otherwise passing the turn

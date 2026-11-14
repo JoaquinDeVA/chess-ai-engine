@@ -20,9 +20,9 @@ pub(super) const RFP_UP_TO_DEPTH: i32 = 6;
 pub(super) const RFP_MARGIN_PER_PLY: i32 = 60;
 
 /// Futility pruning works up to this depth, with a margin of `FUTILITY_MARGIN_PER_PLY` per ply left
-/// (it was 0.69 log-odds, the same 120 centipawns).
+/// (90 centipawns; it was 120).
 pub(super) const SHALLOW_UP_TO_DEPTH: i32 = 3;
-pub(super) const FUTILITY_MARGIN_PER_PLY: i32 = 120;
+pub(super) const FUTILITY_MARGIN_PER_PLY: i32 = 90;
 
 /// Plies a late quiet move is searched less: `0.75 + ln(depth)·ln(index) / 2.25`, one less when
 /// the history says the move has cut before, and never so many that the search falls below one ply.

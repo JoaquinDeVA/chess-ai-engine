@@ -195,7 +195,12 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
 /// time (the length is a multiple of 8).
 #[inline(always)]
 fn clipped_dot(acc: &[f32], weights: &[f32], lanes: &mut [f32; 8]) {
-    for (x, w) in acc.chunks_exact(8).zip(weights.chunks_exact(8)) {
+    for (x, w) in acc
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .zip(weights.as_chunks::<8>().0)
+    {
         for lane in 0..8 {
             lanes[lane] += x[lane].clamp(0.0, 1.0) * w[lane];
         }

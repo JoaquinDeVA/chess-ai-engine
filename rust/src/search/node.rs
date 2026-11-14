@@ -44,6 +44,8 @@ pub(super) struct Search<'a> {
     pub(super) eval: NetState<'a>,
     /// Nodes spent under each root move, by move id (the clock reads how settled the best one is).
     pub(super) root_nodes: Vec<(u32, u64)>,
+    /// The moves played from the root to this node, `None` for a passed turn.
+    pub(super) played: Vec<Option<u32>>,
 }
 
 type Outcome = (i32, Option<u32>);
@@ -66,12 +68,14 @@ impl Search<'_> {
     /// Play `m` in the game state and in the incremental evaluation.
     pub(super) fn play(&mut self, m: Move) {
         self.eval.apply(self.state.pos(), &m);
+        self.played.push(Some(move_id(&m)));
         self.state.apply(m);
     }
 
     /// Pass the turn in the game state and in the incremental evaluation.
     fn play_null(&mut self) {
         self.eval.apply_null();
+        self.played.push(None);
         self.state.apply_null();
     }
 
@@ -125,6 +129,7 @@ impl Search<'_> {
     pub(super) fn unplay(&mut self) {
         self.state.undo();
         self.eval.undo();
+        self.played.pop();
     }
 
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
@@ -225,7 +230,14 @@ impl Search<'_> {
         killer_ids[..stored.len()].copy_from_slice(stored);
         let killers = &killer_ids[..stored.len()];
         let mover = self.state.turn();
-        let ordered = order(&moves, killers, Some((&self.memory.history, mover)));
+        let previous = self.played.last().copied().flatten();
+        let counter = self.memory.countermoves.get(mover, previous);
+        let ordered = order(
+            &moves,
+            killers,
+            counter,
+            Some((&self.memory.history, mover)),
+        );
         // Captures that lose material come after the quiet moves (the order is otherwise kept).
         let pos = self.state.pos();
         let mut ordered: MoveList = ordered
@@ -393,6 +405,7 @@ impl Search<'_> {
                 self.memory.killers.record(ply, action);
                 if !action.is_capture() && !action.is_promotion() {
                     self.memory.history.reward(mover, &action, depth_remaining);
+                    self.memory.countermoves.record(mover, previous, &action);
                 }
                 break;
             }
@@ -490,6 +503,7 @@ pub fn alpha_beta(
         next_clock_check: 0,
         eval: NetState::new(net, &root),
         root_nodes: Vec::new(),
+        played: Vec::new(),
     };
     let (value, best) = search.node(-INFINITE, INFINITE, max_depth, 0, true);
     let best_nodes: u64 = search

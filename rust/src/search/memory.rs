@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 use super::options::DEFAULT_HASH_MB;
-use super::ordering::{History, Killers};
+use super::ordering::{Countermoves, History, Killers};
 use super::stats::Counters;
 use super::tt::Table;
 
@@ -15,6 +15,7 @@ pub struct Memory {
     pub table: Arc<Table>,
     pub killers: Killers,
     pub history: History,
+    pub countermoves: Countermoves,
     pub threads: usize,
     pub counters: Counters,
 }
@@ -26,6 +27,7 @@ impl Memory {
             table: Arc::new(Table::with_megabytes(hash_megabytes)),
             killers: Killers::default(),
             history: History::default(),
+            countermoves: Countermoves::default(),
             threads: threads.max(1),
             counters: Counters::default(),
         }
@@ -35,6 +37,7 @@ impl Memory {
         self.table.clear();
         self.killers.clear();
         self.history.clear();
+        self.countermoves.clear();
     }
 }
 

@@ -44,6 +44,43 @@ impl Killers {
     }
 }
 
+/// The quiet reply that last cut after each move (by mover and `move_id` of the move answered).
+pub struct Countermoves {
+    replies: Vec<u32>,
+}
+
+impl Default for Countermoves {
+    fn default() -> Countermoves {
+        Countermoves {
+            replies: vec![NO_MOVE; 2 * MOVE_IDS],
+        }
+    }
+}
+
+/// Marks a slot with no reply (no move has this identity).
+const NO_MOVE: u32 = u32::MAX;
+
+impl Countermoves {
+    fn slot(replier: Color, previous: u32) -> usize {
+        usize::from(replier == Color::Black) * MOVE_IDS + previous as usize
+    }
+
+    pub fn clear(&mut self) {
+        self.replies.fill(NO_MOVE);
+    }
+
+    pub fn get(&self, replier: Color, previous: Option<u32>) -> Option<u32> {
+        let reply = self.replies[Countermoves::slot(replier, previous?)];
+        (reply != NO_MOVE).then_some(reply)
+    }
+
+    pub fn record(&mut self, replier: Color, previous: Option<u32>, reply: &Move) {
+        if let Some(previous) = previous {
+            self.replies[Countermoves::slot(replier, previous)] = move_id(reply);
+        }
+    }
+}
+
 fn piece_order(role: Role) -> i32 {
     role as i32
 }
@@ -247,7 +284,12 @@ fn sort_descending(moves: &mut [Move], keys: &mut [i32]) {
 /// The moves in the order the search tries them: killers first, then captures (best MVV-LVA first)
 /// and then the quiet moves, each group keeping its incoming order. With a history the quiet moves
 /// that are not killers come by their score instead, best first.
-pub fn order(moves: &[Move], killers: &[u32], history: Option<(&History, Color)>) -> MoveList {
+pub fn order(
+    moves: &[Move],
+    killers: &[u32],
+    counter: Option<u32>,
+    history: Option<(&History, Color)>,
+) -> MoveList {
     let is_killer = |m: &Move| killers.contains(&move_id(m));
     let mut ordered = MoveList::new();
     // Captures: killers first, then the rest, and the whole group sorted by a stable sort.
@@ -290,6 +332,10 @@ pub fn order(moves: &[Move], killers: &[u32], history: Option<(&History, Color)>
         }
         let count = others.len();
         sort_descending(others, &mut keys[..count]);
+    }
+    // The countermove goes right after the killers.
+    if let Some(counter) = counter {
+        move_to_front(&mut ordered[others_start..], Some(counter));
     }
     ordered
 }
@@ -400,7 +446,12 @@ mod tests {
         let history = History::default();
         history.reward(Color::White, &c, 4);
         history.reward(Color::White, &b, 2);
-        let ordered = order(&[a, b, c], &[move_id(&a)], Some((&history, Color::White)));
+        let ordered = order(
+            &[a, b, c],
+            &[move_id(&a)],
+            None,
+            Some((&history, Color::White)),
+        );
         assert_eq!(ordered.as_slice(), &[a, c, b]);
         assert_eq!(
             history.score(Color::Black, &c),
@@ -432,6 +483,7 @@ mod tests {
         let ordered = order(
             &[a, queen_takes_pawn, b, pawn_takes_queen],
             &[move_id(&b)],
+            None,
             None,
         );
         assert_eq!(

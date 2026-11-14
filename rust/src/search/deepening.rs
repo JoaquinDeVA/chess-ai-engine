@@ -8,7 +8,7 @@ use shakmaty::Move;
 use super::memory::*;
 use super::node::alpha_beta;
 use super::options::*;
-use super::ordering::{History, Killers};
+use super::ordering::{Countermoves, History, Killers};
 use super::stats::*;
 use super::tt::Table;
 use crate::board::GameState;
@@ -71,6 +71,7 @@ fn helper(
         table,
         killers: Killers::default(),
         history,
+        countermoves: Countermoves::default(),
         threads: 1,
         counters: Counters::default(),
     };

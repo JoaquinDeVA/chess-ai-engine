@@ -20,7 +20,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
   `history_malus`, `qs_tt`) reached no verdict and were retired.
 - **The model that plays is `net_pst_threats_w64_both`**: piece-square inputs plus five threat inputs, width 64, and a
   second layer that reads the accumulators of both sides over the same weights. It is the default of the binary
-  since `4e82cc7`. Against the previous default `net_pst_w64` it scored +57.9 ± 22.1 Elo, and against
+  since `4e82cc7`. Against the previous default `net_pst_w64` (retired) it scored +57.9 ± 22.1 Elo, and against
   `net_pst_w64_both` (the same network without the threat inputs) +40.7 ± 18.5 ("Network matches" below). Neither
   match reached an SPRT bound (LLR 1.98 and 2.02 of 2.94); they were stopped by hand with the interval
   excluding 0, and the threats are kept on that evidence.
@@ -102,11 +102,11 @@ is the first network. Files: `data/results/roundrobin/<job>/llr.csv`.
 
 | job | A against B | games | Elo (95 %) | LLR | state |
 |---|---|---|---|---|---|
-| `sp_both_vs_w64` | `net_pst_w64_both` against `net_pst_w64` | 800 | +40.6 ± 21.8 | +1.39 | stopped by hand |
-| `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against `net_pst_w64` | 800 | +57.9 ± 22.1 | +1.98 | stopped by hand |
+| `sp_both_vs_w64` | `net_pst_w64_both` against the retired `net_pst_w64` | 800 | +40.6 ± 21.8 | +1.39 | stopped by hand |
+| `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against the retired `net_pst_w64` | 800 | +57.9 ± 22.1 | +1.98 | stopped by hand |
 | `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 800 | +9.1 ± 21.0 | +0.26 | replaced by the next one: it played the binary before the speed-ups of the threat inputs |
 | `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
-| `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
+| `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 
 The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`

@@ -20,7 +20,7 @@ mod search_job;
 ///
 /// ```text
 /// uci bench [repetitions] [model.json]
-/// uci ttd <depth> <positions> [limit_s]
+/// uci ttd <depth> <positions> [limit_s] [model.json]
 /// uci
 /// ```
 ///
@@ -41,18 +41,24 @@ fn main() {
 /// `ttd`:
 ///
 /// ```text
-/// uci ttd <depth> <positions> [limit_s]
+/// uci ttd <depth> <positions> [limit_s] [model.json]
 /// ```
 ///
-/// `<depth>` is the target search depth, `<positions>` is a file containing one FEN per line, and
-/// `[limit_s]` is an optional per-position time limit in seconds.
+/// `<depth>` is the target search depth, `<positions>` is a file containing one FEN per line,
+/// `[limit_s]` is an optional per-position time limit in seconds and `[model.json]`, when
+/// present, replaces the compiled-in network.
 fn run_time_to_depth(eval: &Net) {
     let args: Vec<String> = std::env::args().skip(2).collect();
     let depth = args.first().and_then(|depth| depth.parse().ok());
     let limit = args.get(2).map_or(Some(f64::INFINITY), |s| s.parse().ok());
     let result = match (depth, args.get(1), limit) {
-        (Some(depth), Some(path), Some(limit)) => time_to_depth(eval, depth, path, limit),
-        _ => Err("usage: uci ttd <depth> <positions> [limit_s]".to_string()),
+        (Some(depth), Some(path), Some(limit)) => match args.get(3) {
+            Some(model) => {
+                load_model_file(model).and_then(|net| time_to_depth(&net, depth, path, limit))
+            }
+            None => time_to_depth(eval, depth, path, limit),
+        },
+        _ => Err("usage: uci ttd <depth> <positions> [limit_s] [model.json]".to_string()),
     };
     if let Err(error) = result {
         eprintln!("{error}");
@@ -77,12 +83,16 @@ fn run_bench(eval: &Net) {
         .unwrap_or(5);
     match std::env::args().nth(3) {
         Some(path) => bench(
-            &std::fs::read_to_string(&path)
-                .map_err(|e| e.to_string())
-                .and_then(|text| Net::from_json(&text))
-                .unwrap_or_else(|e| panic!("bench model {path}: {e}")),
+            &load_model_file(&path).unwrap_or_else(|e| panic!("bench model {path}: {e}")),
             repetitions,
         ),
         None => bench(eval, repetitions),
     }
+}
+
+/// Reads a network from a JSON model file.
+fn load_model_file(path: &str) -> Result<Net, String> {
+    std::fs::read_to_string(path)
+        .map_err(|e| e.to_string())
+        .and_then(|text| Net::from_json(&text))
 }

@@ -101,7 +101,7 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
     (total_nodes, elapsed_seconds)
 }
 
-/// `uci ttd <depth> <positions> [limit_s]`: searches every position of the file (one FEN per line,
+/// `uci ttd <depth> <positions> [limit_s] [model.json]`: searches every position of the file (one FEN per line,
 /// `#` starts a comment) to `depth` with fresh memory and one thread, and prints the time and the
 /// nodes of each and what the search counted over all of them. A position that does not finish
 /// within the limit counts as the limit in the median.

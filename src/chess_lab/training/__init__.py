@@ -9,7 +9,7 @@ Typical flow::
 
     python src/chess_lab/datasets/build_raw_shards.py --input data/LichessPositions/lichess_db_eval.jsonl.zst
     python src/chess_lab/datasets/build_sidecars.py
-    python -m chess_lab.training.train --model net_pst_w32 --effort 40
-    python -m chess_lab.measure.evaluate --model net_pst_w32
+    python -m chess_lab.training.train --model net_pst_threats_w64_both --effort 40
+    python -m chess_lab.measure.evaluate --model net_pst_threats_w64_both
 
 """

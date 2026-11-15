@@ -9,7 +9,7 @@ import pytest
 from chess_lab.datasets.raw_shards import shard_path, write_shard
 from chess_lab.datasets.sidecar import build_sidecar, load_sample
 from chess_lab.datasets.split import TRAIN, VALIDATION, assign_split
-from chess_lab.models.definitions import NnW32Model
+from chess_lab.models.definitions import NnW64BothModel
 from chess_lab.models.target import Representation
 from chess_lab.training import effort
 from chess_lab.training.effort import (
@@ -116,7 +116,7 @@ def test_search_keeps_the_trial_with_the_lowest_validation_loss(monkeypatch):
 
     monkeypatch.setattr(effort, "fit", fake_fit)
     plan = {"positions": 1000, "max_epochs": 1, "patience": 2, "trials": 3, "batch_size": 4096}
-    best = search(NnW32Model, Representation(), Path("."), Path("."), None, plan,
+    best = search(NnW64BothModel, Representation(), Path("."), Path("."), None, plan,
                   log=lambda line: None)  # fmt: skip
     assert len(calls) == 3
     assert best == {"l2": calls[1]["l2"], "lr": calls[1]["lr"]}
@@ -144,7 +144,7 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
     monkeypatch.setattr(effort, "iter_batches", recording_iter_batches)
     monkeypatch.setattr(effort, "fit_stream", reading_fit_stream)
     lines = []
-    search(NnW32Model, Representation(), raw, side, validation, plan, log=lines.append)
+    search(NnW64BothModel, Representation(), raw, side, validation, plan, log=lines.append)
     assert splits and set(splits) == {TRAIN}
     assert len(lines) == 1 and lines[0].startswith("trial 1/1")
 

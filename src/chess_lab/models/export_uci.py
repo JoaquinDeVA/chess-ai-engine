@@ -1,12 +1,12 @@
 """Export a saved network to the JSON file the UCI binary embeds (``rust/models/``).
 
-The binary reads plain JSON so that it needs no npz reader. It embeds ``net_pst_w64`` and loads
+The binary reads plain JSON so that it needs no npz reader. It embeds ``net_pst_threats_w64_both`` and loads
 any other file with ``setoption name Model value <file>.json``.
 
 Example::
 
-    python -m chess_lab.models.export_uci --model net_pst_w64@e30
-    python -m chess_lab.models.export_uci --model net_hybrid_w64 --out /tmp/models
+    python -m chess_lab.models.export_uci --model net_pst_threats_w64_both@e30
+    python -m chess_lab.models.export_uci --model net_pst_w64_both@e30 --out /tmp/models
 """
 
 import argparse
@@ -27,7 +27,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     :return: The parsed options.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model", default="net_pst_w64@e30", help="saved model name")
+    parser.add_argument("--model", default="net_pst_threats_w64_both@e30", help="saved model name")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="output folder")
     return parser.parse_args(argv)
 

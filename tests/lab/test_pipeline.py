@@ -6,7 +6,7 @@ import subprocess
 from tests.paths import ROOT
 
 SCRIPT = ROOT / "src" / "chess_lab" / "pipeline.sh"
-PIPELINE_MODELS = "net_pst_w32 net_pst_w64 net_pst_w64x16"
+PIPELINE_MODELS = "net_pst_w64_both net_pst_threats_w64_both"
 
 
 def test_pipeline_is_valid_bash():

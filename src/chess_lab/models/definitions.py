@@ -149,91 +149,6 @@ class NeuralEvalModel:
         return path
 
 
-class NnW32Model(NeuralEvalModel):
-    """768 slotted piece-square inputs, a 32 accumulator and one output (2 layers)."""
-
-    name = "net_pst_w32"
-    feature_set = "pst_slotted"
-    hidden = (32,)
-    architecture = "Sparse network: 768 slotted piece-square inputs, 32-1 (2 layers)"
-
-
-class NnW64Model(NeuralEvalModel):
-    """768 slotted piece-square inputs, a 64 accumulator and one output (2 layers)."""
-
-    name = "net_pst_w64"
-    feature_set = "pst_slotted"
-    hidden = (64,)
-    architecture = "Sparse network: 768 slotted piece-square inputs, 64-1 (2 layers)"
-
-
-class NnW64x16Model(NeuralEvalModel):
-    """768 slotted piece-square inputs, a 64 accumulator, 16 and one output (3 layers)."""
-
-    name = "net_pst_w64x16"
-    feature_set = "pst_slotted"
-    hidden = (64, 16)
-    architecture = "Sparse network: 768 slotted piece-square inputs, 64-16-1 (3 layers)"
-
-
-class NnHybridW32Model(NeuralEvalModel):
-    """768 piece-square plus 22 term inputs, a 32 accumulator, one output."""
-
-    name = "net_hybrid_w32"
-    feature_set = "pst_hybrid"
-    hidden = (32,)
-    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 32-1 (2 layers)"
-
-
-class NnHybridW64Model(NeuralEvalModel):
-    """768 piece-square plus 22 term inputs, a 64 accumulator, one output."""
-
-    name = "net_hybrid_w64"
-    feature_set = "pst_hybrid"
-    hidden = (64,)
-    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 64-1 (2 layers)"
-
-
-class NnHybridW128Model(NeuralEvalModel):
-    """768 piece-square plus 22 term inputs, a 128 accumulator, one output."""
-
-    name = "net_hybrid_w128"
-    feature_set = "pst_hybrid"
-    hidden = (128,)
-    architecture = "Sparse network: 768 piece-square plus 22 term inputs, 128-1 (2 layers)"
-
-
-class NnHybridK4W64Model(NeuralEvalModel):
-    """Hybrid inputs in 4 king buckets, a 64 accumulator, one output."""
-
-    name = "net_hybrid_k4_w64"
-    feature_set = "pst_hybrid_k4"
-    hidden = (64,)
-    architecture = (
-        "Sparse network: 4 king buckets of 768 piece-square inputs plus 22 term inputs, 64-1"
-    )
-
-
-class NnHybridK8W64Model(NeuralEvalModel):
-    """Hybrid inputs in 8 king buckets, a 64 accumulator, one output."""
-
-    name = "net_hybrid_k8_w64"
-    feature_set = "pst_hybrid_k8"
-    hidden = (64,)
-    architecture = (
-        "Sparse network: 8 king buckets of 768 piece-square inputs plus 22 term inputs, 64-1"
-    )
-
-
-class NnK4W64Model(NeuralEvalModel):
-    """Piece squares in 4 king buckets, no terms, a 64 accumulator, one output."""
-
-    name = "net_pst_k4_w64"
-    feature_set = "pst_k4"
-    hidden = (64,)
-    architecture = "Sparse network: 4 king buckets of 768 piece-square inputs, 64-1 (2 layers)"
-
-
 class NnW64BothModel(NeuralEvalModel):
     """Slotted inputs seen from both sides, a shared 64 accumulator, one output."""
 
@@ -260,50 +175,9 @@ class NnThreatsW64BothModel(NeuralEvalModel):
     )
 
 
-class NnK4W64BothModel(NeuralEvalModel):
-    """Piece squares in 4 king buckets seen from both sides, a shared 64 accumulator."""
-
-    name = "net_pst_k4_w64_both"
-    feature_set = "pst_k4"
-    hidden = (64,)
-    perspective = True
-    architecture = (
-        "Sparse network: 4 king buckets of 768 piece-square inputs seen from both sides, each "
-        "side in the bucket of its own king, one shared 64 accumulator, 128-1 (2 layers)"
-    )
-
-
-class NnK4ThreatsW64BothModel(NeuralEvalModel):
-    """King buckets and threat inputs, seen from both sides, a shared 64 accumulator."""
-
-    name = "net_pst_k4_threats_w64_both"
-    feature_set = "pst_k4_threats"
-    hidden = (64,)
-    perspective = True
-    architecture = (
-        "Sparse network: 4 king buckets of 768 piece-square inputs seen from both sides plus 5 "
-        "threat inputs of the mover, one shared 64 accumulator, 128-1 (2 layers)"
-    )
-
-
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
-    cls.name: cls
-    for cls in (
-        NnW32Model,
-        NnW64Model,
-        NnW64x16Model,
-        NnW64BothModel,
-        NnThreatsW64BothModel,
-        NnK4W64BothModel,
-        NnK4ThreatsW64BothModel,
-        NnHybridW32Model,
-        NnHybridW64Model,
-        NnHybridW128Model,
-        NnHybridK4W64Model,
-        NnHybridK8W64Model,
-        NnK4W64Model,
-    )
+    cls.name: cls for cls in (NnW64BothModel, NnThreatsW64BothModel)
 }
 
 

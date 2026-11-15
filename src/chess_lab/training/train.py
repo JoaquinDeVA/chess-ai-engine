@@ -1,7 +1,7 @@
 """Train a registered model.
 
 Every model is trained from the raw shards and their sidecars, sized by effort:
-``python -m chess_lab.training.train --model net_pst_w32 --effort <0-100>``.
+``python -m chess_lab.training.train --model net_pst_threats_w64_both --effort <0-100>``.
 """
 
 import argparse

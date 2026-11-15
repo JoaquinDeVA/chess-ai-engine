@@ -288,12 +288,31 @@ impl NetState<'_> {
         let net = self.net;
         let width = self.width;
         let start = (2 * self.top + slot(pos.turn())) * width;
-        if net.layers.len() == 2 && !net.features.has_terms() && width.is_multiple_of(8) {
-            // one output layer straight over the accumulators: no copy, no intermediate buffer
+        if net.layers.len() == 2 && width.is_multiple_of(8) {
+            // one output layer straight over the accumulators: no intermediate buffer, except the
+            // mover's own with the dense inputs added (they have no rival view)
             let out = &net.layers[1];
-            let own = &self.stack[start..start + width];
             let mut lanes = [0.0f32; 8];
-            clipped_dot(own, &out.weights[..width], &mut lanes);
+            if net.features.has_terms() {
+                self.term_indices.clear();
+                self.term_values.clear();
+                net.features
+                    .term_inputs(pos, &mut self.term_indices, &mut self.term_values);
+                let own = &mut self.hidden[..width];
+                own.copy_from_slice(&self.stack[start..start + width]);
+                for (&index, &value) in self.term_indices.iter().zip(&self.term_values) {
+                    for (h, w) in own.iter_mut().zip(net.layers[0].row(index)) {
+                        *h += w * value as f32;
+                    }
+                }
+                clipped_dot(own, &out.weights[..width], &mut lanes);
+            } else {
+                clipped_dot(
+                    &self.stack[start..start + width],
+                    &out.weights[..width],
+                    &mut lanes,
+                );
+            }
             if net.perspective {
                 let rival = (2 * self.top + slot(!pos.turn())) * width;
                 clipped_dot(

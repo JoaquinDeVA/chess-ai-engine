@@ -2,11 +2,10 @@
 
 use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
 
-use super::features::PIECE_INPUTS;
 use super::net::Net;
 use super::score;
 
-/// Index of a piece among the inputs of one king bucket when `mover` is the side to move: the
+/// Index of a piece among the piece inputs when `mover` is the side to move: the
 /// pieces of the mover come first, then the opponent's, each colour seen from its own home rank.
 fn input_index(mover: Color, color: Color, role: Role, square: Square) -> usize {
     let mut index = (role as usize - 1) * 64;
@@ -37,9 +36,7 @@ const STACK_PLIES: usize = 128;
 /// The accumulators of every ply of the line being searched are kept in a stack: a move copies the
 /// top frame into the next one and changes the copy, and taking it back only steps down.
 ///
-/// With king buckets each accumulator uses the rows of its mover's bucket: when that king moves to
-/// another bucket, its accumulator is rebuilt from the board. The classical terms are not pieces:
-/// they are computed and added at every evaluation.
+/// The dense inputs (the threats) are not pieces: they are computed and added at every evaluation.
 ///
 /// The search calls `apply` for every move it plays and `undo` when it takes it back, and `score`
 /// for the position it is in; the result equals [`Net::score`] up to the rounding of `f32` sums.
@@ -48,15 +45,13 @@ pub struct NetState<'a> {
     width: usize,
     /// One frame of `2 * width` sums per ply, the white mover's accumulator first.
     stack: Vec<f32>,
-    /// King bucket of each accumulator, by `slot` of its mover, one pair per ply.
-    buckets: Vec<[usize; 2]>,
     /// Frame of the current position.
     top: usize,
-    /// Buffers of an evaluation: the layers and the inputs of the classical terms.
+    /// Buffers of an evaluation: the layers and the dense inputs.
     hidden: Vec<f32>,
     spare: Vec<f32>,
-    term_indices: Vec<usize>,
-    term_values: Vec<f64>,
+    dense_indices: Vec<usize>,
+    dense_values: Vec<f64>,
 }
 
 impl<'a> NetState<'a> {
@@ -67,16 +62,13 @@ impl<'a> NetState<'a> {
             net,
             width,
             stack: vec![0.0; 2 * width * STACK_PLIES],
-            buckets: vec![[0; 2]; STACK_PLIES],
             top: 0,
             hidden: vec![0.0; net.max_width],
             spare: vec![0.0; net.max_width],
-            term_indices: Vec::with_capacity(32),
-            term_values: Vec::with_capacity(32),
+            dense_indices: Vec::with_capacity(8),
+            dense_values: Vec::with_capacity(8),
         };
         for mover in [Color::White, Color::Black] {
-            let king = pos.board().king_of(mover).expect("a king per side");
-            state.buckets[0][slot(mover)] = net.features.king_bucket(mover, king);
             state.refresh(mover, pos.board());
         }
         state
@@ -90,9 +82,7 @@ impl<'a> NetState<'a> {
 
     /// The row of a piece in the accumulator of `mover`.
     fn row(&self, mover: Color, piece: Piece, square: Square) -> &'a [f32] {
-        let index = self.buckets[self.top][slot(mover)] * PIECE_INPUTS
-            + input_index(mover, piece.color, piece.role, square);
-        self.net.layers[0].row(index)
+        self.net.layers[0].row(input_index(mover, piece.color, piece.role, square))
     }
 
     /// Rebuild the accumulator of `mover` from the bias and every piece of `board`.
@@ -112,17 +102,15 @@ impl<'a> NetState<'a> {
         let frame = 2 * self.width;
         if (self.top + 2) * frame > self.stack.len() {
             self.stack.resize(self.stack.len() * 2, 0.0);
-            self.buckets.resize(self.buckets.len() * 2, [0; 2]);
         }
         let start = self.top * frame;
         self.stack.copy_within(start..start + frame, start + frame);
-        self.buckets[self.top + 1] = self.buckets[self.top];
         self.top += 1;
     }
 }
 
-/// The pieces a move takes off and puts on the board, and where the mover's king ends.
-fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option<Square>) {
+/// The pieces a move takes off and puts on the board.
+fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize) {
     let own = |role| Piece { color: mover, role };
     let other = |role| Piece {
         color: !mover,
@@ -138,7 +126,6 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
             promotion,
         } => {
             let taken = capture.map_or(none, |taken| (other(taken), to, false));
-            let king = (role == Role::King).then_some(to);
             (
                 [
                     (own(role), from, false),
@@ -147,7 +134,6 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
                     none,
                 ],
                 2 + usize::from(capture.is_some()),
-                king,
             )
         }
         Move::EnPassant { from, to } => (
@@ -162,7 +148,6 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
                 none,
             ],
             3,
-            None,
         ),
         Move::Castle { king, rook } => {
             let kingside = rook.file() > king.file();
@@ -184,7 +169,6 @@ fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize, Option
                     ),
                 ],
                 4,
-                Some(king_to),
             )
         }
         Move::Put { .. } => unreachable!("there are no drops in chess"),
@@ -211,18 +195,12 @@ impl NetState<'_> {
     /// The side to move in `pos` (the position before the move) plays `m`.
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
         let mover = pos.turn();
-        let (pieces, count, king) = changes(mover, m);
-        // a king that enters another bucket rebuilds its own accumulator from the board
-        let moved_bucket = king
-            .map(|king| self.net.features.king_bucket(mover, king))
-            .filter(|&bucket| bucket != self.buckets[self.top][slot(mover)]);
+        let (pieces, count) = changes(mover, m);
         // step up one frame, writing the new accumulators straight from the old ones
         let frame = 2 * self.width;
         if (self.top + 2) * frame > self.stack.len() {
             self.stack.resize(self.stack.len() * 2, 0.0);
-            self.buckets.resize(self.buckets.len() * 2, [0; 2]);
         }
-        self.buckets[self.top + 1] = self.buckets[self.top];
         let width = self.width;
         let layer = &self.net.layers[0];
         {
@@ -232,16 +210,10 @@ impl NetState<'_> {
             for side in [Color::White, Color::Black] {
                 let at = slot(side) * width;
                 let (o, n) = (&old[at..at + width], &mut new[at..at + width]);
-                if side == mover && moved_bucket.is_some() {
-                    n.copy_from_slice(o);
-                    continue;
-                }
-                let bucket = self.buckets[self.top][slot(side)];
                 let mut rows = [o; 4];
                 for (k, &(piece, square, _)) in pieces[..count].iter().enumerate() {
-                    let index =
-                        bucket * PIECE_INPUTS + input_index(side, piece.color, piece.role, square);
-                    rows[k] = &layer.row(index)[..width];
+                    rows[k] =
+                        &layer.row(input_index(side, piece.color, piece.role, square))[..width];
                 }
                 // the pieces alternate: take off, put on, take off, put on
                 match count {
@@ -264,12 +236,6 @@ impl NetState<'_> {
             }
         }
         self.top += 1;
-        if let Some(bucket) = moved_bucket {
-            self.buckets[self.top][slot(mover)] = bucket;
-            let mut after = pos.clone();
-            after.play_unchecked(*m);
-            self.refresh(mover, after.board());
-        }
     }
 
     /// The side to move passes (a null move): the accumulators of both sides stay as they are.
@@ -293,14 +259,14 @@ impl NetState<'_> {
             // mover's own with the dense inputs added (they have no rival view)
             let out = &net.layers[1];
             let mut lanes = [0.0f32; 8];
-            if net.features.has_terms() {
-                self.term_indices.clear();
-                self.term_values.clear();
+            if net.features.has_dense() {
+                self.dense_indices.clear();
+                self.dense_values.clear();
                 net.features
-                    .term_inputs(pos, &mut self.term_indices, &mut self.term_values);
+                    .dense_inputs(pos, &mut self.dense_indices, &mut self.dense_values);
                 let own = &mut self.hidden[..width];
                 own.copy_from_slice(&self.stack[start..start + width]);
-                for (&index, &value) in self.term_indices.iter().zip(&self.term_values) {
+                for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
                     for (h, w) in own.iter_mut().zip(net.layers[0].row(index)) {
                         *h += w * value as f32;
                     }
@@ -329,12 +295,12 @@ impl NetState<'_> {
             let rival = (2 * self.top + slot(!pos.turn())) * width;
             self.hidden[width..2 * width].copy_from_slice(&self.stack[rival..rival + width]);
         }
-        if net.features.has_terms() {
-            self.term_indices.clear();
-            self.term_values.clear();
+        if net.features.has_dense() {
+            self.dense_indices.clear();
+            self.dense_values.clear();
             net.features
-                .term_inputs(pos, &mut self.term_indices, &mut self.term_values);
-            for (&index, &value) in self.term_indices.iter().zip(&self.term_values) {
+                .dense_inputs(pos, &mut self.dense_indices, &mut self.dense_values);
+            for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
                 for (h, w) in self.hidden.iter_mut().zip(net.layers[0].row(index)) {
                     *h += w * value as f32;
                 }
@@ -387,13 +353,8 @@ mod tests {
     }
 
     /// Plays random games, checking the incremental value against the full one after every move
-    /// and again after taking every move back; returns the moves checked, the king moves that
-    /// changed bucket and the castlings.
-    fn check_incremental(features: FeatureSet) -> (usize, usize, usize) {
-        check_net(&net(features), features)
-    }
-
-    fn check_net(net: &Net, features: FeatureSet) -> (usize, usize, usize) {
+    /// and again after taking every move back; returns the moves checked and the castlings.
+    fn check_net(net: &Net) -> (usize, usize) {
         let mut seed = 12345u64;
         let mut pick = |n: usize| {
             seed = seed
@@ -406,7 +367,7 @@ mod tests {
             "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NP1N2/PPPQ1PPP/R3K2R w KQkq - 0 1",
             "r3k2r/1P4P1/8/3pP3/8/8/1p4p1/R3K2R w KQkq d6 0 1",
         ];
-        let (mut checked, mut bucket_changes, mut castles) = (0, 0, 0);
+        let (mut checked, mut castles) = (0, 0);
         for start in starts {
             for _ in 0..40 {
                 let mut pos = position_from_fen(start).unwrap();
@@ -418,15 +379,10 @@ mod tests {
                         break;
                     }
                     let m = moves[pick(moves.len())];
-                    let mover = pos.turn();
-                    let bucket =
-                        |p: &Chess| features.king_bucket(mover, p.board().king_of(mover).unwrap());
-                    let before = bucket(&pos);
                     castles += usize::from(matches!(m, Move::Castle { .. }));
                     state.apply(&pos, &m);
                     trail.push(pos.clone());
                     pos.play_unchecked(m);
-                    bucket_changes += usize::from(bucket(&pos) != before);
                     assert!(
                         (state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE,
                         "{}",
@@ -443,12 +399,12 @@ mod tests {
         }
         assert!(checked > 5000, "{checked}");
         assert!(castles > 0);
-        (checked, bucket_changes, castles)
+        (checked, castles)
     }
 
     #[test]
     fn incremental_equals_full_slotted() {
-        check_incremental(FeatureSet::Slotted);
+        check_net(&net(FeatureSet::Slotted));
     }
 
     /// A network whose second layer reads both sides' accumulators (twice as wide as one).
@@ -466,78 +422,12 @@ mod tests {
 
     #[test]
     fn incremental_equals_full_both_perspectives() {
-        let features = FeatureSet::Slotted;
-        check_net(&both_net(features), features);
-    }
-
-    /// Each side's view uses the bucket of its own king, and a king that changes bucket rebuilds
-    /// its accumulator.
-    #[test]
-    fn incremental_equals_full_both_perspectives_with_king_buckets() {
-        for features in [
-            FeatureSet::Bucketed { file_groups: 2 },
-            FeatureSet::Hybrid { file_groups: 4 },
-            FeatureSet::Threats { file_groups: 2 },
-        ] {
-            let (_, bucket_changes, _) = check_net(&both_net(features), features);
-            assert!(bucket_changes > 100, "{bucket_changes}");
-        }
+        check_net(&both_net(FeatureSet::Slotted));
     }
 
     #[test]
     fn incremental_equals_full_threats() {
-        check_incremental(FeatureSet::Threats { file_groups: 0 });
-    }
-
-    #[test]
-    fn incremental_equals_full_threats_k4() {
-        let (_, bucket_changes, _) = check_incremental(FeatureSet::Threats { file_groups: 2 });
-        assert!(bucket_changes > 100, "{bucket_changes}");
-    }
-
-    #[test]
-    fn incremental_equals_full_hybrid() {
-        check_incremental(FeatureSet::Hybrid { file_groups: 0 });
-    }
-
-    #[test]
-    fn incremental_equals_full_hybrid_k4() {
-        let (_, bucket_changes, _) = check_incremental(FeatureSet::Hybrid { file_groups: 2 });
-        assert!(bucket_changes > 100, "{bucket_changes}");
-    }
-
-    #[test]
-    fn incremental_equals_full_hybrid_k8() {
-        let (_, bucket_changes, _) = check_incremental(FeatureSet::Hybrid { file_groups: 4 });
-        assert!(bucket_changes > 100, "{bucket_changes}");
-    }
-
-    #[test]
-    fn incremental_equals_full_buckets_k4() {
-        let (_, bucket_changes, _) = check_incremental(FeatureSet::Bucketed { file_groups: 2 });
-        assert!(bucket_changes > 100, "{bucket_changes}");
-    }
-
-    /// A king that castles into another bucket rebuilds its accumulator, and undo restores the
-    /// old one with its bucket.
-    #[test]
-    fn castling_across_buckets() {
-        let features = FeatureSet::Hybrid { file_groups: 4 };
-        let net = net(features);
-        let pos = position_from_fen("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1").unwrap();
-        for m in ordered_moves(&pos) {
-            let Move::Castle { .. } = m else { continue };
-            let mut state = NetState::new(&net, &pos);
-            let mut after = pos.clone();
-            after.play_unchecked(m);
-            let king = |p: &Chess| {
-                features.king_bucket(Color::White, p.board().king_of(Color::White).unwrap())
-            };
-            assert_ne!(king(&pos), king(&after));
-            state.apply(&pos, &m);
-            assert!((state.logit(&after) - net.logit(&after)).abs() < TOLERANCE);
-            state.undo();
-            assert!((state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE);
-        }
+        check_net(&net(FeatureSet::Threats));
+        check_net(&both_net(FeatureSet::Threats));
     }
 }

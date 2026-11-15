@@ -50,18 +50,12 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     (w0, b0), *rest = model.layers
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
     if model.perspective:
-        # the rival's view: every piece in the other block of its square, in the bucket of the
-        # rival's king; the dense entries have no rival view
-        features = features_of(model)
-        king = board.king(not board.turn)
-        if board.turn == chess.WHITE:
-            king = chess.square_mirror(king)
-        pieces = getattr(features, "buckets", 1) * 768
-        shift = features.bucket(king) * 768 if hasattr(features, "bucket") else 0
+        # the rival's view: every piece in the other block of its square; the dense entries have
+        # no rival view
         rival = np.zeros_like(x)
         for index, value in zip(indices, values, strict=True):
-            if index < pieces:
-                rival[shift + (index % 768 + 384) % 768] += value
+            if index < 768:
+                rival[(index + 384) % 768] += value
         h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
     for weights, bias in rest[:-1]:
         h = np.maximum(h @ weights + bias, 0.0)
@@ -110,9 +104,7 @@ def test_the_training_graph_computes_what_the_core_does(model_class):
     features = features_of(model)
     width = features.max_entries()
     keras = _training_keras()
-    network, parts = _keras_network(
-        keras, [w.shape for w, _ in model.layers], width, 0.0, True, getattr(features, "buckets", 1)
-    )
+    network, parts = _keras_network(keras, [w.shape for w, _ in model.layers], width, 0.0, True)
     _assign(parts, model.layers)
     boards = random_positions(40, seed=9)
     index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)

@@ -129,7 +129,7 @@ with `--features search-diagnostics` to read them. Check on 2026-11-14 (`uci ttd
 version): 3,989,480 nodes with and without the counters; nodes per second 1,010,980 before, 1,007,256 now (−0.4 % ± 0.6 %),
 1,014,098 with diagnostics (+0.3 % ± 0.5 %): no measurable speed difference.
 
-Baseline at `63cace7` plus the counters (`net_pst_w32`, desktop, one thread, 2026-11-10; the runs were made one
+Baseline at `63cace7` plus the counters (a retired width-32 network, desktop, one thread, 2026-11-10; the runs were made one
 after the other, with the machine idle): depth 9 finished in 20 of 20 positions, 122,806,437 nodes, median 4.30 s
 (1,006,294 nodes/s), branching factor 2.70 from depth 7 to 9, quiescence 22.0 % of the nodes, table hits 3.9 % of
 the probes. With the lock-free table, the only one since `345c3ff`: 118,614,205 nodes but median 4.58 s (974,990 nodes/s).
@@ -167,15 +167,14 @@ that ends at the round cap without a verdict says the addition is too small for 
 
 ### Playing a model that is not compiled in
 
-`uci` embeds `net_pst_w32` and loads any other network from a JSON file with
-`setoption name Model value <file>.json` (`setoption name Model value net_pst_w32` goes back to the embedded one).
-The file is written by `python -m chess_lab.models.export_uci --model net_hybrid_w64 --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
-Python `ModelEvaluator` (checked on one position: 0.518626 with `net_hybrid_w64`). Every network is played with an
-incremental accumulator since 2026-11-09 (commit `75a8071`); before, only the slotted features had one. The hybrids
-still reach fewer nodes per second than `net_pst_w32` (`uci bench 5 <file>.json`, laptop, 2026-11-09: 635,828 for
-`net_hybrid_w64` with the accumulator, 521,915 without, against 1,020,805): the SPRT at a time control includes that
-cost, and an SPRT at fixed nodes leaves it out. A time-control SPRT run before that commit played the hybrids and the
-king-bucket networks without the accumulator against networks with it, so it does not compare them on equal terms.
+`uci` embeds `net_pst_threats_w64_both` and loads any other network from a JSON file with
+`setoption name Model value <file>.json` (`setoption name Model value net_pst_threats_w64_both` goes back to the embedded one).
+The file is written by `python -m chess_lab.models.export_uci --model net_pst_w64_both --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
+Python `ModelEvaluator`. Every network is played with an incremental accumulator since 2026-11-09 (commit `75a8071`);
+the threat inputs are computed at every leaf and are the main cost of `net_pst_threats_w64_both`. A match at a time
+control includes that cost, and a match at fixed nodes leaves it out (`uci bench 5 <file>.json` gives the nodes per
+second of a file). Matches before 2026-11-13 do not compare networks on equal terms: some played without the
+accumulator against networks with it (see [Results](RESULTS.md#retired-models)).
 
 ### Playing one opening book against another
 

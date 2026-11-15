@@ -21,9 +21,12 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
-| 2026-11-15 | `8402069` | perf | fast output path also when the net has dense inputs (threat inputs) | nodes, ttd 11<br>nodes/s, ttd 11 (threats_both, median) | 11,589,046 → 11,589,046<br>909,826 → 978,991 (estimated: 2 of 3 alternated runs, loaded machine) | +0.0 %<br>+7.6 % |
-| 2026-11-15 | `2272d51` | perf | compute the threat inputs from one attack map per side | nodes, bench 5<br>nodes/s, bench (median) | 65,462 → 65,462<br>~925,000 → ~1,000,000 | +0.0 %<br>+8 % |
-| 2026-11-15 | `7d4712c` | feat | `uci ttd` takes an optional model file | — | not measured | — |
+| 2026-11-15 | `57bf14d` | retire | delete the weights and cards of the retired models (width 32, hybrid, king buckets, three layers) | Elo SPRT [0,5] net_pst_k4_w64 vs net_pst_w64, 988 games 10+0.1 (orientative)<br>Elo SPRT [0,5] net_pst_w64x16 vs net_pst_w64, 1,600 games 10+0.1 (orientative) | -31.9 ± 21.5 (LLR -1.39)<br>-38.8 ± 15.9 (LLR -2.91) | —<br>— |
+| 2026-11-15 | `a01a938` | retire | retire the hybrid, king-bucket and classical-term feature sets | Elo SPRT [0,5] net_hybrid_w64 vs net_pst_w32, 2,666 games 10+0.1 (before 2026-11-13: orientative) | +26.5 ± 11.9 (H1); vs net_pst_w64 no verdict | — |
+| 2026-11-15 | `4e82cc7` | feat | play net_pst_threats_w64_both by default and let the bot follow the binary's model | Elo SPRT [0,5] threats_both vs net_pst_w64, 800 games 10+0.2 (Network matches)<br>Elo SPRT [0,5] threats_both vs net_pst_w64_both, binary 5d862f1d7451, 1,200 games 10+0.2 | +57.9 ± 22.1 (LLR +1.98, no verdict)<br>+40.7 ± 18.5 (LLR +2.02, no verdict; accepted as valid) | —<br>— |
+| 2026-11-15 | `8402069` | perf | take the fast output path also when the net has dense inputs | nodes, ttd 11<br>nodes/s, ttd 11 (threats_both, median) | 11,589,046 → 11,589,046<br>909,826 → 978,991 | +0.0 %<br>+7.6 % |
+| 2026-11-15 | `2272d51` | perf | compute the threat inputs from one attack map per side | nodes, bench 5<br>nodes/s, bench (median) | 65,462 → 65,462<br>925,000 → 1,000,000 | +0.0 %<br>+8.1 % |
+| 2026-11-15 | `7d4712c` | feat | let uci ttd measure any model file | — | not measured | — |
 | 2026-11-14 | `61bc5aa` | fix | use as_chunks in the clipped dot product (clippy chunks_exact_to_as_chunks) | nodes, ttd 9<br>nodes/s, ttd 9 (median)<br>nodes/s, bench (median) | 3,989,480 → 3,989,480<br>1,135,065 → 1,136,709<br>1,327,826 → 1,328,686 | +0.0 %<br>+0.1 %<br>+0.1 % |
 | 2026-11-14 | `d5ead4d` | feat | threat inputs (pst_threats, pst_k4_threats) and both perspectives with king buckets | — | not measured | — |
 | 2026-11-14 | `40bb83e` | perf | cache the pawn-structure terms by pawn placement | nodes, ttd 9<br>nodes/s, ttd 9 (median)<br>nodes/s, bench (median) | 3,989,480 → 3,989,480<br>1,127,892 → 1,129,553<br>1,321,936 → 1,322,626 | +0.0 %<br>+0.1 %<br>+0.1 % |
@@ -54,7 +57,7 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 | 2026-11-13 | `ae9135e` | other | Mejorada legibilidad bench.rs | — | — | — |
 | 2026-11-13 | `f9b6231` | fix | dot product with as_chunks for the new clippy lint | — | — | — |
 
-Internal, not itemised: 9 refactor, 8 docs, 1 test, 1 ci (`4f859e3`…`3a2a271`).
+Internal, not itemised: 10 docs, 10 refactor, 1 test, 1 ci (`4f859e3`…`23696c0`).
 
 ## 4.0.0 (2026-11-11)
 
@@ -145,7 +148,7 @@ Internal, not itemised: 3 docs, 1 refactor (`8c79749`…`ec58665`).
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
 | 2026-11-04 | `274a911` | retire | remove the rejected lmr, qs_evasions and TimeRules switches | Elo SPRT [-5,0] 20,000 nodes with lmr, 10,244 games<br>Elo SPRT [-5,0] 20,000 nodes with qs_evasions, 3,428 games | -8.6 ± 6.1 (H0: retired)<br>-21.3 ± 10.6 (H0: retired) | —<br>— |
-| 2026-11-04 | `ae126c0` | perf | follow the piece-square part of linear_pst_terms move by move, 17 % more nodes per second | nodes/s, bench<br>Elo vs the binary before the 2.6x speedup (no see), 280 games 10+0.1 | 788,000 → 928,000<br>+180.2 ± 36.0 (73.83 %) | +17.8 %<br>— |
+| 2026-11-04 | `ae126c0` | perf | follow the piece-square part of linear_pst_terms move by move, 17 % more nodes per second | nodes/s, bench<br>Elo vs el binary previo al 2.6x (without see), 280 games 10+0.1 | 788,000 → 928,000<br>+180.2 ± 36.0 (73.83 %) | +17.8 %<br>— |
 | 2026-11-04 | `1f6b2c7` | perf | build for x86-64-v3 (AVX2, BMI2), same nodes, about 5 % more nodes per second | nodes/s, bench | 750,000 → 788,000 | +5.1 % |
 | 2026-11-04 | `cd31e87` | feat | helper threads with their own deepening and a vote, shared history, cache-aligned table slots | s to depth 8, 4 threads<br>s to depth 8, 6 threads<br>Elo 6 threads vs 4, 280 games 10+0.1 | 0.788 → 0.638<br>0.871 → 0.627<br>+5.0 ± 37.5 (no verdict) | -19.0 %<br>-28.0 %<br>— |
 | 2026-11-04 | `57a23aa` | feat | add the pst_kings feature set and the net_kings_w32 model | — | — | — |
@@ -153,7 +156,7 @@ Internal, not itemised: 3 docs, 1 refactor (`8c79749`…`ec58665`).
 | 2026-11-04 | `5dfeb8d` | feat | switch static exchange evaluation on by default after its SPRT at fixed nodes | Elo SPRT [0,5] 20,000 nodes, 1,188 games<br>Elo SPRT [-5,0] without see, 992 games 10+0.1 | +56.4 ± 17.5 (H1)<br>+64.5 ± 19.5 (H1: keep) | —<br>— |
 | 2026-11-04 | `360e5c2` | fix | apply --patience to the training plan that is printed and saved in the card | — | — | — |
 | 2026-11-04 | `33497b7` | feat | stop training after N epochs without improvement (--patience) | — | — | — |
-| 2026-11-04 | `67f413a` | perf | speed up the Rust search 2.6x with identical nodes (packed move-order key, bitboard pawns, no per-node allocations) | nodes/s, bench<br>Elo vs the previous binary, 300 games 10+0.1 | 304,000 → 784,000<br>+130.9 ± 39.8 | +157.9 %<br>— |
+| 2026-11-04 | `67f413a` | perf | speed up the Rust search 2.6x with identical nodes (packed move-order key, bitboard pawns, no per-node allocations) | nodes/s, bench<br>Elo vs el binary anterior, 300 games 10+0.1 | 304,000 → 784,000<br>+130.9 ± 39.8 | +157.9 %<br>— |
 
 Internal, not itemised: 10 docs, 4 refactor (`78de930`…`9b0d00b`).
 

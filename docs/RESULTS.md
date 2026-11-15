@@ -18,13 +18,16 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
   ("Search techniques at 60 s + 1 s" below). An earlier `lmr` lost 8.6 ± 6.1 Elo at 20,000 nodes per move
   (`lmr_nodes` below), so that conflict is still open. Six others (`pvs`, `history`, `lmp`, `aspiration`,
   `history_malus`, `qs_tt`) reached no verdict and were retired.
-- **The model that plays is the Piece-square network, width 64 (`net_pst_w64`)**, the default of the binary since
-  `4d8dfc4`. There is no SPRT of it against `net_pst_w32`, the model it replaced; that one beat the
-  Piece-square-and-terms logistic model (`linear_pst_terms@e30`) by +165.1 ± 32.9 Elo (SPRT [0, 5], 504 games at
-  10 s + 0.1 s), and the logistic model was retired.
-- **More accurate is not stronger**: the hybrid networks, with the classical terms as inputs, have a higher
-  Spearman (0.702 to 0.722 against 0.693) but search about half the nodes per second and lose
-  (`net_hybrid_w32` against `net_pst_w32`, −105.5 ± 25.5 Elo, H0); see the model table below.
+- **The model that plays is `net_pst_threats_w64_both`**: piece-square inputs plus five threat inputs, width 64, and a
+  second layer that reads the accumulators of both sides over the same weights. It is the default of the binary
+  since `4e82cc7`. Against the previous default `net_pst_w64` it scored +57.9 ± 22.1 Elo, and against
+  `net_pst_w64_both` (the same network without the threat inputs) +40.7 ± 18.5 ("Network matches" below). Neither
+  match reached an SPRT bound (LLR 1.98 and 2.02 of 2.94); they were stopped by hand with the interval
+  excluding 0, and the threats are kept on that evidence.
+- **Retired networks.** The width-32 network, the hybrids (classical terms as inputs), the king-bucket networks, the
+  three-layer network and the logistic model were retired on 2026-11-15 and their weights deleted. Their figures
+  are in "Retired models" below; those measured before 2026-11-13 are orientative (some played without the
+  accumulator, against the search of then).
 
 ## Measured and estimated
 
@@ -35,8 +38,9 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 2.21); retired |
 | `lmr`, `rfp`, `iir` and `futility` make the engine stronger | SPRT [−5, 0] at 60 s + 1 s, 400 to 600 games each ("Search techniques at 60 s + 1 s" below) | Rust | Not yet: +34.9 to +62.3 Elo, LLR 0.68 to 1.27, still running; fixed in the engine meanwhile |
 | `lmp`, `aspiration`, `history_malus` and `qs_tt` help on top of `lmr,rfp,iir` | Same SPRTs, 200 to 600 games each | Rust | Not shown: LLR −0.48 to 0.07, stopped; retired |
-| The network plays better than the logistic model | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Measured; H1 accepted |
-| Adding the classical terms to the network makes it weaker | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Measured; H0 accepted, but it mixes quality and speed (the hybrids have no accumulator). At fixed nodes: pending |
+| The network plays better than the logistic model (retired) | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Orientative (measured before 2026-11-13); H1 accepted |
+| Adding the classical terms to the network makes it weaker (retired) | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Orientative: H0 accepted, but it mixes quality and speed (the hybrids had no accumulator) |
+| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0 |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
 | The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength is judged by an SPRT [−5, 0] against `v4.0.0`, queued |
 | Several threads search faster | Time to depth 8 on 60 positions (Lazy SMP) | Rust | Measured speed; effect in games not measured |
@@ -64,15 +68,8 @@ techniques. It was stopped on 2026-11-09 with jobs still running; their figures 
 | `abl_aspiration` | default against default without `aspiration` | [−5, 0] | 2,200 | +10.7 ± 12.5 | +1.37 | no verdict; retired |
 | `add_history_malus` | default + `history_malus` against default | [−5, 0] | 2,200 | +9.2 ± 12.0 | +1.24 | no verdict; retired |
 | `add_qs_tt` | default + `qs_tt` against default | [−5, 0] | 2,134 | −0.3 ± 12.5 | +0.19 | no verdict; retired |
-| `model_net_vs_linear` | `net_pst_w32` against `linear_pst_terms@e30` | [0, 5] | 504 | +165.1 ± 32.9 | +2.95 | H1: stronger |
-| `model_width_64_vs_32` | `net_hybrid_w64` against `net_hybrid_w32` | [0, 5] | 1,612 | +44.0 ± 15.9 | +2.95 | H1: stronger |
-| `model_terms_in_net_nodes` | `net_hybrid_w64` against `net_pst_w32` at 250,000 nodes per move | [0, 5] | 784 | +89.2 ± 22.5 | +2.95 | H1: stronger per node |
 
-The SPRTs `best_net_hybrid_w64_vs_linear`, `best_net_hybrid_k4_w64_vs_linear`, `model_terms_in_net` and
-`model_buckets_k8_vs_k4` were removed from this table: they ran at a time control before the incremental accumulator
-of the hybrid and king-bucket networks (2026-11-09), against networks that had it, so they mixed quality with speed. They
-are replaced by `acc_*` and `pst_*` jobs with the same binary for both sides (`src/chess_lab/measure/queue.json`).
-The files stay in `data/results/roundrobin/`.
+The model jobs of that round robin are in "Retired models" below.
 
 ## Search techniques at 60 s + 1 s
 
@@ -96,6 +93,45 @@ robin's `results/<job>/llr.csv` on the compute node (games, LLR, Elo and error a
 
 The engine with the eight fixed techniques has no SPRT against the one with switches; `uci bench 5` counts 23.5 %
 fewer nodes (139,252 to 106,583).
+
+## Network matches
+
+From 2026-11-14 the compute node plays the networks against each other with the binary `242475e64e00` (the one of
+`both` and `threats` before the speed-ups): 10 s + 0.2 s, `Hash` 16, one thread, SPRT [0, 5], LLR bounds ±2.94. A
+is the first network. Files: `data/results/roundrobin/<job>/llr.csv`.
+
+| job | A against B | games | Elo (95 %) | LLR | state |
+|---|---|---|---|---|---|
+| `sp_both_vs_w64` | `net_pst_w64_both` against `net_pst_w64` | 800 | +40.6 ± 21.8 | +1.39 | stopped by hand |
+| `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against `net_pst_w64` | 800 | +57.9 ± 22.1 | +1.98 | stopped by hand |
+| `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 800 | +9.1 ± 21.0 | +0.26 | replaced by the next one: it played the binary before the speed-ups of the threat inputs |
+| `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
+| `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
+
+The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
+(`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
+(`uci ttd 11`), and `net_pst_threats_w64_both` still costs about 30 % more time than `net_pst_w64_both`.
+
+## Retired models
+
+Retired on 2026-11-15; the weights were deleted (the code is in the history before `23696c0`). All matches: SPRT [0, 5],
+10 s + 0.1 s, binary `cc258520bbdb` unless said, files `data/results/roundrobin/<job>/llr.csv`. **Orientative:**
+they are earlier than 2026-11-13 and some played without the accumulator (the hybrids and the king buckets until
+2026-11-09) or with the search of then.
+
+| Model | What it looked at | Match | Games | Elo (95 %) | LLR |
+|---|---|---|---|---|---|
+| `linear_pst_terms` (logistic) | piece squares and classical terms, no hidden layer | `model_net_vs_linear`, `net_pst_w32` against it | 504 | +165.1 ± 32.9 | +2.95 |
+| `net_pst_w32` | piece squares, width 32 | `pst_w64_vs_w32`, `net_pst_w64` against it | 1,028 | +73.4 ± 21.5 | +2.95 |
+| `net_hybrid_*` | piece squares plus 11 classical terms | `acc_hybrid_w64_vs_pst_w32`, `net_hybrid_w64` against `net_pst_w32` | 2,666 | +26.5 ± 11.9 | +2.95 |
+| | | `acc_hybrid_k4_vs_w64`, `net_hybrid_k4_w64` against `net_hybrid_w64` | 5,010 | −9.4 ± 8.8 | −2.65 |
+| `net_pst_k4_w64`, `net_pst_k4_threats_w64_both` | piece squares by the rival king's bucket (4 buckets) | `pst_k4_w64_vs_w32` / `pst_k4_w64_vs_w64` | 1,600 / 988 | +26.8 ± 16.0 / −31.9 ± 21.5 | +1.72 / −1.39 |
+| `net_pst_w64x16` | a third layer of 16 units | `pst_w64x16_vs_w32` / `pst_w64x16_vs_w64` | 1,970 / 1,600 | +23.5 ± 14.4 / −38.8 ± 15.9 | +1.84 / −2.91 |
+
+Rows with two matches give the network against `net_pst_w32` and against `net_pst_w64`; an LLR short of ±2.94 is a
+stopped match. Rule for retiring a model: for quality, when against the current one with the same binary and time
+control its interval excludes a gain above +5 Elo and it ties or loses; for cost, when the nodes per second it
+loses outweigh the quality it brings. A cost retirement can be reopened if the cost falls.
 
 ## Engine matches (Rust engine, fastchess)
 
@@ -129,7 +165,7 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 
 | Judge | What it measures | Command |
 |---|---|---|
-| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_w32@e30` |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_threats_w64_both@e30` |
 | Match | Games of the UCI binary against itself with fastchess, Elo with a 95 % interval | [Measurement](MEASUREMENT.md) |
 
 ## Search techniques in games
@@ -169,16 +205,9 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
-| `net_hybrid_k4_w64` | 198,145 | winprob-k0.00368-stm-quiet | 30 | 0.722 | 0.110 | 22.0% / 56.8% | 2.9 |
-| `net_hybrid_k8_w64` | 394,753 | winprob-k0.00368-stm-quiet | 30 | 0.719 | 0.111 | 21.9% / 56.5% | 2.9 |
-| `net_hybrid_w32` | 25,345 | winprob-k0.00368-stm-quiet | 30 | 0.702 | 0.115 | 21.4% / 56.2% | 2.9 |
-| `net_hybrid_w64` | 50,689 | winprob-k0.00368-stm-quiet | 30 | 0.718 | 0.111 | 21.7% / 56.5% | 2.9 |
-| `net_pst_k4_w64` | 196,737 | winprob-k0.00368-stm-quiet | 30 | 0.709 | 0.114 | 21.7% / 56.6% | 2.4 |
-| `net_pst_w32` | 24,641 | winprob-k0.00368-stm-quiet | 30 | 0.693 | 0.118 | 21.3% / 56.2% | 2.4 |
-| `net_pst_w64` | 49,281 | winprob-k0.00368-stm-quiet | 30 | 0.712 | 0.113 | 21.8% / 57.2% | 2.4 |
-| `net_pst_w64x16` | 50,273 | winprob-k0.00368-stm-quiet | 30 | 0.716 | 0.110 | 21.5% / 55.8% | 2.8 |
+| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 30 | 0.746 | 0.105 | 25.3% / 60.0% | 2.2 |
+| `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 | 0.731 | 0.110 | 22.7% / 58.3% | 2.4 |
 | `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.8 |
-| `linear_pst_terms` (retired) | 791 | winprob-k0.00368-stm-quiet | 30 | 0.646 | 0.128 | 20.8% / 56.7% | 2.4 |
 <!-- END GENERATED TABLES -->
 
 ## Reproduce

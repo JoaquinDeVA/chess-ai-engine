@@ -25,13 +25,13 @@ Every figure has its command or file in [Results](docs/RESULTS.md).
 |---|---|---|
 | Moving the search to Rust made it faster | 2.58x in `uci bench` on one build (304 k to 784 k nodes per second; later speed-ups are in the changelog) | [Changelog](CHANGELOG.md) |
 | Four techniques each won an SPRT against the search without them | null move +97, static exchange evaluation +64, table move first +57, incremental accumulator +35 Elo | [Round robin](docs/RESULTS.md#round-robin-rust-engine-fastchess) |
-| The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games | [Results](docs/RESULTS.md#measured-and-estimated) |
-| More accurate is not stronger | Networks with the classical chess terms as inputs have a higher Spearman but lose by 105.5 ± 25.5 Elo | [Results](docs/RESULTS.md#measured-and-estimated) |
+| The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games (before the 2026-11-13 binary: orientative) | [Results](docs/RESULTS.md#retired-models) |
+| Threat inputs and both sides' views each made the network stronger | `net_pst_threats_w64_both` against `net_pst_w64`: +57.9 ± 22.1 Elo (800 games); against `net_pst_w64_both`: +40.7 ± 18.5 (1,200 games) | [Results](docs/RESULTS.md#network-matches) |
 | Six search techniques reached no verdict and were retired | `pvs`, `history`, `lmp`, `aspiration`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
 
-The engine that plays is the Rust UCI binary with the **Piece-square network, width 64** (`net_pst_w64`) and eight
-search techniques, all fixed. The one measurement still open is that `net_pst_w64` has no match against its
-predecessor: see [Results](docs/RESULTS.md#the-short-answer).
+The engine that plays is the Rust UCI binary with the **Piece-square network with threat inputs and both sides' views,
+width 64** (`net_pst_threats_w64_both`) and eight search techniques, all fixed: see
+[Results](docs/RESULTS.md#the-short-answer).
 
 ## Quick start
 
@@ -60,7 +60,7 @@ option name Hash type spin default 64 min 1 max 65536
 option name Threads type spin default 1 min 1 max 64
 option name Book type string default
 option name Tablebase type string default
-option name Model type string default net_pst_w64
+option name Model type string default net_pst_threats_w64_both
 uciok
 readyok
 info depth 8 nodes 1070725 time 1000

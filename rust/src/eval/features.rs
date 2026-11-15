@@ -4,8 +4,10 @@
 
 use std::cell::RefCell;
 
-use shakmaty::attacks::{bishop_attacks, knight_attacks, queen_attacks, rook_attacks};
-use shakmaty::{Bitboard, Chess, Color, File, Piece, Position, Role, Square};
+use shakmaty::attacks::{
+    bishop_attacks, king_attacks, knight_attacks, queen_attacks, rook_attacks,
+};
+use shakmaty::{Bitboard, Board, Chess, Color, File, Piece, Position, Role, Square};
 
 /// Phase of the start position (sum of the phase weights of all pieces).
 const MAX_PHASE: usize = 24;
@@ -364,22 +366,45 @@ fn role_value(role: Role) -> i32 {
     }
 }
 
+/// Every square that some piece of `side` attacks, own pieces included (so also the squares it
+/// defends). Pawns by shifting the whole set, each other role by its attack table.
+fn attacked_by(board: &Board, side: Color) -> Bitboard {
+    let occupied = board.occupied();
+    let mine = board.by_color(side);
+    let pawns = (board.pawns() & mine).0;
+    let (towards_h, towards_a) = if side == Color::White {
+        (pawns << 9, pawns << 7)
+    } else {
+        (pawns >> 7, pawns >> 9)
+    };
+    let mut map = Bitboard(
+        (towards_h & !Bitboard::from(File::A).0) | (towards_a & !Bitboard::from(File::H).0),
+    );
+    for from in board.knights() & mine {
+        map |= knight_attacks(from);
+    }
+    for from in (board.bishops() | board.queens()) & mine {
+        map |= bishop_attacks(from, occupied);
+    }
+    for from in (board.rooks() | board.queens()) & mine {
+        map |= rook_attacks(from, occupied);
+    }
+    map | king_attacks(board.king_of(side).expect("a king per side"))
+}
+
 /// What `attacker` can win at once: the best gain over the pieces (kings aside) of the other side
 /// that it attacks, and how many of them it wins something on. A piece gains its value when no
 /// piece defends it, else its value minus that of the cheapest attacker when that is positive.
-/// Attacks are those on the board as it stands: no x-rays, pins or en passant.
-fn en_prise(pos: &Chess, attacker: Color) -> (i32, i32) {
-    let board = pos.board();
+/// Attacks are those on the board as it stands: no x-rays, pins or en passant. `attacks` and
+/// `defences` are the squares each side attacks, so only the pieces under attack are looked at.
+fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboard) -> (i32, i32) {
     let occupied = board.occupied();
     let (mut best, mut count) = (0, 0);
-    for square in board.by_color(!attacker) & !board.kings() {
-        let attackers = board.attacks_to(square, attacker, occupied);
-        if attackers.is_empty() {
-            continue;
-        }
+    for square in board.by_color(!attacker) & !board.kings() & attacks {
         let target = role_value(board.role_at(square).expect("occupied"));
-        let gain = if board.attacks_to(square, !attacker, occupied).any() {
-            let cheapest = attackers
+        let gain = if defences.contains(square) {
+            let cheapest = board
+                .attacks_to(square, attacker, occupied)
                 .into_iter()
                 .map(|from| role_value(board.role_at(from).expect("occupied")))
                 .min()
@@ -400,8 +425,11 @@ fn en_prise(pos: &Chess, attacker: Color) -> (i32, i32) {
 /// has en prise to the other, and whether the mover is in check.
 fn threats(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let mover = pos.turn();
-    let (mover_gain, mover_count) = en_prise(pos, mover);
-    let (rival_gain, rival_count) = en_prise(pos, !mover);
+    let board = pos.board();
+    let mover_map = attacked_by(board, mover);
+    let rival_map = attacked_by(board, !mover);
+    let (mover_gain, mover_count) = en_prise(board, mover, mover_map, rival_map);
+    let (rival_gain, rival_count) = en_prise(board, !mover, rival_map, mover_map);
     indices.extend(base..base + THREAT_COUNT);
     values.extend([
         f64::from(mover_gain) / GAIN_SCALE,

@@ -21,6 +21,9 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
+| 2026-11-15 | `8402069` | perf | fast output path also when the net has dense inputs (threat inputs) | nodes, ttd 11<br>nodes/s, ttd 11 (threats_both, median) | 11,589,046 → 11,589,046<br>909,826 → 978,991 (estimated: 2 of 3 alternated runs, loaded machine) | +0.0 %<br>+7.6 % |
+| 2026-11-15 | `2272d51` | perf | compute the threat inputs from one attack map per side | nodes, bench 5<br>nodes/s, bench (median) | 65,462 → 65,462<br>~925,000 → ~1,000,000 | +0.0 %<br>+8 % |
+| 2026-11-15 | `7d4712c` | feat | `uci ttd` takes an optional model file | — | not measured | — |
 | 2026-11-14 | `61bc5aa` | fix | use as_chunks in the clipped dot product (clippy chunks_exact_to_as_chunks) | nodes, ttd 9<br>nodes/s, ttd 9 (median)<br>nodes/s, bench (median) | 3,989,480 → 3,989,480<br>1,135,065 → 1,136,709<br>1,327,826 → 1,328,686 | +0.0 %<br>+0.1 %<br>+0.1 % |
 | 2026-11-14 | `d5ead4d` | feat | threat inputs (pst_threats, pst_k4_threats) and both perspectives with king buckets | — | not measured | — |
 | 2026-11-14 | `40bb83e` | perf | cache the pawn-structure terms by pawn placement | nodes, ttd 9<br>nodes/s, ttd 9 (median)<br>nodes/s, bench (median) | 3,989,480 → 3,989,480<br>1,127,892 → 1,129,553<br>1,321,936 → 1,322,626 | +0.0 %<br>+0.1 %<br>+0.1 % |

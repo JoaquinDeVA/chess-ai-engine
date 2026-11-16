@@ -45,6 +45,8 @@ BATCH_SIZE = 4096
 TIMED_POSITIONS = 50_000
 #: Share of ``positions`` used by each hyper-parameter trial.
 TRIAL_FRACTION = 0.1
+#: Cap on the rows of a trial: a search needs a ranking, not a long fit.
+TRIAL_MAX_ROWS = 5_000_000
 L2_RANGE = (1e-7, 1e-3)
 LR_RANGE = (1e-3, 3e-2)
 #: Featurization processes of the real runs (leaves two cores free).
@@ -277,16 +279,25 @@ def calibrate(
 CACHED_SECONDS_PER_ROW = 2.6 / 500_000
 
 
+def trial_rows(positions: int) -> int:
+    """Rows of each hyper-parameter trial: ``TRIAL_FRACTION`` of ``positions``, at most ``TRIAL_MAX_ROWS``.
+
+    :param positions: Positions of the final fit.
+    :return: Rows of one trial (at least 1).
+    """
+    return max(1, min(int(positions * TRIAL_FRACTION), TRIAL_MAX_ROWS))
+
+
 def estimated_seconds(plan: Dict[str, int], timing: Timing, cached: bool = False) -> float:
     """Estimated duration of the trials and the final fit.
 
-    The trials refit on ``TRIAL_FRACTION`` of the positions, but each of them featurizes and scores
+    The trials refit on :func:`trial_rows` rows each, but each of them featurizes and scores
     the full validation set. Early stopping can make the real run shorter.
 
     :param plan: Output of :func:`effort_config`.
     :param timing: Output of :func:`calibrate`.
     :param cached: True when the batches are cached (only the first epoch encodes).
-    :return: Training part ``(1 + trials * TRIAL_FRACTION) * positions * epochs * s_per_position``
+    :return: Training part ``(positions + trials * trial_rows) * epochs * s_per_position``
         plus validation part ``(1 + trials) * (encode + epochs * score)``.
     """
     fits = 1 + plan["trials"]
@@ -295,11 +306,12 @@ def estimated_seconds(plan: Dict[str, int], timing: Timing, cached: bool = False
         per_position = (
             timing.seconds_per_position + (plan["max_epochs"] - 1) * CACHED_SECONDS_PER_ROW
         )
-        training = (1 + plan["trials"] * TRIAL_FRACTION) * plan["positions"] * per_position
+        training = (
+            plan["positions"] + plan["trials"] * trial_rows(plan["positions"])
+        ) * per_position
     else:
         training = (
-            (1 + plan["trials"] * TRIAL_FRACTION)
-            * plan["positions"]
+            (plan["positions"] + plan["trials"] * trial_rows(plan["positions"]))
             * plan["max_epochs"]
             * timing.seconds_per_position
         )
@@ -319,7 +331,7 @@ def search(
 ) -> Dict[str, float]:
     """Random search over ``l2`` and ``lr``, scored by the best validation loss.
 
-    Each trial fits on ``TRIAL_FRACTION`` of ``plan["positions"]``.
+    Each trial fits on :func:`trial_rows` rows.
 
     :param model_class: A concrete :class:`NeuralEvalModel` subclass.
     :param rep: Representation of the target.
@@ -335,7 +347,7 @@ def search(
     if plan["trials"] == 0:
         return best
     rng = np.random.default_rng(SAMPLE_SEED)
-    rows = max(1, int(plan["positions"] * TRIAL_FRACTION))
+    rows = trial_rows(plan["positions"])
     best_loss = math.inf
     for trial in range(1, plan["trials"] + 1):
         candidate = {

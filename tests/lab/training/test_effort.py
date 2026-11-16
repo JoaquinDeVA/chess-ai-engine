@@ -14,11 +14,13 @@ from chess_lab.models.target import Representation
 from chess_lab.training import effort
 from chess_lab.training.effort import (
     MIN_POSITIONS,
+    TRIAL_MAX_ROWS,
     Timing,
     available_rows,
     effort_config,
     estimated_seconds,
     search,
+    trial_rows,
 )
 from tests.conftest import material_cp, random_positions
 
@@ -76,6 +78,12 @@ def test_effort_fixed_settings():
     assert (low["patience"], high["patience"]) == (3, 5)
     assert effort_config(50, 10**9)["patience"] == 4
     assert low["batch_size"] == high["batch_size"] == 4096
+
+
+def test_trial_rows_are_a_tenth_capped():
+    assert trial_rows(30_000_000) == 3_000_000
+    assert trial_rows(190_000_000) == TRIAL_MAX_ROWS
+    assert trial_rows(5) == 1
 
 
 @pytest.mark.parametrize("effort_level", [-1, 101])

@@ -21,6 +21,7 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
+| 2026-11-16 | `d75439c` | feat | each hyper-parameter trial uses 10 % of the positions but at most 5 M rows (effort 100 on ~190 M rows: 5 M instead of 19 M) | — | not measured | — |
 | 2026-11-16 | `1d79fe1` | feat | effort is a percentage of the available TRAIN rows again; the epoch limit uses effort + 10 (effort 100: 12 epochs) and patience goes from 3 (effort 0) to 5 (effort 100) | — | not measurable (Python engine, no command reproduces it) | — |
 | 2026-11-16 | `bd7adcf` | feat | raw conversion of the whole Lichess evaluation database with `--min-depth 20` and all cores: 417,862,375 lines → 391,000,241 positions (before 124,923,027) | `python -m chess_lab.datasets.build_raw_shards --input data/LichessPositions/lichess_db_eval.jsonl.zst --min-depth 20` (6,075 s, 68,784 lines/s) | 124.9 M → 391.0 M positions | +213 % |
 | 2026-11-16 | `c3ff94c` | revert | retire countermove ordering and put the reverse futility margin back to 80 per ply (both were still running their SPRT and drifting negative; hash 256 is only a run-time option, nothing to revert) | bench 5 total nodes<br>Elo SPRT [0,5] 10+0.2, binaries 2fdb9a9cdc81 vs 7c27ecf5ed6c, 800 games (countermove)<br>Elo SPRT [0,5] 10+0.2, binaries c2bc273f7f34 vs 679bf1852d8a, 1,600 games (rfp 60) | 65,462 → 75,659<br>−14.3 ± 21.5 (LLR −0.62, no verdict)<br>−26.5 ± 15.6 (LLR −2.08, no verdict) | +15.6 %<br>—<br>— |

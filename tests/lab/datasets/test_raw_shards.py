@@ -47,6 +47,11 @@ class TestParseRawRecord:
         record = parse_raw_record(line([{"pvs": [{"cp": 0}], "knodes": 1, "depth": 1}]))
         assert record["best_move"] is None
 
+    def test_min_depth_drops_shallow_evaluations(self):
+        evals = [{"pvs": [{"cp": 1, "line": "a"}], "knodes": 5, "depth": 19}]
+        assert parse_raw_record(line(evals), min_depth=20) is None
+        assert parse_raw_record(line(evals), min_depth=19)["depth"] == 19
+
     @pytest.mark.parametrize(
         "text",
         ["not json", "{}", '{"fen": "x", "evals": []}', line([{"pvs": [], "depth": 1}]), "[1]"],

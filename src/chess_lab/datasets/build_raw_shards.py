@@ -100,20 +100,21 @@ def read_chunks(lines, total: int):
         yield chunk
 
 
-def parse_in_order(pool, chunks, window: int):
+def parse_in_order(pool, chunks, window: int, min_depth: int = 0):
     """Parse chunks keeping the order, with at most ``window`` chunks in flight.
 
     :param pool: Process pool, or None to parse in this process.
     :param chunks: Iterable of lists of lines.
     :param window: Maximum number of chunks being parsed (bounds the memory).
+    :param min_depth: Shallowest depth accepted; shallower lines count as unusable.
     :return: Generator of :func:`~chess_lab.datasets.raw_shards.parse_chunk` results.
     """
     pending = deque()
     for chunk in chunks:
         if pool is None:
-            yield parse_chunk(chunk)
+            yield parse_chunk(chunk, min_depth)
             continue
-        pending.append(pool.apply_async(parse_chunk, (chunk,)))
+        pending.append(pool.apply_async(parse_chunk, (chunk, min_depth)))
         if len(pending) >= window:
             yield pending.popleft().get()
     while pending:
@@ -128,6 +129,7 @@ def fetch(
     workers: int = 1,
     log_file: Path | None = None,
     progress_seconds: float = PROGRESS_SECONDS,
+    min_depth: int = 0,
 ) -> dict:
     """Run the conversion and return the measurements.
 
@@ -138,6 +140,7 @@ def fetch(
     :param workers: Parsing processes (1 parses in this process).
     :param log_file: File where the progress lines are also appended.
     :param progress_seconds: Seconds between progress lines.
+    :param min_depth: Shallowest depth kept; lines evaluated shallower count as unusable.
     :return: Measurement summary.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +195,7 @@ def fetch(
             writer, tables, buffered, sample = ShardWriter(path), [], 0, []
             count = bad = bad_position = saved = 0
             chunks = read_chunks(lines, expected)
-            for table, unusable, not_legal in parse_in_order(pool, chunks, 2 * workers):
+            for table, unusable, not_legal in parse_in_order(pool, chunks, 2 * workers, min_depth):
                 count += table.num_rows + unusable + not_legal
                 bad, bad_position = bad + unusable, bad_position + not_legal
                 tables.append(table)
@@ -261,11 +264,14 @@ def main() -> int:
     parser.add_argument(
         "--workers",
         type=int,
-        default=max(1, (os.cpu_count() or 1) - 2),
-        help="parsing processes (default: cores - 2)",
+        default=os.cpu_count() or 1,
+        help="parsing processes (default: all cores; the reading process uses ~0.2 of one)",
     )
     parser.add_argument("--log-file", type=Path, default=None, help="also append the progress")
     parser.add_argument("--progress-seconds", type=float, default=PROGRESS_SECONDS)
+    parser.add_argument(
+        "--min-depth", type=int, default=0, help="drop lines whose deepest evaluation is shallower"
+    )
     args = parser.parse_args()
 
     m = fetch(
@@ -276,6 +282,7 @@ def main() -> int:
         args.workers,
         args.log_file,
         args.progress_seconds,
+        args.min_depth,
     )
     print("\n== Measurements ==")
     print(f"lines read                  : {m['lines']:,}")

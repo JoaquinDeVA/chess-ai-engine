@@ -92,10 +92,12 @@ RAW_SCHEMA = pa.schema(
 ROW_GROUP_SIZE = 100_000
 
 
-def parse_raw_record(line: str) -> dict[str, Any] | None:
+def parse_raw_record(line: str, min_depth: int = 0) -> dict[str, Any] | None:
     """Extract the deepest evaluation of a database line, keeping its metadata.
 
     :param line: One JSON line of the database.
+    :param min_depth: Shallowest depth accepted; a line whose deepest evaluation is shallower is
+        unusable.
     :return: Dict with the :data:`RAW_COLUMNS` keys (``cp`` and ``mate`` as in the database,
         exactly one of them not None), or None if the line has no usable evaluation. Ties in
         depth are broken by ``knodes``.
@@ -104,6 +106,8 @@ def parse_raw_record(line: str) -> dict[str, Any] | None:
         record = json.loads(line)
         evals = record["evals"]
         best = max(evals, key=lambda e: (e["depth"], e.get("knodes", 0)))
+        if best["depth"] < min_depth:
+            return None
         pvs = best["pvs"]
         principal = pvs[0]
         cp, mate = principal.get("cp"), principal.get("mate")
@@ -137,16 +141,17 @@ def is_legal_position(fen: str) -> bool:
         return False
 
 
-def parse_chunk(lines: list[str]) -> tuple[pa.Table, int, int]:
+def parse_chunk(lines: list[str], min_depth: int = 0) -> tuple[pa.Table, int, int]:
     """Parse lines and keep the legal positions (the unit of work of the parallel conversion).
 
     :param lines: Lines of the database.
+    :param min_depth: Shallowest depth accepted (see :func:`parse_raw_record`).
     :return: Table of the kept records, number of unusable lines and number of lines whose
         position is not legal (see :func:`is_legal_position`).
     """
     records, unusable, illegal = [], 0, 0
     for line in lines:
-        record = parse_raw_record(line)
+        record = parse_raw_record(line, min_depth)
         if record is None:
             unusable += 1
         elif is_legal_position(record["fen"]):

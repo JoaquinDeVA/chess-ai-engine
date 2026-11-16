@@ -126,16 +126,17 @@ impl Search<'_> {
 
     fn node_context(&self, ply: i32, in_check: bool) -> NodeContext {
         let mover = self.state.turn();
-        let (previous, previous_piece_to) = match self.played.last().copied().flatten() {
-            Some((id, piece_to)) => (Some(id), Some(piece_to)),
-            None => (None, None),
-        };
+        let previous_piece_to = self
+            .played
+            .last()
+            .copied()
+            .flatten()
+            .map(|(_, piece_to)| piece_to);
         NodeContext {
             ply,
             in_check,
             mover,
             maximizing: mover == self.root_player,
-            previous,
             previous_piece_to,
         }
     }

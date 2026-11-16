@@ -16,7 +16,7 @@ pub(super) struct NodeMoves {
 
 impl Search<'_> {
     /// The legal `moves` in the order they are tried: table move, captures that do not lose
-    /// material, killers, countermove, quiet moves by history, and the losing captures. The root
+    /// material, killers, quiet moves by history, and the losing captures. The root
     /// keeps only the moves it is allowed; helper threads rotate the root instead of putting the
     /// table move first.
     pub(super) fn node_moves(
@@ -30,17 +30,13 @@ impl Search<'_> {
         let stored = self.memory.killers.get(context.ply);
         killer_ids[..stored.len()].copy_from_slice(stored);
         let killer_count = stored.len();
-        let counter = self
-            .memory
-            .countermoves
-            .get(context.mover, context.previous);
         let restricted = context.ply == 0 && self.options.root_moves.is_some();
         let helper_root = depth_remaining == self.max_depth && self.control.rotation > 0;
         let listed = restricted || helper_root;
         let mut picker = MovePicker::new(
             moves,
             &killer_ids[..killer_count],
-            (counter, if listed { None } else { table_move }),
+            if listed { None } else { table_move },
             (&self.memory.history, context.mover),
             context
                 .previous_piece_to

@@ -92,7 +92,7 @@ impl Search<'_> {
         (best_value, best_move)
     }
 
-    /// A move cut: quiet moves that cut are remembered (killers, history, countermoves,
+    /// A move cut: quiet moves that cut are remembered (killers, history,
     /// continuation) to be tried earlier in sibling nodes, and the quiet moves tried before it
     /// are penalized; captures are already ordered first.
     #[allow(clippy::too_many_arguments)]
@@ -118,9 +118,6 @@ impl Search<'_> {
             for tried in failed {
                 self.memory.history.penalize(mover, tried, depth_remaining);
             }
-            self.memory
-                .countermoves
-                .record(mover, context.previous, action);
             if let Some(previous) = context.previous_piece_to {
                 self.memory
                     .continuation

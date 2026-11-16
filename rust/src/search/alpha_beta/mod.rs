@@ -40,8 +40,7 @@ struct NodeContext {
     mover: Color,
     /// Whether the mover is the root player (the value is then to be maximized).
     maximizing: bool,
-    /// Identity and piece-and-target of the move that led here (`None` at the root and after a pass).
-    previous: Option<u32>,
+    /// Piece-and-target of the move that led here (`None` at the root and after a pass).
     previous_piece_to: Option<usize>,
 }
 

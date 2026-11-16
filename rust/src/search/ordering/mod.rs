@@ -1,13 +1,11 @@
 //! Move ordering: table move, captures by MVV-LVA, killer moves and the history of cuts.
 
-mod countermoves;
 mod history;
 mod killers;
 mod picker;
 mod scoring;
 mod see;
 
-pub use countermoves::Countermoves;
 pub use history::{piece_to, ContinuationHistory, History};
 pub use killers::{Killers, MAX_KILLERS_PER_PLY};
 pub use picker::MovePicker;

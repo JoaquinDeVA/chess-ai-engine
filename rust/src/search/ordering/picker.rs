@@ -2,7 +2,7 @@
 //! moves never orders the rest.
 //!
 //! The sequence is the one a full sort would give: the table move; the captures that do not lose
-//! material (best MVV-LVA first, killers first among equals); the quiet killers; the countermove;
+//! material (best MVV-LVA first, killers first among equals); the quiet killers;
 //! the other quiet moves by history score; and last the captures that lose material. Every key
 //! carries the position the move had before sorting, so keys never tie and a selection gives the
 //! same order as a stable sort. History scores are read when the picker is built: the subtrees
@@ -25,7 +25,6 @@ enum Stage {
     Table,
     GoodCaptures,
     QuietKillers,
-    Countermove,
     Quiets,
     LosingCaptures,
     /// A list built by the caller, handed out as it is.
@@ -42,7 +41,6 @@ pub struct MovePicker {
     cursor: usize,
     stage: Stage,
     table: Option<Move>,
-    counter: Option<Move>,
 }
 
 /// Key of the move that was `rank`-th of its group: the higher `score`, the earlier; at equal
@@ -56,7 +54,7 @@ impl MovePicker {
     pub fn new(
         moves: &[Move],
         killers: &[u32],
-        (counter, table): (Option<u32>, Option<u32>),
+        table: Option<u32>,
         (history, color): (&History, Color),
         continuation: Option<(&ContinuationHistory, usize)>,
     ) -> MovePicker {
@@ -69,7 +67,6 @@ impl MovePicker {
             cursor: 0,
             stage: Stage::Table,
             table: None,
-            counter: None,
         };
         // Captures: killers first, then the rest.
         picker.moves.extend(
@@ -111,13 +108,6 @@ impl MovePicker {
                 + continuation.map_or(0, |(cont, previous)| cont.score(color, previous, m));
             *slot = key(score, rank);
         }
-        // Wrapping the counter up into a move: it is only tried if it is one of the others.
-        picker.counter = counter.and_then(|id| {
-            picker.moves[others..]
-                .iter()
-                .find(|m| move_id(m) == id)
-                .copied()
-        });
         picker.table = table.and_then(|id| moves.iter().find(|m| move_id(m) == id).copied());
         picker
     }
@@ -174,18 +164,12 @@ impl MovePicker {
                             return Some(m);
                         }
                     }
-                    self.stage = Stage::Countermove;
-                }
-                Stage::Countermove => {
                     self.stage = Stage::Quiets;
-                    if self.counter.is_some() && self.counter != self.table {
-                        return self.counter;
-                    }
                 }
                 Stage::Quiets => {
                     while self.cursor < self.moves.len() {
                         let m = self.select(self.moves.len());
-                        if Some(m) != self.table && Some(m) != self.counter {
+                        if Some(m) != self.table {
                             return Some(m);
                         }
                     }
@@ -223,7 +207,7 @@ mod tests {
     }
 
     fn picker_of(moves: &[Move], killers: &[u32], history: &History) -> MovePicker {
-        MovePicker::new(moves, killers, (None, None), (history, Color::White), None)
+        MovePicker::new(moves, killers, None, (history, Color::White), None)
     }
 
     #[test]
@@ -272,25 +256,6 @@ mod tests {
         );
         let order = all(picker, &position("4k3/8/8/8/3p4/1q6/P7/3QK3 w - - 0 1"));
         assert_eq!(order, vec![pawn_takes_queen, queen_takes_pawn, b, a]);
-    }
-
-    #[test]
-    fn the_countermove_goes_right_after_the_killers_and_the_table_move_before_everything() {
-        let moves: Vec<Move> = (0..5)
-            .map(|i| quiet(Square::new(i), Square::new(i + 16)))
-            .collect();
-        let picker = MovePicker::new(
-            &moves,
-            &[move_id(&moves[4])],
-            (Some(move_id(&moves[3])), Some(move_id(&moves[2]))),
-            (&History::default(), Color::White),
-            None,
-        );
-        let order = all(picker, &Chess::default());
-        assert_eq!(
-            order,
-            vec![moves[2], moves[4], moves[3], moves[0], moves[1]]
-        );
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::search::alpha_beta::alpha_beta;
 use crate::search::control::Control;
 use crate::search::memory::Memory;
 use crate::search::options::*;
-use crate::search::ordering::{ContinuationHistory, Countermoves, History, Killers};
+use crate::search::ordering::{ContinuationHistory, History, Killers};
 use crate::search::transposition_table::Table;
 
 /// How many consecutive depths a helper skips and searches in turn, and where its pattern starts
@@ -46,7 +46,6 @@ pub(super) fn helper(
         killers: Killers::default(),
         history,
         continuation,
-        countermoves: Countermoves::default(),
         threads: 1,
         diagnostics: Default::default(),
     };

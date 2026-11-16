@@ -10,9 +10,9 @@ use crate::eval::EVAL_LIMIT;
 const NULL_MOVE_FROM_DEPTH: i32 = 3;
 
 /// Reverse futility pruning works up to this depth, and prunes when the static value is beyond the
-/// bound by `RFP_MARGIN_PER_PLY` per ply left (60 centipawns; it was 80).
+/// bound by `RFP_MARGIN_PER_PLY` per ply left (80 centipawns; 60 lost its SPRT).
 const RFP_UP_TO_DEPTH: i32 = 6;
-const RFP_MARGIN_PER_PLY: i32 = 60;
+const RFP_MARGIN_PER_PLY: i32 = 80;
 
 /// Futility pruning works up to this depth, with a margin of `FUTILITY_MARGIN_PER_PLY` per ply left
 /// (90 centipawns; it was 120).

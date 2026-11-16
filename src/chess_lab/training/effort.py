@@ -32,10 +32,14 @@ from chess_lab.training.neural import fit_stream, new_model
 from .cache import cache_path
 
 MAX_EFFORT = 100
-#: Positions per effort point: effort 30 trains on 30 M positions, effort 70 on 70 M.
-POSITIONS_PER_EFFORT = 1_000_000
+#: Extra effort points counted when setting the epoch limit (the limit is a ceiling; early
+#: stopping usually ends the run first).
+EPOCH_MARGIN = 10
 #: Floor of the positions, so that effort 0 still trains on a meaningful sample.
 MIN_POSITIONS = 1_000_000
+#: Epochs without improvement tolerated at effort 0 and at effort 100 (linear in between).
+MIN_PATIENCE = 3
+MAX_PATIENCE = 5
 BATCH_SIZE = 4096
 #: Positions of the timed calibration run (one epoch).
 TIMED_POSITIONS = 50_000
@@ -50,9 +54,9 @@ WORKERS = max(1, (os.cpu_count() or 1) - 2)
 def effort_config(effort: int, available: int) -> Dict[str, int]:
     """Training configuration for an effort level.
 
-    Positions are ``effort * POSITIONS_PER_EFFORT`` (effort 30 is 30 M), with a floor of
-    ``MIN_POSITIONS`` and never more than ``available``. Epochs grow with effort and patience is
-    fixed; hyper-parameter trials start at effort 40.
+    The effort is a percentage of ``available``: effort 30 trains on 30 % of the TRAIN rows and
+    effort 100 on all of them, with a floor of ``MIN_POSITIONS``. The epoch limit grows with
+    ``effort + EPOCH_MARGIN`` and patience from MIN_PATIENCE to MAX_PATIENCE; hyper-parameter trials start at effort 40.
 
     :param effort: Effort level, ``0..100``.
     :param available: Number of TRAIN rows available.
@@ -61,12 +65,12 @@ def effort_config(effort: int, available: int) -> Dict[str, int]:
     """
     if not 0 <= effort <= MAX_EFFORT:
         raise ValueError(f"effort must be between 0 and {MAX_EFFORT}, got {effort}")
-    target = effort * POSITIONS_PER_EFFORT
+    target = available * effort // MAX_EFFORT
     trials = 0 if effort < 40 else 1 + (effort - 40) // 15
     return {
         "positions": min(available, max(MIN_POSITIONS, target)),
-        "max_epochs": 1 + effort // 10,
-        "patience": 2,
+        "max_epochs": 1 + (effort + EPOCH_MARGIN) // 10,
+        "patience": MIN_PATIENCE + (MAX_PATIENCE - MIN_PATIENCE) * effort // MAX_EFFORT,
         "trials": trials,
         "batch_size": BATCH_SIZE,
     }

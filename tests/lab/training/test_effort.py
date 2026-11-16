@@ -40,17 +40,18 @@ def write_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> list[s
 
 def test_effort_bounds():
     assert effort_config(0, 10**9)["positions"] == MIN_POSITIONS
-    assert effort_config(100, 10**9)["positions"] == 100_000_000
+    assert effort_config(100, 10**9)["positions"] == 10**9
 
 
-def test_effort_is_millions_of_positions():
-    assert effort_config(30, 10**9)["positions"] == 30_000_000
-    assert effort_config(70, 10**9)["positions"] == 70_000_000
+def test_effort_is_a_percentage_of_the_available_rows():
+    assert effort_config(30, 200_000_000)["positions"] == 60_000_000
+    assert effort_config(70, 200_000_000)["positions"] == 140_000_000
+    assert effort_config(100, 200_000_000)["positions"] == 200_000_000
 
 
 def test_effort_floors_positions_at_the_minimum():
     assert effort_config(0, 10**9)["positions"] == MIN_POSITIONS
-    assert effort_config(5, 10**9)["positions"] == 5_000_000
+    assert effort_config(1, 10**8)["positions"] == MIN_POSITIONS
 
 
 def test_effort_is_monotonic():
@@ -71,8 +72,9 @@ def test_effort_caps_positions_at_available_rows():
 def test_effort_fixed_settings():
     low, high = effort_config(0, 10**9), effort_config(100, 10**9)
     assert low["trials"] == 0 and high["trials"] == 5
-    assert low["max_epochs"] == 1 and high["max_epochs"] == 11
-    assert low["patience"] == high["patience"] == 2
+    assert low["max_epochs"] == 2 and high["max_epochs"] == 12
+    assert (low["patience"], high["patience"]) == (3, 5)
+    assert effort_config(50, 10**9)["patience"] == 4
     assert low["batch_size"] == high["batch_size"] == 4096
 
 

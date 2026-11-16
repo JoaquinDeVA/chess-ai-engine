@@ -195,7 +195,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         args.sidecar,
         validation,
         plan["positions"],
-        fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=args.patience),
+        fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=plan["patience"]),
         True,
         seed=args.seed,
         use_cache=not args.no_cache,

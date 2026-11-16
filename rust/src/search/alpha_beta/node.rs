@@ -99,7 +99,11 @@ impl Search<'_> {
 
     /// Value of a node whose game is over (mate, stalemate, draw), `None` if it goes on.
     fn finished_game_value(&mut self, moves: &MoveList, ply: i32) -> Option<i32> {
-        let winner = self.state.outcome(moves)?;
+        let winner = if ply == 0 {
+            self.state.outcome_at_root(moves)?
+        } else {
+            self.state.outcome(moves)?
+        };
         let pos = self.state.pos();
         if winner.is_none()
             && !moves.is_empty()

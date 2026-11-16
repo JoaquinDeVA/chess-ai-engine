@@ -2,6 +2,7 @@
 
 mod budget;
 mod helpers;
+mod repetition;
 mod root_moves;
 mod techniques;
 mod threads;

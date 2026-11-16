@@ -226,6 +226,18 @@ impl GameState {
     ///
     /// `None`: not over. `Some(None)`: a draw. `Some(Some(color))`: `color` won.
     pub fn outcome(&self, moves: &[Move]) -> Option<Winner> {
+        self.outcome_inner(moves, true)
+    }
+
+    /// Whether the game is over at the search root.
+    ///
+    /// A claim by making the next move is optional at the root, so the search must evaluate the
+    /// legal moves instead of treating the position as an already claimed draw.
+    pub fn outcome_at_root(&self, moves: &[Move]) -> Option<Winner> {
+        self.outcome_inner(moves, false)
+    }
+
+    fn outcome_inner(&self, moves: &[Move], claim_by_move: bool) -> Option<Winner> {
         if moves.is_empty() {
             return Some(if self.pos.is_check() {
                 Some(!self.pos.turn())
@@ -236,7 +248,7 @@ impl GameState {
         if self.pos.is_insufficient_material() {
             return Some(None);
         }
-        if self.pos.halfmoves() >= 100 || self.can_claim_threefold(moves) {
+        if self.pos.halfmoves() >= 100 || self.can_claim_threefold(moves, claim_by_move) {
             return Some(None);
         }
         None
@@ -244,13 +256,13 @@ impl GameState {
 
     /// The current position occurred three times, or some legal move reaches one that occurred
     /// twice (impossible unless some position has repeated).
-    fn can_claim_threefold(&self, moves: &[Move]) -> bool {
+    fn can_claim_threefold(&self, moves: &[Move], claim_by_move: bool) -> bool {
         let history = &self.keys[self.start..];
         let current = *history.last().expect("the history is never empty");
         if history.iter().filter(|&&k| k == current).count() >= 3 {
             return true;
         }
-        if !self.has_repeated {
+        if !claim_by_move || !self.has_repeated {
             return false;
         }
         moves.iter().any(|m| {

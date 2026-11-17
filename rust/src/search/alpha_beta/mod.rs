@@ -89,6 +89,8 @@ impl Search<'_> {
 
     /// Play `m` in the game state and in the incremental evaluation.
     fn play(&mut self, m: Move) {
+        let child_key = crate::board::zobrist_after(self.state.pos(), self.state.key(), &m);
+        self.memory.table.prefetch(&child_key);
         self.eval.apply(self.state.pos(), &m);
         self.played.push(Some((move_id(&m), piece_to(&m))));
         self.state.apply(m);

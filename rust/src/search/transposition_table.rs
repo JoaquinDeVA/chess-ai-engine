@@ -122,6 +122,19 @@ impl Table {
         Some((entry, ((data >> 32) & 0xFF) as u8))
     }
 
+    /// Ask the cache for the slot of `key` ahead of its probe, so the memory access overlaps other work.
+    #[inline]
+    pub fn prefetch(&self, key: &Key) {
+        #[cfg(target_arch = "x86_64")]
+        // SAFETY: the index is inside the slice and a prefetch never faults or changes memory.
+        unsafe {
+            let slot = self.slots.as_ptr().add(self.index(*key)) as *const i8;
+            std::arch::x86_64::_mm_prefetch(slot, std::arch::x86_64::_MM_HINT_T0);
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        let _ = key;
+    }
+
     pub fn get(&self, key: &Key) -> Option<Entry> {
         let hash = *key;
         self.read(self.index(hash), hash).map(|(entry, _)| entry)

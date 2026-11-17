@@ -40,8 +40,8 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | `lmp`, `aspiration`, `history_malus` and `qs_tt` help on top of `lmr,rfp,iir` | Same SPRTs, 200 to 600 games each | Rust | Not shown: LLR −0.48 to 0.07, stopped; retired |
 | The network plays better than the logistic model (retired) | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Orientative (measured before 2026-11-13); H1 accepted |
 | Adding the classical terms to the network makes it weaker (retired) | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Orientative: H0 accepted, but it mixes quality and speed (the hybrids had no accumulator) |
-| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0 |
-| Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured; H0 accepted |
+| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0. `sp_threats_both_vs_w64` against the older network reached H1 (+62.1 ± 18.5) |
+| Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured at 20,000 nodes; H0 accepted. Applying it only in null-window nodes later reached H1 at 10 s + 0.2 s ("Search technique matches") |
 | The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength is judged by an SPRT [−5, 0] against `v4.0.0`, queued |
 | Several threads search faster | Time to depth 8 on 60 positions (Lazy SMP) | Rust | Measured speed; effect in games not measured |
 | Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo (logistic model) | Rust | Measured; H1 accepted |
@@ -102,15 +102,38 @@ is the first network. Files: `data/results/roundrobin/<job>/llr.csv`.
 
 | job | A against B | games | Elo (95 %) | LLR | state |
 |---|---|---|---|---|---|
-| `sp_both_vs_w64` | `net_pst_w64_both` against the retired `net_pst_w64` | 800 | +40.6 ± 21.8 | +1.39 | stopped by hand |
-| `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against the retired `net_pst_w64` | 800 | +57.9 ± 22.1 | +1.98 | stopped by hand |
-| `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 800 | +9.1 ± 21.0 | +0.26 | replaced by the next one: it played the binary before the speed-ups of the threat inputs |
+| `sp_both_vs_w64` | `net_pst_w64_both` against the retired `net_pst_w64` | 1,486 | +45.1 ± 15.7 | +2.95 | H1 (2026-11-16) |
+| `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against the retired `net_pst_w64` | 1,092 | +62.1 ± 18.5 | +2.97 | H1 (2026-11-16) |
+| `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 2,100 | +19.4 ± 13.2 | +1.67 | running (last report 2026-11-17 14:51; 800 games, +9.1, +0.26 on 2026-11-14); the next row repeats it with the binary after the speed-ups of the threat inputs |
 | `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 
 The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
 (`uci ttd 11`), and `net_pst_threats_w64_both` still costs about 30 % more time than `net_pst_w64_both`.
+
+## Search technique matches
+
+From 2026-11-14 the compute node plays each search change against the build before it: 10 s + 0.2 s, `Hash` 16, one
+thread, `net_pst_w64`, SPRT [0, 5], LLR bounds ±2.94. A is the build with the change, built from the commit in the
+changelog. Files: `data/results/roundrobin/<job>/llr.csv` (the running jobs are read on the node).
+
+| job | A against B | games | Elo (95 %) | LLR | state |
+|---|---|---|---|---|---|
+| `lmr_null_window` | late move reductions in null-window nodes (`953501b`) against without | 970 | +73.1 ± 20.6 | +2.95 | H1 (2026-11-14) |
+| `check_extension` | extension by one ply in check (part of `6f23616`) against its parent `0fbd5a5` | 2,376 | +29.2 ± 12.5 | +2.96 | H1 (2026-11-15) |
+| `qs_evasions` | check evasions at the horizon (`6f23616`) against the extension alone | 2,616 | +27.2 ± 12.1 | +2.97 | H1 (2026-11-16) |
+| `killers_by_ply` | killers by ply (`6bf589a`) against `953501b` | 3,600 | +11.0 ± 10.0 | +1.48 | running (2026-11-17 13:16) |
+| `null_r_by_eval` | null-move reduction by depth and margin (`63c4b0d`) against `6f23616` | 2,000 | +18.1 ± 13.4 | +1.50 | running (2026-11-17 13:26) |
+| `cont_history` | continuation history (`0f1ac06`) against the build with countermove | 1,200 | +18.0 ± 17.3 | +0.89 | running (2026-11-17 14:18) |
+| `history_gravity` | history gravity (`2055295`) against `0f1ac06` | 502 | +43.1 ± 26.5 | +0.96 | running (2026-11-17 14:29) |
+| `futility_margin_90` | futility margin 90 (`940b6d9`) against 120 | 1,710 | +6.5 ± 14.1 | +0.36 | running (2026-11-17 13:47) |
+
+The binaries of `cont_history`, `history_gravity` and `futility_margin_90` were built on top of countermove ordering and
+a reverse futility margin of 60, both retired in `c3ff94c` after their own SPRTs drifted negative (`countermove`
+−2.9 ± 17.6, LLR −0.28, 1,200 games; `rfp_margin_60` −16.0 ± 14.1, LLR −1.64, 2,000 games; both stopped). The engine
+that plays today is therefore not exactly the one these three matches measured. The same retirement stopped `hash_256`
+(`Hash` 256 against 16; −7.2 ± 16.3, LLR −0.56, 1,200 games): it is a run-time option and there was nothing to revert.
 
 ## Retired models
 
@@ -144,7 +167,7 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 | `aa_s12` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 500 | 51.3 % | +9.0 ± 25.0 | +0.28 | no bias |
 | `aa_s13` | default against default | 10 s + 0.1 s, SPRT [−5, 0] | 500 | 50.7 % | +4.9 ± 23.9 | +0.18 | no bias |
 | `lmr_nodes` | default + `lmr` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,244 | 48.76 % | −8.6 ± 6.1 | −2.94 | H0: regresses |
-| `qs_evasions` | default + `qs_evasions` against default | 20,000 nodes per move, SPRT [−5, 0] | 3,428 | 46.94 % | −21.3 ± 10.6 | −2.96 | H0: regresses |
+| `qs_evasions` | default + `qs_evasions` against default | 20,000 nodes per move, SPRT [−5, 0] | 3,428 | 46.94 % | −21.3 ± 10.6 | −2.96 | H0: regresses (the switch of 2026-11-04, retired; the evasions in check at the horizon of `6f23616` reached H1 at 10 s + 0.2 s, "Search technique matches") |
 | `see_nodes` | default + `see` against default | 20,000 nodes per move, SPRT [0, 5] | 1,188 | 58.04 % | +56.4 ± 17.5 | +2.97 | H1: stronger (fixed nodes) |
 | `history_malus_nodes` | default + `history_malus` against default | 20,000 nodes per move, SPRT [0, 5] | 2,404 | 50.56 % | +3.9 ± 9.3 | +0.33 | no verdict (stopped by hand at 2,556 games; Elo as of the last report, 2,404 games) |
 | `qs_tt` | default + `qs_tt` against default | 20,000 nodes per move, SPRT [−5, 0] | 10,000 | 50.10 % | +0.7 ± 3.9 | +1.55 | no verdict (round cap) |

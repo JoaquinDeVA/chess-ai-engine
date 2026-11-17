@@ -5,9 +5,10 @@ use std::sync::Arc;
 
 use shakmaty::{Color, Move};
 
-use super::MOVE_IDS;
 use crate::board::move_id;
 
+/// Origin and target squares: 64 by 64.
+const SQUARE_PAIRS: usize = 64 * 64;
 /// Bound of the history scores: a bonus pushes a score less the closer it is to it.
 const HISTORY_LIMIT: i32 = 1 << 14;
 /// Value above which the continuation history scores are halved.
@@ -24,14 +25,15 @@ pub struct History {
 impl Default for History {
     fn default() -> History {
         History {
-            scores: (0..2 * MOVE_IDS).map(|_| AtomicI32::new(0)).collect(),
+            scores: (0..2 * SQUARE_PAIRS).map(|_| AtomicI32::new(0)).collect(),
         }
     }
 }
 
 impl History {
     fn slot(color: Color, m: &Move) -> usize {
-        usize::from(color == Color::Black) * MOVE_IDS + move_id(m) as usize
+        // The promotion lives in the low 3 bits of the id; promotions are noisy, so history never sees them.
+        usize::from(color == Color::Black) * SQUARE_PAIRS + (move_id(m) >> 3) as usize
     }
 
     pub fn clear(&self) {

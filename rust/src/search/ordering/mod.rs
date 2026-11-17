@@ -16,9 +16,6 @@ use shakmaty::Move;
 
 use crate::board::move_id;
 
-/// Largest identity of a move (`board::move_id`) plus one.
-const MOVE_IDS: usize = 1 << 15;
-
 /// Put the move with the given identity first, if it is among `moves`.
 pub fn move_to_front(moves: &mut [Move], id: Option<u32>) {
     if let Some(id) = id {

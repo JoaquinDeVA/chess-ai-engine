@@ -56,7 +56,6 @@ impl Search<'_> {
         }
 
         let context = self.node_context(ply, in_check);
-        let node_moves = self.node_moves(&context, &moves, depth_remaining, probe.best);
         let mut static_cache: Option<i32> = None;
         if let Some(value) =
             self.reverse_futility_value(&context, depth_remaining, (alpha, beta), &mut static_cache)
@@ -72,6 +71,7 @@ impl Search<'_> {
         ) {
             return cut;
         }
+        let node_moves = self.node_moves(&context, &moves, depth_remaining, probe.best);
         let depth_remaining = internal_iterative_reduction(depth_remaining, ply, probe.best);
         let futility_value =
             self.futility_value(&context, depth_remaining, (alpha, beta), &mut static_cache);

@@ -67,8 +67,9 @@ desktop.ini
 # Instrucciones de agente y diseño interno: local, no se versiona
 CLAUDE.md
 
-# Pesos de Keras: los de cnn_resnet vienen del curso, pendientes de revisar su licencia
-*.keras
+# Contenido didactivo propio
+guia
+demo
 
 # Rust
 rust/target/

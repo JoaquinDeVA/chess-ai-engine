@@ -257,12 +257,16 @@ impl GameState {
     /// The current position occurred three times, or some legal move reaches one that occurred
     /// twice (impossible unless some position has repeated).
     fn can_claim_threefold(&self, moves: &[Move], claim_by_move: bool) -> bool {
+        // Without a repeated position nothing can occur three times or reach one that occurred twice.
+        if !self.has_repeated {
+            return false;
+        }
         let history = &self.keys[self.start..];
         let current = *history.last().expect("the history is never empty");
         if history.iter().filter(|&&k| k == current).count() >= 3 {
             return true;
         }
-        if !claim_by_move || !self.has_repeated {
+        if !claim_by_move {
             return false;
         }
         moves.iter().any(|m| {

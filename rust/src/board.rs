@@ -20,13 +20,13 @@ pub type Key = u64;
 pub type Winner = Option<Color>;
 
 /// Zobrist hash of the position (no counters), counting an en passant square only if it is legal.
-pub fn zobrist(pos: &Chess) -> u64 {
+pub fn zobrist(pos: &Chess) -> Key {
     pos.zobrist_hash::<Zobrist64>(EnPassantMode::Legal).0
 }
 
 /// Zobrist hash of the position after `m`, from the hash `current` of `pos` (shakmaty updates it
 /// from the squares the move touches; the whole hash is computed again where it cannot).
-pub fn zobrist_after(pos: &Chess, current: u64, m: &Move) -> u64 {
+pub fn zobrist_after(pos: &Chess, current: Key, m: &Move) -> Key {
     match pos.update_zobrist_hash::<Zobrist64>(Zobrist64(current), *m, EnPassantMode::Legal) {
         Some(hash) => hash.0,
         None => {
@@ -126,16 +126,16 @@ pub fn fen_of(pos: &Chess) -> String {
 #[derive(Clone)]
 pub struct GameState {
     pos: Chess,
-    keys: Vec<u64>,
-    start: usize,
+    keys: Vec<Key>,
+    irreversible_from: usize,
     has_repeated: bool,
-    undo: Vec<Undo>,
+    undo_stack: Vec<Undo>,
 }
 
 #[derive(Clone)]
 struct Undo {
     pos: Chess,
-    start: usize,
+    irreversible_from: usize,
     has_repeated: bool,
 }
 
@@ -145,9 +145,9 @@ impl GameState {
         GameState {
             keys: vec![zobrist(&pos)],
             pos,
-            start: 0,
+            irreversible_from: 0,
             has_repeated: false,
-            undo: Vec::new(),
+            undo_stack: Vec::new(),
         }
     }
 
@@ -158,7 +158,7 @@ impl GameState {
             let m = parse_move(&state.pos, uci)?;
             state.apply(m);
         }
-        state.undo.clear();
+        state.undo_stack.clear();
         Ok(state)
     }
 
@@ -192,9 +192,9 @@ impl GameState {
     pub fn apply_keyed(&mut self, m: Move, key: Key) {
         let rights = self.pos.castles().castling_rights();
         let had_legal_ep = self.pos.legal_ep_square().is_some();
-        self.undo.push(Undo {
+        self.undo_stack.push(Undo {
             pos: self.pos.clone(),
-            start: self.start,
+            irreversible_from: self.irreversible_from,
             has_repeated: self.has_repeated,
         });
         let zeroing = m.role() == Role::Pawn || m.is_capture();
@@ -202,10 +202,11 @@ impl GameState {
         let irreversible =
             zeroing || had_legal_ep || self.pos.castles().castling_rights() != rights;
         if irreversible {
-            self.start = self.keys.len();
+            self.irreversible_from = self.keys.len();
             self.has_repeated = false;
         } else {
-            self.has_repeated = self.has_repeated || self.keys[self.start..].contains(&key);
+            self.has_repeated =
+                self.has_repeated || self.keys[self.irreversible_from..].contains(&key);
         }
         self.keys.push(key);
     }
@@ -214,9 +215,9 @@ impl GameState {
     /// square. It extends the history like a reversible move. Must not be used when the side to
     /// move is in check.
     pub fn apply_null(&mut self) {
-        self.undo.push(Undo {
+        self.undo_stack.push(Undo {
             pos: self.pos.clone(),
-            start: self.start,
+            irreversible_from: self.irreversible_from,
             has_repeated: self.has_repeated,
         });
         self.pos = self
@@ -225,16 +226,16 @@ impl GameState {
             .swap_turn()
             .expect("a null move is only played when the side to move is not in check");
         let key = zobrist(&self.pos);
-        self.has_repeated = self.has_repeated || self.keys[self.start..].contains(&key);
+        self.has_repeated = self.has_repeated || self.keys[self.irreversible_from..].contains(&key);
         self.keys.push(key);
     }
 
     /// Take back the last move played with [`GameState::apply`] or [`GameState::apply_null`].
     pub fn undo(&mut self) {
         self.keys.pop();
-        let previous = self.undo.pop().expect("undo without a move");
+        let previous = self.undo_stack.pop().expect("undo without a move");
         self.pos = previous.pos;
-        self.start = previous.start;
+        self.irreversible_from = previous.irreversible_from;
         self.has_repeated = previous.has_repeated;
     }
 
@@ -277,7 +278,7 @@ impl GameState {
         if !self.has_repeated {
             return false;
         }
-        let history = &self.keys[self.start..];
+        let history = &self.keys[self.irreversible_from..];
         let current = *history.last().expect("the history is never empty");
         if history.iter().filter(|&&k| k == current).count() >= 3 {
             return true;

@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn incremental_equals_full_slotted() {
-        check_net(&net(FeatureSet::Slotted));
+        check_net(&net(FeatureSet::PstSlotted));
     }
 
     /// A network whose second layer reads both sides' accumulators (twice as wide as one).
@@ -426,12 +426,12 @@ mod tests {
 
     #[test]
     fn incremental_equals_full_both_perspectives() {
-        check_net(&both_net(FeatureSet::Slotted));
+        check_net(&both_net(FeatureSet::PstSlotted));
     }
 
     #[test]
     fn incremental_equals_full_threats() {
-        check_net(&net(FeatureSet::Threats));
-        check_net(&both_net(FeatureSet::Threats));
+        check_net(&net(FeatureSet::PstThreats));
+        check_net(&both_net(FeatureSet::PstThreats));
     }
 }

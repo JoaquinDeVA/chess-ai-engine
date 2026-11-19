@@ -30,7 +30,7 @@ pub(super) fn material() -> Net {
         weights: vec![2.0, -2.0],
         bias: vec![0.0],
     };
-    Net::new(FeatureSet::Slotted, vec![first, last]).unwrap()
+    Net::new(FeatureSet::PstSlotted, vec![first, last]).unwrap()
 }
 
 #[derive(Default)]

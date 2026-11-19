@@ -2,6 +2,7 @@
 
 use shakmaty::{Move, MoveList, Role};
 
+use super::picker::MAX_MOVES;
 use super::sort_descending;
 use crate::board::is_noisy;
 
@@ -43,7 +44,7 @@ pub fn noisy_score(m: &Move) -> i32 {
 /// The captures and promotions of `moves`, the most valuable first (stable among equal scores).
 pub fn order_noisy(moves: &[Move]) -> MoveList {
     let mut noisy: MoveList = moves.iter().filter(|m| is_noisy(m)).copied().collect();
-    let mut keys = [0i32; 256];
+    let mut keys = [0i32; MAX_MOVES];
     for (key, m) in keys.iter_mut().zip(noisy.iter()) {
         *key = noisy_score(m);
     }

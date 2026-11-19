@@ -186,7 +186,7 @@ fn ponder_reply(
     state.apply(*best);
     let reply = memory
         .table
-        .get(&state.key())
+        .probe(&state.key())
         .and_then(|entry| entry.best)
         .and_then(|id| {
             legal_moves(state.pos())

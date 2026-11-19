@@ -21,7 +21,7 @@ impl Search<'_> {
     ) -> NodeResult {
         // The window as it came in: the table flag is decided against it, not against the one
         // narrowed below by the table and by the moves.
-        let window_in = (alpha, beta);
+        let original_window = (alpha, beta);
         self.nodes += 1;
         #[cfg(feature = "search-summary")]
         {
@@ -106,7 +106,7 @@ impl Search<'_> {
                 key,
                 (best_value, best_move),
                 depth_remaining,
-                window_in,
+                original_window,
                 ply,
                 repetitions_before,
             );

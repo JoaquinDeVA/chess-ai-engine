@@ -54,7 +54,7 @@ fn an_entry_that_the_fifty_move_clock_could_change_is_not_stored() {
             4,
             &control(f64::INFINITY, &no_time),
         );
-        memory.table.get(&key).is_some()
+        memory.table.probe(&key).is_some()
     };
     assert!(stored("4k3/8/8/8/8/8/8/R3K3 w - - 0 1"));
     assert!(stored("4k3/8/8/8/8/8/8/R3K3 w - - 90 80"));

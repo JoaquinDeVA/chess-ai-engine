@@ -14,15 +14,15 @@ use super::{mvv_lva_score, see_ge, ContinuationHistory, History};
 use crate::board::move_id;
 
 /// Most moves of a position (the capacity of a `MoveList`).
-const MAX_MOVES: usize = 256;
+pub(super) const MAX_MOVES: usize = 256;
 /// Bits of a key that hold the position before sorting.
-const RANK_BITS: u32 = 8;
+const ORDER_BITS: u32 = 8;
 /// Key of a capture found to lose material, until the last stage hands it out.
 const LOSING: i64 = i64::MIN;
 
 #[derive(Clone, Copy)]
 enum Stage {
-    Table,
+    TableMove,
     GoodCaptures,
     QuietKillers,
     Quiets,
@@ -40,13 +40,13 @@ pub struct MovePicker {
     killers_end: usize,
     cursor: usize,
     stage: Stage,
-    table: Option<Move>,
+    table_move: Option<Move>,
 }
 
-/// Key of the move that was `rank`-th of its group: the higher `score`, the earlier; at equal
-/// scores the lower `rank`.
-fn key(score: i32, rank: usize) -> i64 {
-    (i64::from(score) << RANK_BITS) | (MAX_MOVES - 1 - rank) as i64
+/// Key of the move that was `incoming`-th of its group: the higher `score`, the earlier; at equal
+/// scores the lower `incoming`.
+fn key(score: i32, incoming: usize) -> i64 {
+    (i64::from(score) << ORDER_BITS) | (MAX_MOVES - 1 - incoming) as i64
 }
 
 impl MovePicker {
@@ -54,17 +54,17 @@ impl MovePicker {
     pub fn new(
         moves: &[Move],
         killers: &[u32],
-        table: Option<u32>,
+        table_id: Option<u32>,
         (history, color): (&History, Color),
         continuation_history: Option<(&ContinuationHistory, usize)>,
     ) -> MovePicker {
         let mut killer = [false; MAX_MOVES];
         let mut table_move = None;
-        if !killers.is_empty() || table.is_some() {
+        if !killers.is_empty() || table_id.is_some() {
             for (k, m) in moves.iter().enumerate() {
                 let id = move_id(m);
                 killer[k] = killers.contains(&id);
-                if table_move.is_none() && table == Some(id) {
+                if table_move.is_none() && table_id == Some(id) {
                     table_move = Some(*m);
                 }
             }
@@ -75,8 +75,8 @@ impl MovePicker {
             captures_end: 0,
             killers_end: 0,
             cursor: 0,
-            stage: Stage::Table,
-            table: None,
+            stage: Stage::TableMove,
+            table_move: None,
         };
         // Captures: killers first, then the rest.
         picker.moves.extend(
@@ -93,8 +93,8 @@ impl MovePicker {
                 .filter(|&(m, &k)| m.is_capture() && !k)
                 .map(|(m, _)| *m),
         );
-        for (rank, (slot, m)) in picker.keys.iter_mut().zip(picker.moves.iter()).enumerate() {
-            *slot = key(mvv_lva_score(m), rank);
+        for (incoming, (slot, m)) in picker.keys.iter_mut().zip(picker.moves.iter()).enumerate() {
+            *slot = key(mvv_lva_score(m), incoming);
         }
         picker.captures_end = picker.moves.len();
         picker.moves.extend(
@@ -113,16 +113,16 @@ impl MovePicker {
                 .map(|(m, _)| *m),
         );
         let others = picker.killers_end;
-        for (rank, (slot, m)) in picker.keys[others..]
+        for (incoming, (slot, m)) in picker.keys[others..]
             .iter_mut()
             .zip(picker.moves[others..].iter())
             .enumerate()
         {
             let score = history.score(color, m)
                 + continuation_history.map_or(0, |(cont, previous)| cont.score(color, previous, m));
-            *slot = key(score, rank);
+            *slot = key(score, incoming);
         }
-        picker.table = table_move;
+        picker.table_move = table_move;
         picker
     }
 
@@ -151,16 +151,16 @@ impl MovePicker {
     pub fn next(&mut self, pos: &Chess) -> Option<Move> {
         loop {
             match self.stage {
-                Stage::Table => {
+                Stage::TableMove => {
                     self.stage = Stage::GoodCaptures;
-                    if self.table.is_some() {
-                        return self.table;
+                    if self.table_move.is_some() {
+                        return self.table_move;
                     }
                 }
                 Stage::GoodCaptures => {
                     while self.cursor < self.captures_end {
                         let m = self.select(self.captures_end);
-                        if Some(m) == self.table {
+                        if Some(m) == self.table_move {
                             continue;
                         }
                         if see_ge(pos, &m, 0) {
@@ -174,7 +174,7 @@ impl MovePicker {
                     while self.cursor < self.killers_end {
                         self.cursor += 1;
                         let m = self.moves[self.cursor - 1];
-                        if Some(m) != self.table {
+                        if Some(m) != self.table_move {
                             return Some(m);
                         }
                     }
@@ -183,7 +183,7 @@ impl MovePicker {
                 Stage::Quiets => {
                     while self.cursor < self.moves.len() {
                         let m = self.select(self.moves.len());
-                        if Some(m) != self.table {
+                        if Some(m) != self.table_move {
                             return Some(m);
                         }
                     }
@@ -194,7 +194,7 @@ impl MovePicker {
                     while self.cursor < self.captures_end {
                         self.cursor += 1;
                         let m = self.moves[self.cursor - 1];
-                        if self.keys[self.cursor - 1] == LOSING && Some(m) != self.table {
+                        if self.keys[self.cursor - 1] == LOSING && Some(m) != self.table_move {
                             return Some(m);
                         }
                     }

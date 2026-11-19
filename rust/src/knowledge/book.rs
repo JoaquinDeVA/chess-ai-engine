@@ -9,7 +9,7 @@ use crate::board::{fen_of, parse_move};
 
 /// The first four fields of a FEN (placement, side to move, castling, en passant): the key of the
 /// book, which lets transpositions hit the same entry.
-pub fn position_key(fen: &str) -> String {
+pub fn fen_key(fen: &str) -> String {
     fen.split_whitespace().take(4).collect::<Vec<_>>().join(" ")
 }
 
@@ -24,7 +24,7 @@ impl OpeningBook {
     pub fn from_entries<I: IntoIterator<Item = (String, String)>>(entries: I) -> OpeningBook {
         let mut moves = HashMap::new();
         for (fen, uci) in entries {
-            moves.entry(position_key(&fen)).or_insert(uci);
+            moves.entry(fen_key(&fen)).or_insert(uci);
         }
         OpeningBook { moves }
     }
@@ -59,7 +59,7 @@ impl OpeningBook {
 
     /// The book move for `pos` if there is one and it is legal.
     pub fn lookup(&self, pos: &Chess) -> Option<Move> {
-        let uci = self.moves.get(&position_key(&fen_of(pos)))?;
+        let uci = self.moves.get(&fen_key(&fen_of(pos)))?;
         parse_move(pos, uci).ok()
     }
 }
@@ -74,8 +74,8 @@ mod tests {
     #[test]
     fn the_key_ignores_the_move_counters() {
         assert_eq!(
-            position_key(START),
-            position_key("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 9")
+            fen_key(START),
+            fen_key("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 9")
         );
     }
 

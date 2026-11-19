@@ -82,19 +82,19 @@ impl EndgameTablebase {
         if moves.is_empty() || pos.is_insufficient_material() || pos.halfmoves() >= 150 {
             return None;
         }
-        let mut keys = Vec::with_capacity(moves.len());
+        let mut ranks = Vec::with_capacity(moves.len());
         for m in &moves {
             let mut after = pos.clone();
             after.play_unchecked(*m);
             let zeroing = m.role() == Role::Pawn || m.is_capture();
-            keys.push(self.result_after(&after, zeroing)?);
+            ranks.push(self.result_after(&after, zeroing)?);
         }
-        let best = keys.iter().map(|k| k.0).max()?;
-        let fastest = keys.iter().filter(|k| k.0 == best).map(|k| k.1).min()?;
+        let best = ranks.iter().map(|k| k.0).max()?;
+        let fastest = ranks.iter().filter(|k| k.0 == best).map(|k| k.1).min()?;
         Some(
             moves
                 .into_iter()
-                .zip(keys)
+                .zip(ranks)
                 .filter(|&(_, (result, dtz))| result == best && dtz == fastest)
                 .map(|(m, _)| m)
                 .collect(),

@@ -1,12 +1,12 @@
 //! Alpha-beta search of a position to a fixed depth.
 //!
 //! `Search` holds the state of one search; the stages of a node live in one file each:
-//! `node.rs` (the order of the stages), `table_access.rs`, `limits.rs`, `move_list.rs`,
+//! `node.rs` (the order of the stages), `table_access.rs`, `budget.rs`, `move_list.rs`,
 //! `pruning.rs` and `reductions.rs` (the techniques), `move_loop.rs` and `child_search.rs`
 //! (the moves of the node), and `quiescence.rs` (the horizon).
 
+mod budget;
 mod child_search;
-mod limits;
 mod move_list;
 mod move_loop;
 mod node;

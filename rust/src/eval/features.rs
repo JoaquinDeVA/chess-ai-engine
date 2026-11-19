@@ -18,10 +18,10 @@ const EN_PRISE_SCALE: f64 = 4.0;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FeatureSet {
     /// `pst_slotted`: one-hot piece squares, the mover's pieces first.
-    Slotted,
+    PstSlotted,
     /// `pst_threats`: the slotted inputs plus five dense threat inputs (best capture of each side,
     /// pieces en prise of each side, mover in check).
-    Threats,
+    PstThreats,
 }
 
 impl FeatureSet {
@@ -31,8 +31,8 @@ impl FeatureSet {
     /// The feature set called `name` in the saved models.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
         Some(match name {
-            "pst_slotted" => FeatureSet::Slotted,
-            "pst_threats" => FeatureSet::Threats,
+            "pst_slotted" => FeatureSet::PstSlotted,
+            "pst_threats" => FeatureSet::PstThreats,
             _ => return None,
         })
     }
@@ -40,20 +40,20 @@ impl FeatureSet {
     /// Number of inputs.
     pub fn size(self) -> usize {
         match self {
-            FeatureSet::Slotted => PIECE_INPUTS,
-            FeatureSet::Threats => PIECE_INPUTS + THREAT_INPUTS,
+            FeatureSet::PstSlotted => PIECE_INPUTS,
+            FeatureSet::PstThreats => PIECE_INPUTS + THREAT_INPUTS,
         }
     }
 
     /// Whether the set has dense inputs that are not single pieces (the threats); they are
     /// computed from the board at every evaluation.
     pub fn has_dense(self) -> bool {
-        self == FeatureSet::Threats
+        self == FeatureSet::PstThreats
     }
 
     /// The dense inputs (the threats), appended to the vectors.
     pub fn dense_inputs(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-        if self == FeatureSet::Threats {
+        if self == FeatureSet::PstThreats {
             threats(pos, PIECE_INPUTS, indices, values);
         }
     }

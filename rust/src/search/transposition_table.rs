@@ -1,9 +1,9 @@
 //! The transposition table, shared without locks by every thread of a search.
 //!
-//! Each slot is three words: `check = hash ^ value ^ data`, the value and a packed word with the
+//! Each slot is three words: `check = key ^ value ^ data`, the value and a packed word with the
 //! best move, depth, bound, age and a validity bit. A reader accepts the slot only if the check
 //! matches, so a slot torn by two writers at once is simply ignored (the usual XOR trick). The key
-//! is a 64-bit hash of the position and the two counters, so two different positions can collide
+//! is a 64-bit Zobrist hash of the position and the two counters, so two different positions can collide
 //! with probability 2^-64 per pair.
 
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering::Relaxed};
@@ -16,10 +16,10 @@ const VALID: u64 = 1 << 63;
 
 /// What an entry says about the value of the position.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Flag {
+pub enum Bound {
     Exact,
-    LowerBound,
-    UpperBound,
+    Lower,
+    Upper,
 }
 
 /// One entry of the table.
@@ -29,14 +29,14 @@ pub struct Entry {
     /// Identity of the best move (see `board::move_id`), if any.
     pub best: Option<u32>,
     pub depth: i32,
-    pub flag: Flag,
+    pub flag: Bound,
 }
 
-fn flag_bits(flag: Flag) -> u64 {
+fn flag_bits(flag: Bound) -> u64 {
     match flag {
-        Flag::Exact => 0,
-        Flag::LowerBound => 1,
-        Flag::UpperBound => 2,
+        Bound::Exact => 0,
+        Bound::Lower => 1,
+        Bound::Upper => 2,
     }
 }
 
@@ -93,25 +93,25 @@ impl Table {
         self.len() == 0
     }
 
-    fn index(&self, hash: u64) -> usize {
-        ((hash as u128 * self.slots.len() as u128) >> 64) as usize
+    fn index(&self, key: Key) -> usize {
+        ((key as u128 * self.slots.len() as u128) >> 64) as usize
     }
 
-    fn read(&self, index: usize, hash: u64) -> Option<(Entry, u8)> {
+    fn read(&self, index: usize, key: Key) -> Option<(Entry, u8)> {
         let slot = &self.slots[index].0;
         let (check, value, data) = (
             slot[0].load(Relaxed),
             slot[1].load(Relaxed),
             slot[2].load(Relaxed),
         );
-        if data & VALID == 0 || check ^ value ^ data != hash {
+        if data & VALID == 0 || check ^ value ^ data != key {
             return None;
         }
         let best = (data & 0xFFFF) as u32;
         let flag = match (data >> 24) & 3 {
-            0 => Flag::Exact,
-            1 => Flag::LowerBound,
-            _ => Flag::UpperBound,
+            0 => Bound::Exact,
+            1 => Bound::Lower,
+            _ => Bound::Upper,
         };
         let entry = Entry {
             value: value as u32 as i32,
@@ -135,9 +135,9 @@ impl Table {
         let _ = key;
     }
 
-    pub fn get(&self, key: &Key) -> Option<Entry> {
-        let hash = *key;
-        self.read(self.index(hash), hash).map(|(entry, _)| entry)
+    pub fn probe(&self, key: &Key) -> Option<Entry> {
+        let key = *key;
+        self.read(self.index(key), key).map(|(entry, _)| entry)
     }
 
     /// Store a result, classifying it against the original window of the search. A slot holding
@@ -149,27 +149,26 @@ impl Table {
         value: i32,
         best: Option<u32>,
         depth: i32,
-        alpha_orig: i32,
-        beta_orig: i32,
+        original_window: (i32, i32),
     ) -> Option<i32> {
-        let hash = key;
-        let index = self.index(hash);
+        let (alpha_orig, beta_orig) = original_window;
+        let index = self.index(key);
         let age = self.age.load(Relaxed);
-        let mut dropped = None;
+        let mut evicted = None;
         if let Some((old, old_age)) = self.read_any(index) {
-            if old_age == age && old.0 != hash && old.1.depth > depth {
+            if old_age == age && old.0 != key && old.1.depth > depth {
                 return None;
             }
-            if old.0 != hash {
-                dropped = Some(old.1.depth);
+            if old.0 != key {
+                evicted = Some(old.1.depth);
             }
         }
         let flag = if value <= alpha_orig {
-            Flag::UpperBound
+            Bound::Upper
         } else if value >= beta_orig {
-            Flag::LowerBound
+            Bound::Lower
         } else {
-            Flag::Exact
+            Bound::Exact
         };
         let data = VALID
             | best.map_or(0, |id| u64::from(id) + 1)
@@ -180,11 +179,11 @@ impl Table {
         let slot = &self.slots[index].0;
         slot[1].store(value, Relaxed);
         slot[2].store(data, Relaxed);
-        slot[0].store(hash ^ value ^ data, Relaxed);
-        dropped
+        slot[0].store(key ^ value ^ data, Relaxed);
+        evicted
     }
 
-    /// The valid slot at `index` whatever its key: `(key hash, entry)` and its age.
+    /// The valid slot at `index` whatever its key: `(key, entry)` and its age.
     fn read_any(&self, index: usize) -> Option<((u64, Entry), u8)> {
         let slot = &self.slots[index].0;
         let (check, value, data) = (
@@ -195,9 +194,9 @@ impl Table {
         if data & VALID == 0 {
             return None;
         }
-        let hash = check ^ value ^ data;
-        self.read(index, hash)
-            .map(|(entry, age)| ((hash, entry), age))
+        let key = check ^ value ^ data;
+        self.read(index, key)
+            .map(|(entry, age)| ((key, entry), age))
     }
 }
 
@@ -212,27 +211,27 @@ mod tests {
     #[test]
     fn an_entry_comes_back_as_it_was_stored() {
         let table = Table::with_slots(4096);
-        table.store(key(1), -30_995, Some(1234), 5, -32_000, 32_000);
-        let entry = table.get(&key(1)).unwrap();
+        table.store(key(1), -30_995, Some(1234), 5, (-32_000, 32_000));
+        let entry = table.probe(&key(1)).unwrap();
         assert_eq!(
             (entry.value, entry.best, entry.depth, entry.flag),
-            (-30_995, Some(1234), 5, Flag::Exact)
+            (-30_995, Some(1234), 5, Bound::Exact)
         );
-        table.store(key(2), 90, None, 3, -100, 50);
-        let entry = table.get(&key(2)).unwrap();
-        assert_eq!((entry.best, entry.flag), (None, Flag::LowerBound));
-        assert!(table.get(&key(3)).is_none());
+        table.store(key(2), 90, None, 3, (-100, 50));
+        let entry = table.probe(&key(2)).unwrap();
+        assert_eq!((entry.best, entry.flag), (None, Bound::Lower));
+        assert!(table.probe(&key(3)).is_none());
     }
 
     #[test]
     fn bounds_are_classified_against_the_original_window() {
         let table = Table::with_slots(4096);
-        table.store(key(1), -80, None, 3, -50, 200);
-        table.store(key(2), 300, None, 3, -50, 200);
-        table.store(key(3), 10, None, 3, -50, 200);
-        assert_eq!(table.get(&key(1)).unwrap().flag, Flag::UpperBound);
-        assert_eq!(table.get(&key(2)).unwrap().flag, Flag::LowerBound);
-        assert_eq!(table.get(&key(3)).unwrap().flag, Flag::Exact);
+        table.store(key(1), -80, None, 3, (-50, 200));
+        table.store(key(2), 300, None, 3, (-50, 200));
+        table.store(key(3), 10, None, 3, (-50, 200));
+        assert_eq!(table.probe(&key(1)).unwrap().flag, Bound::Upper);
+        assert_eq!(table.probe(&key(2)).unwrap().flag, Bound::Lower);
+        assert_eq!(table.probe(&key(3)).unwrap().flag, Bound::Exact);
     }
 
     #[test]
@@ -245,13 +244,13 @@ mod tests {
             .map(key)
             .find(|k| table.index(*k) == slot)
             .unwrap();
-        table.store(first, 0, None, 6, -100, 100);
-        table.store(second, 20, None, 2, -100, 100);
-        assert!(table.get(&first).is_some() && table.get(&second).is_none());
+        table.store(first, 0, None, 6, (-100, 100));
+        table.store(second, 20, None, 2, (-100, 100));
+        assert!(table.probe(&first).is_some() && table.probe(&second).is_none());
         table.new_search();
-        table.store(second, 20, None, 2, -100, 100);
+        table.store(second, 20, None, 2, (-100, 100));
         assert!(
-            table.get(&second).is_some(),
+            table.probe(&second).is_some(),
             "an old entry yields to a new search"
         );
     }
@@ -271,11 +270,10 @@ mod tests {
                             expected(n),
                             Some((n % 1000) as u32),
                             (n % 30) as i32,
-                            -1000,
-                            1000,
+                            (-1000, 1000),
                         );
                         let probe = (round * 31 + thread) % 5000;
-                        if let Some(entry) = table.get(&key(probe)) {
+                        if let Some(entry) = table.probe(&key(probe)) {
                             assert_eq!(entry.value, expected(probe));
                             assert_eq!(entry.best, Some((probe % 1000) as u32));
                         }

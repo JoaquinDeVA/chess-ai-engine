@@ -23,7 +23,7 @@ impl Killers {
         self.by_ply.get(ply as usize).map_or(&[], |v| v.as_slice())
     }
 
-    /// Remember `m` as a killer of `ply` (at most three per ply).
+    /// Remember `m` as a killer of `ply` (at most `MAX_KILLERS_PER_PLY` per ply).
     pub fn record(&mut self, ply: i32, m: Move) {
         let ply = ply as usize;
         if self.by_ply.len() <= ply {

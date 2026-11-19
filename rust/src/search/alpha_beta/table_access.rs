@@ -4,7 +4,7 @@ use shakmaty::Position;
 
 use super::{NodeResult, Search};
 use crate::search::scores::{at_ply, for_table};
-use crate::search::transposition_table::Flag;
+use crate::search::transposition_table::Bound;
 
 /// What the table said about a node.
 pub(super) struct TableProbe {
@@ -33,7 +33,7 @@ impl Search<'_> {
         let entry = if self.state.has_repeated() {
             None
         } else {
-            self.memory.table.get(&key)
+            self.memory.table.probe(&key)
         };
         let table_move = entry.and_then(|e| e.best);
         self.memory.diagnostics.table_probe();
@@ -45,12 +45,12 @@ impl Search<'_> {
             if fifty_move_safe && entry.depth >= depth_remaining && !restricted_root {
                 let value = at_ply(entry.value, ply);
                 match entry.flag {
-                    Flag::Exact => {
+                    Bound::Exact => {
                         self.memory.diagnostics.table_cut();
                         cut = Some((value, entry.best));
                     }
-                    Flag::LowerBound => *alpha = (*alpha).max(value),
-                    Flag::UpperBound => *beta = (*beta).min(value),
+                    Bound::Lower => *alpha = (*alpha).max(value),
+                    Bound::Upper => *beta = (*beta).min(value),
                 }
                 if cut.is_none() && *alpha >= *beta {
                     self.memory.diagnostics.table_cut();
@@ -71,22 +71,24 @@ impl Search<'_> {
         key: u64,
         (value, best): NodeResult,
         depth_remaining: i32,
-        (alpha, beta): (i32, i32),
+        original_window: (i32, i32),
         ply: i32,
         repetitions_before: u64,
     ) {
         // Mates are stored by their distance from this node, not from the root.
-        let dropped = self.memory.table.store(
+        let evicted = self.memory.table.store(
             key,
             for_table(value, ply),
             best,
             depth_remaining,
-            for_table(alpha, ply),
-            for_table(beta, ply),
+            (
+                for_table(original_window.0, ply),
+                for_table(original_window.1, ply),
+            ),
         );
         let over_repetition = self.memory.diagnostics.repetition_draws() > repetitions_before;
         self.memory
             .diagnostics
-            .store(over_repetition, dropped, depth_remaining);
+            .store(over_repetition, evicted, depth_remaining);
     }
 }

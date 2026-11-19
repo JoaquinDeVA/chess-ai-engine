@@ -1,4 +1,5 @@
-//! Move ordering: table move, captures by MVV-LVA, killer moves and the history of cuts.
+//! Move ordering: table move, captures by static exchange evaluation (SEE) and MVV-LVA, killer
+//! moves, the history of cuts and the continuation history, served lazily by the move picker.
 
 mod history;
 mod killers;

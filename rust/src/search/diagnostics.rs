@@ -33,7 +33,7 @@ pub struct SearchDiagnostics {
     pub stores: u64,
     #[cfg(feature = "search-diagnostics")]
     pub stores_over_repetition: u64,
-    /// Stores that dropped an entry of another position, and those where it was deeper.
+    /// Stores that evicted an entry of another position, and those where it was deeper.
     #[cfg(feature = "search-diagnostics")]
     pub evictions: u64,
     #[cfg(feature = "search-diagnostics")]

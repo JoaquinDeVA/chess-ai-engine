@@ -13,7 +13,7 @@ fn root() -> PathBuf {
 #[test]
 fn the_book_returns_the_entry_of_a_position_and_nothing_else() {
     let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    let key = _core::knowledge::book::position_key(start);
+    let key = _core::knowledge::book::fen_key(start);
     let book = OpeningBook::from_entries([(key, "e2e4".to_string())]);
     let pos = position_from_fen(start).unwrap();
     assert_eq!(

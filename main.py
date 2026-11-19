@@ -3,7 +3,7 @@
     python main.py
 
 Who plays each colour, the time control and the settings of every AI are chosen on the first page.
-Games between engines are played with fastchess and the UCI binary (``rust/target/release/uci``).
+Engines play through the UCI binary (``rust/target/release/uci``) with the app's own client (``chess_engine/uci.py``).
 Needs the ``gui`` extra: ``pip install -e ".[gui]"``.
 """
 

@@ -128,12 +128,31 @@ fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboar
     for square in board.by_color(!attacker) & !board.kings() & attacks {
         let target = role_value(board.role_at(square).expect("occupied"));
         let gain = if defences.contains(square) {
-            let cheapest = board
-                .attacks_to(square, attacker, occupied)
-                .into_iter()
-                .map(|from| role_value(board.role_at(from).expect("occupied")))
-                .min()
-                .expect("an attacker");
+            let mine = board.by_color(attacker);
+            let cheapest = if target == 1
+                || (shakmaty::attacks::pawn_attacks(!attacker, square) & board.pawns() & mine).any()
+            {
+                1
+            } else if ((shakmaty::attacks::knight_attacks(square) & board.knights())
+                | (shakmaty::attacks::bishop_attacks(square, occupied) & board.bishops()))
+                & mine
+                != Bitboard(0)
+            {
+                3
+            } else if (shakmaty::attacks::rook_attacks(square, occupied) & board.rooks() & mine)
+                .any()
+            {
+                5
+            } else if ((shakmaty::attacks::bishop_attacks(square, occupied)
+                | shakmaty::attacks::rook_attacks(square, occupied))
+                & board.queens()
+                & mine)
+                .any()
+            {
+                9
+            } else {
+                100
+            };
             target - cheapest
         } else {
             target

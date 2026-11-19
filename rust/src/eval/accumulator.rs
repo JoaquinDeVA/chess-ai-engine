@@ -267,6 +267,9 @@ impl NetState<'_> {
                 let own = &mut self.hidden[..width];
                 own.copy_from_slice(&self.stack[start..start + width]);
                 for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
+                    if value == 0.0 {
+                        continue;
+                    }
                     for (h, w) in own.iter_mut().zip(net.layers[0].row(index)) {
                         *h += w * value as f32;
                     }

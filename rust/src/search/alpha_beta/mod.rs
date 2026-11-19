@@ -93,7 +93,7 @@ impl Search<'_> {
         self.memory.table.prefetch(&child_key);
         self.eval.apply(self.state.pos(), &m);
         self.played.push(Some((move_id(&m), piece_to(&m))));
-        self.state.apply(m);
+        self.state.apply_keyed(m, child_key);
     }
 
     /// Pass the turn in the game state and in the incremental evaluation.

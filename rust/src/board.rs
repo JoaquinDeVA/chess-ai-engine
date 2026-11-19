@@ -173,6 +173,12 @@ impl GameState {
 
     /// Play a legal move, extending the history.
     pub fn apply(&mut self, m: Move) {
+        let key = zobrist_after(&self.pos, self.keys[self.keys.len() - 1], &m);
+        self.apply_keyed(m, key);
+    }
+
+    /// Like apply, with the key after the move already computed.
+    pub fn apply_keyed(&mut self, m: Move, key: Key) {
         let rights = self.pos.castles().castling_rights();
         let had_legal_ep = self.pos.legal_ep_square().is_some();
         self.undo.push(Undo {
@@ -181,7 +187,6 @@ impl GameState {
             has_repeated: self.has_repeated,
         });
         let zeroing = m.role() == Role::Pawn || m.is_capture();
-        let key = zobrist_after(&self.pos, self.keys[self.keys.len() - 1], &m);
         self.pos.play_unchecked(m);
         let irreversible =
             zeroing || had_legal_ep || self.pos.castles().castling_rights() != rights;

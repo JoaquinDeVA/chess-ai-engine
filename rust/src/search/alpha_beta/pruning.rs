@@ -78,7 +78,7 @@ impl Search<'_> {
             return None;
         }
         // If passing the turn already cuts, playing a move will too: prune.
-        let reduction = null_move_reduction(depth_remaining, margin);
+        let reduction = null_move_reduction(depth_remaining);
         let (low, high) = if context.maximizing {
             (beta - NULL_WINDOW_WIDTH, beta)
         } else {

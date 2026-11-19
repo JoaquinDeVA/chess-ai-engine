@@ -1,8 +1,8 @@
 //! Techniques that search less deep: late move reductions, internal iterative reduction and the
 //! reduction of the null move.
 
-/// Centipawns beyond the bound that deepen the null-move reduction by one ply.
-const NULL_MOVE_MARGIN_STEP: i32 = 200;
+/// From this depth on the null-move reduction is one ply deeper.
+const NULL_MOVE_DEEP_FROM_DEPTH: i32 = 6;
 /// Internal iterative reduction works from this depth on.
 const IIR_FROM_DEPTH: i32 = 4;
 /// Late move reductions start at this depth and at this position in the move order.
@@ -24,10 +24,13 @@ pub(super) fn late_move_reduction(
     steps.clamp(0, depth_remaining - 2)
 }
 
-/// Plies the null-move search is reduced: 2 from depth 3, one more every four plies of depth, and one
-/// more per `NULL_MOVE_MARGIN_STEP` by which the static value is beyond the bound (two at most).
-pub(super) fn null_move_reduction(depth_remaining: i32, margin: i32) -> i32 {
-    2 + depth_remaining / 4 + (margin / NULL_MOVE_MARGIN_STEP).clamp(0, 2)
+/// Plies the null-move search is reduced: 2, or 3 from `NULL_MOVE_DEEP_FROM_DEPTH`.
+pub(super) fn null_move_reduction(depth_remaining: i32) -> i32 {
+    if depth_remaining >= NULL_MOVE_DEEP_FROM_DEPTH {
+        3
+    } else {
+        2
+    }
 }
 
 /// Internal iterative reduction: with no table move the order is poor, so search one ply
@@ -71,15 +74,10 @@ mod tests {
     }
 
     #[test]
-    fn the_null_move_reduction_grows_with_the_depth_and_the_margin() {
-        assert_eq!(null_move_reduction(3, 0), 2);
-        assert_eq!(null_move_reduction(4, 0), 3);
-        assert_eq!(null_move_reduction(8, 0), 4);
-        assert_eq!(null_move_reduction(3, 200), 3);
-        assert_eq!(
-            null_move_reduction(3, 5_000),
-            4,
-            "the margin adds two plies at most"
-        );
+    fn the_null_move_reduction_deepens_from_depth_six() {
+        assert_eq!(null_move_reduction(3), 2);
+        assert_eq!(null_move_reduction(5), 2);
+        assert_eq!(null_move_reduction(6), 3);
+        assert_eq!(null_move_reduction(12), 3);
     }
 }

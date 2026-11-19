@@ -1,6 +1,6 @@
 //! The quiescence search: at the horizon, only captures and promotions that do not lose material.
 
-use shakmaty::{MoveList, Position};
+use shakmaty::{Move, MoveList, Position};
 
 use super::Search;
 use crate::board::ordered_moves;
@@ -15,7 +15,7 @@ impl Search<'_> {
         mut beta: i32,
         plies_left: u32,
         ply: i32,
-        moves: MoveList,
+        moves: &MoveList,
     ) -> i32 {
         let in_check = self.state.pos().is_check();
         let maximizing = self.state.turn() == self.root_player;
@@ -44,8 +44,14 @@ impl Search<'_> {
             }
             value
         };
-        let candidates = if in_check { moves } else { order_noisy(&moves) };
-        for action in candidates {
+        let noisy;
+        let candidates: &[Move] = if in_check {
+            moves
+        } else {
+            noisy = order_noisy(moves);
+            &noisy
+        };
+        for &action in candidates {
             if !in_check && !see_ge(self.state.pos(), &action, 0) {
                 continue;
             }
@@ -60,7 +66,7 @@ impl Search<'_> {
                     beta,
                     plies_left.saturating_sub(1),
                     ply + 1,
-                    child_moves,
+                    &child_moves,
                 ),
             };
             self.unplay();

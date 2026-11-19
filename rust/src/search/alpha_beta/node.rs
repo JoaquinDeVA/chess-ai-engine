@@ -46,7 +46,7 @@ impl Search<'_> {
             return (value, None);
         }
         if depth_remaining <= 0 {
-            return (self.horizon_value(alpha, beta, ply, moves), None);
+            return (self.horizon_value(alpha, beta, ply, &moves), None);
         }
         // Checked after the horizon test so a cut never hides a quiescence value, and before any
         // move is searched so a cut node stores nothing in the table.
@@ -116,7 +116,7 @@ impl Search<'_> {
     }
 
     /// Value of a node at the horizon: the quiescence search, or the static value without one.
-    fn horizon_value(&mut self, alpha: i32, beta: i32, ply: i32, moves: MoveList) -> i32 {
+    fn horizon_value(&mut self, alpha: i32, beta: i32, ply: i32, moves: &MoveList) -> i32 {
         if self.options.quiescence_plies > 0 {
             self.quiescence(alpha, beta, self.options.quiescence_plies, ply, moves)
         } else {

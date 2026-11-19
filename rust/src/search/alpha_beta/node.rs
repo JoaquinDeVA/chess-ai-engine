@@ -41,12 +41,23 @@ impl Search<'_> {
         }
         let repetitions_before = self.memory.diagnostics.repetition_draws();
 
-        let moves = ordered_moves(self.state.pos());
-        if let Some(value) = self.finished_game_value(&moves, ply) {
-            return (value, None);
-        }
-        if depth_remaining <= 0 {
-            return (self.horizon_value(alpha, beta, ply, &moves), None);
+        // Inner nodes out of check with no repetition: the draws that need no moves now, the
+        // legal moves (and stalemate) only after reverse futility and the null move.
+        let deferred = depth_remaining > 0 && ply > 0 && !in_check && !self.state.has_repeated();
+        let mut moves = MoveList::new();
+        if deferred {
+            let pos = self.state.pos();
+            if pos.is_insufficient_material() || pos.halfmoves() >= 100 {
+                return (self.terminal_utility(None, ply), None);
+            }
+        } else {
+            moves = ordered_moves(self.state.pos());
+            if let Some(value) = self.finished_game_value(&moves, ply) {
+                return (value, None);
+            }
+            if depth_remaining <= 0 {
+                return (self.horizon_value(alpha, beta, ply, &moves), None);
+            }
         }
         // Checked after the horizon test so a cut never hides a quiescence value, and before any
         // move is searched so a cut node stores nothing in the table.
@@ -70,6 +81,12 @@ impl Search<'_> {
             &mut static_cache,
         ) {
             return cut;
+        }
+        if deferred {
+            moves = ordered_moves(self.state.pos());
+            if moves.is_empty() {
+                return (self.terminal_utility(None, ply), None);
+            }
         }
         let node_moves = self.node_moves(&context, &moves, depth_remaining, probe.best);
         let depth_remaining = internal_iterative_reduction(depth_remaining, ply, probe.best);

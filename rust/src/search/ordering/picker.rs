@@ -58,7 +58,17 @@ impl MovePicker {
         (history, color): (&History, Color),
         continuation: Option<(&ContinuationHistory, usize)>,
     ) -> MovePicker {
-        let is_killer = |m: &Move| killers.contains(&move_id(m));
+        let mut killer = [false; MAX_MOVES];
+        let mut table_move = None;
+        if !killers.is_empty() || table.is_some() {
+            for (k, m) in moves.iter().enumerate() {
+                let id = move_id(m);
+                killer[k] = killers.contains(&id);
+                if table_move.is_none() && table == Some(id) {
+                    table_move = Some(*m);
+                }
+            }
+        }
         let mut picker = MovePicker {
             moves: MoveList::new(),
             keys: [0; MAX_MOVES],
@@ -72,14 +82,16 @@ impl MovePicker {
         picker.moves.extend(
             moves
                 .iter()
-                .filter(|m| m.is_capture() && is_killer(m))
-                .copied(),
+                .zip(&killer)
+                .filter(|&(m, &k)| m.is_capture() && k)
+                .map(|(m, _)| *m),
         );
         picker.moves.extend(
             moves
                 .iter()
-                .filter(|m| m.is_capture() && !is_killer(m))
-                .copied(),
+                .zip(&killer)
+                .filter(|&(m, &k)| m.is_capture() && !k)
+                .map(|(m, _)| *m),
         );
         for (rank, (slot, m)) in picker.keys.iter_mut().zip(picker.moves.iter()).enumerate() {
             *slot = key(mvv_lva_score(m), rank);
@@ -88,15 +100,17 @@ impl MovePicker {
         picker.moves.extend(
             moves
                 .iter()
-                .filter(|m| !m.is_capture() && is_killer(m))
-                .copied(),
+                .zip(&killer)
+                .filter(|&(m, &k)| !m.is_capture() && k)
+                .map(|(m, _)| *m),
         );
         picker.killers_end = picker.moves.len();
         picker.moves.extend(
             moves
                 .iter()
-                .filter(|m| !m.is_capture() && !is_killer(m))
-                .copied(),
+                .zip(&killer)
+                .filter(|&(m, &k)| !m.is_capture() && !k)
+                .map(|(m, _)| *m),
         );
         let others = picker.killers_end;
         for (rank, (slot, m)) in picker.keys[others..]
@@ -108,7 +122,7 @@ impl MovePicker {
                 + continuation.map_or(0, |(cont, previous)| cont.score(color, previous, m));
             *slot = key(score, rank);
         }
-        picker.table = table.and_then(|id| moves.iter().find(|m| move_id(m) == id).copied());
+        picker.table = table_move;
         picker
     }
 

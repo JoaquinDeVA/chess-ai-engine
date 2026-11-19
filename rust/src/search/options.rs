@@ -7,7 +7,7 @@ pub const DEFAULT_MIN_DEPTH: usize = 1;
 pub const MAX_DEPTH: usize = 30;
 /// Megabytes of the transposition table by default (the `Hash` option of the protocol).
 pub const DEFAULT_HASH_MB: usize = 64;
-/// Plies of quiescence search of the bots.
+/// Plies of quiescence search by default.
 pub const DEFAULT_QUIESCENCE_PLIES: u32 = 4;
 
 /// Settings of a search.

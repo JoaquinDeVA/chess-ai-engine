@@ -77,7 +77,7 @@ pub(super) fn run(
     fen: &str,
     options: &Options,
     max_depth: usize,
-    time_limit: f64,
+    soft_limit: f64,
     hard_limit: f64,
     tick: f64,
 ) -> (Option<String>, Stats) {
@@ -92,7 +92,7 @@ pub(super) fn run(
         &mut Memory::default(),
         options,
         max_depth,
-        time_limit,
+        soft_limit,
         &control(hard_limit, &now),
     )
     .unwrap();
@@ -133,7 +133,7 @@ pub(super) const HANGING_QUEEN: &str = "4k3/8/8/3q4/8/8/3R4/4K3 w - - 0 1";
 /// Ids of the legal moves of `fen` whose UCI string is in `names`.
 pub(super) fn ids(fen: &str, names: &[&str]) -> Vec<u32> {
     let state = state(fen);
-    crate::board::ordered_moves(state.pos())
+    crate::board::legal_moves(state.pos())
         .iter()
         .filter(|m| names.contains(&uci_string(m).as_str()))
         .map(crate::board::move_id)

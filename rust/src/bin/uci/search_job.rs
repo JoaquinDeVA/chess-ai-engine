@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use _core::board::{move_id, ordered_moves, uci_string};
+use _core::board::{legal_moves, move_id, uci_string};
 use _core::eval::Net;
 use _core::search::{self, Control, Memory, Options};
 use shakmaty::Move;
@@ -163,7 +163,7 @@ fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<SearchR
         (clock() * 1000.0) as u64
     );
     let best_name = best.as_ref().map(uci_string).unwrap_or_else(|| {
-        ordered_moves(state.pos())
+        legal_moves(state.pos())
             .first()
             .map_or("0000".to_string(), uci_string)
     });
@@ -189,7 +189,7 @@ fn ponder_reply(
         .get(&state.key())
         .and_then(|entry| entry.best)
         .and_then(|id| {
-            ordered_moves(state.pos())
+            legal_moves(state.pos())
                 .into_iter()
                 .find(|mv| move_id(mv) == id)
         })

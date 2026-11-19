@@ -1,6 +1,6 @@
 //! The rules of the core: move generation by perft, and the end of the game.
 
-use _core::board::{ordered_moves, position_from_fen, GameState};
+use _core::board::{legal_moves, position_from_fen, GameState};
 use shakmaty::{Chess, Color, Position};
 
 const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -10,7 +10,7 @@ fn perft(pos: &Chess, depth: u32) -> u64 {
     if depth == 0 {
         return 1;
     }
-    let moves = ordered_moves(pos);
+    let moves = legal_moves(pos);
     if depth == 1 {
         return moves.len() as u64;
     }
@@ -31,7 +31,7 @@ fn perft_counts_match_the_published_ones() {
 fn outcome(fen: &str, moves: &[&str]) -> Option<Option<Color>> {
     let moves: Vec<String> = moves.iter().map(|m| m.to_string()).collect();
     let state = GameState::from_moves(fen, &moves).unwrap();
-    state.outcome(&ordered_moves(state.pos()))
+    state.outcome(&legal_moves(state.pos()))
 }
 
 #[test]

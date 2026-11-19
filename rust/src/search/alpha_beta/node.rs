@@ -4,7 +4,7 @@ use shakmaty::{MoveList, Position};
 
 use super::reductions::internal_iterative_reduction;
 use super::{NodeContext, Outcome, Search};
-use crate::board::ordered_moves;
+use crate::board::legal_moves;
 
 impl Search<'_> {
     /// Value of the node, searching `depth_remaining` more plies inside `(alpha, beta)`.
@@ -25,7 +25,7 @@ impl Search<'_> {
         self.nodes += 1;
         #[cfg(feature = "search-summary")]
         {
-            self.max_ply = self.max_ply.max(ply);
+            self.seldepth = self.seldepth.max(ply);
         }
 
         let in_check = self.state.pos().is_check();
@@ -51,7 +51,7 @@ impl Search<'_> {
                 return (self.terminal_utility(None, ply), None);
             }
         } else {
-            moves = ordered_moves(self.state.pos());
+            moves = legal_moves(self.state.pos());
             if let Some(value) = self.finished_game_value(&moves, ply) {
                 return (value, None);
             }
@@ -83,7 +83,7 @@ impl Search<'_> {
             return cut;
         }
         if deferred {
-            moves = ordered_moves(self.state.pos());
+            moves = legal_moves(self.state.pos());
             if moves.is_empty() {
                 return (self.terminal_utility(None, ply), None);
             }

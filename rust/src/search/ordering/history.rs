@@ -14,7 +14,7 @@ const HISTORY_LIMIT: i32 = 1 << 14;
 /// Value above which the continuation history scores are halved.
 const CONTINUATION_LIMIT: i32 = 1 << 24;
 
-/// How often each quiet move (by mover and `move_id`) caused a cut-off, weighted by depth. A clone
+/// How often each quiet move (by mover, origin and target) caused a cut-off, weighted by depth. A clone
 /// is another handle to the same scores: the threads of a search share them, with relaxed atomics
 /// (a lost update only blurs a heuristic).
 #[derive(Clone)]

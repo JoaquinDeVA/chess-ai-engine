@@ -24,7 +24,7 @@ use super::ordering::piece_to;
 use super::scores::{INFINITE, MATE};
 #[cfg(feature = "search-summary")]
 use super::stats::SearchReport;
-use crate::board::{move_id, ordered_moves, GameState};
+use crate::board::{legal_moves, move_id, GameState};
 use crate::eval::{Net, NetState};
 
 /// Width of the null window used by principal variation search: one unit of the score.
@@ -53,9 +53,9 @@ struct Search<'a> {
     max_depth: i32,
     nodes: u64,
     #[cfg(feature = "search-summary")]
-    prunings: u64,
+    cutoffs: u64,
     #[cfg(feature = "search-summary")]
-    max_ply: i32,
+    seldepth: i32,
     truncated: bool,
     /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
     next_clock_check: u64,
@@ -151,9 +151,9 @@ pub fn alpha_beta(
         max_depth,
         nodes: 0,
         #[cfg(feature = "search-summary")]
-        prunings: 0,
+        cutoffs: 0,
         #[cfg(feature = "search-summary")]
-        max_ply: 0,
+        seldepth: 0,
         truncated: false,
         next_clock_check: 0,
         eval: NetState::new(net, &root),
@@ -168,7 +168,7 @@ pub fn alpha_beta(
         .map(|&(_, nodes)| nodes)
         .sum();
     let best_share = best_nodes as f64 / search.nodes.max(1) as f64;
-    let best = best.and_then(|id| ordered_moves(&root).into_iter().find(|m| move_id(m) == id));
+    let best = best.and_then(|id| legal_moves(&root).into_iter().find(|m| move_id(m) == id));
     SearchResult {
         value,
         best,
@@ -177,8 +177,8 @@ pub fn alpha_beta(
         best_share,
         #[cfg(feature = "search-summary")]
         report: SearchReport {
-            prunings: search.prunings,
-            max_ply: search.max_ply,
+            cutoffs: search.cutoffs,
+            seldepth: search.seldepth,
         },
     }
 }

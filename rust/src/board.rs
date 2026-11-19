@@ -80,7 +80,7 @@ pub fn is_noisy(m: &Move) -> bool {
 /// Legal moves of a position in the order shakmaty generates them: en passant, pawns, knights,
 /// bishops, rooks, queens, king and castling, each from the lowest square to the highest.
 /// Among moves of equal value the search plays the first.
-pub fn ordered_moves(pos: &Chess) -> MoveList {
+pub fn legal_moves(pos: &Chess) -> MoveList {
     pos.legal_moves()
 }
 
@@ -290,7 +290,7 @@ mod tests {
     }
 
     fn outcome_of(s: &GameState) -> Option<Winner> {
-        s.outcome(&ordered_moves(s.pos()))
+        s.outcome(&legal_moves(s.pos()))
     }
 
     #[test]
@@ -307,7 +307,7 @@ mod tests {
             for stride in 1..8 {
                 let mut s = GameState::new(position_from_fen(fen).unwrap());
                 for ply in 0..80 {
-                    let moves = ordered_moves(s.pos());
+                    let moves = legal_moves(s.pos());
                     if moves.is_empty() {
                         break;
                     }
@@ -380,7 +380,7 @@ mod tests {
         // passing twice in a row repeats the first position
         s.apply_null();
         assert_eq!(s.key(), before);
-        let moves = ordered_moves(s.pos());
+        let moves = legal_moves(s.pos());
         assert!(
             s.outcome(&moves).is_none(),
             "two occurrences are not yet a claim"

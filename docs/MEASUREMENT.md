@@ -124,7 +124,7 @@ clears it outside its timer, so that the first touch of the memory is not counte
 cd rust && cargo build --release --bin uci && ./target/release/uci ttd 9 bench/middlegame.epd
 ```
 
-The counters beyond nodes, prunings and depth (cuts by move, table hits, evictions) are compiled out by default; build
+The counters beyond nodes, cutoffs and depth (cuts by move, table hits, evictions) are compiled out by default; build
 with `--features search-diagnostics` to read them. Check on 2026-11-14 (`uci ttd 9 bench/middlegame.epd 30`, one thread, laptop, 12 alternated runs per
 version): 3,989,480 nodes with and without the counters; nodes per second 1,010,980 before, 1,007,256 now (−0.4 % ± 0.6 %),
 1,014,098 with diagnostics (+0.3 % ± 0.5 %): no measurable speed difference.

@@ -1,11 +1,11 @@
-//! Syzygy endgame tables for the root of the search (port of `knowledge/endgame_tablebase.py`).
+//! Syzygy endgame tables for the root of the search.
 
 use std::path::Path;
 
 use shakmaty::{Chess, Move, Position, Role};
 use shakmaty_syzygy::Tablebase;
 
-use crate::board::ordered_moves;
+use crate::board::legal_moves;
 
 /// Positions with more pieces than this are not probed.
 pub const MAX_PIECES: usize = 5;
@@ -71,14 +71,14 @@ impl EndgameTablebase {
 
     /// The moves that keep the best result the tables give (a mate, else a win, else a draw, else the
     /// longest resistance) and, in a win, are the fastest to the next zeroing move, in the order of
-    /// `ordered_moves`. The search chooses among them. Any slower move lets it shuffle: with 4 plies
+    /// `legal_moves`. The search chooses among them. Any slower move lets it shuffle: with 4 plies
     /// of slack a quarter of the won games ended in repetition. `None` when the position is not
     /// covered, has no legal move or a needed table is missing.
     pub fn root_moves(&self, pos: &Chess) -> Option<Vec<Move>> {
         if !self.covers(pos) {
             return None;
         }
-        let moves = ordered_moves(pos);
+        let moves = legal_moves(pos);
         if moves.is_empty() || pos.is_insufficient_material() || pos.halfmoves() >= 150 {
             return None;
         }

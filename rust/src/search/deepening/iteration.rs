@@ -19,7 +19,7 @@ pub(super) fn deepen(
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
-    time_limit: f64,
+    soft_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats, Option<i32>), String> {
     let clock = control.clock;
@@ -27,7 +27,7 @@ pub(super) fn deepen(
     let mut best_move: Option<Move> = None;
     let mut total_nodes = 0u64;
     #[cfg(feature = "search-summary")]
-    let (mut total_prunings, mut deepest_ply) = (0u64, 0i32);
+    let (mut total_cutoffs, mut seldepth) = (0u64, 0i32);
     let mut completed_depth = 0usize;
     let mut last_truncated = false;
     let mut iterations: Vec<IterationInfo> = Vec::new();
@@ -51,8 +51,8 @@ pub(super) fn deepen(
         total_nodes += result.nodes;
         #[cfg(feature = "search-summary")]
         {
-            total_prunings += result.report.prunings;
-            deepest_ply = deepest_ply.max(result.report.max_ply);
+            total_cutoffs += result.report.cutoffs;
+            seldepth = seldepth.max(result.report.seldepth);
         }
         last_truncated = result.truncated;
 
@@ -75,7 +75,7 @@ pub(super) fn deepen(
         // Clock policy: never stop before `min_depth`, so the move always comes from a minimum of
         // real search; after it, the soft limit scaled by how settled the best move is.
         let soft =
-            control.scaled_soft_limit(time_limit, soft_scale(depth, stable, result.best_share));
+            control.scaled_soft_limit(soft_limit, soft_scale(depth, stable, result.best_share));
         if depth >= options.min_depth && clock() - start >= soft {
             stop_reason = StopReason::Budget;
             break;
@@ -98,9 +98,9 @@ pub(super) fn deepen(
     let stats = Stats {
         nodes_visited: total_nodes,
         #[cfg(feature = "search-summary")]
-        pruning_count: total_prunings,
+        cutoffs: total_cutoffs,
         #[cfg(feature = "search-summary")]
-        max_depth_reached: deepest_ply,
+        seldepth,
         truncated: last_truncated && best_move.is_none(),
         completed_depth,
         iterations,

@@ -321,7 +321,7 @@ impl NetState<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::board::{ordered_moves, position_from_fen};
+    use crate::board::{legal_moves, position_from_fen};
     use crate::eval::{FeatureSet, Layer};
 
     /// The incremental and the full sums add the same `f32` terms in another order.
@@ -377,7 +377,7 @@ mod tests {
                 let mut state = NetState::new(net, &pos);
                 let mut trail = Vec::new();
                 for _ in 0..80 {
-                    let moves = ordered_moves(&pos);
+                    let moves = legal_moves(&pos);
                     if moves.is_empty() {
                         break;
                     }

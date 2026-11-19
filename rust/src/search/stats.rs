@@ -32,9 +32,9 @@ pub struct IterationInfo {
 pub struct Stats {
     pub nodes_visited: u64,
     #[cfg(feature = "search-summary")]
-    pub pruning_count: u64,
+    pub cutoffs: u64,
     #[cfg(feature = "search-summary")]
-    pub max_depth_reached: i32,
+    pub seldepth: i32,
     pub truncated: bool,
     pub completed_depth: usize,
     pub iterations: Vec<IterationInfo>,
@@ -45,6 +45,6 @@ pub struct Stats {
 #[cfg(feature = "search-summary")]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SearchReport {
-    pub prunings: u64,
-    pub max_ply: i32,
+    pub cutoffs: u64,
+    pub seldepth: i32,
 }

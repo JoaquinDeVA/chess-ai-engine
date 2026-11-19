@@ -3,7 +3,7 @@
 //! The values are integer scores of the root player: the evaluation of the network in centipawns
 //! of the logistic scale, within `±EVAL_LIMIT`, and a mate `n` plies away as `±(MATE - n)`, so
 //! that quicker wins and slower losses are preferred; a draw is 0. The search keeps a lock-free
-//! transposition table and killer moves between iterations and between the moves of a game, and
+//! transposition table, killers and history between iterations and between the moves of a game, and
 //! ends every branch at the horizon with a quiescence search over captures and promotions.
 
 mod alpha_beta;

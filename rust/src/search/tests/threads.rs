@@ -27,7 +27,7 @@ fn several_threads_return_a_legal_move_and_do_not_lose_nodes() {
             &control(1e9, &no_time),
         )
         .unwrap();
-        let legal = crate::board::ordered_moves(game.pos());
+        let legal = crate::board::legal_moves(game.pos());
         assert!(
             legal
                 .iter()

@@ -23,7 +23,7 @@ use voting::vote;
 /// Iterative deepening over [`alpha_beta`]: depth 1, 2, ... `max_depth`, returning the move of the
 /// deepest **completed** iteration.
 ///
-/// After each completed iteration the loop stops if the elapsed time passes `time_limit` (the soft
+/// After each completed iteration the loop stops if the elapsed time passes `soft_limit` (the soft
 /// limit) times [`soft_scale`]: more time when the best move has just changed or shares the nodes
 /// with others, less when it holds and takes most of them. The soft limit is ignored until
 /// `min_depth` iterations are complete; the hard limit (`control.hard_limit`) cuts the tree at any
@@ -38,12 +38,12 @@ pub fn iterative_deepening(
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
-    time_limit: f64,
+    soft_limit: f64,
     control: &Control,
 ) -> Result<(Option<Move>, Stats), String> {
     memory.table.new_search();
     if memory.threads <= 1 {
-        return deepen(state, eval, memory, options, max_depth, time_limit, control)
+        return deepen(state, eval, memory, options, max_depth, soft_limit, control)
             .map(|(best, stats, _)| (best, stats));
     }
     let (table, extra) = (memory.table.clone(), memory.threads - 1);
@@ -107,7 +107,7 @@ pub fn iterative_deepening(
             memory,
             options,
             max_depth,
-            time_limit,
+            soft_limit,
             &main_control,
         );
         stop.store(true, Relaxed);

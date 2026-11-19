@@ -3,7 +3,7 @@
 use shakmaty::{Move, MoveList, Position};
 
 use super::Search;
-use crate::board::ordered_moves;
+use crate::board::legal_moves;
 use crate::search::ordering::{order_noisy, see_ge};
 use crate::search::scores::INFINITE;
 
@@ -38,7 +38,7 @@ impl Search<'_> {
             if alpha >= beta {
                 #[cfg(feature = "search-summary")]
                 {
-                    self.prunings += 1;
+                    self.cutoffs += 1;
                 }
                 return value;
             }
@@ -58,7 +58,7 @@ impl Search<'_> {
             self.play(action);
             self.nodes += 1;
             self.memory.diagnostics.quiescence_node();
-            let child_moves = ordered_moves(self.state.pos());
+            let child_moves = legal_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
                 Some(winner) => self.terminal_utility(winner, ply + 1),
                 None => self.quiescence(
@@ -80,7 +80,7 @@ impl Search<'_> {
             if alpha >= beta {
                 #[cfg(feature = "search-summary")]
                 {
-                    self.prunings += 1;
+                    self.cutoffs += 1;
                 }
                 break;
             }

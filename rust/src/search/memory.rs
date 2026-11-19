@@ -7,8 +7,8 @@ use super::options::DEFAULT_HASH_MB;
 use super::ordering::{ContinuationHistory, History, Killers};
 use super::transposition_table::Table;
 
-/// What a game keeps between two moves: the transposition table and the killer moves, and how
-/// many threads search.
+/// What a game keeps between two moves: the transposition table, the killer moves, the history
+/// and continuation history, and how many threads search.
 pub struct Memory {
     /// Shared by every thread of a search.
     pub table: Arc<Table>,

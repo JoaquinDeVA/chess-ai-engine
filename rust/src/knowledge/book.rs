@@ -1,5 +1,4 @@
-//! Opening book: a map from positions to the move to play in them (port of
-//! `knowledge/opening_book.py`).
+//! Opening book: a map from positions to the move to play in them.
 
 use std::collections::HashMap;
 use std::path::Path;

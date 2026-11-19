@@ -72,7 +72,7 @@ impl Search<'_> {
             if alpha >= beta {
                 #[cfg(feature = "search-summary")]
                 {
-                    self.prunings += 1;
+                    self.cutoffs += 1;
                 }
                 self.reward_cutoff(
                     context,

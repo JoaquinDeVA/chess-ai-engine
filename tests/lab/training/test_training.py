@@ -122,6 +122,14 @@ class TestCardsAndReport:
         )
         assert header in text and row in text
 
+    def test_a_model_trained_twice_shows_only_its_highest_effort(self, isolated_cards):
+        for effort in (30, 100):
+            cards.update_card(
+                f"m@e{effort}", status="current", architecture="A", training={"effort": effort}
+            )
+        lines = [line for line in report.render_tables().splitlines() if line.startswith("| `m`")]
+        assert len(lines) == 1 and "| 100 |" in lines[0]
+
     def test_models_without_sections_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
         assert f"| `fresh` |{' — |' * 7}" in report.render_tables()

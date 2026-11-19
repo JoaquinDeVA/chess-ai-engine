@@ -58,6 +58,12 @@ def _representation(card: Dict[str, Any]) -> str:
     return _DASH if not fields else Representation.from_dict(fields).name
 
 
+def _effort(card: Dict[str, Any]) -> int:
+    """Training effort of a card, -1 when it has none."""
+    effort = _dig(card, "training", "effort")
+    return -1 if effort is None else int(effort)
+
+
 def _row(card: Dict[str, Any]) -> str:
     """One line of the history table.
 
@@ -92,6 +98,7 @@ def _row(card: Dict[str, Any]) -> str:
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
+    One row per model, the card of its highest effort.
     Models with status ``current``, ``reference`` (the retired heuristic ``h1``, kept as the record
     of the anchor) or ``retired`` are listed, in that order and by name within each status; a
     retired model is marked as such.
@@ -99,11 +106,14 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     :param cards: Model cards (default: all cards on disk).
     :return: Markdown, without the markers.
     """
-    rows = [
-        card
-        for card in (load_all_cards() if cards is None else cards)
-        if card.get("status") in _STATUS_ORDER
-    ]
+    best: Dict[str, Dict[str, Any]] = {}
+    for card in load_all_cards() if cards is None else cards:
+        if card.get("status") not in _STATUS_ORDER:
+            continue
+        base = card["name"].split("@")[0]
+        if base not in best or _effort(card) > _effort(best[base]):
+            best[base] = card
+    rows = list(best.values())
     rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"].split("@")[0]))
     return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
 

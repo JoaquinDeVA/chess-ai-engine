@@ -228,7 +228,7 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
-| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 30 | 0.746 | 0.105 | 25.3% / 60.0% | 2.2 |
+| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 0.751 | 0.103 | 24.7% / 60.0% | 2.1 |
 | `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 | 0.731 | 0.110 | 22.7% / 58.3% | 2.4 |
 | `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.8 |
 <!-- END GENERATED TABLES -->

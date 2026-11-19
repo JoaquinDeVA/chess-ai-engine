@@ -35,7 +35,7 @@ pub(super) fn helper(
     eval: &Net,
     table: Arc<Table>,
     history: History,
-    continuation: ContinuationHistory,
+    continuation_history: ContinuationHistory,
     options: &Options,
     max_depth: usize,
     control: &Control,
@@ -45,7 +45,7 @@ pub(super) fn helper(
         table,
         killers: Killers::default(),
         history,
-        continuation,
+        continuation_history,
         threads: 1,
         diagnostics: Default::default(),
     };
@@ -55,7 +55,7 @@ pub(super) fn helper(
     );
     let (mut nodes, mut depth) = (0, 1);
     while !control.stop.is_some_and(|flag| flag.load(Relaxed)) {
-        depth = depth.max(control.progress.map_or(1, |p| p.load(Relaxed)));
+        depth = depth.max(control.main_depth.map_or(1, |p| p.load(Relaxed)));
         if depth > max_depth {
             break;
         }

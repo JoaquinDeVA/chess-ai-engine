@@ -17,13 +17,13 @@ const STABILITY_SCALE: [f64; 5] = [2.5, 1.2, 0.9, 0.8, 0.75];
 const NODE_SHARE_PIVOT: f64 = 1.5;
 const NODE_SHARE_SCALE: f64 = 1.35;
 
-/// Factor of the soft limit after an iteration of `depth` whose best move has held `stable`
+/// Factor of the soft limit after an iteration of `depth` whose best move has held `stable_iterations`
 /// iterations in a row and took `share` of the nodes.
-pub(super) fn soft_scale(depth: usize, stable: usize, share: f64) -> f64 {
+pub(super) fn soft_scale(depth: usize, stable_iterations: usize, share: f64) -> f64 {
     if depth < SCALE_FROM_DEPTH {
         return 1.0;
     }
-    STABILITY_SCALE[stable.min(STABILITY_SCALE.len() - 1)]
+    STABILITY_SCALE[stable_iterations.min(STABILITY_SCALE.len() - 1)]
         * (NODE_SHARE_PIVOT - share)
         * NODE_SHARE_SCALE
 }

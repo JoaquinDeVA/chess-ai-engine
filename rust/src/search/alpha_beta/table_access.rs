@@ -2,18 +2,18 @@
 
 use shakmaty::Position;
 
-use super::{Outcome, Search};
+use super::{NodeResult, Search};
 use crate::search::scores::{at_ply, for_table};
 use crate::search::transposition_table::Flag;
 
 /// What the table said about a node.
 pub(super) struct TableProbe {
     /// The best move the entry remembers, to be tried first.
-    pub(super) best: Option<u32>,
+    pub(super) table_move: Option<u32>,
     /// Whether a value searched this deep cannot depend on the fifty-move clock.
-    pub(super) clock_free: bool,
+    pub(super) fifty_move_safe: bool,
     /// The value that ends the node, when the entry is deep enough and exact for the window.
-    pub(super) cut: Option<Outcome>,
+    pub(super) cut: Option<NodeResult>,
 }
 
 impl Search<'_> {
@@ -29,20 +29,20 @@ impl Search<'_> {
         // A value searched `depth_remaining` plies deep can depend on the fifty-move clock only if
         // the clock can reach 100 inside that search; then the entry gives its move and nothing
         // else. A position with a repetition behind it is a possible draw: the table is not asked.
-        let clock_free = self.state.pos().halfmoves() as i32 + depth_remaining < 100;
+        let fifty_move_safe = self.state.pos().halfmoves() as i32 + depth_remaining < 100;
         let entry = if self.state.has_repeated() {
             None
         } else {
             self.memory.table.get(&key)
         };
-        let best = entry.and_then(|e| e.best);
+        let table_move = entry.and_then(|e| e.best);
         self.memory.diagnostics.table_probe();
         let mut cut = None;
         if let Some(entry) = entry {
             self.memory.diagnostics.table_hit();
             // A restricted root is never cut by the table: its move may be one the list excludes.
             let restricted_root = ply == 0 && self.options.root_moves.is_some();
-            if clock_free && entry.depth >= depth_remaining && !restricted_root {
+            if fifty_move_safe && entry.depth >= depth_remaining && !restricted_root {
                 let value = at_ply(entry.value, ply);
                 match entry.flag {
                     Flag::Exact => {
@@ -59,8 +59,8 @@ impl Search<'_> {
             }
         }
         TableProbe {
-            best,
-            clock_free,
+            table_move,
+            fifty_move_safe,
             cut,
         }
     }
@@ -69,7 +69,7 @@ impl Search<'_> {
     pub(super) fn store_result(
         &mut self,
         key: u64,
-        (value, best): Outcome,
+        (value, best): NodeResult,
         depth_remaining: i32,
         (alpha, beta): (i32, i32),
         ply: i32,

@@ -144,7 +144,7 @@ fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<SearchR
         dynamic_budget_start: Some(&signals.budget_start),
         clock: &clock,
         stop: Some(&signals.stop),
-        progress: None,
+        main_depth: None,
         rotation: 0,
     };
     let (best, stats) = search::iterative_deepening(
@@ -168,7 +168,7 @@ fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<SearchR
             .map_or("0000".to_string(), uci_string)
     });
     let ponder = match &best {
-        Some(mv) if !job.limits.ponder => ponder_reply(&mut state, memory, mv),
+        Some(m) if !job.limits.ponder => ponder_reply(&mut state, memory, m),
         _ => None,
     };
     Ok(SearchResult {
@@ -191,9 +191,9 @@ fn ponder_reply(
         .and_then(|id| {
             legal_moves(state.pos())
                 .into_iter()
-                .find(|mv| move_id(mv) == id)
+                .find(|m| move_id(m) == id)
         })
-        .map(|mv| uci_string(&mv));
+        .map(|m| uci_string(&m));
     state.undo();
     reply
 }

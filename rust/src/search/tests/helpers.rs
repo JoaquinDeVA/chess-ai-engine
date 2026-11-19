@@ -62,7 +62,7 @@ pub(super) fn control(hard_limit: f64, clock: Clock<'_>) -> Control<'_> {
         dynamic_budget_start: None,
         clock,
         stop: None,
-        progress: None,
+        main_depth: None,
         rotation: 0,
     }
 }

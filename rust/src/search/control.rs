@@ -22,7 +22,7 @@ pub struct Control<'a> {
     pub clock: Clock<'a>,
     pub stop: Option<&'a AtomicBool>,
     /// Depth the main thread is searching, written by it and read by the helpers.
-    pub progress: Option<&'a AtomicUsize>,
+    pub main_depth: Option<&'a AtomicUsize>,
     /// Helper threads rotate the moves of the root by this much, so that they do not all start with
     /// the same one.
     pub rotation: usize,

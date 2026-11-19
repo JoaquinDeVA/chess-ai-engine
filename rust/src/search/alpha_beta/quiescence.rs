@@ -51,16 +51,16 @@ impl Search<'_> {
             noisy = order_noisy(moves);
             &noisy
         };
-        for &action in candidates {
-            if !in_check && !see_ge(self.state.pos(), &action, 0) {
+        for &m in candidates {
+            if !in_check && !see_ge(self.state.pos(), &m, 0) {
                 continue;
             }
-            self.play(action);
+            self.apply(m);
             self.nodes += 1;
             self.memory.diagnostics.quiescence_node();
             let child_moves = legal_moves(self.state.pos());
             let value = match self.state.outcome(&child_moves) {
-                Some(winner) => self.terminal_utility(winner, ply + 1),
+                Some(winner) => self.terminal_value(winner, ply + 1),
                 None => self.quiescence(
                     alpha,
                     beta,
@@ -69,7 +69,7 @@ impl Search<'_> {
                     &child_moves,
                 ),
             };
-            self.unplay();
+            self.undo();
             if maximizing {
                 best_value = best_value.max(value);
                 alpha = alpha.max(best_value);

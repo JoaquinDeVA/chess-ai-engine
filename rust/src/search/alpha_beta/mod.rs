@@ -31,7 +31,7 @@ use crate::eval::{Net, NetState};
 const NULL_WINDOW_WIDTH: i32 = 1;
 
 /// A value and the best move found for it (`None` when the node has none to give).
-type Outcome = (i32, Option<u32>);
+type NodeResult = (i32, Option<u32>);
 
 /// What the stages of one node need to know about who moves and what was just played.
 struct NodeContext {
@@ -70,7 +70,7 @@ struct Search<'a> {
 impl Search<'_> {
     /// Value of a finished game for the root player: a mate counts the plies to it, so that
     /// quicker wins and slower losses are preferred.
-    fn terminal_utility(&self, winner: Option<Color>, ply: i32) -> i32 {
+    fn terminal_value(&self, winner: Option<Color>, ply: i32) -> i32 {
         match winner {
             Some(color) if color == self.root_player => MATE - ply,
             Some(_) => ply - MATE,
@@ -88,7 +88,7 @@ impl Search<'_> {
     }
 
     /// Play `m` in the game state and in the incremental evaluation.
-    fn play(&mut self, m: Move) {
+    fn apply(&mut self, m: Move) {
         let child_key = crate::board::zobrist_after(self.state.pos(), self.state.key(), &m);
         self.memory.table.prefetch(&child_key);
         self.eval.apply(self.state.pos(), &m);
@@ -97,14 +97,14 @@ impl Search<'_> {
     }
 
     /// Pass the turn in the game state and in the incremental evaluation.
-    fn play_null(&mut self) {
+    fn apply_null(&mut self) {
         self.eval.apply_null();
         self.played.push(None);
         self.state.apply_null();
     }
 
-    /// Take back the last move played with [`Search::play`] or [`Search::play_null`].
-    fn unplay(&mut self) {
+    /// Take back the last move played with [`Search::apply`] or [`Search::apply_null`].
+    fn undo(&mut self) {
         self.state.undo();
         self.eval.undo();
         self.played.pop();

@@ -23,11 +23,11 @@ pub(super) fn vote(main: (usize, i32, Option<Move>), reports: &[Report]) -> Opti
         .min()
         .expect("the main thread votes");
     let mut weights: Vec<(Move, i64)> = Vec::new();
-    for (depth, value, mv) in voters {
+    for (depth, value, m) in voters {
         let weight = depth as i64 * i64::from(value - lowest + VOTE_MARGIN);
-        match weights.iter_mut().find(|(m, _)| *m == mv) {
+        match weights.iter_mut().find(|(known, _)| *known == m) {
             Some((_, total)) => *total += weight,
-            None => weights.push((mv, weight)),
+            None => weights.push((m, weight)),
         }
     }
     let mut best = 0;

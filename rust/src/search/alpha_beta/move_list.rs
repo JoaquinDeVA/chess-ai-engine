@@ -40,7 +40,7 @@ impl Search<'_> {
             (&self.memory.history, context.mover),
             context
                 .previous_piece_to
-                .map(|previous| (&self.memory.continuation, previous)),
+                .map(|previous| (&self.memory.continuation_history, previous)),
         );
         if listed {
             let pos = self.state.pos();

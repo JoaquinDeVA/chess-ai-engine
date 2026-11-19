@@ -18,7 +18,7 @@ fn dynamic_limits_are_visible_to_an_active_search() {
         dynamic_budget_start: None,
         clock: &no_time,
         stop: None,
-        progress: None,
+        main_depth: None,
         rotation: 0,
     };
     hard.store(2.0f64.to_bits(), Ordering::Release);
@@ -40,7 +40,7 @@ fn the_scale_applies_to_the_budget_and_not_to_the_time_before_it() {
         dynamic_budget_start: Some(&begin),
         clock: &no_time,
         stop: None,
-        progress: None,
+        main_depth: None,
         rotation: 0,
     };
     // Budget 1.5 s from second 2.3.

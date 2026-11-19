@@ -3,7 +3,7 @@
 use shakmaty::{Chess, Color, Move, Position};
 
 use super::reductions::null_move_reduction;
-use super::{NodeContext, Outcome, Search, NULL_WINDOW_WIDTH};
+use super::{NodeContext, NodeResult, Search, NULL_WINDOW_WIDTH};
 use crate::eval::EVAL_LIMIT;
 
 /// The null move is tried from this depth on.
@@ -59,7 +59,7 @@ impl Search<'_> {
         (alpha, beta): (i32, i32),
         allow_null: bool,
         static_cache: &mut Option<i32>,
-    ) -> Option<Outcome> {
+    ) -> Option<NodeResult> {
         if !(allow_null
             && context.ply > 0
             && depth_remaining >= NULL_MOVE_FROM_DEPTH
@@ -84,7 +84,7 @@ impl Search<'_> {
         } else {
             (alpha, alpha + NULL_WINDOW_WIDTH)
         };
-        self.play_null();
+        self.apply_null();
         let (value, _) = self.node(
             low,
             high,
@@ -92,7 +92,7 @@ impl Search<'_> {
             context.ply + 1,
             false,
         );
-        self.unplay();
+        self.undo();
         if !self.truncated
             && ((context.maximizing && value >= beta) || (!context.maximizing && value <= alpha))
         {
@@ -117,12 +117,12 @@ impl Search<'_> {
         shallow.then(|| self.cached_static_value(static_cache))
     }
 
-    /// Whether the quiet move `action` is skipped: the static value is so far from the (current)
+    /// Whether the quiet move `m` is skipped: the static value is so far from the (current)
     /// window that a move cannot bring it back, and the move gives no check.
     pub(super) fn is_futile(
         &self,
         context: &NodeContext,
-        action: &Move,
+        m: &Move,
         static_value: i32,
         depth_remaining: i32,
         (alpha, beta): (i32, i32),
@@ -138,7 +138,7 @@ impl Search<'_> {
         }
         // A move that gives check is never skipped.
         let mut after = self.state.pos().clone();
-        after.play_unchecked(*action);
+        after.play_unchecked(*m);
         !after.is_check()
     }
 }

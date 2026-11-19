@@ -32,12 +32,12 @@ pub(super) fn deepen(
     let mut last_truncated = false;
     let mut iterations: Vec<IterationInfo> = Vec::new();
     let mut stop_reason = StopReason::MaxDepth;
-    let mut stable = 0usize;
+    let mut stable_iterations = 0usize;
     let mut last_value: Option<i32> = None;
 
     for depth in 1..=max_depth {
-        if let Some(progress) = control.progress {
-            progress.store(depth, Relaxed);
+        if let Some(main_depth) = control.main_depth {
+            main_depth.store(depth, Relaxed);
         }
         let iteration_start = clock();
         let result = alpha_beta(state, eval, memory, options, depth as i32, control);
@@ -64,8 +64,8 @@ pub(super) fn deepen(
             stop_reason = StopReason::Truncated;
             break;
         }
-        stable = if result.best.is_some() && result.best == best_move {
-            stable + 1
+        stable_iterations = if result.best.is_some() && result.best == best_move {
+            stable_iterations + 1
         } else {
             0
         };
@@ -74,8 +74,10 @@ pub(super) fn deepen(
         completed_depth = depth;
         // Clock policy: never stop before `min_depth`, so the move always comes from a minimum of
         // real search; after it, the soft limit scaled by how settled the best move is.
-        let soft =
-            control.scaled_soft_limit(soft_limit, soft_scale(depth, stable, result.best_share));
+        let soft = control.scaled_soft_limit(
+            soft_limit,
+            soft_scale(depth, stable_iterations, result.best_share),
+        );
         if depth >= options.min_depth && clock() - start >= soft {
             stop_reason = StopReason::Budget;
             break;

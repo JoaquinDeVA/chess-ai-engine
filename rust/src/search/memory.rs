@@ -14,7 +14,7 @@ pub struct Memory {
     pub table: Arc<Table>,
     pub killers: Killers,
     pub history: History,
-    pub continuation: ContinuationHistory,
+    pub continuation_history: ContinuationHistory,
     pub threads: usize,
     pub diagnostics: SearchDiagnostics,
 }
@@ -26,7 +26,7 @@ impl Memory {
             table: Arc::new(Table::with_megabytes(hash_megabytes)),
             killers: Killers::default(),
             history: History::default(),
-            continuation: ContinuationHistory::default(),
+            continuation_history: ContinuationHistory::default(),
             threads: threads.max(1),
             diagnostics: SearchDiagnostics::default(),
         }
@@ -36,7 +36,7 @@ impl Memory {
         self.table.clear();
         self.killers.clear();
         self.history.clear();
-        self.continuation.clear();
+        self.continuation_history.clear();
     }
 }
 

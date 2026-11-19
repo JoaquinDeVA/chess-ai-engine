@@ -250,7 +250,7 @@ impl UciEngine {
                 .as_ref()
                 .and_then(|book| book.lookup(state.pos()))
             {
-                Some(mv) => return Some(uci_string(&mv)),
+                Some(m) => return Some(uci_string(&m)),
                 None => self.settings.in_book = false,
             }
         }

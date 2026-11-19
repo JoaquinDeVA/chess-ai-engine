@@ -3,7 +3,7 @@
 use shakmaty::{MoveList, Position};
 
 use super::reductions::internal_iterative_reduction;
-use super::{NodeContext, Outcome, Search};
+use super::{NodeContext, NodeResult, Search};
 use crate::board::legal_moves;
 
 impl Search<'_> {
@@ -18,7 +18,7 @@ impl Search<'_> {
         depth_remaining: i32,
         ply: i32,
         allow_null: bool,
-    ) -> Outcome {
+    ) -> NodeResult {
         // The window as it came in: the table flag is decided against it, not against the one
         // narrowed below by the table and by the moves.
         let window_in = (alpha, beta);
@@ -48,7 +48,7 @@ impl Search<'_> {
         if deferred {
             let pos = self.state.pos();
             if pos.is_insufficient_material() || pos.halfmoves() >= 100 {
-                return (self.terminal_utility(None, ply), None);
+                return (self.terminal_value(None, ply), None);
             }
         } else {
             moves = legal_moves(self.state.pos());
@@ -85,11 +85,11 @@ impl Search<'_> {
         if deferred {
             moves = legal_moves(self.state.pos());
             if moves.is_empty() {
-                return (self.terminal_utility(None, ply), None);
+                return (self.terminal_value(None, ply), None);
             }
         }
-        let node_moves = self.node_moves(&context, &moves, depth_remaining, probe.best);
-        let depth_remaining = internal_iterative_reduction(depth_remaining, ply, probe.best);
+        let node_moves = self.node_moves(&context, &moves, depth_remaining, probe.table_move);
+        let depth_remaining = internal_iterative_reduction(depth_remaining, ply, probe.table_move);
         let futility_value =
             self.futility_value(&context, depth_remaining, (alpha, beta), &mut static_cache);
         let (best_value, best_move) = self.search_moves(
@@ -97,11 +97,11 @@ impl Search<'_> {
             node_moves,
             (alpha, beta),
             depth_remaining,
-            probe.best,
+            probe.table_move,
             futility_value,
         );
         // A cut search has partial values, so it must not be stored as if it were exact.
-        if !self.truncated && probe.clock_free {
+        if !self.truncated && probe.fifty_move_safe {
             self.store_result(
                 key,
                 (best_value, best_move),
@@ -129,7 +129,7 @@ impl Search<'_> {
         {
             self.memory.diagnostics.repetition_draw();
         }
-        Some(self.terminal_utility(winner, ply))
+        Some(self.terminal_value(winner, ply))
     }
 
     /// Value of a node at the horizon: the quiescence search, or the static value without one.

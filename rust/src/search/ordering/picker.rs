@@ -56,7 +56,7 @@ impl MovePicker {
         killers: &[u32],
         table: Option<u32>,
         (history, color): (&History, Color),
-        continuation: Option<(&ContinuationHistory, usize)>,
+        continuation_history: Option<(&ContinuationHistory, usize)>,
     ) -> MovePicker {
         let mut killer = [false; MAX_MOVES];
         let mut table_move = None;
@@ -119,7 +119,7 @@ impl MovePicker {
             .enumerate()
         {
             let score = history.score(color, m)
-                + continuation.map_or(0, |(cont, previous)| cont.score(color, previous, m));
+                + continuation_history.map_or(0, |(cont, previous)| cont.score(color, previous, m));
             *slot = key(score, rank);
         }
         picker.table = table_move;

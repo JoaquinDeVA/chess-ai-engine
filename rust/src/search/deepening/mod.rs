@@ -46,21 +46,25 @@ pub fn iterative_deepening(
         return deepen(state, eval, memory, options, max_depth, soft_limit, control)
             .map(|(best, stats, _)| (best, stats));
     }
-    let (table, extra) = (memory.table.clone(), memory.threads - 1);
+    let (table, helper_count) = (memory.table.clone(), memory.threads - 1);
     // Helpers only fill the shared table; the main thread alone decides the move, so the result
     // does not depend on how the threads interleave. They stop when the main thread is done.
     let stop = AtomicBool::new(false);
     let helper_nodes = std::sync::atomic::AtomicU64::new(0);
-    let progress = AtomicUsize::new(0);
-    let copies: Vec<GameState> = (0..extra).map(|_| state.clone()).collect();
-    let reports: Vec<Report> = (0..extra).map(|_| Mutex::new(None)).collect();
+    let main_depth = AtomicUsize::new(0);
+    let copies: Vec<GameState> = (0..helper_count).map(|_| state.clone()).collect();
+    let reports: Vec<Report> = (0..helper_count).map(|_| Mutex::new(None)).collect();
     let history = memory.history.clone();
-    let continuation = memory.continuation.clone();
+    let continuation_history = memory.continuation_history.clone();
     let result = std::thread::scope(|scope| {
         for (index, copy) in copies.into_iter().enumerate() {
-            let (table, stop, nodes, progress) = (table.clone(), &stop, &helper_nodes, &progress);
-            let (history, continuation, report) =
-                (history.clone(), continuation.clone(), &reports[index]);
+            let (table, stop, nodes, main_depth) =
+                (table.clone(), &stop, &helper_nodes, &main_depth);
+            let (history, continuation_history, report) = (
+                history.clone(),
+                continuation_history.clone(),
+                &reports[index],
+            );
             scope.spawn(move || {
                 let helper_control = Control {
                     start: control.start,
@@ -70,7 +74,7 @@ pub fn iterative_deepening(
                     dynamic_budget_start: control.dynamic_budget_start,
                     clock: control.clock,
                     stop: Some(stop),
-                    progress: Some(progress),
+                    main_depth: Some(main_depth),
                     rotation: index + 1,
                 };
                 nodes.fetch_add(
@@ -80,7 +84,7 @@ pub fn iterative_deepening(
                         eval,
                         table,
                         history,
-                        continuation,
+                        continuation_history,
                         options,
                         max_depth,
                         &helper_control,
@@ -98,7 +102,7 @@ pub fn iterative_deepening(
             dynamic_budget_start: control.dynamic_budget_start,
             clock: control.clock,
             stop: control.stop,
-            progress: Some(&progress),
+            main_depth: Some(&main_depth),
             rotation: control.rotation,
         };
         let result = deepen(

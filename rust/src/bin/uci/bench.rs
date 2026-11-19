@@ -52,7 +52,7 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
         dynamic_budget_start: None,
         clock: &unlimited_clock,
         stop: None,
-        progress: None,
+        main_depth: None,
         rotation: 0,
     };
     let mut memory = Memory::new(1, DEFAULT_HASH_MB);
@@ -140,7 +140,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
             dynamic_budget_start: None,
             clock: &clock,
             stop: None,
-            progress: None,
+            main_depth: None,
             rotation: 0,
         };
         let (_, stats) = search::iterative_deepening(

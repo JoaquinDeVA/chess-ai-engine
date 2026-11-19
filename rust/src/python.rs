@@ -38,7 +38,7 @@ impl PyEvaluator {
     /// the first layer consumes the feature accumulator produced by the selected feature set.
     ///
     /// With `perspective` the second layer reads the accumulators of both sides, which share the
-    /// first layer (see `Net::with_perspective`).
+    /// first layer (see `Net::with_both_perspectives`).
     #[staticmethod]
     #[pyo3(signature = (features, layers, perspective=false))]
     fn network(
@@ -60,7 +60,7 @@ impl PyEvaluator {
             })
             .collect();
         let net = if perspective {
-            Net::with_perspective(set, layers)
+            Net::with_both_perspectives(set, layers)
         } else {
             Net::new(set, layers)
         }

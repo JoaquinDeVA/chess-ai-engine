@@ -1,16 +1,7 @@
 //! Static exchange evaluation: whether a capture wins material once both sides have traded.
 
+use crate::board::piece_value;
 use shakmaty::{Chess, Color, Move, Position, Role, Square};
-
-fn see_value(role: Role) -> i32 {
-    match role {
-        Role::Pawn => 1,
-        Role::Knight | Role::Bishop => 3,
-        Role::Rook => 5,
-        Role::Queen => 9,
-        Role::King => 100,
-    }
-}
 
 /// Static exchange evaluation: whether the capture `m` wins at least `threshold` pawns once both
 /// sides have traded on its target square, each always with its least valuable attacker and free to
@@ -35,11 +26,11 @@ pub fn see_ge(pos: &Chess, m: &Move, threshold: i32) -> bool {
     }
     // `balance` is what the side to move wins if it stops now, from the point of view of the side
     // that captured last.
-    let mut balance = see_value(victim) - threshold;
+    let mut balance = piece_value(victim) - threshold;
     if balance < 0 {
         return false;
     }
-    balance = see_value(attacker) - balance;
+    balance = piece_value(attacker) - balance;
     if balance <= 0 {
         return true;
     }
@@ -71,7 +62,7 @@ pub fn see_ge(pos: &Chess, m: &Move, threshold: i32) -> bool {
             let rest = (board.attacks_to(to, !side, occupied)) & occupied & board.by_color(!side);
             return if rest.any() { !result } else { result };
         }
-        balance = see_value(role) - balance;
+        balance = piece_value(role) - balance;
         if balance < i32::from(result) {
             return result;
         }

@@ -32,7 +32,7 @@ pub(super) type Report = Mutex<Option<(usize, i32, Move)>>;
 pub(super) fn helper(
     index: usize,
     mut state: GameState,
-    eval: &Net,
+    net: &Net,
     table: Arc<Table>,
     history: History,
     continuation_history: ContinuationHistory,
@@ -63,14 +63,7 @@ pub(super) fn helper(
             depth += 1;
             continue;
         }
-        let result = alpha_beta(
-            &mut state,
-            eval,
-            &mut memory,
-            options,
-            depth as i32,
-            control,
-        );
+        let result = alpha_beta(&mut state, net, &mut memory, options, depth as i32, control);
         nodes += result.nodes;
         if result.truncated {
             break;

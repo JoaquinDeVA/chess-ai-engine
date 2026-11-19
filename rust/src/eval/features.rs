@@ -2,14 +2,15 @@
 //! from the side to move. The network scores them. The features and their order are those of
 //! `chess_lab/models/features.py`.
 
+use crate::board::piece_value;
 use shakmaty::attacks::{bishop_attacks, king_attacks, knight_attacks, rook_attacks};
-use shakmaty::{Bitboard, Board, Chess, Color, File, Piece, Position, Role, Square};
+use shakmaty::{Bitboard, Board, Chess, Color, File, Piece, Position, Square};
 
 pub(super) const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
-/// Piece inputs: one per piece, colour and square.
+/// Piece inputs: one per piece, color and square.
 pub const PIECE_INPUTS: usize = 2 * OPPONENT_PIECE_BLOCK;
 /// Dense threat inputs: two best capture gains, two en-prise counts and the check flag.
-const THREAT_COUNT: usize = 5;
+const THREAT_INPUTS: usize = 5;
 const GAIN_SCALE: f64 = 9.0;
 const EN_PRISE_SCALE: f64 = 4.0;
 
@@ -40,7 +41,7 @@ impl FeatureSet {
     pub fn size(self) -> usize {
         match self {
             FeatureSet::Slotted => PIECE_INPUTS,
-            FeatureSet::Threats => PIECE_INPUTS + THREAT_COUNT,
+            FeatureSet::Threats => PIECE_INPUTS + THREAT_INPUTS,
         }
     }
 
@@ -80,17 +81,6 @@ fn mirror(sq: Square) -> usize {
     u32::from(sq.flip_vertical()) as usize
 }
 
-/// Material value of a role for the capture gains; the king is worth more than any gain.
-fn role_value(role: Role) -> i32 {
-    match role {
-        Role::Pawn => 1,
-        Role::Knight | Role::Bishop => 3,
-        Role::Rook => 5,
-        Role::Queen => 9,
-        Role::King => 100,
-    }
-}
-
 /// Every square that some piece of `side` attacks, own pieces included (so also the squares it
 /// defends). Pawns by shifting the whole set, each other role by its attack table.
 fn attacked_by(board: &Board, side: Color) -> Bitboard {
@@ -126,7 +116,7 @@ fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboar
     let occupied = board.occupied();
     let (mut best, mut count) = (0, 0);
     for square in board.by_color(!attacker) & !board.kings() & attacks {
-        let target = role_value(board.role_at(square).expect("occupied"));
+        let target = piece_value(board.role_at(square).expect("occupied"));
         let gain = if defences.contains(square) {
             let mine = board.by_color(attacker);
             let cheapest = if target == 1
@@ -165,27 +155,27 @@ fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboar
     (best, count)
 }
 
-/// The threat inputs from `base` on: the mover's best capture, the rival's, the pieces each side
+/// The threat inputs from `base` on: the mover's best capture, the opponent's, the pieces each side
 /// has en prise to the other, and whether the mover is in check.
 fn threats(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let mover = pos.turn();
     let board = pos.board();
     let mover_map = attacked_by(board, mover);
-    let rival_map = attacked_by(board, !mover);
-    let (mover_gain, mover_count) = en_prise(board, mover, mover_map, rival_map);
-    let (rival_gain, rival_count) = en_prise(board, !mover, rival_map, mover_map);
-    indices.extend(base..base + THREAT_COUNT);
+    let opponent_map = attacked_by(board, !mover);
+    let (mover_gain, mover_count) = en_prise(board, mover, mover_map, opponent_map);
+    let (opponent_gain, opponent_count) = en_prise(board, !mover, opponent_map, mover_map);
+    indices.extend(base..base + THREAT_INPUTS);
     values.extend([
         f64::from(mover_gain) / GAIN_SCALE,
-        f64::from(rival_gain) / GAIN_SCALE,
+        f64::from(opponent_gain) / GAIN_SCALE,
         f64::from(mover_count) / EN_PRISE_SCALE,
-        f64::from(rival_count) / EN_PRISE_SCALE,
+        f64::from(opponent_count) / EN_PRISE_SCALE,
         if pos.is_check() { 1.0 } else { 0.0 },
     ]);
 }
 
 /// One entry per piece: the mover's pieces in the first block, the opponent's in the second, each
-/// colour seen from its own home rank.
+/// color seen from its own home rank.
 fn slotted(pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
     let mover = pos.turn();
     for (square, piece) in pieces(pos) {
@@ -213,7 +203,7 @@ mod tests {
         let pos = position_from_fen(fen).unwrap();
         let (mut indices, mut values) = (Vec::new(), Vec::new());
         threats(&pos, 0, &mut indices, &mut values);
-        assert_eq!(indices, (0..THREAT_COUNT).collect::<Vec<_>>());
+        assert_eq!(indices, (0..THREAT_INPUTS).collect::<Vec<_>>());
         values
     }
 

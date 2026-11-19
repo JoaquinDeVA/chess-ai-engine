@@ -19,11 +19,11 @@ const BENCH_DEPTH: usize = 6;
 
 /// Runs `bench_once` `repetitions` times: the node counts (stdout) come from the first run, the
 /// times and the nodes per second (stderr) from all of them, with their median.
-pub fn bench(network: &Net, repetitions: usize) {
+pub fn bench(net: &Net, repetitions: usize) {
     let mut elapsed_seconds: Vec<f64> = Vec::new();
     let mut total_nodes = 0u64;
     for run in 0..repetitions {
-        let (nodes, elapsed) = bench_once(network, run == 0);
+        let (nodes, elapsed) = bench_once(net, run == 0);
         total_nodes = nodes; //Son iguales todas las ejecuciones, solo varía el tiempo
         elapsed_seconds.push(elapsed);
     }
@@ -41,7 +41,7 @@ pub fn bench(network: &Net, repetitions: usize) {
 /// total nodes and the time of the searches: the table is cleared outside the clock, as a game does
 /// it once and not per move (clearing also brings its pages into memory, which a fresh table would
 /// do mid-search).
-fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
+fn bench_once(net: &Net, print_positions: bool) -> (u64, f64) {
     let search_options = Options::default();
     let unlimited_clock = || 0.0;
     let search_control = Control {
@@ -69,7 +69,7 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
         let search_started = Instant::now();
         let (best_move, stats) = search::iterative_deepening(
             &mut game_state,
-            network,
+            net,
             &mut memory,
             &search_options,
             BENCH_DEPTH,
@@ -105,7 +105,7 @@ fn bench_once(network: &Net, print_positions: bool) -> (u64, f64) {
 /// `#` starts a comment) to `depth` with fresh memory and one thread, and prints the time and the
 /// nodes of each and what the search counted over all of them. A position that does not finish
 /// within the limit counts as the limit in the median.
-pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result<(), String> {
+pub fn time_to_depth(net: &Net, depth: usize, path: &str, limit: f64) -> Result<(), String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
     let fens: Vec<String> = text
         .lines()
@@ -145,7 +145,7 @@ pub fn time_to_depth(eval: &Net, depth: usize, path: &str, limit: f64) -> Result
         };
         let (_, stats) = search::iterative_deepening(
             &mut state,
-            eval,
+            net,
             &mut memory,
             &options,
             depth,

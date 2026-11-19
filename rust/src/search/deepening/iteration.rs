@@ -15,7 +15,7 @@ use crate::search::stats::*;
 
 pub(super) fn deepen(
     state: &mut GameState,
-    eval: &Net,
+    net: &Net,
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
@@ -40,7 +40,7 @@ pub(super) fn deepen(
             main_depth.store(depth, Relaxed);
         }
         let iteration_start = clock();
-        let result = alpha_beta(state, eval, memory, options, depth as i32, control);
+        let result = alpha_beta(state, net, memory, options, depth as i32, control);
         let seconds = clock() - iteration_start;
         iterations.push(IterationInfo {
             depth,

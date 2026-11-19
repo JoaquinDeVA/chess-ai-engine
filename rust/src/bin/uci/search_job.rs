@@ -51,7 +51,7 @@ pub struct RunningSearch {
 impl RunningSearch {
     pub fn start(
         memory: Memory,
-        eval: Arc<Net>,
+        net: Arc<Net>,
         position: Position,
         limits: SearchLimits,
         root_moves: Option<Vec<u32>>,
@@ -76,7 +76,7 @@ impl RunningSearch {
             signals: signals.clone(),
         };
         Self {
-            handle: std::thread::spawn(move || search_job(memory, eval, job)),
+            handle: std::thread::spawn(move || search_job(memory, net, job)),
             signals,
             ponder,
             resume_soft_time,
@@ -109,9 +109,9 @@ impl RunningSearch {
     }
 }
 
-fn search_job(mut memory: Memory, eval: Arc<Net>, job: SearchJob) -> Memory {
+fn search_job(mut memory: Memory, net: Arc<Net>, job: SearchJob) -> Memory {
     let (ponder, signals) = (job.limits.ponder, job.signals.clone());
-    let outcome = run_search(&mut memory, &eval, job);
+    let outcome = run_search(&mut memory, &net, job);
     // UCI: a search started with `go ponder` must not print `bestmove` before `ponderhit` or `stop`,
     // even if it ended by itself (maximum depth, node limit, forced mate).
     while ponder && !signals.stop.load(Relaxed) && !signals.ponder_hit.load(Relaxed) {
@@ -127,7 +127,7 @@ fn search_job(mut memory: Memory, eval: Arc<Net>, job: SearchJob) -> Memory {
     memory
 }
 
-fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<SearchResult, String> {
+fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<SearchResult, String> {
     let mut state = job.position.state()?;
     let signals = &job.signals;
     let options = Options {
@@ -149,7 +149,7 @@ fn run_search(memory: &mut Memory, eval: &Net, job: SearchJob) -> Result<SearchR
     };
     let (best, stats) = search::iterative_deepening(
         &mut state,
-        eval,
+        net,
         memory,
         &options,
         job.limits.max_depth,

@@ -34,8 +34,8 @@ pub struct Net {
     /// Widest layer before the output: the size of the buffers of an evaluation.
     pub(super) max_width: usize,
     /// Whether the second layer reads the accumulators of both sides (the mover's, then the
-    /// rival's, 2 * width values) instead of the mover's alone.
-    pub(super) perspective: bool,
+    /// opponent's, 2 * width values) instead of the mover's alone.
+    pub(super) both_perspectives: bool,
 }
 
 impl Net {
@@ -45,13 +45,17 @@ impl Net {
     }
 
     /// A network whose second layer reads both sides' accumulators, which share the first layer's
-    /// weights (`layers[1].fan_in` is twice the accumulator width). The rival's view of a piece is
+    /// weights (`layers[1].fan_in` is twice the accumulator width). The opponent's view of a piece is
     /// the other block of the same square; the dense inputs (the threats) are the mover's alone and only reach the mover's half.
-    pub fn with_perspective(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
+    pub fn with_both_perspectives(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
         Net::build(features, layers, true)
     }
 
-    fn build(features: FeatureSet, layers: Vec<Layer>, perspective: bool) -> Result<Net, String> {
+    fn build(
+        features: FeatureSet,
+        layers: Vec<Layer>,
+        both_perspectives: bool,
+    ) -> Result<Net, String> {
         if layers.len() < 2 {
             return Err("a network needs an accumulator and an output layer".into());
         }
@@ -63,7 +67,7 @@ impl Net {
             ));
         }
         for (position, pair) in layers.windows(2).enumerate() {
-            let wanted = if perspective && position == 0 {
+            let wanted = if both_perspectives && position == 0 {
                 2 * pair[0].fan_out
             } else {
                 pair[0].fan_out
@@ -83,7 +87,7 @@ impl Net {
             return Err("the output layer must have one unit".into());
         }
         let mut max_width = layers.iter().map(|l| l.fan_out).max().unwrap_or(1);
-        if perspective {
+        if both_perspectives {
             max_width = max_width.max(2 * layers[0].fan_out);
         }
         let single = |values: &[f64]| values.iter().map(|&v| v as f32).collect();
@@ -99,7 +103,7 @@ impl Net {
             features,
             layers,
             max_width,
-            perspective,
+            both_perspectives,
         })
     }
     /// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`,
@@ -168,9 +172,9 @@ impl Net {
                 *h += w * value as f32;
             }
         }
-        if self.perspective {
-            // the rival's view: every piece in the other block of its square; the dense inputs
-            // have no rival view
+        if self.both_perspectives {
+            // the opponent's view: every piece in the other block of its square; the dense inputs
+            // have no opponent view
             hidden.extend_from_slice(&first.bias);
             for (&index, &value) in indices
                 .iter()
@@ -192,7 +196,7 @@ impl Net {
     /// `max_width` values each, so that an evaluation allocates nothing.
     pub(super) fn finish(&self, hidden: &mut [f32], spare: &mut [f32]) -> f32 {
         let mut width = self.layers[0].fan_out;
-        if self.perspective {
+        if self.both_perspectives {
             width *= 2;
         }
         for h in &mut hidden[..width] {

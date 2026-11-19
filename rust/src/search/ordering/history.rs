@@ -123,7 +123,7 @@ mod tests {
     use shakmaty::Square;
 
     #[test]
-    fn history_scores_each_colour_apart_and_clears() {
+    fn history_scores_each_color_apart_and_clears() {
         let c = quiet(Square::A2, Square::A3);
         let history = History::default();
         history.reward(Color::White, &c, 4);
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(
             history.score(Color::Black, &c),
             0,
-            "the colours have their own scores"
+            "the colors have their own scores"
         );
         history.clear();
         assert_eq!(history.score(Color::White, &c), 0);

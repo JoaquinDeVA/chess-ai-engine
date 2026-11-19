@@ -27,11 +27,11 @@ mod search_job;
 /// `bench` measures fixed-position search performance, `ttd` measures the time to reach a
 /// depth for one FEN per line, and no mode starts the interactive UCI protocol on `stdin`.
 fn main() {
-    let eval = Arc::new(load_model().expect("the compiled-in model is valid"));
+    let net = Arc::new(load_model().expect("the compiled-in model is valid"));
     match std::env::args().nth(1).as_deref() {
-        Some("ttd") => run_time_to_depth(&eval),
-        Some("bench") => run_bench(&eval),
-        _ => UciEngine::new(eval).run(),
+        Some("ttd") => run_time_to_depth(&net),
+        Some("bench") => run_bench(&net),
+        _ => UciEngine::new(net).run(),
     }
 }
 
@@ -47,7 +47,7 @@ fn main() {
 /// `<depth>` is the target search depth, `<positions>` is a file containing one FEN per line,
 /// `[limit_s]` is an optional per-position time limit in seconds and `[model.json]`, when
 /// present, replaces the compiled-in network.
-fn run_time_to_depth(eval: &Net) {
+fn run_time_to_depth(net: &Net) {
     let args: Vec<String> = std::env::args().skip(2).collect();
     let depth = args.first().and_then(|depth| depth.parse().ok());
     let limit = args.get(2).map_or(Some(f64::INFINITY), |s| s.parse().ok());
@@ -56,7 +56,7 @@ fn run_time_to_depth(eval: &Net) {
             Some(model) => {
                 load_model_file(model).and_then(|net| time_to_depth(&net, depth, path, limit))
             }
-            None => time_to_depth(eval, depth, path, limit),
+            None => time_to_depth(net, depth, path, limit),
         },
         _ => Err("usage: uci ttd <depth> <positions> [limit_s] [model.json]".to_string()),
     };
@@ -76,7 +76,7 @@ fn run_time_to_depth(eval: &Net) {
 /// ```
 ///
 /// `[repetitions]` defaults to 5. `[model.json]`, when present, replaces the compiled-in network.
-fn run_bench(eval: &Net) {
+fn run_bench(net: &Net) {
     let repetitions = std::env::args()
         .nth(2)
         .and_then(|n| n.parse().ok())
@@ -86,7 +86,7 @@ fn run_bench(eval: &Net) {
             &load_model_file(&path).unwrap_or_else(|e| panic!("bench model {path}: {e}")),
             repetitions,
         ),
-        None => bench(eval, repetitions),
+        None => bench(net, repetitions),
     }
 }
 

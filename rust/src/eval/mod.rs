@@ -13,14 +13,14 @@ use shakmaty::Color;
 
 /// Distance of the lowest and highest expected score from 0 and 1, to stay clear of the terminal
 /// values 0 and 1.
-pub const MARGIN: f64 = 1e-2;
+pub const PROBABILITY_CLIP: f64 = 1e-2;
 
 /// Units of the score per unit of log-odds: the score is in centipawns of the usual logistic scale
 /// (`400 / ln 10`), so a pawn up is about 100 and the margins of the techniques read as such.
 pub const SCORE_PER_LOGIT: f32 = 173.717_8;
 
 /// Highest score of an evaluation, so that a mate is always beyond it: the clip of the expected
-/// score to `[MARGIN, 1 - MARGIN]` on this scale (`ln 99 · 400 / ln 10`).
+/// score to `[PROBABILITY_CLIP, 1 - PROBABILITY_CLIP]` on this scale (`ln 99 · 400 / ln 10`).
 pub const EVAL_LIMIT: i32 = 798;
 
 /// Expected score of White turned into the value of `player`, kept within the margin.
@@ -30,7 +30,7 @@ fn for_player(white_score: f64, player: Color) -> f64 {
     } else {
         1.0 - white_score
     };
-    (1.0 - MARGIN).min(MARGIN.max(score))
+    (1.0 - PROBABILITY_CLIP).min(PROBABILITY_CLIP.max(score))
 }
 
 /// Score of `player` from the logit of the side to move, `mover`, clipped to the evaluation range.

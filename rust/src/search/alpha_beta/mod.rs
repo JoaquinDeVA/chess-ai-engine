@@ -60,7 +60,7 @@ struct Search<'a> {
     /// Node count from which the clock is read again (it is read every `CLOCK_EVERY_NODES`).
     next_clock_check: u64,
     /// Evaluation that follows the moves of the search.
-    eval: NetState<'a>,
+    net_state: NetState<'a>,
     /// Nodes spent under each root move, by move id (the clock reads how settled the best one is).
     root_nodes: Vec<(u32, u64)>,
     /// The moves played from the root to this node, `None` for a passed turn.
@@ -79,7 +79,7 @@ impl Search<'_> {
     }
 
     fn static_value(&mut self) -> i32 {
-        self.eval.score(self.state.pos(), self.root_player)
+        self.net_state.score(self.state.pos(), self.root_player)
     }
 
     /// The static value of the node, evaluated once for all the techniques that ask for it.
@@ -91,14 +91,14 @@ impl Search<'_> {
     fn apply(&mut self, m: Move) {
         let child_key = crate::board::zobrist_after(self.state.pos(), self.state.key(), &m);
         self.memory.table.prefetch(&child_key);
-        self.eval.apply(self.state.pos(), &m);
+        self.net_state.apply(self.state.pos(), &m);
         self.played.push(Some((move_id(&m), piece_to(&m))));
         self.state.apply_keyed(m, child_key);
     }
 
     /// Pass the turn in the game state and in the incremental evaluation.
     fn apply_null(&mut self) {
-        self.eval.apply_null();
+        self.net_state.apply_null();
         self.played.push(None);
         self.state.apply_null();
     }
@@ -106,7 +106,7 @@ impl Search<'_> {
     /// Take back the last move played with [`Search::apply`] or [`Search::apply_null`].
     fn undo(&mut self) {
         self.state.undo();
-        self.eval.undo();
+        self.net_state.undo();
         self.played.pop();
     }
 }
@@ -156,7 +156,7 @@ pub fn alpha_beta(
         seldepth: 0,
         truncated: false,
         next_clock_check: 0,
-        eval: NetState::new(net, &root),
+        net_state: NetState::new(net, &root),
         root_nodes: Vec::new(),
         played: Vec::new(),
     };

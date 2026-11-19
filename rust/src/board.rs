@@ -72,6 +72,17 @@ pub fn uci_string(m: &Move) -> String {
     UciMove::from_move(*m, CastlingMode::Standard).to_string()
 }
 
+/// Material value of a role in pawns; the king is worth more than any gain.
+pub fn piece_value(role: Role) -> i32 {
+    match role {
+        Role::Pawn => 1,
+        Role::Knight | Role::Bishop => 3,
+        Role::Rook => 5,
+        Role::Queen => 9,
+        Role::King => 100,
+    }
+}
+
 /// Whether the move is a capture or a promotion, the moves of the quiescence search.
 pub fn is_noisy(m: &Move) -> bool {
     m.is_capture() || m.is_promotion()

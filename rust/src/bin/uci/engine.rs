@@ -21,7 +21,7 @@ pub(crate) const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR 
 struct EngineSettings {
     threads: usize,
     hash_mb: usize,
-    eval: Arc<Net>,
+    net: Arc<Net>,
     book: Option<OpeningBook>,
     in_book: bool,
     tablebase: Option<EndgameTablebase>,
@@ -39,11 +39,11 @@ pub struct UciEngine {
 }
 
 impl UciEngine {
-    pub fn new(eval: Arc<Net>) -> Self {
+    pub fn new(net: Arc<Net>) -> Self {
         let settings = EngineSettings {
             threads: 1,
             hash_mb: DEFAULT_HASH_MB,
-            eval,
+            net,
             book: None,
             in_book: false,
             tablebase: None,
@@ -145,11 +145,11 @@ impl UciEngine {
                     .parse::<bool>()
                     .map_err(|_| "Ponder needs true or false")?;
             }
-            "Model" if value == MODEL_NAME => self.settings.eval = Arc::new(load_model()?),
+            "Model" if value == MODEL_NAME => self.settings.net = Arc::new(load_model()?),
             "Model" => {
                 let text = std::fs::read_to_string(value)
                     .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;
-                self.settings.eval = Arc::new(Net::from_json(&text)?);
+                self.settings.net = Arc::new(Net::from_json(&text)?);
             }
             "Book" => {
                 self.settings.book = match value {
@@ -173,7 +173,7 @@ impl UciEngine {
         match self.position.state() {
             Ok(state) => println!(
                 "info string eval {:.6}",
-                self.settings.eval.evaluate(state.pos(), Color::White)
+                self.settings.net.evaluate(state.pos(), Color::White)
             ),
             Err(error) => println!("info string {error}"),
         }
@@ -216,7 +216,7 @@ impl UciEngine {
         let memory = self.memory.take().expect("memory is back after finish");
         self.running = Some(RunningSearch::start(
             memory,
-            self.settings.eval.clone(),
+            self.settings.net.clone(),
             self.position.clone(),
             limits,
             root_moves,

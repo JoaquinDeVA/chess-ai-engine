@@ -2,15 +2,16 @@
 
 use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
 
+use super::features::OPPONENT_PIECE_BLOCK;
 use super::net::Net;
 use super::score;
 
 /// Index of a piece among the piece inputs when `mover` is the side to move: the
-/// pieces of the mover come first, then the opponent's, each colour seen from its own home rank.
+/// pieces of the mover come first, then the opponent's, each color seen from its own home rank.
 fn input_index(mover: Color, color: Color, role: Role, square: Square) -> usize {
     let mut index = (role as usize - 1) * 64;
     if color != mover {
-        index += 384;
+        index += OPPONENT_PIECE_BLOCK;
     }
     let square = if color == Color::Black {
         square.flip_vertical()
@@ -256,7 +257,7 @@ impl NetState<'_> {
         let start = (2 * self.top + slot(pos.turn())) * width;
         if net.layers.len() == 2 && width.is_multiple_of(8) {
             // one output layer straight over the accumulators: no intermediate buffer, except the
-            // mover's own with the dense inputs added (they have no rival view)
+            // mover's own with the dense inputs added (they have no opponent view)
             let out = &net.layers[1];
             let mut lanes = [0.0f32; 8];
             if net.features.has_dense() {
@@ -282,10 +283,10 @@ impl NetState<'_> {
                     &mut lanes,
                 );
             }
-            if net.perspective {
-                let rival = (2 * self.top + slot(!pos.turn())) * width;
+            if net.both_perspectives {
+                let opponent = (2 * self.top + slot(!pos.turn())) * width;
                 clipped_dot(
-                    &self.stack[rival..rival + width],
+                    &self.stack[opponent..opponent + width],
                     &out.weights[width..2 * width],
                     &mut lanes,
                 );
@@ -293,10 +294,10 @@ impl NetState<'_> {
             return out.bias[0] + lanes.iter().sum::<f32>();
         }
         self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
-        if net.perspective {
-            // the rival's accumulator follows the mover's: both views, one shared first layer
-            let rival = (2 * self.top + slot(!pos.turn())) * width;
-            self.hidden[width..2 * width].copy_from_slice(&self.stack[rival..rival + width]);
+        if net.both_perspectives {
+            // the opponent's accumulator follows the mover's: both views, one shared first layer
+            let opponent = (2 * self.top + slot(!pos.turn())) * width;
+            self.hidden[width..2 * width].copy_from_slice(&self.stack[opponent..opponent + width]);
         }
         if net.features.has_dense() {
             self.dense_indices.clear();
@@ -412,7 +413,7 @@ mod tests {
 
     /// A network whose second layer reads both sides' accumulators (twice as wide as one).
     fn both_net(features: FeatureSet) -> Net {
-        Net::with_perspective(
+        Net::with_both_perspectives(
             features,
             vec![
                 layer(features.size(), 16, 1),

@@ -34,7 +34,7 @@ use voting::vote;
 /// those of the main thread and are not used by the helpers' copies.
 pub fn iterative_deepening(
     state: &mut GameState,
-    eval: &Net,
+    net: &Net,
     memory: &mut Memory,
     options: &Options,
     max_depth: usize,
@@ -43,7 +43,7 @@ pub fn iterative_deepening(
 ) -> Result<(Option<Move>, Stats), String> {
     memory.table.new_search();
     if memory.threads <= 1 {
-        return deepen(state, eval, memory, options, max_depth, soft_limit, control)
+        return deepen(state, net, memory, options, max_depth, soft_limit, control)
             .map(|(best, stats, _)| (best, stats));
     }
     let (table, helper_count) = (memory.table.clone(), memory.threads - 1);
@@ -81,7 +81,7 @@ pub fn iterative_deepening(
                     helper(
                         index,
                         copy,
-                        eval,
+                        net,
                         table,
                         history,
                         continuation_history,
@@ -107,7 +107,7 @@ pub fn iterative_deepening(
         };
         let result = deepen(
             state,
-            eval,
+            net,
             memory,
             options,
             max_depth,

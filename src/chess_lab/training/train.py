@@ -76,7 +76,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--tag",
-        help="train a variant: artifact <model>@<tag>, card <model>@<tag> (letters, digits, ._-)",
+        help="name a variant: artifact and card <model>@e<effort>-<tag> (letters, digits, ._-)",
     )
     parser.add_argument(
         "--no-cache", action="store_true", help="do not cache the encoded training batches"
@@ -108,12 +108,13 @@ def parse_representation(text: Optional[str]) -> Representation:
 
 
 def model_spec(args: argparse.Namespace) -> str:
-    """Name of the model being trained: ``<model>`` or ``<model>@<tag>``.
+    """Name of the model being trained: ``<model>@e<effort>`` or ``<model>@e<effort>-<tag>``.
 
-    :param args: Parsed arguments (``model`` and ``tag``).
+    :param args: Parsed arguments (``model``, ``effort`` and ``tag``).
     :return: The specification, also used for the artifact and the card.
     """
-    return f"{args.model}@{args.tag}" if args.tag else args.model
+    variant = f"-{args.tag}" if args.tag else ""
+    return f"{args.model}@e{args.effort}{variant}"
 
 
 def effort_representation(args: argparse.Namespace) -> Representation:

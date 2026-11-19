@@ -272,7 +272,7 @@ class TestCommandLineWithDoubles:
 
     def test_training_writes_the_card_with_its_training_section(self, fake_training, capsys):
         assert self.train() == 0
-        card = cards.load_card("net_pst_w64_both")
+        card = cards.load_card("net_pst_w64_both@e40")
         assert card["status"] == "current" and card["parameters"] == 7
         training = card["training"]
         assert training["effort"] == 40 and training["train_samples"] == 900
@@ -283,15 +283,17 @@ class TestCommandLineWithDoubles:
     def test_patience_option_reaches_the_printed_plan_and_the_card(self, fake_training, capsys):
         assert self.train("--patience", "3") == 0
         assert "  patience: 3" in capsys.readouterr().out
-        assert cards.load_card("net_pst_w64_both")["training"]["effort_config"]["patience"] == 3
+        assert cards.load_card("net_pst_w64_both@e40")["training"]["effort_config"]["patience"] == 3
 
-    def test_tag_writes_artifact_and_card_without_touching_the_untagged_one(self, fake_training):
-        cards.update_card("net_pst_w64_both", status="current", parameters=99)
+    def test_the_artifact_and_card_carry_the_effort_and_a_variant_goes_after_it(
+        self, fake_training
+    ):
+        cards.update_card("net_pst_w64_both@e40", status="current", parameters=99)
         assert self.train("--tag", "x") == 0
-        assert (fake_training / "artifacts" / "net_pst_w64_both@x.npz").exists()
-        assert cards.load_card("net_pst_w64_both@x")["training"]["effort"] == 40
-        assert cards.load_card("net_pst_w64_both") == {
-            "name": "net_pst_w64_both", "status": "current", "parameters": 99
+        assert (fake_training / "artifacts" / "net_pst_w64_both@e40-x.npz").exists()
+        assert cards.load_card("net_pst_w64_both@e40-x")["training"]["effort"] == 40
+        assert cards.load_card("net_pst_w64_both@e40") == {
+            "name": "net_pst_w64_both@e40", "status": "current", "parameters": 99
         }  # fmt: skip
 
     def test_evaluation_with_a_tag_writes_the_tagged_card(
@@ -310,14 +312,14 @@ class TestCommandLineWithDoubles:
 
     def test_retraining_drops_the_measurements_of_the_previous_model(self, fake_training):
         cards.update_card(
-            "net_pst_w64_both",
+            "net_pst_w64_both@e40",
             status="current",
             training={"effort": 15, "old_key": 1},
             accuracy=ACCURACY,
             cost={"us_per_eval": 5.0},
         )
         assert self.train() == 0
-        card = cards.load_card("net_pst_w64_both")
+        card = cards.load_card("net_pst_w64_both@e40")
         assert not {"accuracy", "cost"} & set(card)
         assert card["training"]["effort"] == 40 and "old_key" not in card["training"]
         assert card["parameters"] == 7

@@ -16,7 +16,7 @@ ARTIFACTS_DIR = ROOT / "data" / "models"
 def split_spec(spec: str) -> Tuple[str, Optional[str]]:
     """Split a model specification ``name`` or ``name@tag``.
 
-    A tag names a second artifact of the same model (e.g. trained on undersampled mates).
+    The tag is ``e<effort>`` and, for a variant, ``e<effort>-<variant>`` (e.g. ``e100-mates100``).
 
     :param spec: Model name, optionally followed by ``@`` and a tag.
     :return: ``(name, tag)``; the tag is None for an untagged name.
@@ -41,8 +41,8 @@ def artifact_path(spec: str) -> Path:
 
 
 def installed_models() -> list[str]:
-    """Names of the models that have a saved artifact (tagged variants excluded).
+    """Names of the models that have a saved artifact, whatever its effort or variant.
 
-    :return: Sorted list of names.
+    :return: Sorted list of names, without the tag.
     """
-    return sorted(path.stem for path in ARTIFACTS_DIR.glob("*.npz") if "@" not in path.stem)
+    return sorted({split_spec(path.stem)[0] for path in ARTIFACTS_DIR.glob("*.npz")})

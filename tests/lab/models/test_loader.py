@@ -47,12 +47,13 @@ def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
     save_network(tmp_path / "net_pst_w64_both.npz")
     save_network(tmp_path / "net_pst_w64_both@x.npz", output_bias=1.0)
+    save_network(tmp_path / "net_pst_w64_w32@e30.npz")
 
     assert split_spec("net_pst_w64_both@x") == ("net_pst_w64_both", "x")
     assert split_spec("net_pst_w64_both") == ("net_pst_w64_both", None)
     with pytest.raises(ValueError):
         split_spec("net_pst_w64_both@")
-    assert installed_models() == ["net_pst_w64_both"]
+    assert installed_models() == ["net_pst_w64_both", "net_pst_w64_w32"]
     assert load_evaluator("net_pst_w64_both@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
     assert load_evaluator("net_pst_w64_both").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
     with pytest.raises(FileNotFoundError):

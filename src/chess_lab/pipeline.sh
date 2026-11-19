@@ -51,7 +51,7 @@ present_models() {
   local m out=()
   for m in $MODELS; do
     if [ "$DRY_RUN" = 1 ]; then out+=("$m")
-    elif registered "$m" && [ -f "$ARTIFACTS/$m.npz" ]; then out+=("$m"); fi
+    elif registered "$m" && [ -f "$ARTIFACTS/$m@e$EFFORT.npz" ]; then out+=("$m"); fi
   done
   echo "${out[*]:-}"
 }
@@ -81,7 +81,7 @@ step_evaluate() {
   local model
   for model in $(present_models); do
     log "evaluate $model"
-    run "$PYTHON" -m chess_lab.measure.evaluate --model "$model" \
+    run "$PYTHON" -m chess_lab.measure.evaluate --model "$model@e$EFFORT" \
       --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"
   done
 }

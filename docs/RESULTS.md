@@ -11,19 +11,22 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 
 ## The short answer
 
-- **The engine that plays is the Rust UCI binary** with eight search techniques, all fixed (none can be switched
-  off). Four won an SPRT against the set without them: incremental accumulator, table move, null move and static
-  exchange evaluation (+35.5 to +97.4 Elo, "Round robin" below). `lmr`, `rfp`, `iir` and `futility` were added by
-  their node count at a fixed depth; their SPRTs at 60 s + 1 s lean towards keeping them but have no verdict yet
-  ("Search techniques at 60 s + 1 s" below). An earlier `lmr` lost 8.6 ± 6.1 Elo at 20,000 nodes per move
-  (`lmr_nodes` below), so that conflict is still open. Six others (`pvs`, `history`, `lmp`, `aspiration`,
-  `history_malus`, `qs_tt`) reached no verdict and were retired.
+- **The engine that plays is the Rust UCI binary** with its search techniques all fixed (none can be switched
+  off). Six won an SPRT against the set without them: incremental accumulator, table move, null move and static
+  exchange evaluation (+35.5 to +97.4 Elo), `pvs` and `history` (+22.8 and +20.0; "Round robin" below). `lmr`,
+  `rfp`, `iir` and `futility` were added by their node count at a fixed depth; their SPRTs at 60 s + 1 s were stopped
+  without a verdict (LLR +0.68 to +1.27, all positive), and they stay on that evidence ("Search techniques at
+  60 s + 1 s" below). An earlier `lmr` lost 8.6 ± 6.1 Elo at 20,000 nodes per move (`lmr_nodes` below), so that
+  conflict is still open. Four others (`lmp`, `aspiration`, `history_malus`, `qs_tt`) reached no verdict and were
+  retired.
 - **The model that plays is `net_pst_threats_w64_both`**: piece-square inputs plus five threat inputs, width 64, and a
   second layer that reads the accumulators of both sides over the same weights. It is the default of the binary
-  since `4e82cc7`. Against the previous default `net_pst_w64` (retired) it scored +57.9 ± 22.1 Elo, and against
-  `net_pst_w64_both` (the same network without the threat inputs) +40.7 ± 18.5 ("Network matches" below). Neither
-  match reached an SPRT bound (LLR 1.98 and 2.02 of 2.94); they were stopped by hand with the interval
-  excluding 0, and the threats are kept on that evidence.
+  since `4e82cc7`, and the weights are the effort-100 ones since `4c59054`. Against the previous default `net_pst_w64`
+  (retired) it scored +62.1 ± 18.5 Elo (H1), and against `net_pst_w64_both` (the same network without the threat
+  inputs) +12.1 ± 9.4 in 4,300 games and +40.7 ± 18.5 with the optimised binary ("Network matches" below). Neither
+  of those two matches reached an SPRT bound (LLR 1.93 and 2.02 of 2.94); the intervals exclude 0, and the threats are
+  kept on that evidence. The effort-100 weights against the effort-30 ones: +10.0 ± 11.5 in 2,722 games, LLR +1.00,
+  no verdict and an interval that includes 0.
 - **Retired networks.** The width-32 network, the hybrids (classical terms as inputs), the king-bucket networks, the
   three-layer network and the logistic model were retired on 2026-11-15 and their weights deleted. Their figures
   are in "Retired models" below; those measured before 2026-11-13 are orientative (some played without the
@@ -35,14 +38,16 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 |---|---|---|---|
 | The measuring instrument has no bias | Three A/A matches of 400 to 500 games, fastchess ([Measurement](MEASUREMENT.md#the-aa-check)) | Rust | Measured; intervals ±24 to ±27 Elo |
 | Each of the four default techniques makes the engine stronger | SPRT [−5, 0] removing it from the default set of then, 710 to 1,690 games at 10 s + 0.1 s ("Round robin" below) | Rust | Measured; H1 accepted for each. The set of four has no SPRT against the set of seven |
-| `pvs`, `aspiration`, `history`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 2.21); retired |
-| `lmr`, `rfp`, `iir` and `futility` make the engine stronger | SPRT [−5, 0] at 60 s + 1 s, 400 to 600 games each ("Search techniques at 60 s + 1 s" below) | Rust | Not yet: +34.9 to +62.3 Elo, LLR 0.68 to 1.27, still running; fixed in the engine meanwhile |
+| `pvs` and `history` make the engine stronger | Same round robin, 2,424 and 2,778 games | Rust | Measured; H1 accepted (+22.8 ± 11.6, +20.0 ± 11.1) |
+| `aspiration`, `history_malus` and `qs_tt` help | Same round robin, 2,134 to 2,200 games each | Rust | Not shown: no verdict (LLR 0.19 to 1.37); retired |
+| `lmr`, `rfp`, `iir` and `futility` make the engine stronger | SPRT [−5, 0] at 60 s + 1 s, 400 to 644 games each ("Search techniques at 60 s + 1 s" below) | Rust | Not shown: +34.9 to +62.3 Elo, LLR 0.68 to 1.27, stopped without a verdict; kept in the engine |
 | `lmp`, `aspiration`, `history_malus` and `qs_tt` help on top of `lmr,rfp,iir` | Same SPRTs, 200 to 600 games each | Rust | Not shown: LLR −0.48 to 0.07, stopped; retired |
 | The network plays better than the logistic model (retired) | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Orientative (measured before 2026-11-13); H1 accepted |
 | Adding the classical terms to the network makes it weaker (retired) | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Orientative: H0 accepted, but it mixes quality and speed (the hybrids had no accumulator) |
-| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0. `sp_threats_both_vs_w64` against the older network reached H1 (+62.1 ± 18.5) |
+| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0 (the same match with the binary before the speed-ups: 4,300 games, +12.1 ± 9.4, LLR 1.93). `sp_threats_both_vs_w64` against the older network reached H1 (+62.1 ± 18.5) |
+| The effort-100 weights play better than the effort-30 ones | `sp_threats_e100_vs_e30`, SPRT [0, 5], 2,722 games at 10 s + 0.2 s, +10.0 ± 11.5 Elo | Rust | Not shown: LLR +1.00, interval includes 0; the weights that play, with the lower error of their card |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured at 20,000 nodes; H0 accepted. Applying it only in null-window nodes later reached H1 at 10 s + 0.2 s ("Search technique matches") |
-| The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength is judged by an SPRT [−5, 0] against `v4.0.0`, queued |
+| The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength was judged by `rust_cleanup_vs_v4`, SPRT [−5, 0] against `v4.0.0`, 896 games at 10 s + 0.1 s: +73.6 ± 21.0 Elo, LLR +2.97, H1 accepted |
 | Several threads search faster | Time to depth 8 on 60 positions (Lazy SMP) | Rust | Measured speed; effect in games not measured |
 | Training on quiet positions makes the model stronger | SPRT of 362 games at 60 s + 1 s, +284 ± 43 Elo (logistic model) | Rust | Measured; H1 accepted |
 | Quiescence, endgame tables and the opening book help | Position suites ("Decisions that are settled") | Python | Measured on positions, not in games |
@@ -54,8 +59,7 @@ From 2026-11-06 to 2026-11-09 the compute node played every job of `src/chess_la
 openings of `data/openings/openings.epd`, LLR bounds ±2.94. Technique jobs used the default set of then
 (`incremental,tt_move,history,pvs,aspiration,null_move,see`) and `linear_pst_terms`; `abl_` removes one switch from
 it (A is the full set, so a positive Elo is what the switch gains), `add_` adds one. Model jobs used the default
-techniques. It was stopped on 2026-11-09 with jobs still running; their figures are the last report. Files:
-`data/results/roundrobin/<job>/llr.csv`.
+techniques. It was stopped on 2026-11-09 with jobs still running; their figures are the last report. Measured on the compute node with `src/chess_lab/measure/roundrobin.py`; the per-job `llr.csv` files were removed from the node on 2026-11-19, so the figures are the last state of each job.
 
 | job | A against B | SPRT | games | Elo (95 %) | LLR | verdict |
 |---|---|---|---|---|---|---|
@@ -63,8 +67,8 @@ techniques. It was stopped on 2026-11-09 with jobs still running; their figures 
 | `abl_see` | default against default without `see` | [−5, 0] | 992 | +64.5 ± 19.5 | +2.96 | H1: keep |
 | `abl_tt_move` | default against default without `tt_move` | [−5, 0] | 1,098 | +56.5 ± 18.3 | +2.96 | H1: keep |
 | `abl_incremental` | default against default without `incremental` | [−5, 0] | 1,690 | +35.5 ± 14.7 | +2.96 | H1: keep |
-| `abl_pvs` | default against default without `pvs` | [−5, 0] | 2,200 | +18.2 ± 12.1 | +2.21 | no verdict; retired |
-| `abl_history` | default against default without `history` | [−5, 0] | 2,200 | +17.5 ± 12.4 | +2.09 | no verdict; retired |
+| `abl_pvs` | default against default without `pvs` | [−5, 0] | 2,424 | +22.8 ± 11.6 | +2.98 | H1: keep |
+| `abl_history` | default against default without `history` | [−5, 0] | 2,778 | +20.0 ± 11.1 | +2.97 | H1: keep |
 | `abl_aspiration` | default against default without `aspiration` | [−5, 0] | 2,200 | +10.7 ± 12.5 | +1.37 | no verdict; retired |
 | `add_history_malus` | default + `history_malus` against default | [−5, 0] | 2,200 | +9.2 ± 12.0 | +1.24 | no verdict; retired |
 | `add_qs_tt` | default + `qs_tt` against default | [−5, 0] | 2,134 | −0.3 ± 12.5 | +0.19 | no verdict; retired |
@@ -73,19 +77,18 @@ The model jobs of that round robin are in "Retired models" below.
 
 ## Search techniques at 60 s + 1 s
 
-From 2026-11-11 the compute node plays one SPRT [−5, 0] per technique at 60 s + 1 s in a new round robin, with
+From 2026-11-11 the compute node played one SPRT [−5, 0] per technique at 60 s + 1 s in a new round robin, with
 the binary `db98489bd531` (the last one with switches) on both sides, `Hash` 16, one thread. `abl_` removes one
 technique from the default set of then, `lmr,rfp,iir` (A is the full set, so a positive Elo is what the technique
 gains); `add_` adds one to it. On 2026-11-13 the four `add_` jobs that did not move were stopped and their techniques
-retired; the other four keep running only to confirm, while the engine already has them fixed. Files: the round
-robin's `results/<job>/llr.csv` on the compute node (games, LLR, Elo and error after each turn).
+retired; the other four were stopped as well, without a verdict, while the engine already had them fixed. Measured on the compute node with `src/chess_lab/measure/roundrobin.py`; the per-job `llr.csv` files were removed from the node on 2026-11-19, so the figures are the last state of each job.
 
 | job | A against B | games | Elo (95 %) | LLR | state |
 |---|---|---|---|---|---|
-| `abl_lmr_60s` | `lmr,rfp,iir` against `rfp,iir` | 600 | +46.0 ± 26.2 | +1.27 | running; `lmr` fixed |
-| `abl_rfp_60s` | `lmr,rfp,iir` against `lmr,iir` | 400 | +62.3 ± 31.4 | +1.13 | running; `rfp` fixed |
-| `abl_iir_60s` | `lmr,rfp,iir` against `lmr,rfp` | 400 | +34.9 ± 30.8 | +0.68 | running; `iir` fixed |
-| `add_futility_60s` | `lmr,rfp,iir,futility` against `lmr,rfp,iir` | 400 | +44.5 ± 32.0 | +0.82 | running; `futility` fixed |
+| `abl_lmr_60s` | `lmr,rfp,iir` against `rfp,iir` | 644 | +42.6 ± 25.5 | +1.25 | stopped; `lmr` fixed |
+| `abl_rfp_60s` | `lmr,rfp,iir` against `lmr,iir` | 400 | +62.3 ± 31.4 | +1.13 | stopped; `rfp` fixed |
+| `abl_iir_60s` | `lmr,rfp,iir` against `lmr,rfp` | 400 | +34.9 ± 30.8 | +0.68 | stopped; `iir` fixed |
+| `add_futility_60s` | `lmr,rfp,iir,futility` against `lmr,rfp,iir` | 400 | +44.5 ± 32.0 | +0.82 | stopped; `futility` fixed |
 | `add_lmp_60s` | `lmr,rfp,iir,lmp` against `lmr,rfp,iir` | 600 | −19.1 ± 24.5 | −0.48 | stopped; retired |
 | `add_aspiration_60s` | `lmr,rfp,iir,aspiration` against `lmr,rfp,iir` | 600 | −1.7 ± 23.9 | +0.01 | stopped; retired |
 | `add_history_malus_60s` | `lmr,rfp,iir,history_malus` against `lmr,rfp,iir` | 236 | +4.4 ± 39.2 | +0.07 | stopped; retired |
@@ -96,16 +99,17 @@ fewer nodes (139,252 to 106,583).
 
 ## Network matches
 
-From 2026-11-14 the compute node plays the networks against each other with the binary `242475e64e00` (the one of
+From 2026-11-14 the compute node played the networks against each other with the binary `242475e64e00` (the one of
 `both` and `threats` before the speed-ups): 10 s + 0.2 s, `Hash` 16, one thread, SPRT [0, 5], LLR bounds ±2.94. A
-is the first network. Files: `data/results/roundrobin/<job>/llr.csv`.
+is the first network. Measured on the compute node with `src/chess_lab/measure/roundrobin.py`; the per-job `llr.csv` files were removed from the node on 2026-11-19, so the figures are the last state of each job.
 
 | job | A against B | games | Elo (95 %) | LLR | state |
 |---|---|---|---|---|---|
 | `sp_both_vs_w64` | `net_pst_w64_both` against the retired `net_pst_w64` | 1,486 | +45.1 ± 15.7 | +2.95 | H1 (2026-11-16) |
 | `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against the retired `net_pst_w64` | 1,092 | +62.1 ± 18.5 | +2.97 | H1 (2026-11-16) |
-| `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 2,100 | +19.4 ± 13.2 | +1.67 | running (last report 2026-11-17 14:51; 800 games, +9.1, +0.26 on 2026-11-14); the next row repeats it with the binary after the speed-ups of the threat inputs |
+| `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 4,300 | +12.1 ± 9.4 | +1.93 | no verdict (stopped 2026-11-19); the next row repeats it with the binary after the speed-ups of the threat inputs |
 | `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
+| `sp_threats_e100_vs_e30` | `net_pst_threats_w64_both` trained at effort 100 against the same network at effort 30, binary `242475e64e00` | 2,722 | +10.0 ± 11.5 | +1.00 | no verdict (stopped 2026-11-19); interval includes 0; the effort-100 weights play since `4c59054` |
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 
 The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
@@ -114,20 +118,20 @@ The row with the optimised binary has its own file because the binary is the one
 
 ## Search technique matches
 
-From 2026-11-14 the compute node plays each search change against the build before it: 10 s + 0.2 s, `Hash` 16, one
+From 2026-11-14 the compute node played each search change against the build before it: 10 s + 0.2 s, `Hash` 16, one
 thread, `net_pst_w64`, SPRT [0, 5], LLR bounds ±2.94. A is the build with the change, built from the commit in the
-changelog. Files: `data/results/roundrobin/<job>/llr.csv` (the running jobs are read on the node).
+changelog. Measured on the compute node with `src/chess_lab/measure/roundrobin.py`; the per-job `llr.csv` files were removed from the node on 2026-11-19, so the figures are the last state of each job.
 
 | job | A against B | games | Elo (95 %) | LLR | state |
 |---|---|---|---|---|---|
 | `lmr_null_window` | late move reductions in null-window nodes (`953501b`) against without | 970 | +73.1 ± 20.6 | +2.95 | H1 (2026-11-14) |
 | `check_extension` | extension by one ply in check (part of `6f23616`) against its parent `0fbd5a5` | 2,376 | +29.2 ± 12.5 | +2.96 | H1 (2026-11-15) |
 | `qs_evasions` | check evasions at the horizon (`6f23616`) against the extension alone | 2,616 | +27.2 ± 12.1 | +2.97 | H1 (2026-11-16) |
-| `killers_by_ply` | killers by ply (`6bf589a`) against `953501b` | 3,600 | +11.0 ± 10.0 | +1.48 | running (2026-11-17 13:16) |
-| `null_r_by_eval` | null-move reduction by depth and margin (`63c4b0d`) against `6f23616` | 2,000 | +18.1 ± 13.4 | +1.50 | running (2026-11-17 13:26) |
-| `cont_history` | continuation history (`0f1ac06`) against the build with countermove | 1,200 | +18.0 ± 17.3 | +0.89 | running (2026-11-17 14:18) |
-| `history_gravity` | history gravity (`2055295`) against `0f1ac06` | 502 | +43.1 ± 26.5 | +0.96 | running (2026-11-17 14:29) |
-| `futility_margin_90` | futility margin 90 (`940b6d9`) against 120 | 1,710 | +6.5 ± 14.1 | +0.36 | running (2026-11-17 13:47) |
+| `killers_by_ply` | killers by ply (`6bf589a`) against `953501b` | 5,900 | +9.3 ± 7.9 | +1.94 | no verdict (stopped 2026-11-19); kept |
+| `null_r_by_eval` | null-move reduction by depth and margin (`63c4b0d`) against `6f23616` | 4,300 | +1.5 ± 9.1 | −0.15 | no verdict (stopped 2026-11-19); reverted in `ec990da` |
+| `cont_history` | continuation history (`0f1ac06`) against the build with countermove | 3,400 | +3.0 ± 10.4 | +0.12 | no verdict (stopped 2026-11-19); kept |
+| `history_gravity` | history gravity (`2055295`) against `0f1ac06` | 1,336 | +50.5 ± 16.6 | +2.95 | H1 (2026-11-18) |
+| `futility_margin_90` | futility margin 90 (`940b6d9`) against 120 | 4,010 | +12.9 ± 9.2 | +2.09 | no verdict (stopped 2026-11-19); kept |
 
 The binaries of `cont_history`, `history_gravity` and `futility_margin_90` were built on top of countermove ordering and
 a reverse futility margin of 60, both retired in `c3ff94c` after their own SPRTs drifted negative (`countermove`
@@ -138,7 +142,7 @@ that plays today is therefore not exactly the one these three matches measured. 
 ## Retired models
 
 Retired on 2026-11-15; the weights were deleted (the code is in the history before `23696c0`). All matches: SPRT [0, 5],
-10 s + 0.1 s, binary `cc258520bbdb` unless said, files `data/results/roundrobin/<job>/llr.csv`. **Orientative:**
+10 s + 0.1 s, binary `cc258520bbdb` unless said (the node's configurations name `62998381c19b` for the `acc_` and `pst_` jobs and the unhashed `./uci` for the `model_` ones, which cannot be checked now). Measured on the compute node with `src/chess_lab/measure/roundrobin.py`; the per-job `llr.csv` files were removed from the node on 2026-11-19, so the figures are the last state of each job. **Orientative:**
 they are earlier than 2026-11-13 and some played without the accumulator (the hybrids and the king buckets until
 2026-11-09) or with the search of then.
 
@@ -150,6 +154,9 @@ they are earlier than 2026-11-13 and some played without the accumulator (the hy
 | | | `acc_hybrid_k4_vs_w64`, `net_hybrid_k4_w64` against `net_hybrid_w64` | 5,010 | −9.4 ± 8.8 | −2.65 |
 | `net_pst_k4_w64`, `net_pst_k4_threats_w64_both` | piece squares by the rival king's bucket (4 buckets) | `pst_k4_w64_vs_w32` / `pst_k4_w64_vs_w64` | 1,600 / 988 | +26.8 ± 16.0 / −31.9 ± 21.5 | +1.72 / −1.39 |
 | `net_pst_w64x16` | a third layer of 16 units | `pst_w64x16_vs_w32` / `pst_w64x16_vs_w64` | 1,970 / 1,600 | +23.5 ± 14.4 / −38.8 ± 15.9 | +1.84 / −2.91 |
+| `net_hybrid_w64` | width 64 against width 32 of the hybrid | `model_width_64_vs_32`, `net_hybrid_w64` against `net_hybrid_w32` | 1,612 | +44.0 ± 15.9 | +2.95 |
+| | the hybrid at 250,000 nodes per move | `model_terms_in_net_nodes`, `net_hybrid_w64` against `net_pst_w32` | 784 | +89.2 ± 22.5 | +2.95 |
+| `net_hybrid_w64`, `net_hybrid_k4_w64` | against the logistic model | `best_net_hybrid_w64_vs_linear` / `best_net_hybrid_k4_w64_vs_linear` against `linear_pst_terms@e30` | 888 / 900 | +82.1 ± 22.2 / +78.9 ± 21.6 | +2.95 / +2.95 |
 
 Rows with two matches give the network against `net_pst_w32` and against `net_pst_w64`; an LLR short of ±2.94 is a
 stopped match. Rule for retiring a model: for quality, when against the current one with the same binary and time
@@ -188,7 +195,7 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 
 | Judge | What it measures | Command |
 |---|---|---|
-| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_threats_w64_both@e30` |
+| Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_threats_w64_both@e100` |
 | Match | Games of the UCI binary against itself with fastchess, Elo with a 95 % interval | [Measurement](MEASUREMENT.md) |
 
 ## Search techniques in games

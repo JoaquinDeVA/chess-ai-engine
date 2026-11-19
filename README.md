@@ -26,8 +26,8 @@ Every figure has its command or file in [Results](docs/RESULTS.md).
 | Moving the search to Rust made it faster | 2.58x in `uci bench` on one build (304 k to 784 k nodes per second; later speed-ups are in the changelog) | [Changelog](CHANGELOG.md) |
 | Four techniques each won an SPRT against the search without them | null move +97, static exchange evaluation +64, table move first +57, incremental accumulator +35 Elo | [Round robin](docs/RESULTS.md#round-robin-rust-engine-fastchess) |
 | The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games (before the 2026-11-13 binary: orientative) | [Results](docs/RESULTS.md#retired-models) |
-| Threat inputs and both sides' views each made the network stronger | `net_pst_threats_w64_both` against the retired `net_pst_w64`: +57.9 ± 22.1 Elo (800 games); against `net_pst_w64_both`: +40.7 ± 18.5 (1,200 games) | [Results](docs/RESULTS.md#network-matches) |
-| Six search techniques reached no verdict and were retired | `pvs`, `history`, `lmp`, `aspiration`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
+| Threat inputs and both sides' views each made the network stronger | `net_pst_threats_w64_both` against the retired `net_pst_w64`: +62.1 ± 18.5 Elo (1,092 games, H1); against `net_pst_w64_both`: +40.7 ± 18.5 (1,200 games) | [Results](docs/RESULTS.md#network-matches) |
+| Four search techniques reached no verdict and were retired | `lmp`, `aspiration`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
 
 The engine that plays is the Rust UCI binary with the **Piece-square network with threat inputs and both sides' views,
 width 64** (`net_pst_threats_w64_both`) and eight search techniques, all fixed: see

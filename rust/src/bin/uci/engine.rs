@@ -13,8 +13,8 @@ use crate::limits::parse_go;
 use crate::position::{self, Position};
 use crate::search_job::RunningSearch;
 
-pub const MODEL_NAME: &str = "net_pst_threats_w64_both";
-const MODEL_JSON: &str = include_str!("../../../models/net_pst_threats_w64_both.json");
+pub const MODEL_NAME: &str = "net_pst_threats_w64_both@e100";
+const MODEL_JSON: &str = include_str!("../../../models/net_pst_threats_w64_both@e100.json");
 pub(crate) const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 /// Settings changed with `setoption`.

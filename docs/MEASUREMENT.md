@@ -167,8 +167,8 @@ that ends at the round cap without a verdict says the addition is too small for 
 
 ### Playing a model that is not compiled in
 
-`uci` embeds `net_pst_threats_w64_both` and loads any other network from a JSON file with
-`setoption name Model value <file>.json` (`setoption name Model value net_pst_threats_w64_both` goes back to the embedded one).
+`uci` embeds `net_pst_threats_w64_both@e100` and loads any other network from a JSON file with
+`setoption name Model value <file>.json` (`setoption name Model value net_pst_threats_w64_both@e100` goes back to the embedded one).
 The file is written by `python -m chess_lab.models.export_uci --model net_pst_w64_both --out <folder>`. The command `eval` prints the evaluation of the current position, which equals the
 Python `ModelEvaluator`. Every network is played with an incremental accumulator since 2026-11-09 (commit `75a8071`);
 the threat inputs are computed at every leaf and are the main cost of `net_pst_threats_w64_both`. A match at a time

@@ -60,7 +60,7 @@ option name Hash type spin default 64 min 1 max 65536
 option name Threads type spin default 1 min 1 max 64
 option name Book type string default
 option name Tablebase type string default
-option name Model type string default net_pst_threats_w64_both
+option name Model type string default net_pst_threats_w64_both@e100
 uciok
 readyok
 info depth 8 nodes 1070725 time 1000

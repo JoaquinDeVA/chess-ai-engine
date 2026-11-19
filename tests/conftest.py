@@ -88,7 +88,11 @@ MATE_IN_ONE = "6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1"  # 1.Ra8#
 
 
 #: Trained model files (data/models/) that no test may overwrite.
-PROTECTED_ARTIFACTS = ("net_pst_w64_both@e30.npz", "net_pst_threats_w64_both@e30.npz")
+PROTECTED_ARTIFACTS = (
+    "net_pst_w64_both@e30.npz",
+    "net_pst_threats_w64_both@e30.npz",
+    "net_pst_threats_w64_both@e100.npz",
+)
 _PROTECTED_HASHES: dict = {}
 
 

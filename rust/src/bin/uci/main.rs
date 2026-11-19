@@ -5,7 +5,7 @@ use std::sync::Arc;
 use _core::eval::Net;
 
 use bench::{bench, time_to_depth};
-use engine::{load_model, UciEngine};
+use engine::{load_embedded_model, UciEngine};
 
 mod bench;
 mod clock;
@@ -27,7 +27,7 @@ mod search_job;
 /// `bench` measures fixed-position search performance, `ttd` measures the time to reach a
 /// depth for one FEN per line, and no mode starts the interactive UCI protocol on `stdin`.
 fn main() {
-    let net = Arc::new(load_model().expect("the compiled-in model is valid"));
+    let net = Arc::new(load_embedded_model().expect("the compiled-in model is valid"));
     match std::env::args().nth(1).as_deref() {
         Some("ttd") => run_time_to_depth(&net),
         Some("bench") => run_bench(&net),

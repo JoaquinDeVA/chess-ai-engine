@@ -2,12 +2,12 @@ use _core::board::GameState;
 
 /// The position as the GUI sent it: the root FEN and the moves played from it.
 #[derive(Clone)]
-pub struct Position {
+pub struct UciPosition {
     pub fen: String,
     pub moves: Vec<String>,
 }
 
-impl Position {
+impl UciPosition {
     /// Full move number of the position to search: the root FEN plus the moves played.
     pub fn move_number(&self) -> u32 {
         let mut fields = self.fen.split_whitespace().skip(1);
@@ -25,12 +25,12 @@ impl Position {
 }
 
 /// Parses the position arguments after `position`.
-pub fn parse(fen: String, rest: &[&str]) -> Position {
+pub fn parse(fen: String, rest: &[&str]) -> UciPosition {
     let moves = rest
         .iter()
         .skip_while(|word| **word != "moves")
         .skip(1)
         .map(|word| word.to_string())
         .collect();
-    Position { fen, moves }
+    UciPosition { fen, moves }
 }

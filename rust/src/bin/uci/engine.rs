@@ -10,7 +10,7 @@ use _core::search::{Memory, DEFAULT_HASH_MB};
 use shakmaty::Color;
 
 use crate::limits::parse_go;
-use crate::position::{self, Position};
+use crate::position::{self, UciPosition};
 use crate::search_job::RunningSearch;
 
 pub const MODEL_NAME: &str = "net_pst_threats_w64_both@e100";
@@ -27,14 +27,14 @@ struct EngineSettings {
     tablebase: Option<EndgameTablebase>,
 }
 
-pub fn load_model() -> Result<Net, String> {
+pub fn load_embedded_model() -> Result<Net, String> {
     Net::from_json(MODEL_JSON)
 }
 
 pub struct UciEngine {
     settings: EngineSettings,
     memory: Option<Memory>,
-    position: Position,
+    position: UciPosition,
     running: Option<RunningSearch>,
 }
 
@@ -52,7 +52,7 @@ impl UciEngine {
         Self {
             settings,
             memory,
-            position: Position {
+            position: UciPosition {
                 fen: START_FEN.to_string(),
                 moves: Vec::new(),
             },
@@ -145,7 +145,7 @@ impl UciEngine {
                     .parse::<bool>()
                     .map_err(|_| "Ponder needs true or false")?;
             }
-            "Model" if value == MODEL_NAME => self.settings.net = Arc::new(load_model()?),
+            "Model" if value == MODEL_NAME => self.settings.net = Arc::new(load_embedded_model()?),
             "Model" => {
                 let text = std::fs::read_to_string(value)
                     .map_err(|e| format!("Model is {MODEL_NAME} or a JSON file: {value}: {e}"))?;

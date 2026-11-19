@@ -12,7 +12,7 @@ use _core::search::{self, Control, Memory, Options};
 use shakmaty::Move;
 
 use crate::limits::SearchLimits;
-use crate::position::Position;
+use crate::position::UciPosition;
 
 /// What the UCI thread and the search thread share. Limits are seconds since `origin`, stored as
 /// the bits of an `f64`; infinity until a pondering search gets its `ponderhit`.
@@ -28,13 +28,13 @@ struct Signals {
 }
 
 struct SearchJob {
-    position: Position,
+    position: UciPosition,
     limits: SearchLimits,
     root_moves: Option<Vec<u32>>,
     signals: Arc<Signals>,
 }
 
-struct SearchResult {
+struct BestMove {
     best: String,
     ponder: Option<String>,
 }
@@ -44,30 +44,30 @@ pub struct RunningSearch {
     handle: JoinHandle<Memory>,
     signals: Arc<Signals>,
     ponder: bool,
-    resume_soft_time: f64,
-    resume_hard_time: f64,
+    resume_soft_limit: f64,
+    resume_hard_limit: f64,
 }
 
 impl RunningSearch {
     pub fn start(
         memory: Memory,
         net: Arc<Net>,
-        position: Position,
+        position: UciPosition,
         limits: SearchLimits,
         root_moves: Option<Vec<u32>>,
     ) -> Self {
         let signals = Arc::new(Signals {
             stop: AtomicBool::new(false),
             ponder_hit: AtomicBool::new(false),
-            soft_limit: AtomicU64::new(limits.soft_time.to_bits()),
-            hard_limit: AtomicU64::new(limits.hard_time.to_bits()),
+            soft_limit: AtomicU64::new(limits.soft_limit.to_bits()),
+            hard_limit: AtomicU64::new(limits.hard_limit.to_bits()),
             budget_start: AtomicU64::new(0.0_f64.to_bits()),
             origin: Instant::now(),
         });
-        let (ponder, resume_soft_time, resume_hard_time) = (
+        let (ponder, resume_soft_limit, resume_hard_limit) = (
             limits.ponder,
-            limits.resume_soft_time,
-            limits.resume_hard_time,
+            limits.resume_soft_limit,
+            limits.resume_hard_limit,
         );
         let job = SearchJob {
             position,
@@ -79,8 +79,8 @@ impl RunningSearch {
             handle: std::thread::spawn(move || search_job(memory, net, job)),
             signals,
             ponder,
-            resume_soft_time,
-            resume_hard_time,
+            resume_soft_limit,
+            resume_hard_limit,
         }
     }
 
@@ -96,10 +96,10 @@ impl RunningSearch {
             self.signals.budget_start.store(elapsed.to_bits(), Release);
             self.signals
                 .soft_limit
-                .store((elapsed + self.resume_soft_time).to_bits(), Release);
+                .store((elapsed + self.resume_soft_limit).to_bits(), Release);
             self.signals
                 .hard_limit
-                .store((elapsed + self.resume_hard_time).to_bits(), Release);
+                .store((elapsed + self.resume_hard_limit).to_bits(), Release);
         }
     }
 
@@ -127,7 +127,7 @@ fn search_job(mut memory: Memory, net: Arc<Net>, job: SearchJob) -> Memory {
     memory
 }
 
-fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<SearchResult, String> {
+fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<BestMove, String> {
     let mut state = job.position.state()?;
     let signals = &job.signals;
     let options = Options {
@@ -138,7 +138,7 @@ fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<SearchRe
     let clock = || signals.origin.elapsed().as_secs_f64();
     let control = Control {
         start: 0.0,
-        hard_limit: job.limits.hard_time,
+        hard_limit: job.limits.hard_limit,
         dynamic_hard_limit: Some(&signals.hard_limit),
         dynamic_soft_limit: Some(&signals.soft_limit),
         dynamic_budget_start: Some(&signals.budget_start),
@@ -153,7 +153,7 @@ fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<SearchRe
         memory,
         &options,
         job.limits.max_depth,
-        job.limits.soft_time,
+        job.limits.soft_limit,
         &control,
     )?;
     println!(
@@ -171,7 +171,7 @@ fn run_search(memory: &mut Memory, net: &Net, job: SearchJob) -> Result<SearchRe
         Some(m) if !job.limits.ponder => ponder_reply(&mut state, memory, m),
         _ => None,
     };
-    Ok(SearchResult {
+    Ok(BestMove {
         best: best_name,
         ponder,
     })
@@ -201,14 +201,14 @@ fn ponder_reply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{load_model, START_FEN};
+    use crate::engine::{load_embedded_model, START_FEN};
     use crate::limits::parse_go;
     use crate::position;
 
     fn start(go: &[&str]) -> RunningSearch {
         RunningSearch::start(
             Memory::new(1, 1),
-            Arc::new(load_model().unwrap()),
+            Arc::new(load_embedded_model().unwrap()),
             position::parse(START_FEN.into(), &[]),
             parse_go(go, true, 1),
             None,

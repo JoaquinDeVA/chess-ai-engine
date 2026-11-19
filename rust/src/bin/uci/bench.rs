@@ -24,7 +24,7 @@ pub fn bench(net: &Net, repetitions: usize) {
     let mut total_nodes = 0u64;
     for run in 0..repetitions {
         let (nodes, elapsed) = bench_once(net, run == 0);
-        total_nodes = nodes; //Son iguales todas las ejecuciones, solo varía el tiempo
+        total_nodes = nodes; // Every run searches the same nodes; only the time varies
         elapsed_seconds.push(elapsed);
     }
     elapsed_seconds.sort_by(f64::total_cmp);

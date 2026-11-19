@@ -6,11 +6,11 @@ use crate::clock::allocate_time;
 pub struct SearchLimits {
     pub max_depth: usize,
     pub node_limit: Option<u64>,
-    pub soft_time: f64,
-    pub hard_time: f64,
+    pub soft_limit: f64,
+    pub hard_limit: f64,
     pub ponder: bool,
-    pub resume_soft_time: f64,
-    pub resume_hard_time: f64,
+    pub resume_soft_limit: f64,
+    pub resume_hard_limit: f64,
 }
 
 /// Parses the UCI `go` arguments for the side to move.
@@ -48,7 +48,7 @@ pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchL
     } else {
         (black_time, black_increment)
     };
-    let (resume_soft_time, resume_hard_time) = match (move_time, time_left) {
+    let (resume_soft_limit, resume_hard_limit) = match (move_time, time_left) {
         (Some(seconds), _) => (seconds, seconds),
         (None, Some(seconds)) => {
             let budget = allocate_time(seconds, increment, moves_to_go, move_number);
@@ -56,19 +56,19 @@ pub fn parse_go(args: &[&str], white_to_move: bool, move_number: u32) -> SearchL
         }
         (None, None) => (f64::INFINITY, f64::INFINITY),
     };
-    let (soft_time, hard_time) = if ponder {
+    let (soft_limit, hard_limit) = if ponder {
         (f64::INFINITY, f64::INFINITY)
     } else {
-        (resume_soft_time, resume_hard_time)
+        (resume_soft_limit, resume_hard_limit)
     };
     SearchLimits {
         max_depth: depth.unwrap_or(MAX_DEPTH).max(1),
         node_limit: nodes,
-        soft_time,
-        hard_time,
+        soft_limit,
+        hard_limit,
         ponder,
-        resume_soft_time,
-        resume_hard_time,
+        resume_soft_limit,
+        resume_hard_limit,
     }
 }
 
@@ -87,10 +87,10 @@ mod tests {
             false,
             60,
         );
-        assert!(close(black.soft_time, 1.48) && close(black.hard_time, 11.1));
+        assert!(close(black.soft_limit, 1.48) && close(black.hard_limit, 11.1));
 
         let fixed = parse_go(&["movetime", "500", "wtime", "60000"], true, 1);
-        assert!(close(fixed.soft_time, 0.5) && close(fixed.hard_time, 0.5));
+        assert!(close(fixed.soft_limit, 0.5) && close(fixed.hard_limit, 0.5));
     }
 
     #[test]
@@ -103,7 +103,7 @@ mod tests {
             1,
         );
         assert!(limits.ponder);
-        assert!(limits.soft_time.is_infinite() && limits.hard_time.is_infinite());
-        assert!(close(limits.resume_soft_time, 0.5));
+        assert!(limits.soft_limit.is_infinite() && limits.hard_limit.is_infinite());
+        assert!(close(limits.resume_soft_limit, 0.5));
     }
 }

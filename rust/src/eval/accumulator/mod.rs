@@ -32,7 +32,7 @@ const STACK_PLIES: usize = 128;
 /// The dense inputs (the threats) are not pieces: they are computed and added at every evaluation.
 ///
 /// The search calls `apply` for every move it plays and `undo` when it takes it back, and `score`
-/// for the position it is in; the result equals [`Net::score`] up to the rounding of `f32` sums.
+/// for the position it is in; the result equals [`Net::logit`] scaled by `score` up to the rounding of `f32` sums.
 pub struct NetState<'a> {
     net: &'a Net,
     width: usize,

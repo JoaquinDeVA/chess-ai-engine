@@ -13,11 +13,11 @@ use shakmaty::Color;
 
 /// Distance of the lowest and highest expected score from 0 and 1, to stay clear of the terminal
 /// values 0 and 1.
-pub const PROBABILITY_CLIP: f64 = 1e-2;
+const PROBABILITY_CLIP: f64 = 1e-2;
 
 /// Units of the score per unit of log-odds: the score is in centipawns of the usual logistic scale
 /// (`400 / ln 10`), so a pawn up is about 100 and the margins of the techniques read as such.
-pub const SCORE_PER_LOGIT: f32 = 173.717_8;
+const SCORE_PER_LOGIT: f32 = 173.717_8;
 
 /// Highest score of an evaluation, so that a mate is always beyond it: the clip of the expected
 /// score to `[PROBABILITY_CLIP, 1 - PROBABILITY_CLIP]` on this scale (`ln 99 · 400 / ln 10`).

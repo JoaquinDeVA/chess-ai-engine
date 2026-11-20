@@ -4,7 +4,7 @@ use shakmaty::{Chess, Color, Position};
 
 use super::features::{Families, FeatureSet};
 use super::NetState;
-use super::{for_player, score, sigmoid};
+use super::{for_player, sigmoid};
 
 /// One dense layer as the lab writes it: `weights` is row-major `(fan_in, fan_out)`.
 pub struct Layer {
@@ -188,11 +188,6 @@ impl Net {
         }
         let output = &self.layers[last];
         output.bias[0] + dot(&hidden[..width], &output.weights)
-    }
-
-    /// Score of `player` in `pos`, from the board (see [`Net::logit`]).
-    pub fn score(&self, pos: &Chess, player: Color) -> i32 {
-        score(self.logit(pos), pos.turn(), player)
     }
 
     /// Expected score of `player` in `pos`, in `[0.01, 0.99]`, from the board.

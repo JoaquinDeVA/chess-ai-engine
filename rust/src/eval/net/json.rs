@@ -69,54 +69,65 @@ impl Net {
 mod tests {
     use super::*;
 
-    fn net_json(fan_in: usize, extra: &str) -> String {
+    /// The file of a network of two units in the accumulator, with `rows` inputs and an output
+    /// layer of `last_in` inputs, the `extra` fields before the layers.
+    fn net_json(features: &str, extra: &str, rows: usize, last_in: usize) -> String {
         let first = format!(
-            r#"{{"fan_in":{fan_in},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
-            vec![0.0; fan_in * 2]
+            r#"{{"fan_in":{rows},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
+            vec![0.0; rows * 2]
         );
-        let last = r#"{"fan_in":4,"fan_out":1,"weights":[1.0,1.0,1.0,1.0],"bias":[0.0]}"#;
-        format!(r#"{{"features":"pst_slotted",{extra}"layers":[{first},{last}]}}"#)
+        let last = format!(
+            r#"{{"fan_in":{last_in},"fan_out":1,"weights":{:?},"bias":[0.0]}}"#,
+            vec![1.0; last_in]
+        );
+        format!(r#"{{"features":"{features}",{extra}"layers":[{first},{last}]}}"#)
+    }
+
+    fn loads(features: &str, extra: &str, rows: usize, last_in: usize) -> bool {
+        Net::from_json(&net_json(features, extra, rows, last_in)).is_ok()
     }
 
     #[test]
     fn the_perspective_field_is_absent_or_both() {
-        assert!(Net::from_json(&net_json(768, "")).is_ok());
-        assert!(Net::from_json(&net_json(768, r#""perspective":"both","#)).is_ok());
-        assert!(Net::from_json(&net_json(768, r#""perspective":"side_to_move","#)).is_err());
-        assert!(Net::from_json(&net_json(768, r#""perspective":"white","#)).is_err());
+        assert!(loads("pst_ctx", "", 768, 4));
+        assert!(loads("pst_ctx", r#""perspective":"both","#, 768, 4));
+        assert!(!loads(
+            "pst_ctx",
+            r#""perspective":"side_to_move","#,
+            768,
+            4
+        ));
+        assert!(!loads("pst_ctx", r#""perspective":"white","#, 768, 4));
     }
 
     #[test]
     fn the_second_layer_must_be_twice_as_wide_as_the_accumulator() {
-        let first = format!(
-            r#"{{"fan_in":768,"fan_out":2,"weights":{:?},"bias":[0.0,0.0]}}"#,
-            vec![0.0; 768 * 2]
-        );
-        let last = r#"{"fan_in":2,"fan_out":1,"weights":[1.0,1.0],"bias":[0.0]}"#;
-        let text = format!(r#"{{"features":"pst_slotted","layers":[{first},{last}]}}"#);
-        assert!(Net::from_json(&text).is_err());
+        assert!(!loads("pst_ctx", "", 768, 2));
         // the dense inputs make the first layer wider than the 768 pieces of this file
-        assert!(Net::from_json(&net_json(768, "").replace("pst_slotted", "pst_threats")).is_err());
+        assert!(!loads("pst_threats", "", 768, 4));
+        assert!(loads("pst_threats", "", 773, 4));
     }
 
     #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
-        assert!(Net::from_json(&net_json(10, "")).is_err());
+        assert!(!loads("pst_ctx", "", 10, 4));
     }
 
     #[test]
     fn a_ctx_network_reads_its_families_from_the_file() {
         let rows = 768 * 4 + 30;
-        let first = format!(
-            r#"{{"fan_in":{rows},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
-            vec![0.0; rows * 2]
-        );
-        let last = r#"{"fan_in":4,"fan_out":1,"weights":[1.0,1.0,1.0,1.0],"bias":[0.0]}"#;
-        let text = |families: &str| {
-            format!(r#"{{"features":"pst_ctx",{families}"layers":[{first},{last}]}}"#)
-        };
-        assert!(Net::from_json(&text(r#""families":["material","king_buckets"],"#)).is_ok());
-        assert!(Net::from_json(&text("")).is_err());
-        assert!(Net::from_json(&text(r#""families":["nothing"],"#)).is_err());
+        assert!(loads(
+            "pst_ctx",
+            r#""families":["material","king_buckets"],"#,
+            rows,
+            4
+        ));
+        assert!(!loads("pst_ctx", "", rows, 4));
+        assert!(!loads("pst_ctx", r#""families":["nothing"],"#, rows, 4));
+    }
+
+    #[test]
+    fn the_old_name_of_the_pieces_alone_still_loads() {
+        assert!(loads("pst_slotted", "", 768, 4));
     }
 }

@@ -1,14 +1,15 @@
-//! Sparse board features: a position becomes a list of active feature indices and values, seen
-//! from the side to move. The network scores them. The features and their order are those of
-//! `chess_lab/models/features.py`. One file per family of inputs: [`pieces`] (the base of every
-//! network), [`threats`] (`pst_threats`, the model that plays) and [`ctx`] (`pst_ctx`).
+//! The inputs of the network, seen from the side to move. The features and their order are those
+//! of `chess_lab/models/features.py`. One file per family of inputs: [`pieces`] (the base of every
+//! network), [`threats`] (`pst_threats`, the model that plays) and [`ctx`] with [`families`]
+//! (`pst_ctx`).
 
 mod ctx;
+mod families;
 mod pieces;
 mod threats;
 
-pub use ctx::Families;
 pub(in crate::eval) use ctx::{entry_edits, king_bucket_at, piece_offset, view_rows};
+pub use families::Families;
 pub(in crate::eval) use pieces::input_index;
 use pieces::PIECE_INPUTS;
 
@@ -65,5 +66,33 @@ impl FeatureSet {
         if self == FeatureSet::PstThreats {
             push_threats(pos, PIECE_INPUTS, indices, values);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_name_gives_its_feature_set() {
+        assert_eq!(
+            FeatureSet::from_name("pst_threats"),
+            Some(FeatureSet::PstThreats)
+        );
+        assert_eq!(FeatureSet::from_name("nothing"), None);
+        // the networks saved as `pst_slotted` read the pieces alone: `pst_ctx` without families
+        assert_eq!(
+            FeatureSet::from_name("pst_slotted"),
+            FeatureSet::from_name("pst_ctx")
+        );
+    }
+
+    #[test]
+    fn only_pst_ctx_has_families() {
+        let all = Families::from_names(&["material"]).unwrap();
+        assert!(FeatureSet::PstThreats.with_families(all).is_err());
+        assert!(FeatureSet::PstThreats
+            .with_families(Families::default())
+            .is_ok());
     }
 }

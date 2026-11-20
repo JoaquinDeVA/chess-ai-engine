@@ -8,15 +8,12 @@ mod pieces;
 mod threats;
 
 pub use ctx::Families;
-pub(in crate::eval) use ctx::{
-    count_of, king_bucket, material_entry, material_row, pawn_entry, pawn_row, pawns_on, view_rows,
-    MATERIAL_ROLES,
-};
+pub(in crate::eval) use ctx::{entry_edits, king_bucket_at, piece_offset, view_rows};
 pub(in crate::eval) use pieces::input_index;
-pub use pieces::PIECE_INPUTS;
+use pieces::PIECE_INPUTS;
 
 use shakmaty::Chess;
-use threats::{threats, THREAT_INPUTS};
+use threats::{push_threats, THREAT_INPUTS};
 
 /// The families of features.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -66,7 +63,7 @@ impl FeatureSet {
     /// The dense inputs (the threats), appended to the vectors.
     pub fn dense_inputs(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
         if self == FeatureSet::PstThreats {
-            threats(pos, PIECE_INPUTS, indices, values);
+            push_threats(pos, PIECE_INPUTS, indices, values);
         }
     }
 }

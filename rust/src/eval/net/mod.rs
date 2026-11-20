@@ -1,15 +1,13 @@
-//! The sparse network: the layers and how to ask them. The first layer is the accumulator that
-//! [`NetState`](super::NetState) keeps move by move; this file builds the network and evaluates a
-//! position from the board. Reading it from a file is `json.rs`, the end of the network `forward.rs`.
+//! The sparse network: its layers. The first layer is the accumulator that
+//! [`NetState`](super::NetState) keeps move by move, and the rest is `forward.rs`; reading a network
+//! from a file is `json.rs`. The rest of `eval/` reads the layers through the methods below.
 
 mod forward;
 mod json;
 
-use shakmaty::{Chess, Color, Position};
+pub(super) use forward::add_clipped_lanes;
 
 use super::features::FeatureSet;
-use super::NetState;
-use super::{for_player, sigmoid};
 
 /// One dense layer: `weights` is row-major `(fan_in, fan_out)`.
 pub struct Layer {
@@ -28,10 +26,10 @@ impl Layer {
 
 /// A feed-forward network over sparse inputs; the first layer is the accumulator.
 pub struct Net {
-    pub(super) features: FeatureSet,
-    pub(super) layers: Vec<Layer>,
+    features: FeatureSet,
+    layers: Vec<Layer>,
     /// Widest layer before the output: the size of the buffers of an evaluation.
-    pub(super) max_width: usize,
+    max_width: usize,
 }
 
 impl Net {
@@ -83,21 +81,33 @@ impl Net {
         })
     }
 
-    /// Network output before the logistic function, for the side to move, from the board: the
-    /// accumulators are built from scratch, where the search follows them move by move with
-    /// [`NetState`](super::NetState).
-    pub fn logit(&self, pos: &Chess) -> f32 {
-        NetState::new(self, pos).logit(pos)
+    /// The feature set of the inputs.
+    pub(super) fn features(&self) -> FeatureSet {
+        self.features
     }
 
-    /// Expected score of `player` in `pos`, in `[0.01, 0.99]`, from the board.
-    pub fn evaluate(&self, pos: &Chess, player: Color) -> f64 {
-        let mover = sigmoid(f64::from(self.logit(pos)));
-        let white = if pos.turn() == Color::White {
-            mover
-        } else {
-            1.0 - mover
-        };
-        for_player(white, player)
+    /// Width of the accumulator: the units of the first layer.
+    pub(super) fn width(&self) -> usize {
+        self.layers[0].fan_out
+    }
+
+    /// Row of the first layer for input `index`: what the input adds to an accumulator.
+    pub(super) fn first_row(&self, index: usize) -> &[f32] {
+        self.layers[0].row(index)
+    }
+
+    /// Bias of the first layer: where an accumulator starts.
+    pub(super) fn first_bias(&self) -> &[f32] {
+        &self.layers[0].bias
+    }
+
+    /// Length of the buffers an evaluation needs.
+    pub(super) fn buffer_len(&self) -> usize {
+        self.max_width
+    }
+
+    /// The output layer when it follows the accumulator directly, with no hidden layer between.
+    pub(super) fn direct_output(&self) -> Option<&Layer> {
+        (self.layers.len() == 2).then(|| &self.layers[1])
     }
 }

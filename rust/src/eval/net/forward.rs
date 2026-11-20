@@ -1,5 +1,5 @@
-//! The end of the network: from the sums of the accumulator to the output. [`NetState`](super::super::NetState)
-//! keeps the sums move by move and calls [`Net::finish`] to get the logit.
+//! The end of the network: from the sums of the accumulator to the output. `NetState` keeps the
+//! sums move by move and calls [`Net::finish`] to get the logit.
 
 use super::Net;
 
@@ -31,17 +31,36 @@ impl Net {
     }
 }
 
-/// Dot product in eight lanes, so that the compiler can use vector instructions (a single running
-/// sum would have to add the terms one after another).
-fn dot(a: &[f32], b: &[f32]) -> f32 {
-    let mut lanes = [0.0f32; 8];
-    let ((chunks_a, rest_a), (chunks_b, rest_b)) = (a.as_chunks::<8>(), b.as_chunks::<8>());
-    let tail: f32 = rest_a.iter().zip(rest_b).map(|(x, y)| x * y).sum();
-    for (x, y) in chunks_a.iter().zip(chunks_b) {
+/// Adds to `lanes` the products of `a`, each value read through `read`, with `b`, eight lanes at a
+/// time so that the compiler can use vector instructions (a single running sum would have to add
+/// the terms one after another). Only whole groups of eight are added.
+#[inline(always)]
+fn add_lanes(lanes: &mut [f32; 8], a: &[f32], b: &[f32], read: impl Fn(f32) -> f32) {
+    for (x, w) in a.as_chunks::<8>().0.iter().zip(b.as_chunks::<8>().0) {
         for lane in 0..8 {
-            lanes[lane] += x[lane] * y[lane];
+            lanes[lane] += read(x[lane]) * w[lane];
         }
     }
+}
+
+/// [`add_lanes`] of the values clipped to `[0, 1]`, as the accumulator is read; the length of
+/// both is a multiple of 8.
+#[inline(always)]
+pub(in crate::eval) fn add_clipped_lanes(lanes: &mut [f32; 8], acc: &[f32], weights: &[f32]) {
+    add_lanes(lanes, acc, weights, |x| x.clamp(0.0, 1.0));
+}
+
+/// Dot product: the lanes of [`add_lanes`] and the terms left over.
+fn dot(a: &[f32], b: &[f32]) -> f32 {
+    let mut lanes = [0.0f32; 8];
+    add_lanes(&mut lanes, a, b, |x| x);
+    let tail: f32 = a
+        .as_chunks::<8>()
+        .1
+        .iter()
+        .zip(b.as_chunks::<8>().1)
+        .map(|(x, y)| x * y)
+        .sum();
     lanes.iter().sum::<f32>() + tail
 }
 

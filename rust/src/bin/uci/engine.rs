@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use _core::board::{move_id, uci_string};
-use _core::eval::Net;
+use _core::eval::{Net, NetState};
 use _core::knowledge::book::OpeningBook;
 use _core::knowledge::tablebase::EndgameTablebase;
 use _core::search::{Memory, DEFAULT_HASH_MB};
@@ -173,7 +173,7 @@ impl UciEngine {
         match self.position.state() {
             Ok(state) => println!(
                 "info string eval {:.6}",
-                self.settings.net.evaluate(state.pos(), Color::White)
+                NetState::new(&self.settings.net, state.pos()).evaluate(state.pos(), Color::White)
             ),
             Err(error) => println!("info string {error}"),
         }

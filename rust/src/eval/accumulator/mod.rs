@@ -6,15 +6,32 @@ mod changes;
 mod ctx;
 mod logit;
 
-use shakmaty::{Board, Chess, Color, Move, Piece, Position, Square};
+pub use logit::EVAL_LIMIT;
+
+use shakmaty::{Board, Chess, Color, Move, Position};
 
 use super::features::{input_index, view_rows, Families, FeatureSet};
 use super::net::Net;
-use super::score;
 use changes::changes;
 
 fn slot(color: Color) -> usize {
     usize::from(color == Color::Black)
+}
+
+/// Adds `row` to `acc`, or takes it off when `sign` is -1.
+fn add_row(acc: &mut [f32], row: &[f32], sign: f32) {
+    for (a, w) in acc.iter_mut().zip(row) {
+        *a += sign * w;
+    }
+}
+
+/// 1 for a piece put on a square, -1 for a piece taken off it.
+fn sign(put: bool) -> f32 {
+    if put {
+        1.0
+    } else {
+        -1.0
+    }
 }
 
 /// Plies the stack of accumulators holds before it has to grow: more than any search reaches.
@@ -37,7 +54,7 @@ pub struct NetState<'a> {
     net: &'a Net,
     width: usize,
     /// The input families of a `pst_ctx` network, which `apply` follows with its own update.
-    ctx: Option<Families>,
+    families: Option<Families>,
     /// One frame of `2 * width` sums per ply, the white mover's accumulator first.
     stack: Vec<f32>,
     /// Frame of the current position.
@@ -52,19 +69,19 @@ pub struct NetState<'a> {
 impl<'a> NetState<'a> {
     /// The accumulators of `pos`, built from the board.
     pub fn new(net: &'a Net, pos: &Chess) -> NetState<'a> {
-        let width = net.layers[0].fan_out;
-        let ctx = match net.features {
+        let width = net.width();
+        let families = match net.features() {
             FeatureSet::PstCtx(families) => Some(families),
             _ => None,
         };
         let mut state = NetState {
             net,
             width,
-            ctx,
+            families,
             stack: vec![0.0; 2 * width * STACK_PLIES],
             top: 0,
-            hidden: vec![0.0; net.max_width],
-            spare: vec![0.0; net.max_width],
+            hidden: vec![0.0; net.buffer_len()],
+            spare: vec![0.0; net.buffer_len()],
             dense_indices: Vec::with_capacity(8),
             dense_values: Vec::with_capacity(8),
         };
@@ -80,30 +97,21 @@ impl<'a> NetState<'a> {
         &mut self.stack[start..start + self.width]
     }
 
-    /// The row of a piece in the accumulator of `mover`.
-    fn row(&self, mover: Color, piece: Piece, square: Square) -> &'a [f32] {
-        self.net.layers[0].row(input_index(mover, piece.color, piece.role, square))
-    }
-
     /// Rebuild the accumulator of `mover` from the bias and every piece of `board`.
     fn refresh(&mut self, mover: Color, board: &Board) {
         let net = self.net;
-        self.acc(mover).copy_from_slice(&net.layers[0].bias);
-        if let Some(families) = self.ctx {
+        self.acc(mover).copy_from_slice(net.first_bias());
+        if let Some(families) = self.families {
             let mut rows = Vec::with_capacity(64);
             view_rows(families, board, mover, &mut rows);
             for row in rows {
-                for (a, w) in self.acc(mover).iter_mut().zip(net.layers[0].row(row)) {
-                    *a += w;
-                }
+                add_row(self.acc(mover), net.first_row(row), 1.0);
             }
             return;
         }
         for (square, piece) in board.clone() {
-            let row = self.row(mover, piece, square);
-            for (a, w) in self.acc(mover).iter_mut().zip(row) {
-                *a += w;
-            }
+            let row = input_index(mover, piece.color, piece.role, square);
+            add_row(self.acc(mover), net.first_row(row), 1.0);
         }
     }
 
@@ -122,51 +130,19 @@ impl<'a> NetState<'a> {
 impl NetState<'_> {
     /// The side to move in `pos` (the position before the move) plays `m`.
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
-        let mover = pos.turn();
-        let (pieces, count) = changes(mover, m);
-        if let Some(families) = self.ctx {
-            return self.apply_ctx(families, pos, m, &pieces[..count]);
+        let (pieces, count) = changes(pos.turn(), m);
+        let pieces = &pieces[..count];
+        if let Some(families) = self.families {
+            return self.apply_ctx(families, pos, m, pieces);
         }
-        // step up one frame, writing the new accumulators straight from the old ones
-        let frame = 2 * self.width;
-        if (self.top + 2) * frame > self.stack.len() {
-            self.stack.resize(self.stack.len() * 2, 0.0);
-        }
-        let width = self.width;
-        let layer = &self.net.layers[0];
-        {
-            let (head, tail) = self.stack.split_at_mut((self.top + 1) * frame);
-            let old = &head[self.top * frame..];
-            let new = &mut tail[..frame];
-            for side in [Color::White, Color::Black] {
-                let at = slot(side) * width;
-                let (o, n) = (&old[at..at + width], &mut new[at..at + width]);
-                let mut rows = [o; 4];
-                for (k, &(piece, square, _)) in pieces[..count].iter().enumerate() {
-                    rows[k] =
-                        &layer.row(input_index(side, piece.color, piece.role, square))[..width];
-                }
-                // the pieces alternate: take off, put on, take off, put on
-                match count {
-                    2 => {
-                        for i in 0..width {
-                            n[i] = o[i] - rows[0][i] + rows[1][i];
-                        }
-                    }
-                    3 => {
-                        for i in 0..width {
-                            n[i] = o[i] - rows[0][i] + rows[1][i] - rows[2][i];
-                        }
-                    }
-                    _ => {
-                        for i in 0..width {
-                            n[i] = o[i] - rows[0][i] + rows[1][i] - rows[2][i] + rows[3][i];
-                        }
-                    }
-                }
+        self.push();
+        let net = self.net;
+        for side in [Color::White, Color::Black] {
+            for &(piece, square, put) in pieces {
+                let row = input_index(side, piece.color, piece.role, square);
+                add_row(self.acc(side), net.first_row(row), sign(put));
             }
         }
-        self.top += 1;
     }
 
     /// The side to move passes (a null move): the accumulators of both sides stay as they are.
@@ -177,11 +153,6 @@ impl NetState<'_> {
     /// Take back the last move played with `apply` or `apply_null`.
     pub fn undo(&mut self) {
         self.top -= 1;
-    }
-
-    /// Score of `player` in `pos`, the position the state is following.
-    pub fn score(&mut self, pos: &Chess, player: Color) -> i32 {
-        score(self.logit(pos), pos.turn(), player)
     }
 }
 
@@ -255,7 +226,8 @@ mod tests {
                     trail.push(pos.clone());
                     pos.play_unchecked(m);
                     assert!(
-                        (state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE,
+                        (state.logit(&pos) - NetState::new(net, &pos).logit(&pos)).abs()
+                            < TOLERANCE,
                         "{}",
                         crate::board::fen_of(&pos)
                     );
@@ -264,7 +236,10 @@ mod tests {
                 while let Some(before) = trail.pop() {
                     state.undo();
                     pos = before;
-                    assert!((state.logit(&pos) - net.logit(&pos)).abs() < TOLERANCE);
+                    assert!(
+                        (state.logit(&pos) - NetState::new(net, &pos).logit(&pos)).abs()
+                            < TOLERANCE
+                    );
                 }
             }
         }

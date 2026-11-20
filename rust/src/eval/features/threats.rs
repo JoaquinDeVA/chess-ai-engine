@@ -89,7 +89,12 @@ fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboar
 
 /// The threat inputs from `base` on: the mover's best capture, the opponent's, the pieces each side
 /// has en prise to the other, and whether the mover is in check.
-pub(super) fn threats(pos: &Chess, base: usize, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
+pub(super) fn push_threats(
+    pos: &Chess,
+    base: usize,
+    indices: &mut Vec<usize>,
+    values: &mut Vec<f64>,
+) {
     let mover = pos.turn();
     let board = pos.board();
     let mover_map = attacked_by(board, mover);
@@ -115,7 +120,7 @@ mod tests {
     fn threat_values(fen: &str) -> Vec<f64> {
         let pos = position_from_fen(fen).unwrap();
         let (mut indices, mut values) = (Vec::new(), Vec::new());
-        threats(&pos, 0, &mut indices, &mut values);
+        push_threats(&pos, 0, &mut indices, &mut values);
         assert_eq!(indices, (0..THREAT_INPUTS).collect::<Vec<_>>());
         values
     }

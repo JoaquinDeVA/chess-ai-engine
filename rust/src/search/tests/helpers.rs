@@ -25,9 +25,10 @@ pub(super) fn material() -> Net {
         bias: vec![0.0, 0.0],
     };
     let last = Layer {
-        fan_in: 2,
+        fan_in: 4,
         fan_out: 1,
-        weights: vec![2.0, -2.0],
+        // only the mover's accumulator counts; the opponent's half has no weight
+        weights: vec![2.0, -2.0, 0.0, 0.0],
         bias: vec![0.0],
     };
     Net::new(FeatureSet::PstSlotted, vec![first, last]).unwrap()

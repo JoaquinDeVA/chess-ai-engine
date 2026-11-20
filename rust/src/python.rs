@@ -40,14 +40,13 @@ impl PyEvaluator {
     /// `families` names the inputs of `pst_ctx` the first layer has rows for (`material`,
     /// `pawn_files`, `king_buckets`).
     ///
-    /// With `perspective` the second layer reads the accumulators of both sides, which share the
-    /// first layer (see `Net::with_both_perspectives`).
+    /// The second layer reads the accumulators of both sides, which share the first layer (see
+    /// `Net::new`).
     #[staticmethod]
-    #[pyo3(signature = (features, layers, perspective=false, families=Vec::new()))]
+    #[pyo3(signature = (features, layers, families=Vec::new()))]
     fn network(
         features: &str,
         layers: Vec<(PyReadonlyArray2<f64>, PyReadonlyArray1<f64>)>,
-        perspective: bool,
         families: Vec<String>,
     ) -> PyResult<PyEvaluator> {
         let set = parse_features(features)?
@@ -65,12 +64,7 @@ impl PyEvaluator {
                 }
             })
             .collect();
-        let net = if perspective {
-            Net::with_both_perspectives(set, layers)
-        } else {
-            Net::new(set, layers)
-        }
-        .map_err(value_error)?;
+        let net = Net::new(set, layers).map_err(value_error)?;
         Ok(PyEvaluator { net })
     }
 

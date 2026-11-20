@@ -87,14 +87,13 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
         x[index] += value
     (w0, b0), *rest = model.layers
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
-    if model.perspective:
-        # the rival's view: every piece in the other block of its square; the dense entries have
-        # no rival view
-        rival = np.zeros_like(x)
-        for index, value in zip(indices, values, strict=True):
-            if index < 768:
-                rival[(index + 384) % 768] += value
-        h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
+    # the rival's view: every piece in the other block of its square; the dense entries have no
+    # rival view
+    rival = np.zeros_like(x)
+    for index, value in zip(indices, values, strict=True):
+        if index < 768:
+            rival[(index + 384) % 768] += value
+    h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
     for weights, bias in rest[:-1]:
         h = np.maximum(h @ weights + bias, 0.0)
     last_weights, last_bias = rest[-1]
@@ -105,18 +104,17 @@ def test_net_has_the_documented_layer_shapes_and_parameter_count():
     model = new_model(ThreeLayerModel, Representation())
     assert [weights.shape for weights, _ in model.layers] == [
         (768, 64),
-        (64, 16),
+        (128, 16),
         (16, 1),
     ]
     assert [bias.shape for _, bias in model.layers] == [(64,), (16,), (1,)]
-    assert model.count_parameters() == 768 * 64 + 64 + 64 * 16 + 16 + 16 + 1
+    assert model.count_parameters() == 768 * 64 + 64 + 128 * 16 + 16 + 16 + 1
     assert ThreeLayerModel.hidden == (64, 16)
 
 
-def test_both_perspectives_double_the_input_of_the_second_layer():
+def test_the_second_layer_reads_both_sides_so_its_input_is_twice_the_accumulator():
     model = new_model(NnW64BothModel, Representation())
     assert [weights.shape for weights, _ in model.layers] == [(768, 64), (128, 1)]
-    assert model.perspective and not ThreeLayerModel.perspective
     assert model.count_parameters() == 768 * 64 + 64 + 128 + 1
 
 
@@ -148,7 +146,6 @@ def test_the_training_graph_computes_what_the_core_does(model_class):
         [w.shape for w, _ in model.layers],
         width,
         0.0,
-        True,
         model.families,
         model.feature_set == "pst_ctx",
     )
@@ -166,7 +163,6 @@ class CtxPlainModel(NeuralEvalModel):
     name = "net_test_ctx_plain"
     feature_set = "pst_ctx"
     hidden = (128,)
-    perspective = True
 
 
 def test_ctx_without_families_is_the_slotted_network():
@@ -181,7 +177,7 @@ def test_ctx_without_families_is_the_slotted_network():
         features = features_of(model)
         width = features.max_entries()
         network, parts = _keras_network(
-            keras, [w.shape for w, _ in model.layers], width, 0.0, True, (), ctx
+            keras, [w.shape for w, _ in model.layers], width, 0.0, (), ctx
         )
         _assign(parts, model.layers)
         index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)

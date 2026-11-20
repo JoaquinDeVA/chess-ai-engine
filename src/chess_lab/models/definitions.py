@@ -36,8 +36,6 @@ class NeuralEvalModel:
     :cvar feature_set: Name of the feature set, one of ``_core.FEATURE_SETS``.
     :cvar architecture: One-line description of the architecture, for the model card.
     :cvar hidden: Sizes of the hidden layers, the first being the accumulator.
-    :cvar perspective: Whether the second layer reads the accumulators of both sides (the mover's,
-        then the rival's, over the same first-layer weights): its input is ``2 * hidden[0]`` wide.
     :cvar families: Which families of the ``pst_ctx`` inputs the network reads, among
         :data:`CTX_FAMILIES`; empty for the other feature sets.
     """
@@ -46,7 +44,6 @@ class NeuralEvalModel:
     feature_set: ClassVar[str]
     architecture: ClassVar[str] = ""
     hidden: ClassVar[Tuple[int, ...]] = ()
-    perspective: ClassVar[bool] = False
     families: ClassVar[Tuple[str, ...]] = ()
 
     @classmethod
@@ -77,12 +74,12 @@ class NeuralEvalModel:
     def layer_shapes(cls) -> List[Tuple[int, int]]:
         """``(fan_in, fan_out)`` of every weight layer, accumulator first.
 
-        :return: One pair per layer; with both perspectives the second layer has twice the inputs.
+        :return: One pair per layer; the second layer reads the accumulators of both sides (the
+            mover's, then the rival's, over the same first-layer weights), so it has twice the inputs.
         """
         sizes = (cls.input_rows(), *cls.hidden, 1)
         shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
-        if cls.perspective:
-            shapes[1] = (2 * shapes[1][0], shapes[1][1])
+        shapes[1] = (2 * shapes[1][0], shapes[1][1])
         return shapes
 
     def __init__(self, layers: Sequence[Layer], rep: Optional[Dict[str, Any]] = None):
@@ -117,9 +114,7 @@ class NeuralEvalModel:
             (np.ascontiguousarray(weights), np.ascontiguousarray(bias))
             for weights, bias in self.layers
         ]
-        return _core.Evaluator.network(
-            self.feature_set, layers, self.perspective, list(self.families)
-        )
+        return _core.Evaluator.network(self.feature_set, layers, list(self.families))
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "NeuralEvalModel":
@@ -156,7 +151,7 @@ class NeuralEvalModel:
                     f"{path}: layer {position} has shapes {weights.shape} and {bias.shape}, "
                     f"expected {fan_out} outputs"
                 )
-        if cls.perspective and layers[1][0].shape[0] != 2 * cls.hidden[0]:
+        if layers[1][0].shape[0] != 2 * cls.hidden[0]:
             raise ValueError(f"{path}: the second layer must read both perspectives")
         return cls(layers=layers, rep=meta["rep"])
 
@@ -189,7 +184,6 @@ class NnW64BothModel(NeuralEvalModel):
     name = "net_pst_w64_both"
     feature_set = "pst_slotted"
     hidden = (64,)
-    perspective = True
     architecture = (
         "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
         "64 accumulator, 128-1 (2 layers)"
@@ -202,7 +196,6 @@ class NnW128BothModel(NeuralEvalModel):
     name = "net_pst_w128_both"
     feature_set = "pst_slotted"
     hidden = (128,)
-    perspective = True
     architecture = (
         "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
         "128 accumulator, 256-1 (2 layers)"
@@ -215,7 +208,6 @@ class NnW256BothModel(NeuralEvalModel):
     name = "net_pst_w256_both"
     feature_set = "pst_slotted"
     hidden = (256,)
-    perspective = True
     architecture = (
         "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
         "256 accumulator, 512-1 (2 layers)"
@@ -228,7 +220,6 @@ class NnThreatsW64BothModel(NeuralEvalModel):
     name = "net_pst_threats_w64_both"
     feature_set = "pst_threats"
     hidden = (64,)
-    perspective = True
     architecture = (
         "Sparse network: 768 slotted piece-square inputs seen from both sides plus 5 threat "
         "inputs of the mover, one shared 64 accumulator, 128-1 (2 layers)"
@@ -255,7 +246,6 @@ def _ctx_model(letters: str, width: int) -> Type[NeuralEvalModel]:
             "name": f"net_ctx_{letters}_w{width}_both",
             "feature_set": "pst_ctx",
             "hidden": (width,),
-            "perspective": True,
             "families": families,
             "architecture": (
                 f"Sparse network: 768 slotted piece-square inputs plus {', '.join(families)} "

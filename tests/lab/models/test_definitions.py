@@ -49,7 +49,6 @@ def test_ctx_models_read_the_families_they_name(letters, families, rows):
     cls = get_model_class(f"net_ctx_{letters}_w128_both")
     assert cls.feature_set == "pst_ctx"
     assert cls.families == families
-    assert cls.perspective
     assert cls.layer_shapes() == [(rows, 128), (256, 1)]
 
 

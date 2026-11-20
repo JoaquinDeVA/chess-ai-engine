@@ -134,13 +134,12 @@ def _accumulator_class(keras: Any) -> type:
             rows: int,
             units: int,
             l2: float,
-            both: bool = False,
             families: Sequence[str] = (),
             ctx: bool = False,
             **kwargs: Any,
         ):
             super().__init__(**kwargs)
-            self.rows, self.units, self.l2, self.both = rows, units, l2, both
+            self.rows, self.units, self.l2 = rows, units, l2
             self.families, self.ctx = tuple(families), ctx
 
         def build(self, _input_shape: Any) -> None:
@@ -209,8 +208,6 @@ def _accumulator_class(keras: Any) -> type:
             own_bucket = ops.sum(ops.where(own, feature - KING_BASE, 0), axis=1)
             rival_bucket = ops.sum(ops.where(rival, feature - KING_BASE - KING_BUCKETS, 0), axis=1)
             mover = self._sum(*self._ctx_rows(index, value, own_bucket, False))
-            if not self.both:
-                return mover
             rival_view = self._sum(*self._ctx_rows(index, value, rival_bucket, True))
             return ops.concatenate([mover, rival_view], axis=-1)
 
@@ -219,8 +216,6 @@ def _accumulator_class(keras: Any) -> type:
             if self.ctx:
                 return self._ctx_call(index, value)
             mover = self._sum(index, value)
-            if not self.both:
-                return mover
             # The rival's view of a piece is the other block of the same square; the dense entries
             # (past the pieces) have no rival view. Feature ``i`` is index ``i + 1`` and index 0
             # is padding.
@@ -239,7 +234,6 @@ def _keras_network(
     shapes: Sequence[Tuple[int, int]],
     width: int,
     l2: float,
-    both: bool = False,
     families: Sequence[str] = (),
     ctx: bool = False,
 ) -> Tuple[Any, List[Any]]:
@@ -249,7 +243,6 @@ def _keras_network(
     :param shapes: ``(fan_in, fan_out)`` of every weight layer, accumulator first.
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
-    :param both: Whether the second layer reads the accumulators of both sides, one table.
     :param families: Families of the ``pst_ctx`` inputs the network reads.
     :param ctx: Whether the inputs are those of ``pst_ctx``.
     :return: The model (inputs: indices, values; output: logit) and its weight layers in order.
@@ -258,7 +251,6 @@ def _keras_network(
         rows=shapes[0][0] + 1,
         units=shapes[0][1],
         l2=l2,
-        both=both,
         families=families,
         ctx=ctx,
         name="accumulator",
@@ -347,7 +339,6 @@ def fit_stream(
         [w.shape for w, _ in model.layers],
         width,
         float(cfg["l2"]),
-        model.perspective,
         model.families,
         model.feature_set == "pst_ctx",
     )

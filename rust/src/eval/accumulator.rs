@@ -395,22 +395,18 @@ impl NetState<'_> {
                     &mut lanes,
                 );
             }
-            if net.both_perspectives {
-                let opponent = (2 * self.top + slot(!pos.turn())) * width;
-                clipped_dot(
-                    &self.stack[opponent..opponent + width],
-                    &out.weights[width..2 * width],
-                    &mut lanes,
-                );
-            }
+            let opponent = (2 * self.top + slot(!pos.turn())) * width;
+            clipped_dot(
+                &self.stack[opponent..opponent + width],
+                &out.weights[width..2 * width],
+                &mut lanes,
+            );
             return out.bias[0] + lanes.iter().sum::<f32>();
         }
         self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
-        if net.both_perspectives {
-            // the opponent's accumulator follows the mover's: both views, one shared first layer
-            let opponent = (2 * self.top + slot(!pos.turn())) * width;
-            self.hidden[width..2 * width].copy_from_slice(&self.stack[opponent..opponent + width]);
-        }
+        // the opponent's accumulator follows the mover's: both views, one shared first layer
+        let opponent = (2 * self.top + slot(!pos.turn())) * width;
+        self.hidden[width..2 * width].copy_from_slice(&self.stack[opponent..opponent + width]);
         if net.features.has_dense() {
             self.dense_indices.clear();
             self.dense_values.clear();
@@ -456,12 +452,13 @@ mod tests {
         }
     }
 
+    /// A network whose second layer reads both sides' accumulators (twice as wide as one).
     fn net(features: FeatureSet) -> Net {
         Net::new(
             features,
             vec![
                 layer(features.size(), 16, 1),
-                layer(16, 8, 2),
+                layer(32, 8, 2),
                 layer(8, 1, 3),
             ],
         )
@@ -523,31 +520,12 @@ mod tests {
         check_net(&net(FeatureSet::PstSlotted));
     }
 
-    /// A network whose second layer reads both sides' accumulators (twice as wide as one).
-    fn both_net(features: FeatureSet) -> Net {
-        Net::with_both_perspectives(
-            features,
-            vec![
-                layer(features.size(), 16, 1),
-                layer(32, 8, 2),
-                layer(8, 1, 3),
-            ],
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn incremental_equals_full_both_perspectives() {
-        check_net(&both_net(FeatureSet::PstSlotted));
-    }
-
     #[test]
     fn incremental_equals_full_threats() {
         check_net(&net(FeatureSet::PstThreats));
-        check_net(&both_net(FeatureSet::PstThreats));
     }
 
-    /// Every combination of the families, alone and together, with and without both views.
+    /// Every combination of the families, alone and together.
     fn ctx_nets() -> Vec<Net> {
         let mut nets = Vec::new();
         for bits in 0..8u8 {
@@ -558,7 +536,6 @@ mod tests {
             };
             let features = FeatureSet::PstCtx(families);
             nets.push(net(features));
-            nets.push(both_net(features));
         }
         nets
     }

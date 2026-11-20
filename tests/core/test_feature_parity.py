@@ -26,8 +26,8 @@ def test_rust_features_equal_python_features(name):
     # the entries of pst_ctx are the same whatever the families; give the net rows for two of them
     families = ["material", "pawn_files"] if name == "pst_ctx" else []
     rows = 768 + 30 + 32 if families else features.size()
-    layers = [(np.zeros((rows, 1)), np.zeros(1)), (np.zeros((1, 1)), np.zeros(1))]
-    evaluator = _core.Evaluator.network(name, layers, False, families)
+    layers = [(np.zeros((rows, 1)), np.zeros(1)), (np.zeros((2, 1)), np.zeros(1))]
+    evaluator = _core.Evaluator.network(name, layers, families)
     for fen in fens():
         expected = features.active(chess.Board(fen))
         got = evaluator.features(fen)

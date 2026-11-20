@@ -516,11 +516,6 @@ mod tests {
     }
 
     #[test]
-    fn incremental_equals_full_slotted() {
-        check_net(&net(FeatureSet::PstSlotted));
-    }
-
-    #[test]
     fn incremental_equals_full_threats() {
         check_net(&net(FeatureSet::PstThreats));
     }

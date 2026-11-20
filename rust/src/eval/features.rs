@@ -87,8 +87,6 @@ impl Families {
 /// The families of features.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FeatureSet {
-    /// `pst_slotted`: one-hot piece squares, the mover's pieces first.
-    PstSlotted,
     /// `pst_threats`: the slotted inputs plus five dense threat inputs (best capture of each side,
     /// pieces en prise of each side, mover in check).
     PstThreats,
@@ -98,15 +96,16 @@ pub enum FeatureSet {
 }
 
 impl FeatureSet {
-    /// Names of the feature sets, as the saved models call them.
-    pub const NAMES: [&'static str; 3] = ["pst_slotted", "pst_threats", "pst_ctx"];
+    /// Names of the feature sets, as the saved models call them (`pst_slotted` is also read, see
+    /// [`FeatureSet::from_name`]).
+    pub const NAMES: [&'static str; 2] = ["pst_threats", "pst_ctx"];
 
-    /// The feature set called `name` in the saved models (`pst_ctx` without families).
+    /// The feature set called `name` in the saved models (`pst_ctx` without families). The
+    /// networks saved as `pst_slotted` read the pieces alone, which is `pst_ctx` without families.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
         Some(match name {
-            "pst_slotted" => FeatureSet::PstSlotted,
             "pst_threats" => FeatureSet::PstThreats,
-            "pst_ctx" => FeatureSet::PstCtx(Families::default()),
+            "pst_ctx" | "pst_slotted" => FeatureSet::PstCtx(Families::default()),
             _ => return None,
         })
     }
@@ -123,7 +122,6 @@ impl FeatureSet {
     /// Number of inputs (rows of the first layer).
     pub fn size(self) -> usize {
         match self {
-            FeatureSet::PstSlotted => PIECE_INPUTS,
             FeatureSet::PstThreats => PIECE_INPUTS + THREAT_INPUTS,
             FeatureSet::PstCtx(families) => families.rows(),
         }
@@ -478,6 +476,11 @@ mod tests {
         let all = Families::from_names(&["material", "pawn_files", "king_buckets"]).unwrap();
         assert_eq!(all.rows(), 768 * 4 + 30 + 32);
         assert!(Families::from_names(&["nothing"]).is_err());
-        assert!(FeatureSet::PstSlotted.with_families(all).is_err());
+        assert!(FeatureSet::PstThreats.with_families(all).is_err());
+        // the old name of the networks that read the pieces alone
+        assert_eq!(
+            FeatureSet::from_name("pst_slotted"),
+            FeatureSet::from_name("pst_ctx")
+        );
     }
 }

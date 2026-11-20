@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::board::{position_from_fen, uci_string, GameState};
-use crate::eval::{FeatureSet, Layer, Net};
+use crate::eval::{Families, FeatureSet, Layer, Net};
 use crate::search::*;
 
 /// A network that sees only material: the side to move's expected score is
@@ -31,7 +31,7 @@ pub(super) fn material() -> Net {
         weights: vec![2.0, -2.0, 0.0, 0.0],
         bias: vec![0.0],
     };
-    Net::new(FeatureSet::PstSlotted, vec![first, last]).unwrap()
+    Net::new(FeatureSet::PstCtx(Families::default()), vec![first, last]).unwrap()
 }
 
 #[derive(Default)]

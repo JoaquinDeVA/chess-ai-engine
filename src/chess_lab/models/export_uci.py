@@ -50,6 +50,8 @@ def export_payload(model: NeuralEvalModel) -> Dict[str, Any]:
     payload: Dict[str, Any] = {"features": model.feature_set, "layers": layers}
     if model.perspective:
         payload["perspective"] = "both"
+    if model.families:
+        payload["families"] = list(model.families)
     return payload
 
 

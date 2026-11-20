@@ -12,8 +12,15 @@ from chess_lab.models.definitions import (
     NeuralEvalModel,
     NnThreatsW64BothModel,
     NnW64BothModel,
+    get_model_class,
 )
-from chess_lab.models.features import features_of
+from chess_lab.models.features import (
+    KING_BASE,
+    KING_BUCKETS,
+    MATERIAL_BASE,
+    PAWN_FILES_BASE,
+    features_of,
+)
 from chess_lab.models.target import Representation
 from chess_lab.training.neural import fit_stream, new_model
 from tests.conftest import mover_score, random_positions, white_score_of
@@ -41,8 +48,39 @@ def random_net(
     return model
 
 
+def ctx_table_rows(model: NeuralEvalModel, board: chess.Board) -> list[int]:
+    """Rows of the table that the entries of ``board`` select, as the mover sees them."""
+    indices, _ = features_of(model).active(board)
+    bucket = next(i - KING_BASE for i in indices if KING_BASE <= i < KING_BASE + KING_BUCKETS)
+    king = "king_buckets" in model.families
+    piece_rows = MATERIAL_BASE * (KING_BUCKETS if king else 1)
+    material_rows = PAWN_FILES_BASE - MATERIAL_BASE if "material" in model.families else 0
+    rows = []
+    for i in indices:
+        if i < MATERIAL_BASE:
+            rows.append(i + (bucket * MATERIAL_BASE if king else 0))
+        elif i < PAWN_FILES_BASE and "material" in model.families:
+            rows.append(piece_rows + i - MATERIAL_BASE)
+        elif PAWN_FILES_BASE <= i < KING_BASE and "pawn_files" in model.families:
+            rows.append(piece_rows + material_rows + i - PAWN_FILES_BASE)
+    return rows
+
+
+def ctx_logit(model: NeuralEvalModel, board: chess.Board) -> float:
+    """Reference of a ``pst_ctx`` network: each view is the position with that side to move."""
+    (w0, b0), *rest = model.layers
+    rival = board.copy()
+    rival.turn = not board.turn
+    views = [ctx_table_rows(model, board), ctx_table_rows(model, rival)]
+    h = np.concatenate([np.clip(w0[rows].sum(axis=0) + b0, 0.0, 1.0) for rows in views])
+    last_weights, last_bias = rest[-1]
+    return float((h @ last_weights + last_bias)[0])
+
+
 def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     """Reference forward pass on a dense 768- (or 769-) vector, same weights as ``model``."""
+    if model.feature_set == "pst_ctx":
+        return ctx_logit(model, board)
     indices, values = features_of(model).active(board)
     x = np.zeros(features_of(model).size())
     for index, value in zip(indices, values, strict=True):
@@ -83,6 +121,7 @@ def test_both_perspectives_double_the_input_of_the_second_layer():
 
 
 BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel]
+CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]
 
 
 @pytest.mark.parametrize("model_class", [ThreeLayerModel, *BOTH_MODELS])
@@ -95,7 +134,7 @@ def test_core_score_matches_a_dense_numpy_reference(model_class):
         )
 
 
-@pytest.mark.parametrize("model_class", BOTH_MODELS)
+@pytest.mark.parametrize("model_class", [*BOTH_MODELS, *CTX_MODELS])
 def test_the_training_graph_computes_what_the_core_does(model_class):
     from chess_lab.training.epochs import encode_frame
     from chess_lab.training.neural import _assign, _keras_network, _padded, _training_keras
@@ -104,13 +143,50 @@ def test_the_training_graph_computes_what_the_core_does(model_class):
     features = features_of(model)
     width = features.max_entries()
     keras = _training_keras()
-    network, parts = _keras_network(keras, [w.shape for w, _ in model.layers], width, 0.0, True)
+    network, parts = _keras_network(
+        keras,
+        [w.shape for w, _ in model.layers],
+        width,
+        0.0,
+        True,
+        model.families,
+        model.feature_set == "pst_ctx",
+    )
     _assign(parts, model.layers)
     boards = random_positions(40, seed=9)
     index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)
     logits = np.asarray(network.predict([index, value], verbose=0)).reshape(-1)
     for board, logit in zip(boards, logits, strict=True):
         assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
+
+
+class CtxPlainModel(NeuralEvalModel):
+    """The ``pst_ctx`` inputs without any family: only the pieces, as ``pst_slotted``."""
+
+    name = "net_test_ctx_plain"
+    feature_set = "pst_ctx"
+    hidden = (128,)
+    perspective = True
+
+
+def test_ctx_without_families_is_the_slotted_network():
+    from chess_lab.training.epochs import encode_frame
+    from chess_lab.training.neural import _assign, _keras_network, _padded, _training_keras
+
+    keras = _training_keras()
+    boards = random_positions(30, seed=13)
+    logits = []
+    for model_class, ctx in ((CtxPlainModel, True), (get_model_class("net_pst_w128_both"), False)):
+        model = random_net(seed=4, model_class=model_class)
+        features = features_of(model)
+        width = features.max_entries()
+        network, parts = _keras_network(
+            keras, [w.shape for w, _ in model.layers], width, 0.0, True, (), ctx
+        )
+        _assign(parts, model.layers)
+        index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)
+        logits.append(np.asarray(network.predict([index, value], verbose=0)).reshape(-1))
+    assert logits[0] == pytest.approx(logits[1], abs=1e-5)
 
 
 @pytest.mark.parametrize("model_class", [ThreeLayerModel, NnW64BothModel])

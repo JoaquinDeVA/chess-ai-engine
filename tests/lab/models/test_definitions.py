@@ -19,6 +19,10 @@ def test_every_model_is_in_the_table():
         "net_pst_w128_both",
         "net_pst_w256_both",
         "net_pst_threats_w64_both",
+        "net_ctx_m_w128_both",
+        "net_ctx_p_w128_both",
+        "net_ctx_k_w128_both",
+        "net_ctx_mpk_w128_both",
     }
 
 
@@ -30,6 +34,31 @@ def test_wider_models_share_the_inputs_and_double_the_output_layer(width):
     assert (
         new_model(cls, Representation()).count_parameters() == 768 * width + width + 2 * width + 1
     )
+
+
+@pytest.mark.parametrize(
+    ("letters", "families", "rows"),
+    [
+        ("m", ("material",), 768 + 30),
+        ("p", ("pawn_files",), 768 + 32),
+        ("k", ("king_buckets",), 4 * 768),
+        ("mpk", ("material", "pawn_files", "king_buckets"), 4 * 768 + 30 + 32),
+    ],
+)
+def test_ctx_models_read_the_families_they_name(letters, families, rows):
+    cls = get_model_class(f"net_ctx_{letters}_w128_both")
+    assert cls.feature_set == "pst_ctx"
+    assert cls.families == families
+    assert cls.perspective
+    assert cls.layer_shapes() == [(rows, 128), (256, 1)]
+
+
+def test_a_saved_ctx_model_remembers_its_families(tmp_path):
+    cls = get_model_class("net_ctx_mpk_w128_both")
+    path = new_model(cls, Representation()).save(tmp_path / "net_ctx_mpk_w128_both.npz")
+    assert cls.load(path).families == cls.families
+    with pytest.raises(ValueError, match="families"):
+        get_model_class("net_ctx_k_w128_both").load(path)
 
 
 def test_unknown_model_lists_the_valid_names():

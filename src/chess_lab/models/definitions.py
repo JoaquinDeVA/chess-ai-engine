@@ -38,6 +38,8 @@ class NeuralEvalModel:
     :cvar hidden: Sizes of the hidden layers, the first being the accumulator.
     :cvar perspective: Whether the second layer reads the accumulators of both sides (the mover's,
         then the rival's, over the same first-layer weights): its input is ``2 * hidden[0]`` wide.
+    :cvar families: Which families of the ``pst_ctx`` inputs the network reads, among
+        :data:`CTX_FAMILIES`; empty for the other feature sets.
     """
 
     name: ClassVar[str]
@@ -45,6 +47,31 @@ class NeuralEvalModel:
     architecture: ClassVar[str] = ""
     hidden: ClassVar[Tuple[int, ...]] = ()
     perspective: ClassVar[bool] = False
+    families: ClassVar[Tuple[str, ...]] = ()
+
+    @classmethod
+    def input_rows(cls) -> int:
+        """Rows of the accumulator table: the inputs the network reads.
+
+        With ``pst_ctx`` the king buckets multiply the piece rows, and each of the material and
+        pawn-file families adds its rows; the bucket entries themselves have no row.
+
+        :return: Number of rows of the first layer.
+        """
+        from .features import (
+            FEATURE_SETS,
+            KING_BASE,
+            KING_BUCKETS,
+            MATERIAL_BASE,
+            PAWN_FILES_BASE,
+        )
+
+        if cls.feature_set != "pst_ctx":
+            return FEATURE_SETS[cls.feature_set].size()
+        pieces = MATERIAL_BASE * (KING_BUCKETS if "king_buckets" in cls.families else 1)
+        material = PAWN_FILES_BASE - MATERIAL_BASE if "material" in cls.families else 0
+        pawns = KING_BASE - PAWN_FILES_BASE if "pawn_files" in cls.families else 0
+        return pieces + material + pawns
 
     @classmethod
     def layer_shapes(cls) -> List[Tuple[int, int]]:
@@ -52,9 +79,7 @@ class NeuralEvalModel:
 
         :return: One pair per layer; with both perspectives the second layer has twice the inputs.
         """
-        from .features import FEATURE_SETS
-
-        sizes = (FEATURE_SETS[cls.feature_set].size(), *cls.hidden, 1)
+        sizes = (cls.input_rows(), *cls.hidden, 1)
         shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
         if cls.perspective:
             shapes[1] = (2 * shapes[1][0], shapes[1][1])
@@ -92,7 +117,9 @@ class NeuralEvalModel:
             (np.ascontiguousarray(weights), np.ascontiguousarray(bias))
             for weights, bias in self.layers
         ]
-        return _core.Evaluator.network(self.feature_set, layers, self.perspective)
+        return _core.Evaluator.network(
+            self.feature_set, layers, self.perspective, list(self.families)
+        )
 
     @classmethod
     def load(cls, path: Optional[Path] = None) -> "NeuralEvalModel":
@@ -114,6 +141,8 @@ class NeuralEvalModel:
             meta = json.loads(str(data["meta"]))
             if meta["features"] != cls.feature_set:
                 raise ValueError(f"{path} was saved with features {meta['features']!r}")
+            if tuple(meta.get("families", ())) != cls.families:
+                raise ValueError(f"{path} was saved with families {meta.get('families', ())}")
             if tuple(meta["hidden"]) != cls.hidden:
                 raise ValueError(
                     f"{path} was saved with hidden sizes {tuple(meta['hidden'])}, "
@@ -142,7 +171,12 @@ class NeuralEvalModel:
         arrays: Dict[str, np.ndarray] = {}
         for position, (weights, bias) in enumerate(self.layers):
             arrays[f"W{position}"], arrays[f"b{position}"] = weights, bias
-        meta = {"features": self.feature_set, "rep": self.rep, "hidden": list(self.hidden)}
+        meta = {
+            "features": self.feature_set,
+            "rep": self.rep,
+            "hidden": list(self.hidden),
+            "families": list(self.families),
+        }
         # A file object keeps numpy from appending ".npz" to the requested name.
         with open(path, "wb") as handle:
             np.savez(handle, meta=np.array(json.dumps(meta)), **arrays)
@@ -201,10 +235,47 @@ class NnThreatsW64BothModel(NeuralEvalModel):
     )
 
 
+#: Families of the ``pst_ctx`` inputs by the letter of the model names.
+CTX_FAMILIES = {"m": "material", "p": "pawn_files", "k": "king_buckets"}
+
+
+def _ctx_model(letters: str, width: int) -> Type[NeuralEvalModel]:
+    """A ``pst_ctx`` network over the families named by ``letters``.
+
+    :param letters: Some of ``m`` (material), ``p`` (pawn files) and ``k`` (own king buckets).
+    :param width: Accumulator width.
+    :return: The model class ``net_ctx_<letters>_w<width>_both``.
+    """
+    families = tuple(CTX_FAMILIES[letter] for letter in letters)
+    return type(
+        f"NnCtx{letters.upper()}W{width}BothModel",
+        (NeuralEvalModel,),
+        {
+            "__doc__": f"Slotted inputs plus {', '.join(families)}, both sides, {width} accumulator.",
+            "name": f"net_ctx_{letters}_w{width}_both",
+            "feature_set": "pst_ctx",
+            "hidden": (width,),
+            "perspective": True,
+            "families": families,
+            "architecture": (
+                f"Sparse network: 768 slotted piece-square inputs plus {', '.join(families)} "
+                f"seen from both sides over one shared {width} accumulator, {2 * width}-1 "
+                "(2 layers)"
+            ),
+        },
+    )
+
+
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
     cls.name: cls
-    for cls in (NnW64BothModel, NnW128BothModel, NnW256BothModel, NnThreatsW64BothModel)
+    for cls in (
+        NnW64BothModel,
+        NnW128BothModel,
+        NnW256BothModel,
+        NnThreatsW64BothModel,
+        *(_ctx_model(letters, 128) for letters in ("m", "p", "k", "mpk")),
+    )
 }
 
 

@@ -15,7 +15,15 @@ import numpy as np
 import pandas as pd
 
 from chess_lab.models.definitions import Layer, NeuralEvalModel
-from chess_lab.models.features import features_of
+from chess_lab.models.features import (
+    KING_BASE,
+    KING_BUCKETS,
+    MATERIAL_BASE,
+    MATERIAL_PER_SIDE,
+    PAWN_FILES_BASE,
+    PAWN_FILES_PER_SIDE,
+    features_of,
+)
 from chess_lab.models.target import Representation
 
 from .epochs import (
@@ -127,10 +135,13 @@ def _accumulator_class(keras: Any) -> type:
             units: int,
             l2: float,
             both: bool = False,
+            families: Sequence[str] = (),
+            ctx: bool = False,
             **kwargs: Any,
         ):
             super().__init__(**kwargs)
             self.rows, self.units, self.l2, self.both = rows, units, l2, both
+            self.families, self.ctx = tuple(families), ctx
 
         def build(self, _input_shape: Any) -> None:
             # L2(c) penalises c * sum(w**2); half the coefficient gives gradient l2 * w.
@@ -147,8 +158,66 @@ def _accumulator_class(keras: Any) -> type:
             total = keras.ops.sum(rows * keras.ops.expand_dims(value, -1), axis=1)
             return keras.ops.clip(total + self.bias, 0.0, 1.0)
 
+        def _ctx_rows(self, index: Any, value: Any, bucket: Any, swap: bool) -> Tuple[Any, Any]:
+            """Table rows and values of one side's view of ``pst_ctx`` entries.
+
+            Piece entries read ``bucket * 768 + piece`` with king buckets, else the piece; the
+            material and pawn-file entries read their own rows after the pieces, or nothing when
+            their family is off; the bucket entries have no row. ``swap`` gives the rival's view:
+            the two sides' blocks of every family exchange places.
+
+            :param index: Feature ``i`` as ``i + 1``, ``0`` for padding.
+            :param value: Values of the entries.
+            :param bucket: King bucket of the side the view belongs to, shape ``(rows,)``.
+            :param swap: Whether this is the rival's view.
+            :return: ``(index, value)`` for :meth:`_sum`, with ``0`` where an entry is dropped.
+            """
+            ops = keras.ops
+            feature = index - 1
+            valid = index > 0
+            is_piece = ops.logical_and(valid, feature < MATERIAL_BASE)
+            is_material = ops.logical_and(
+                ops.logical_and(valid, feature >= MATERIAL_BASE), feature < PAWN_FILES_BASE
+            )
+            is_pawn = ops.logical_and(
+                ops.logical_and(valid, feature >= PAWN_FILES_BASE), feature < KING_BASE
+            )
+            piece, material, pawn = feature, feature - MATERIAL_BASE, feature - PAWN_FILES_BASE
+            if swap:
+                piece = ops.mod(piece + MATERIAL_BASE // 2, MATERIAL_BASE)
+                material = ops.mod(material + MATERIAL_PER_SIDE, 2 * MATERIAL_PER_SIDE)
+                pawn = ops.mod(pawn + PAWN_FILES_PER_SIDE, 2 * PAWN_FILES_PER_SIDE)
+            king = "king_buckets" in self.families
+            if king:
+                piece = piece + ops.expand_dims(bucket, -1) * MATERIAL_BASE
+            piece_rows = MATERIAL_BASE * (KING_BUCKETS if king else 1)
+            material_rows = 2 * MATERIAL_PER_SIDE if "material" in self.families else 0
+            row = ops.where(is_piece, piece, -1)
+            if "material" in self.families:
+                row = ops.where(is_material, piece_rows + material, row)
+            if "pawn_files" in self.families:
+                row = ops.where(is_pawn, piece_rows + material_rows + pawn, row)
+            kept = row >= 0
+            return ops.where(kept, row + 1, 0), ops.where(kept, value, 0.0)
+
+        def _ctx_call(self, index: Any, value: Any) -> Any:
+            ops = keras.ops
+            feature = index - 1
+            in_buckets = ops.logical_and(index > 0, feature >= KING_BASE)
+            own = ops.logical_and(in_buckets, feature < KING_BASE + KING_BUCKETS)
+            rival = ops.logical_and(in_buckets, feature >= KING_BASE + KING_BUCKETS)
+            own_bucket = ops.sum(ops.where(own, feature - KING_BASE, 0), axis=1)
+            rival_bucket = ops.sum(ops.where(rival, feature - KING_BASE - KING_BUCKETS, 0), axis=1)
+            mover = self._sum(*self._ctx_rows(index, value, own_bucket, False))
+            if not self.both:
+                return mover
+            rival_view = self._sum(*self._ctx_rows(index, value, rival_bucket, True))
+            return ops.concatenate([mover, rival_view], axis=-1)
+
         def call(self, inputs: Any) -> Any:
             index, value = inputs
+            if self.ctx:
+                return self._ctx_call(index, value)
             mover = self._sum(index, value)
             if not self.both:
                 return mover
@@ -171,6 +240,8 @@ def _keras_network(
     width: int,
     l2: float,
     both: bool = False,
+    families: Sequence[str] = (),
+    ctx: bool = False,
 ) -> Tuple[Any, List[Any]]:
     """The training network, with the layers of ``shapes``.
 
@@ -179,6 +250,8 @@ def _keras_network(
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
     :param both: Whether the second layer reads the accumulators of both sides, one table.
+    :param families: Families of the ``pst_ctx`` inputs the network reads.
+    :param ctx: Whether the inputs are those of ``pst_ctx``.
     :return: The model (inputs: indices, values; output: logit) and its weight layers in order.
     """
     accumulator = _accumulator_class(keras)(
@@ -186,6 +259,8 @@ def _keras_network(
         units=shapes[0][1],
         l2=l2,
         both=both,
+        families=families,
+        ctx=ctx,
         name="accumulator",
     )
     index_in = keras.Input(shape=(width,), dtype="int32")
@@ -273,6 +348,8 @@ def fit_stream(
         width,
         float(cfg["l2"]),
         model.perspective,
+        model.families,
+        model.feature_set == "pst_ctx",
     )
     _assign(parts, model.layers)
     network.compile(

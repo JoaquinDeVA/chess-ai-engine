@@ -16,8 +16,8 @@ const PROBABILITY_CLIP: f64 = 1e-2;
 /// (`400 / ln 10`), so a pawn up is about 100 and the margins of the techniques read as such.
 const SCORE_PER_LOGIT: f32 = 173.717_8;
 
-/// Highest score of an evaluation, so that a mate is always beyond it: the clip of the expected
-/// score to `[PROBABILITY_CLIP, 1 - PROBABILITY_CLIP]` on this scale (`ln 99 · 400 / ln 10`).
+/// Highest score of an evaluation, so that a mate is always beyond it. It is its own bound of the
+/// search, not derived from `PROBABILITY_CLIP`: it only has to stay below `MATE_BOUND`.
 pub const EVAL_LIMIT: i32 = 798;
 
 /// The logit in centipawns, clipped to `±EVAL_LIMIT`.
@@ -119,8 +119,6 @@ mod tests {
     fn the_score_is_the_logit_in_centipawns_clipped_like_the_expected_score() {
         assert_eq!(centipawns(1.0), 174);
         assert_eq!(centipawns(-1.0), -174);
-        // 0.99 of expected score is the highest evaluation in both readings
-        assert_eq!(centipawns((0.99f64 / 0.01).ln() as f32), EVAL_LIMIT);
         assert_eq!(centipawns(10.0), EVAL_LIMIT);
         assert_eq!(centipawns(-10.0), -EVAL_LIMIT);
     }

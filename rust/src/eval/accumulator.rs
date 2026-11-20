@@ -2,24 +2,12 @@
 
 use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
 
-use super::features::OPPONENT_PIECE_BLOCK;
+use super::features::{
+    count_of, input_index, king_bucket, material_entry, material_row, pawn_entry, pawn_row,
+    pawns_on, view_rows, Families, FeatureSet, PIECE_INPUTS,
+};
 use super::net::Net;
 use super::score;
-
-/// Index of a piece among the piece inputs when `mover` is the side to move: the
-/// pieces of the mover come first, then the opponent's, each color seen from its own home rank.
-fn input_index(mover: Color, color: Color, role: Role, square: Square) -> usize {
-    let mut index = (role as usize - 1) * 64;
-    if color != mover {
-        index += OPPONENT_PIECE_BLOCK;
-    }
-    let square = if color == Color::Black {
-        square.flip_vertical()
-    } else {
-        square
-    };
-    index + u32::from(square) as usize
-}
 
 fn slot(color: Color) -> usize {
     usize::from(color == Color::Black)
@@ -44,6 +32,8 @@ const STACK_PLIES: usize = 128;
 pub struct NetState<'a> {
     net: &'a Net,
     width: usize,
+    /// The input families of a `pst_ctx` network, which `apply` follows with its own update.
+    ctx: Option<Families>,
     /// One frame of `2 * width` sums per ply, the white mover's accumulator first.
     stack: Vec<f32>,
     /// Frame of the current position.
@@ -59,9 +49,14 @@ impl<'a> NetState<'a> {
     /// The accumulators of `pos`, built from the board.
     pub fn new(net: &'a Net, pos: &Chess) -> NetState<'a> {
         let width = net.layers[0].fan_out;
+        let ctx = match net.features {
+            FeatureSet::PstCtx(families) => Some(families),
+            _ => None,
+        };
         let mut state = NetState {
             net,
             width,
+            ctx,
             stack: vec![0.0; 2 * width * STACK_PLIES],
             top: 0,
             hidden: vec![0.0; net.max_width],
@@ -90,6 +85,16 @@ impl<'a> NetState<'a> {
     fn refresh(&mut self, mover: Color, board: &Board) {
         let net = self.net;
         self.acc(mover).copy_from_slice(&net.layers[0].bias);
+        if let Some(families) = self.ctx {
+            let mut rows = Vec::with_capacity(64);
+            view_rows(families, board, mover, &mut rows);
+            for row in rows {
+                for (a, w) in self.acc(mover).iter_mut().zip(net.layers[0].row(row)) {
+                    *a += w;
+                }
+            }
+            return;
+        }
         for (square, piece) in board.clone() {
             let row = self.row(mover, piece, square);
             for (a, w) in self.acc(mover).iter_mut().zip(row) {
@@ -197,6 +202,9 @@ impl NetState<'_> {
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
         let mover = pos.turn();
         let (pieces, count) = changes(mover, m);
+        if let Some(families) = self.ctx {
+            return self.apply_ctx(families, pos, m, &pieces[..count]);
+        }
         // step up one frame, writing the new accumulators straight from the old ones
         let frame = 2 * self.width;
         if (self.top + 2) * frame > self.stack.len() {
@@ -237,6 +245,110 @@ impl NetState<'_> {
             }
         }
         self.top += 1;
+    }
+
+    /// `apply` for a `pst_ctx` network. A view whose own king changes bucket is rebuilt from the
+    /// board after the move (all its piece rows move); the others add the rows of the pieces that
+    /// change, and of the material and pawn-file entries whose count changes.
+    fn apply_ctx(
+        &mut self,
+        families: Families,
+        pos: &Chess,
+        m: &Move,
+        pieces: &[(Piece, Square, bool)],
+    ) {
+        let mover = pos.turn();
+        let board = pos.board();
+        self.push();
+        let mut rebuilt = false;
+        if families.king_buckets {
+            let king = |put| pieces.iter().find(|p| p.0.role == Role::King && p.2 == put);
+            if let (Some(&(_, from, _)), Some(&(_, to, _))) = (king(false), king(true)) {
+                let bucket = |square: Square| {
+                    let mut board = Board::empty();
+                    board.set_piece_at(
+                        square,
+                        Piece {
+                            color: mover,
+                            role: Role::King,
+                        },
+                    );
+                    king_bucket(&board, mover)
+                };
+                if bucket(from) != bucket(to) {
+                    let mut after = pos.clone();
+                    after.play_unchecked(*m);
+                    self.refresh(mover, after.board());
+                    rebuilt = true;
+                }
+            }
+        }
+        // count changes: [color][role - 1] for the material, [color][file] for the pawns
+        let (mut by_role, mut by_file) = ([[0i32; 5]; 2], [[0i32; 8]; 2]);
+        for &(piece, square, put) in pieces {
+            if piece.role == Role::King {
+                continue;
+            }
+            let delta = if put { 1 } else { -1 };
+            by_role[slot(piece.color)][piece.role as usize - 1] += delta;
+            if piece.role == Role::Pawn {
+                by_file[slot(piece.color)][square.file() as usize] += delta;
+            }
+        }
+        // (side, material or pawn file, entry, sign)
+        let mut edits: Vec<(Color, bool, usize, f32)> = Vec::with_capacity(16);
+        for side in [Color::White, Color::Black] {
+            for (at, &delta) in by_role[slot(side)].iter().enumerate() {
+                if delta != 0 && families.material {
+                    let old = count_of(board, side, super::features::MATERIAL_ROLES[at]);
+                    let new = (old as i32 + delta) as usize;
+                    if material_entry(at, old) != material_entry(at, new) {
+                        edits.extend(material_entry(at, old).map(|e| (side, true, e, -1.0)));
+                        edits.extend(material_entry(at, new).map(|e| (side, true, e, 1.0)));
+                    }
+                }
+            }
+            for (file, &delta) in by_file[slot(side)].iter().enumerate() {
+                if delta != 0 && families.pawn_files {
+                    let old = pawns_on(board, side, file);
+                    let new = (old as i32 + delta) as usize;
+                    if pawn_entry(file, old) != pawn_entry(file, new) {
+                        edits.extend(pawn_entry(file, old).map(|e| (side, false, e, -1.0)));
+                        edits.extend(pawn_entry(file, new).map(|e| (side, false, e, 1.0)));
+                    }
+                }
+            }
+        }
+        let net = self.net;
+        for view in [Color::White, Color::Black] {
+            if rebuilt && view == mover {
+                continue;
+            }
+            let offset = if families.king_buckets {
+                king_bucket(board, view) * PIECE_INPUTS
+            } else {
+                0
+            };
+            let mut rows: Vec<(usize, f32)> = Vec::with_capacity(24);
+            for &(piece, square, put) in pieces {
+                let row = offset + input_index(view, piece.color, piece.role, square);
+                rows.push((row, if put { 1.0 } else { -1.0 }));
+            }
+            for &(side, material, entry, sign) in &edits {
+                let row = if material {
+                    material_row(families, view, side, entry)
+                } else {
+                    pawn_row(families, view, side, entry)
+                };
+                rows.push((row, sign));
+            }
+            let acc = self.acc(view);
+            for (row, sign) in rows {
+                for (a, w) in acc.iter_mut().zip(net.layers[0].row(row)) {
+                    *a += sign * w;
+                }
+            }
+        }
     }
 
     /// The side to move passes (a null move): the accumulators of both sides stay as they are.
@@ -433,5 +545,28 @@ mod tests {
     fn incremental_equals_full_threats() {
         check_net(&net(FeatureSet::PstThreats));
         check_net(&both_net(FeatureSet::PstThreats));
+    }
+
+    /// Every combination of the families, alone and together, with and without both views.
+    fn ctx_nets() -> Vec<Net> {
+        let mut nets = Vec::new();
+        for bits in 0..8u8 {
+            let families = Families {
+                material: bits & 1 != 0,
+                pawn_files: bits & 2 != 0,
+                king_buckets: bits & 4 != 0,
+            };
+            let features = FeatureSet::PstCtx(families);
+            nets.push(net(features));
+            nets.push(both_net(features));
+        }
+        nets
+    }
+
+    #[test]
+    fn incremental_equals_full_ctx() {
+        for net in ctx_nets() {
+            check_net(&net);
+        }
     }
 }

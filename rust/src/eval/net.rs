@@ -2,7 +2,7 @@
 
 use shakmaty::{Chess, Color, Position};
 
-use super::features::{FeatureSet, OPPONENT_PIECE_BLOCK, PIECE_INPUTS};
+use super::features::{view_rows, Families, FeatureSet, OPPONENT_PIECE_BLOCK, PIECE_INPUTS};
 use super::{for_player, score, sigmoid};
 
 /// One dense layer as the lab writes it: `weights` is row-major `(fan_in, fan_out)`.
@@ -116,6 +116,16 @@ impl Net {
             .as_str()
             .and_then(FeatureSet::from_name)
             .ok_or("model: unknown features")?;
+        let families: Vec<&str> = match value.get("families") {
+            None => Vec::new(),
+            Some(list) => list
+                .as_array()
+                .ok_or("model: families is not a list")?
+                .iter()
+                .map(|name| name.as_str().ok_or("model: a family is not a name"))
+                .collect::<Result<_, _>>()?,
+        };
+        let features = features.with_families(Families::from_names(&families)?)?;
         let perspective = match value.get("perspective").map(|p| p.as_str()) {
             None | Some(Some("side_to_move")) => false,
             Some(Some("both")) => true,
@@ -162,6 +172,9 @@ impl Net {
     /// Network output before the logistic function, for the side to move, from the board (the
     /// search follows it move by move with [`NetState`](super::NetState)).
     pub fn logit(&self, pos: &Chess) -> f32 {
+        if let FeatureSet::PstCtx(families) = self.features {
+            return self.logit_ctx(families, pos);
+        }
         let (mut indices, mut values) = (Vec::with_capacity(40), Vec::with_capacity(40));
         self.features.active(pos, &mut indices, &mut values);
         let first = &self.layers[0];
@@ -184,6 +197,27 @@ impl Net {
                 let seen = (index + OPPONENT_PIECE_BLOCK) % PIECE_INPUTS;
                 for (h, w) in hidden[width..].iter_mut().zip(first.row(seen)) {
                     *h += w * value as f32;
+                }
+            }
+        }
+        hidden.resize(self.max_width, 0.0);
+        self.finish(&mut hidden, &mut vec![0.0; self.max_width])
+    }
+
+    /// [`Net::logit`] of a `pst_ctx` network: each view adds the rows of the position as seen by
+    /// that side, as if it were to move.
+    fn logit_ctx(&self, families: Families, pos: &Chess) -> f32 {
+        let first = &self.layers[0];
+        let mut hidden = Vec::with_capacity(self.max_width);
+        let views = if self.both_perspectives { 2 } else { 1 };
+        for view in [pos.turn(), !pos.turn()].into_iter().take(views) {
+            let mut rows = Vec::with_capacity(64);
+            view_rows(families, pos.board(), view, &mut rows);
+            let start = hidden.len();
+            hidden.extend_from_slice(&first.bias);
+            for row in rows {
+                for (h, w) in hidden[start..].iter_mut().zip(first.row(row)) {
+                    *h += w;
                 }
             }
         }
@@ -298,5 +332,21 @@ mod tests {
         let a: Vec<f32> = (0..19).map(|i| i as f32).collect();
         let b = vec![2.0; 19];
         assert_eq!(dot(&a, &b), 2.0 * (0..19).sum::<i32>() as f32);
+    }
+
+    #[test]
+    fn a_ctx_network_reads_its_families_from_the_file() {
+        let rows = 768 * 4 + 30;
+        let first = format!(
+            r#"{{"fan_in":{rows},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
+            vec![0.0; rows * 2]
+        );
+        let last = r#"{"fan_in":2,"fan_out":1,"weights":[1.0,1.0],"bias":[0.0]}"#;
+        let text = |families: &str| {
+            format!(r#"{{"features":"pst_ctx",{families}"layers":[{first},{last}]}}"#)
+        };
+        assert!(Net::from_json(&text(r#""families":["material","king_buckets"],"#)).is_ok());
+        assert!(Net::from_json(&text("")).is_err());
+        assert!(Net::from_json(&text(r#""families":["nothing"],"#)).is_err());
     }
 }

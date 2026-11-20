@@ -124,7 +124,7 @@ BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel]
 CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]
 
 
-@pytest.mark.parametrize("model_class", [ThreeLayerModel, *BOTH_MODELS])
+@pytest.mark.parametrize("model_class", [ThreeLayerModel, *BOTH_MODELS, *CTX_MODELS])
 def test_core_score_matches_a_dense_numpy_reference(model_class):
     model = random_net(seed=6, model_class=model_class)
     evaluator = model.evaluator()
@@ -189,7 +189,7 @@ def test_ctx_without_families_is_the_slotted_network():
     assert logits[0] == pytest.approx(logits[1], abs=1e-5)
 
 
-@pytest.mark.parametrize("model_class", [ThreeLayerModel, NnW64BothModel])
+@pytest.mark.parametrize("model_class", [ThreeLayerModel, NnW64BothModel, CTX_MODELS[-1]])
 def test_mirror_complement_holds_for_random_weights(model_class):
     model = random_net(seed=3, model_class=model_class)
     for board in random_positions(20, seed=11):
@@ -213,6 +213,15 @@ def test_save_load_round_trip_gives_identical_scores(tmp_path):
 
     assert Representation.from_dict(loaded.rep) == rep
     assert loaded.count_parameters() == model.count_parameters()
+    for board in random_positions(10, seed=2):
+        assert white_score_of(loaded, board) == pytest.approx(white_score_of(model, board))
+
+
+def test_a_saved_ctx_network_scores_the_same_after_loading(tmp_path):
+    model_class = get_model_class("net_ctx_mpk_w128_both")
+    model = random_net(seed=5, model_class=model_class)
+    path = model.save(tmp_path / "net_ctx_mpk_w128_both.npz")
+    loaded = model_class.load(path)
     for board in random_positions(10, seed=2):
         assert white_score_of(loaded, board) == pytest.approx(white_score_of(model, board))
 

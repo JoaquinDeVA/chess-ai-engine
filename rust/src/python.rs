@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use shakmaty::Color;
 
 use crate::board::position_from_fen;
-use crate::eval::FeatureSet;
+use crate::eval::{Families, FeatureSet};
 use crate::eval::{Layer, Net};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
@@ -37,16 +37,22 @@ impl PyEvaluator {
     /// Each layer is a Python `(weights, bias)` pair. Weights are copied into Rust-owned storage;
     /// the first layer consumes the feature accumulator produced by the selected feature set.
     ///
+    /// `families` names the inputs of `pst_ctx` the first layer has rows for (`material`,
+    /// `pawn_files`, `king_buckets`).
+    ///
     /// With `perspective` the second layer reads the accumulators of both sides, which share the
     /// first layer (see `Net::with_both_perspectives`).
     #[staticmethod]
-    #[pyo3(signature = (features, layers, perspective=false))]
+    #[pyo3(signature = (features, layers, perspective=false, families=Vec::new()))]
     fn network(
         features: &str,
         layers: Vec<(PyReadonlyArray2<f64>, PyReadonlyArray1<f64>)>,
         perspective: bool,
+        families: Vec<String>,
     ) -> PyResult<PyEvaluator> {
-        let set = parse_features(features)?;
+        let set = parse_features(features)?
+            .with_families(Families::from_names(&families).map_err(value_error)?)
+            .map_err(value_error)?;
         let layers = layers
             .iter()
             .map(|(weights, bias)| {

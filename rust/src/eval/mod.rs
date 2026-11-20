@@ -6,7 +6,7 @@ pub mod features;
 mod net;
 
 pub use accumulator::NetState;
-pub use features::FeatureSet;
+pub use features::{Families, FeatureSet};
 pub use net::{Layer, Net};
 
 use shakmaty::Color;

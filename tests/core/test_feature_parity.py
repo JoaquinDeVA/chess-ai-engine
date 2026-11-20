@@ -23,8 +23,11 @@ def test_every_rust_feature_set_has_a_python_version():
 @pytest.mark.parametrize("name", sorted(_core.FEATURE_SETS))
 def test_rust_features_equal_python_features(name):
     features = FEATURE_SETS[name]
-    layers = [(np.zeros((features.size(), 1)), np.zeros(1)), (np.zeros((1, 1)), np.zeros(1))]
-    evaluator = _core.Evaluator.network(name, layers)
+    # the entries of pst_ctx are the same whatever the families; give the net rows for two of them
+    families = ["material", "pawn_files"] if name == "pst_ctx" else []
+    rows = 768 + 30 + 32 if families else features.size()
+    layers = [(np.zeros((rows, 1)), np.zeros(1)), (np.zeros((1, 1)), np.zeros(1))]
+    evaluator = _core.Evaluator.network(name, layers, False, families)
     for fen in fens():
         expected = features.active(chess.Board(fen))
         got = evaluator.features(fen)

@@ -38,7 +38,8 @@ positions of the feature-parity tests), `data/syzygy/` (five 3-piece tables) and
   `cargo test` does not build the bindings (the `python` feature is off).
 - **The features exist twice.** Training encodes with `src/chess_lab/models/features.py`, the core plays
   with `rust/src/eval/features/`; if they differ, one thing is trained and another played, with no error.
-  `core/test_feature_parity.py` compares them on 300 positions per feature family: keep it green.
+  `lab/training/test_neural.py::test_core_score_matches_a_dense_numpy_reference` compares the core's score with a
+  Python reference built from `features.py` for every model family: keep it green.
 - **The models table of `docs/RESULTS.md` is generated** (`python -m chess_lab.measure.report`); a hand edit is
   lost, and `test_docs.py` does not check its numbers.
 - **Timing figures need an idle machine.** Do not run the suite or compile while measuring speed.

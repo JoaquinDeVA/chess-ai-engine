@@ -11,7 +11,7 @@ use shakmaty::Color;
 
 use crate::board::position_from_fen;
 use crate::eval::{Families, FeatureSet};
-use crate::eval::{Layer, Net};
+use crate::eval::{Layer, Net, NetState};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
     PyValueError::new_err(error.to_string())
@@ -59,8 +59,8 @@ impl PyEvaluator {
                 Layer {
                     fan_in,
                     fan_out,
-                    weights: weights.as_array().iter().copied().collect(),
-                    bias: bias.as_array().to_vec(),
+                    weights: weights.as_array().iter().map(|&w| w as f32).collect(),
+                    bias: bias.as_array().iter().map(|&b| b as f32).collect(),
                 }
             })
             .collect();
@@ -74,18 +74,8 @@ impl PyEvaluator {
     /// in the evaluator's `[0.01, 0.99]` range.
     fn evaluate(&self, fen: &str, white: bool) -> PyResult<f64> {
         let pos = position_from_fen(fen).map_err(value_error)?;
-        Ok(self
-            .net
-            .evaluate(&pos, if white { Color::White } else { Color::Black }))
-    }
-
-    /// Return the active sparse feature indices and values for a FEN position.
-    fn features(&self, fen: &str) -> PyResult<(Vec<usize>, Vec<f64>)> {
-        let set = self.net.features();
-        let pos = position_from_fen(fen).map_err(value_error)?;
-        let (mut indices, mut values) = (Vec::new(), Vec::new());
-        set.active(&pos, &mut indices, &mut values);
-        Ok((indices, values))
+        let player = if white { Color::White } else { Color::Black };
+        Ok(NetState::new(&self.net, &pos).evaluate(&pos, player))
     }
 }
 
@@ -102,7 +92,6 @@ mod _core {
         // Keep these values sourced from Rust so Python tooling uses the same defaults as the
         // engine instead of maintaining a second copy.
         module.add("MAX_DEPTH", crate::search::MAX_DEPTH)?;
-        module.add("FEATURE_SETS", crate::eval::FeatureSet::NAMES.to_vec())?;
         Ok(())
     }
 }

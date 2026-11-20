@@ -23,6 +23,8 @@ def test_every_model_is_in_the_table():
         "net_ctx_p_w128_both",
         "net_ctx_k_w128_both",
         "net_ctx_mpk_w128_both",
+        "net_ctx_m_w256_both",
+        "net_ctx_mpk_w256_both",
     }
 
 

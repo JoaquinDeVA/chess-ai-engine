@@ -33,7 +33,7 @@ class NeuralEvalModel:
         ``(hidden[0], hidden[1])``, ..., ``(hidden[-1], 1)``.
     :param rep: Representation of the training target as a plain dictionary, saved untouched.
     :cvar name: Model name, also used for the artifact and card file names.
-    :cvar feature_set: Name of the feature set, one of ``_core.FEATURE_SETS``.
+    :cvar feature_set: Name of the feature set, one of ``chess_lab.models.features.FEATURE_SETS``.
     :cvar architecture: One-line description of the architecture, for the model card.
     :cvar hidden: Sizes of the hidden layers, the first being the accumulator.
     :cvar families: Which families of the ``pst_ctx`` inputs the network reads, among
@@ -265,6 +265,7 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnW256BothModel,
         NnThreatsW64BothModel,
         *(_ctx_model(letters, 128) for letters in ("m", "p", "k", "mpk")),
+        *(_ctx_model(letters, 256) for letters in ("m", "mpk")),
     )
 }
 

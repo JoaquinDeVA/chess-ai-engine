@@ -1,13 +1,17 @@
-//! The accumulator of the network followed move by move during the search.
+//! The accumulator of the network followed move by move during the search. `mod.rs` keeps the
+//! stack of accumulators and the update for the pieces; [`changes`] says which pieces a move
+//! moves, [`ctx`] has the extra update of `pst_ctx` and [`logit`] the output.
 
-use shakmaty::{Board, Chess, Color, Move, Piece, Position, Role, Square};
+mod changes;
+mod ctx;
+mod logit;
 
-use super::features::{
-    count_of, input_index, king_bucket, material_entry, material_row, pawn_entry, pawn_row,
-    pawns_on, view_rows, Families, FeatureSet, PIECE_INPUTS,
-};
+use shakmaty::{Board, Chess, Color, Move, Piece, Position, Square};
+
+use super::features::{input_index, view_rows, Families, FeatureSet};
 use super::net::Net;
 use super::score;
+use changes::changes;
 
 fn slot(color: Color) -> usize {
     usize::from(color == Color::Black)
@@ -115,88 +119,6 @@ impl<'a> NetState<'a> {
     }
 }
 
-/// The pieces a move takes off and puts on the board.
-fn changes(mover: Color, m: &Move) -> ([(Piece, Square, bool); 4], usize) {
-    let own = |role| Piece { color: mover, role };
-    let other = |role| Piece {
-        color: !mover,
-        role,
-    };
-    let none = (own(Role::Pawn), Square::A1, false);
-    match *m {
-        Move::Normal {
-            role,
-            from,
-            capture,
-            to,
-            promotion,
-        } => {
-            let taken = capture.map_or(none, |taken| (other(taken), to, false));
-            (
-                [
-                    (own(role), from, false),
-                    (own(promotion.unwrap_or(role)), to, true),
-                    taken,
-                    none,
-                ],
-                2 + usize::from(capture.is_some()),
-            )
-        }
-        Move::EnPassant { from, to } => (
-            [
-                (own(Role::Pawn), from, false),
-                (own(Role::Pawn), to, true),
-                (
-                    other(Role::Pawn),
-                    Square::from_coords(to.file(), from.rank()),
-                    false,
-                ),
-                none,
-            ],
-            3,
-        ),
-        Move::Castle { king, rook } => {
-            let kingside = rook.file() > king.file();
-            let (king_file, rook_file) = if kingside {
-                (shakmaty::File::G, shakmaty::File::F)
-            } else {
-                (shakmaty::File::C, shakmaty::File::D)
-            };
-            let king_to = Square::from_coords(king_file, king.rank());
-            (
-                [
-                    (own(Role::King), king, false),
-                    (own(Role::King), king_to, true),
-                    (own(Role::Rook), rook, false),
-                    (
-                        own(Role::Rook),
-                        Square::from_coords(rook_file, rook.rank()),
-                        true,
-                    ),
-                ],
-                4,
-            )
-        }
-        Move::Put { .. } => unreachable!("there are no drops in chess"),
-    }
-}
-
-/// Adds to `lanes` the dot product of `acc` clipped to `[0, 1]` with `weights`, eight lanes at a
-/// time (the length is a multiple of 8).
-#[inline(always)]
-fn clipped_dot(acc: &[f32], weights: &[f32], lanes: &mut [f32; 8]) {
-    for (x, w) in acc
-        .as_chunks::<8>()
-        .0
-        .iter()
-        .zip(weights.as_chunks::<8>().0)
-    {
-        for lane in 0..8 {
-            lanes[lane] += x[lane].clamp(0.0, 1.0) * w[lane];
-        }
-    }
-}
-
 impl NetState<'_> {
     /// The side to move in `pos` (the position before the move) plays `m`.
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
@@ -247,110 +169,6 @@ impl NetState<'_> {
         self.top += 1;
     }
 
-    /// `apply` for a `pst_ctx` network. A view whose own king changes bucket is rebuilt from the
-    /// board after the move (all its piece rows move); the others add the rows of the pieces that
-    /// change, and of the material and pawn-file entries whose count changes.
-    fn apply_ctx(
-        &mut self,
-        families: Families,
-        pos: &Chess,
-        m: &Move,
-        pieces: &[(Piece, Square, bool)],
-    ) {
-        let mover = pos.turn();
-        let board = pos.board();
-        self.push();
-        let mut rebuilt = false;
-        if families.king_buckets {
-            let king = |put| pieces.iter().find(|p| p.0.role == Role::King && p.2 == put);
-            if let (Some(&(_, from, _)), Some(&(_, to, _))) = (king(false), king(true)) {
-                let bucket = |square: Square| {
-                    let mut board = Board::empty();
-                    board.set_piece_at(
-                        square,
-                        Piece {
-                            color: mover,
-                            role: Role::King,
-                        },
-                    );
-                    king_bucket(&board, mover)
-                };
-                if bucket(from) != bucket(to) {
-                    let mut after = pos.clone();
-                    after.play_unchecked(*m);
-                    self.refresh(mover, after.board());
-                    rebuilt = true;
-                }
-            }
-        }
-        // count changes: [color][role - 1] for the material, [color][file] for the pawns
-        let (mut by_role, mut by_file) = ([[0i32; 5]; 2], [[0i32; 8]; 2]);
-        for &(piece, square, put) in pieces {
-            if piece.role == Role::King {
-                continue;
-            }
-            let delta = if put { 1 } else { -1 };
-            by_role[slot(piece.color)][piece.role as usize - 1] += delta;
-            if piece.role == Role::Pawn {
-                by_file[slot(piece.color)][square.file() as usize] += delta;
-            }
-        }
-        // (side, material or pawn file, entry, sign)
-        let mut edits: Vec<(Color, bool, usize, f32)> = Vec::with_capacity(16);
-        for side in [Color::White, Color::Black] {
-            for (at, &delta) in by_role[slot(side)].iter().enumerate() {
-                if delta != 0 && families.material {
-                    let old = count_of(board, side, super::features::MATERIAL_ROLES[at]);
-                    let new = (old as i32 + delta) as usize;
-                    if material_entry(at, old) != material_entry(at, new) {
-                        edits.extend(material_entry(at, old).map(|e| (side, true, e, -1.0)));
-                        edits.extend(material_entry(at, new).map(|e| (side, true, e, 1.0)));
-                    }
-                }
-            }
-            for (file, &delta) in by_file[slot(side)].iter().enumerate() {
-                if delta != 0 && families.pawn_files {
-                    let old = pawns_on(board, side, file);
-                    let new = (old as i32 + delta) as usize;
-                    if pawn_entry(file, old) != pawn_entry(file, new) {
-                        edits.extend(pawn_entry(file, old).map(|e| (side, false, e, -1.0)));
-                        edits.extend(pawn_entry(file, new).map(|e| (side, false, e, 1.0)));
-                    }
-                }
-            }
-        }
-        let net = self.net;
-        for view in [Color::White, Color::Black] {
-            if rebuilt && view == mover {
-                continue;
-            }
-            let offset = if families.king_buckets {
-                king_bucket(board, view) * PIECE_INPUTS
-            } else {
-                0
-            };
-            let mut rows: Vec<(usize, f32)> = Vec::with_capacity(24);
-            for &(piece, square, put) in pieces {
-                let row = offset + input_index(view, piece.color, piece.role, square);
-                rows.push((row, if put { 1.0 } else { -1.0 }));
-            }
-            for &(side, material, entry, sign) in &edits {
-                let row = if material {
-                    material_row(families, view, side, entry)
-                } else {
-                    pawn_row(families, view, side, entry)
-                };
-                rows.push((row, sign));
-            }
-            let acc = self.acc(view);
-            for (row, sign) in rows {
-                for (a, w) in acc.iter_mut().zip(net.layers[0].row(row)) {
-                    *a += sign * w;
-                }
-            }
-        }
-    }
-
     /// The side to move passes (a null move): the accumulators of both sides stay as they are.
     pub fn apply_null(&mut self) {
         self.push();
@@ -359,66 +177,6 @@ impl NetState<'_> {
     /// Take back the last move played with `apply` or `apply_null`.
     pub fn undo(&mut self) {
         self.top -= 1;
-    }
-
-    /// Network output before the logistic function, for the side to move in `pos`, the position
-    /// the state is following.
-    pub fn logit(&mut self, pos: &Chess) -> f32 {
-        let net = self.net;
-        let width = self.width;
-        let start = (2 * self.top + slot(pos.turn())) * width;
-        if net.layers.len() == 2 && width.is_multiple_of(8) {
-            // one output layer straight over the accumulators: no intermediate buffer, except the
-            // mover's own with the dense inputs added (they have no opponent view)
-            let out = &net.layers[1];
-            let mut lanes = [0.0f32; 8];
-            if net.features.has_dense() {
-                self.dense_indices.clear();
-                self.dense_values.clear();
-                net.features
-                    .dense_inputs(pos, &mut self.dense_indices, &mut self.dense_values);
-                let own = &mut self.hidden[..width];
-                own.copy_from_slice(&self.stack[start..start + width]);
-                for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
-                    if value == 0.0 {
-                        continue;
-                    }
-                    for (h, w) in own.iter_mut().zip(net.layers[0].row(index)) {
-                        *h += w * value as f32;
-                    }
-                }
-                clipped_dot(own, &out.weights[..width], &mut lanes);
-            } else {
-                clipped_dot(
-                    &self.stack[start..start + width],
-                    &out.weights[..width],
-                    &mut lanes,
-                );
-            }
-            let opponent = (2 * self.top + slot(!pos.turn())) * width;
-            clipped_dot(
-                &self.stack[opponent..opponent + width],
-                &out.weights[width..2 * width],
-                &mut lanes,
-            );
-            return out.bias[0] + lanes.iter().sum::<f32>();
-        }
-        self.hidden[..width].copy_from_slice(&self.stack[start..start + width]);
-        // the opponent's accumulator follows the mover's: both views, one shared first layer
-        let opponent = (2 * self.top + slot(!pos.turn())) * width;
-        self.hidden[width..2 * width].copy_from_slice(&self.stack[opponent..opponent + width]);
-        if net.features.has_dense() {
-            self.dense_indices.clear();
-            self.dense_values.clear();
-            net.features
-                .dense_inputs(pos, &mut self.dense_indices, &mut self.dense_values);
-            for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
-                for (h, w) in self.hidden.iter_mut().zip(net.layers[0].row(index)) {
-                    *h += w * value as f32;
-                }
-            }
-        }
-        net.finish(&mut self.hidden, &mut self.spare)
     }
 
     /// Score of `player` in `pos`, the position the state is following.

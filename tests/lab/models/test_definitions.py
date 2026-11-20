@@ -14,7 +14,22 @@ from chess_lab.training.neural import new_model
 
 
 def test_every_model_is_in_the_table():
-    assert set(available_models()) == {"net_pst_w64_both", "net_pst_threats_w64_both"}
+    assert set(available_models()) == {
+        "net_pst_w64_both",
+        "net_pst_w128_both",
+        "net_pst_w256_both",
+        "net_pst_threats_w64_both",
+    }
+
+
+@pytest.mark.parametrize("width", [128, 256])
+def test_wider_models_share_the_inputs_and_double_the_output_layer(width):
+    cls = get_model_class(f"net_pst_w{width}_both")
+    assert cls.feature_set == get_model_class("net_pst_w64_both").feature_set
+    assert cls.layer_shapes() == [(768, width), (2 * width, 1)]
+    assert (
+        new_model(cls, Representation()).count_parameters() == 768 * width + width + 2 * width + 1
+    )
 
 
 def test_unknown_model_lists_the_valid_names():

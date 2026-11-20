@@ -162,6 +162,32 @@ class NnW64BothModel(NeuralEvalModel):
     )
 
 
+class NnW128BothModel(NeuralEvalModel):
+    """Slotted inputs seen from both sides, a shared 128 accumulator, one output."""
+
+    name = "net_pst_w128_both"
+    feature_set = "pst_slotted"
+    hidden = (128,)
+    perspective = True
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
+        "128 accumulator, 256-1 (2 layers)"
+    )
+
+
+class NnW256BothModel(NeuralEvalModel):
+    """Slotted inputs seen from both sides, a shared 256 accumulator, one output."""
+
+    name = "net_pst_w256_both"
+    feature_set = "pst_slotted"
+    hidden = (256,)
+    perspective = True
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
+        "256 accumulator, 512-1 (2 layers)"
+    )
+
+
 class NnThreatsW64BothModel(NeuralEvalModel):
     """Slotted inputs plus five threat inputs, seen from both sides, a shared 64 accumulator."""
 
@@ -177,7 +203,8 @@ class NnThreatsW64BothModel(NeuralEvalModel):
 
 #: The models of the project by name.
 MODELS: Dict[str, Type[NeuralEvalModel]] = {
-    cls.name: cls for cls in (NnW64BothModel, NnThreatsW64BothModel)
+    cls.name: cls
+    for cls in (NnW64BothModel, NnW128BothModel, NnW256BothModel, NnThreatsW64BothModel)
 }
 
 

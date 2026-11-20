@@ -55,3 +55,55 @@ def test_threat_set_has_the_pieces_and_five_dense_entries():
     features = FEATURE_SETS["pst_threats"]
     assert features.size() == 768 + 5
     assert features.max_entries() == 37
+
+
+def _ctx_extras(fen):
+    """Entries of ``pst_ctx`` past the pieces, split by block."""
+    features = FEATURE_SETS["pst_ctx"]
+    indices, values = features.active(chess.Board(fen))
+    assert values == [1.0] * len(indices)
+    extra = indices[len([i for i in indices if i < 768]) :]
+    return (
+        [i - 768 for i in extra if 768 <= i < 798],
+        [i - 798 for i in extra if 798 <= i < 830],
+        [i - 830 for i in extra if i >= 830],
+    )
+
+
+def test_ctx_set_sizes():
+    features = FEATURE_SETS["pst_ctx"]
+    assert features.size() == 768 + 30 + 32 + 8
+    assert features.max_entries() == 60
+    for board in random_positions(200, seed=3):
+        assert len(features.active(board)[0]) <= features.max_entries()
+
+
+def test_ctx_entries_of_the_start_position():
+    material, pawns, buckets = _ctx_extras(chess.STARTING_FEN)
+    # per side: 8 pawns (7), 2 knights (9), 2 bishops (11), 2 rooks (13), 1 queen (14)
+    side = [7, 9, 11, 13, 14]
+    assert material == side + [i + 15 for i in side]
+    # every file has one pawn: entry 2 * file; the rival's block starts at 16
+    assert pawns == [2 * f for f in range(8)] + [16 + 2 * f for f in range(8)]
+    # both kings at home (bucket 2), mover's then rival's
+    assert buckets == [2, 4 + 2]
+
+
+def test_ctx_counts_files_and_buckets_after_castling_and_capture():
+    # White castled short with six pawns (doubled on the c-file) and a rook; Black has the king
+    # on e8 and pawns on d7 and e7; white to move
+    fen = "4k3/3pp3/8/8/8/2P5/P1P2PPP/5RK1 w - - 0 1"
+    material, pawns, buckets = _ctx_extras(fen)
+    # mover: 6 pawns -> index 5, 1 rook -> 12 (first rook entry); rival: 2 pawns -> 15 + 1
+    assert material == [5, 12, 15 + 1]
+    # mover: a (1 pawn) -> 0, c (2 pawns) -> 5, f -> 10, g -> 12, h -> 14; rival: d -> 16 + 6,
+    # e -> 16 + 8
+    assert pawns == [0, 5, 10, 12, 14, 22, 24]
+    assert buckets == [0, 4 + 2]
+
+
+def test_ctx_king_bucket_is_seen_from_the_home_rank():
+    # Black king castled long, seen from its home rank it is on c1: bucket 1; white king on h4
+    fen = "2kr4/8/8/8/7K/8/8/8 w - - 0 1"
+    _, _, buckets = _ctx_extras(fen)
+    assert buckets == [3, 4 + 1]

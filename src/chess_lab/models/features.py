@@ -163,9 +163,99 @@ class ThreatsPstFeatures(SlottedPstFeatures):
         return indices + dense_indices, values + dense_values
 
 
+#: Largest count of each piece type that has its own material entry (pawn, knight, bishop,
+#: rook, queen); a bigger count shares the entry of the largest.
+MATERIAL_CAP = (8, 2, 2, 2, 1)
+#: Material entries of one side, and of both.
+MATERIAL_PER_SIDE = sum(MATERIAL_CAP)
+#: Pawn-file entries of one side (one for a single pawn, one for two or more, per file).
+PAWN_FILES_PER_SIDE = 16
+#: Kinds of king bucket of one side.
+KING_BUCKETS = 4
+#: First index of each block of :class:`CtxPstFeatures`: the pieces come first, then the
+#: material entries, the pawn files and the king buckets (the mover's, then the rival's).
+MATERIAL_BASE = 768
+PAWN_FILES_BASE = MATERIAL_BASE + 2 * MATERIAL_PER_SIDE
+KING_BASE = PAWN_FILES_BASE + 2 * PAWN_FILES_PER_SIDE
+
+
+def king_bucket(king_square: int) -> int:
+    """Bucket of a king by its square seen from its own home rank (``a1 = 0``).
+
+    :param king_square: Square of the king, mirrored by rank for Black.
+    :return: ``0`` castled short (f1-h1), ``1`` castled long (a1-c1), ``2`` at home (d1, e1),
+        ``3`` anywhere else.
+    """
+    if king_square < 8:
+        file = king_square
+        return 0 if file >= 5 else 1 if file <= 2 else 2
+    return 3
+
+
+class CtxPstFeatures(SlottedPstFeatures):
+    """Piece squares plus material, pawn files and king buckets, all one-hot.
+
+    After the 768 piece entries come, for the mover and then for its rival, one entry per piece
+    type present with its count (:data:`MATERIAL_CAP`), one entry per pawn file with a pawn (a
+    second one when it has two or more) and the bucket of its king (:func:`king_bucket`). The
+    rival's view of a position is the same entries with the two sides swapped, so the network
+    reads each side's family from its own block. The model decides which families it uses.
+
+    :cvar name: ``"pst_ctx"``.
+    """
+
+    name = "pst_ctx"
+
+    def max_entries(self) -> int:
+        """Pieces, up to five material entries and sixteen pawn-file entries, two buckets.
+
+        :return: ``32 + 10 + 16 + 2``.
+        """
+        return self.max_active + 2 * len(MATERIAL_CAP) + 2 * 8 + 2
+
+    def size(self) -> int:
+        """Piece squares, material, pawn files and the king buckets of both sides.
+
+        :return: ``768 + 30 + 32 + 8``.
+        """
+        return KING_BASE + 2 * KING_BUCKETS
+
+    def active(self, board: chess.Board) -> Tuple[List[int], List[float]]:
+        """The piece entries, then material, pawn files and king buckets.
+
+        :param board: The position.
+        :return: Two parallel lists.
+        """
+        indices, _ = super().active(board)
+        mover = board.turn
+        buckets = []
+        for side, color in enumerate((mover, not mover)):
+            for position, piece_type in enumerate(
+                (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN)
+            ):
+                count = min(len(board.pieces(piece_type, color)), MATERIAL_CAP[position])
+                if count:
+                    first = sum(MATERIAL_CAP[:position])
+                    indices.append(MATERIAL_BASE + side * MATERIAL_PER_SIDE + first + count - 1)
+            per_file = [0] * 8
+            for square in board.pieces(chess.PAWN, color):
+                per_file[chess.square_file(square)] += 1
+            for file, count in enumerate(per_file):
+                if count:
+                    indices.append(
+                        PAWN_FILES_BASE + side * PAWN_FILES_PER_SIDE + 2 * file + (count > 1)
+                    )
+            king = board.king(color)
+            oriented = chess.square_mirror(king) if color == chess.BLACK else king
+            buckets.append(KING_BASE + side * KING_BUCKETS + king_bucket(oriented))
+        indices += buckets
+        return indices, [1.0] * len(indices)
+
+
 #: Every feature set by its name, the one the saved models and the core refer to.
 FEATURE_SETS: Dict[str, SlottedPstFeatures] = {
-    features.name: features for features in (SlottedPstFeatures(), ThreatsPstFeatures())
+    features.name: features
+    for features in (SlottedPstFeatures(), ThreatsPstFeatures(), CtxPstFeatures())
 }
 
 

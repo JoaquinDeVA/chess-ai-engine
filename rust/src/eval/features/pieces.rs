@@ -5,7 +5,7 @@
 
 use shakmaty::{Chess, Color, Piece, Position, Role, Square};
 
-pub(in crate::eval) const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
+const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 /// Piece inputs: one per piece, color and square.
 pub const PIECE_INPUTS: usize = 2 * OPPONENT_PIECE_BLOCK;
 

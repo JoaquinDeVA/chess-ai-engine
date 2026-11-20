@@ -2,7 +2,8 @@
 
 use shakmaty::{Chess, Color, Position};
 
-use super::features::{view_rows, Families, FeatureSet, OPPONENT_PIECE_BLOCK, PIECE_INPUTS};
+use super::features::{Families, FeatureSet};
+use super::NetState;
 use super::{for_player, score, sigmoid};
 
 /// One dense layer as the lab writes it: `weights` is row-major `(fan_in, fan_out)`.
@@ -156,57 +157,11 @@ impl Net {
         self.features
     }
 
-    /// Network output before the logistic function, for the side to move, from the board (the
-    /// search follows it move by move with [`NetState`](super::NetState)).
+    /// Network output before the logistic function, for the side to move, from the board: the
+    /// accumulators are built from scratch, where the search follows them move by move with
+    /// [`NetState`](super::NetState).
     pub fn logit(&self, pos: &Chess) -> f32 {
-        if let FeatureSet::PstCtx(families) = self.features {
-            return self.logit_ctx(families, pos);
-        }
-        let (mut indices, mut values) = (Vec::with_capacity(40), Vec::with_capacity(40));
-        self.features.active(pos, &mut indices, &mut values);
-        let first = &self.layers[0];
-        let width = first.fan_out;
-        let mut hidden = first.bias.clone();
-        for (&index, &value) in indices.iter().zip(&values) {
-            for (h, w) in hidden.iter_mut().zip(first.row(index)) {
-                *h += w * value as f32;
-            }
-        }
-        // the opponent's view: every piece in the other block of its square; the dense inputs
-        // have no opponent view
-        hidden.extend_from_slice(&first.bias);
-        for (&index, &value) in indices
-            .iter()
-            .zip(&values)
-            .filter(|(&i, _)| i < PIECE_INPUTS)
-        {
-            let seen = (index + OPPONENT_PIECE_BLOCK) % PIECE_INPUTS;
-            for (h, w) in hidden[width..].iter_mut().zip(first.row(seen)) {
-                *h += w * value as f32;
-            }
-        }
-        hidden.resize(self.max_width, 0.0);
-        self.finish(&mut hidden, &mut vec![0.0; self.max_width])
-    }
-
-    /// [`Net::logit`] of a `pst_ctx` network: each view adds the rows of the position as seen by
-    /// that side, as if it were to move.
-    fn logit_ctx(&self, families: Families, pos: &Chess) -> f32 {
-        let first = &self.layers[0];
-        let mut hidden = Vec::with_capacity(self.max_width);
-        for view in [pos.turn(), !pos.turn()] {
-            let mut rows = Vec::with_capacity(64);
-            view_rows(families, pos.board(), view, &mut rows);
-            let start = hidden.len();
-            hidden.extend_from_slice(&first.bias);
-            for row in rows {
-                for (h, w) in hidden[start..].iter_mut().zip(first.row(row)) {
-                    *h += w;
-                }
-            }
-        }
-        hidden.resize(self.max_width, 0.0);
-        self.finish(&mut hidden, &mut vec![0.0; self.max_width])
+        NetState::new(self, pos).logit(pos)
     }
 
     /// The rest of the network from the sums of the accumulator, the first values of `hidden`: the

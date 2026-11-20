@@ -12,8 +12,8 @@ pub(in crate::eval) use ctx::{
     count_of, king_bucket, material_entry, material_row, pawn_entry, pawn_row, pawns_on, view_rows,
     MATERIAL_ROLES,
 };
+pub(in crate::eval) use pieces::input_index;
 pub use pieces::PIECE_INPUTS;
-pub(in crate::eval) use pieces::{input_index, OPPONENT_PIECE_BLOCK};
 
 use ctx::ctx_entries;
 use pieces::slotted;

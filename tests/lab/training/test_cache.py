@@ -1,6 +1,6 @@
 """Directory of the encoded-batch cache."""
 
-from chess_lab.models.definitions import NnW64BothModel
+from chess_lab.models.definitions import NnThreatsW64BothModel, NnW64BothModel, NnW128BothModel
 from chess_lab.models.target import Representation
 from chess_lab.training.cache import cache_path
 
@@ -20,3 +20,15 @@ def test_cache_path_changes_with_every_input():
         != reference
     )
     assert cache_path(model_class=NnW64BothModel, rep=Representation(k=0.01), **args) != reference
+
+
+def test_cache_path_depends_on_feature_set_not_on_class():
+    args = {"rep": Representation(), "positions": 1000, "seed": 42, "quiet_only": True}
+    args["batch_size"] = 4096
+
+    assert cache_path(model_class=NnW128BothModel, **args) == cache_path(
+        model_class=NnW64BothModel, **args
+    )
+    assert cache_path(model_class=NnThreatsW64BothModel, **args) != cache_path(
+        model_class=NnW64BothModel, **args
+    )

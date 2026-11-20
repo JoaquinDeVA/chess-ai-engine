@@ -1,7 +1,8 @@
 """Cache of the encoded training batches: where it lives and which directory a run uses.
 
 Encoding half a million rows takes minutes and reading them back from the cache takes seconds, so
-the batches of a run are kept in data/cache/<hash>. Every network shares it.
+the batches of a run are kept in data/cache/<hash>. Every network with the same feature set shares
+it, whatever its width or perspective: the encoding depends only on the inputs.
 """
 
 import hashlib
@@ -30,7 +31,7 @@ def cache_path(
     key = "|".join(
         str(part)
         for part in (
-            model_class.__name__,
+            model_class.feature_set,
             rep.name,
             positions,
             seed,

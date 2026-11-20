@@ -3,7 +3,7 @@
 //! rank. They are the inputs of the networks saved as `pst_slotted` (`net_pst_w64_both` and its
 //! wider versions) and the first entries of the other two sets.
 
-use shakmaty::{Chess, Color, Piece, Position, Role, Square};
+use shakmaty::{Color, Role, Square};
 
 const OPPONENT_PIECE_BLOCK: usize = 6 * 64;
 /// Piece inputs: one per piece, color and square.
@@ -27,37 +27,4 @@ pub(in crate::eval) fn input_index(
         square
     };
     index + u32::from(square) as usize
-}
-
-/// Pieces of the board from the highest square to the lowest, as `python-chess` lists them.
-fn pieces(pos: &Chess) -> impl Iterator<Item = (Square, Piece)> + '_ {
-    let board = pos.board();
-    board
-        .occupied()
-        .into_iter()
-        .rev()
-        .map(move |sq| (sq, board.piece_at(sq).expect("occupied")))
-}
-
-fn mirror(sq: Square) -> usize {
-    u32::from(sq.flip_vertical()) as usize
-}
-
-/// One entry per piece: the mover's pieces in the first block, the opponent's in the second, each
-/// color seen from its own home rank.
-pub(super) fn slotted(pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-    let mover = pos.turn();
-    for (square, piece) in pieces(pos) {
-        let mut offset = (piece.role as usize - 1) * 64;
-        if piece.color != mover {
-            offset += OPPONENT_PIECE_BLOCK;
-        }
-        let oriented = if piece.color == Color::Black {
-            mirror(square)
-        } else {
-            u32::from(square) as usize
-        };
-        indices.push(offset + oriented);
-    }
-    values.resize(indices.len(), 1.0);
 }

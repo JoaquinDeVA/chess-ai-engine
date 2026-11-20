@@ -4,7 +4,7 @@
 //! the viewer's own king. Not measured yet: `docs/RESULTS.md` has no SPRT for these networks.
 
 use super::pieces::{input_index, PIECE_INPUTS};
-use shakmaty::{Bitboard, Board, Chess, Color, File, Position, Role};
+use shakmaty::{Bitboard, Board, Color, File, Role};
 
 /// Entries of one side in the material block of `pst_ctx`: the counts of pawns (1 to 8), knights,
 /// bishops, rooks (1 or 2 each) and queens (1).
@@ -13,11 +13,6 @@ const MATERIAL_PER_SIDE: usize = 15;
 const PAWN_FILES_PER_SIDE: usize = 16;
 /// Kinds of king bucket.
 const KING_BUCKETS: usize = 4;
-/// First index of the material block, the pawn-file block and the bucket block in the entries of
-/// `pst_ctx` (the pieces come first).
-const MATERIAL_BASE: usize = PIECE_INPUTS;
-const PAWN_FILES_BASE: usize = MATERIAL_BASE + 2 * MATERIAL_PER_SIDE;
-const KING_BASE: usize = PAWN_FILES_BASE + 2 * PAWN_FILES_PER_SIDE;
 /// Roles that have a material entry, and the first entry of each in a side's material block.
 pub(in crate::eval) const MATERIAL_ROLES: [Role; 5] = [
     Role::Pawn,
@@ -129,24 +124,6 @@ fn pawn_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ 
     (0..8).filter_map(move |file| pawn_entry(file, pawns_on(board, side, file)))
 }
 
-/// The entries of `pst_ctx` after the pieces: for the mover and then its rival the material and
-/// pawn-file entries, then the two king buckets.
-pub(super) fn ctx_entries(pos: &Chess, indices: &mut Vec<usize>) {
-    let board = pos.board();
-    let sides = [pos.turn(), !pos.turn()];
-    for (i, side) in sides.into_iter().enumerate() {
-        indices.extend(
-            material_entries(board, side).map(|e| MATERIAL_BASE + i * MATERIAL_PER_SIDE + e),
-        );
-        indices.extend(
-            pawn_entries(board, side).map(|e| PAWN_FILES_BASE + i * PAWN_FILES_PER_SIDE + e),
-        );
-    }
-    for (i, side) in sides.into_iter().enumerate() {
-        indices.push(KING_BASE + i * KING_BUCKETS + king_bucket(board, side));
-    }
-}
-
 /// Row of the first layer of the material entry `entry` of `side`, seen by `view`: the viewer's
 /// own block first, then its rival's.
 pub(in crate::eval) fn material_row(
@@ -205,26 +182,7 @@ pub(in crate::eval) fn view_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::board::position_from_fen;
     use crate::eval::FeatureSet;
-
-    #[test]
-    fn the_ctx_entries_of_the_start_position() {
-        let pos =
-            position_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
-        let (mut indices, mut values) = (Vec::new(), Vec::new());
-        FeatureSet::from_name("pst_ctx")
-            .unwrap()
-            .active(&pos, &mut indices, &mut values);
-        assert_eq!(indices.len(), 32 + 2 * (5 + 8) + 2);
-        assert_eq!(values.len(), indices.len());
-        // eight pawns, two of each minor piece and rook, one queen; the king at home
-        assert_eq!(
-            &indices[32..37],
-            &[768 + 7, 768 + 9, 768 + 11, 768 + 13, 768 + 14]
-        );
-        assert_eq!(&indices[indices.len() - 2..], &[830 + 2, 830 + 4 + 2]);
-    }
 
     #[test]
     fn the_family_names_and_sizes() {

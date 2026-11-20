@@ -15,8 +15,6 @@ pub(in crate::eval) use ctx::{
 pub(in crate::eval) use pieces::input_index;
 pub use pieces::PIECE_INPUTS;
 
-use ctx::ctx_entries;
-use pieces::slotted;
 use shakmaty::Chess;
 use threats::{threats, THREAT_INPUTS};
 
@@ -32,10 +30,6 @@ pub enum FeatureSet {
 }
 
 impl FeatureSet {
-    /// Names of the feature sets, as the saved models call them (`pst_slotted` is also read, see
-    /// [`FeatureSet::from_name`]).
-    pub const NAMES: [&'static str; 2] = ["pst_threats", "pst_ctx"];
-
     /// The feature set called `name` in the saved models (`pst_ctx` without families). The
     /// networks saved as `pst_slotted` read the pieces alone, which is `pst_ctx` without families.
     pub fn from_name(name: &str) -> Option<FeatureSet> {
@@ -74,18 +68,5 @@ impl FeatureSet {
         if self == FeatureSet::PstThreats {
             threats(pos, PIECE_INPUTS, indices, values);
         }
-    }
-
-    /// Active indices and values of a position, appended to the (cleared) vectors. For `pst_ctx`
-    /// they are all the entries of the extractor in Python, whatever the families.
-    pub fn active(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-        indices.clear();
-        values.clear();
-        slotted(pos, indices, values);
-        if matches!(self, FeatureSet::PstCtx(_)) {
-            ctx_entries(pos, indices);
-            values.resize(indices.len(), 1.0);
-        }
-        self.dense_inputs(pos, indices, values);
     }
 }

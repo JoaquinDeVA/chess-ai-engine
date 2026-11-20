@@ -152,11 +152,6 @@ impl Net {
         Net::new(features, layers)
     }
 
-    /// The feature set of the inputs.
-    pub fn features(&self) -> FeatureSet {
-        self.features
-    }
-
     /// Network output before the logistic function, for the side to move, from the board: the
     /// accumulators are built from scratch, where the search follows them move by move with
     /// [`NetState`](super::NetState).

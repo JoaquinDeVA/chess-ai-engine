@@ -10,25 +10,27 @@ use crate::search::*;
 /// `sigmoid((own - opponent) / 20)`, with pawn 1, knight and bishop 3, rook 5 and queen 9.
 pub(super) fn material() -> Net {
     let value = |role: usize| [1.0, 3.0, 3.0, 5.0, 9.0, 0.0][role];
-    // First layer 768 -> 2: unit 0 adds the material of the side to move, unit 1 the opponent's
-    // (inputs 0..384 and 384..768, 64 squares per piece type), divided by 40 to stay below the
-    // clip at 1.
-    let mut weights = vec![0.0; 768 * 2];
+    // First layer 768 -> 8 (the width is a multiple of 8): unit 0 adds the material of the side
+    // to move, unit 1 the opponent's (inputs 0..384 and 384..768, 64 squares per piece type),
+    // divided by 40 to stay below the clip at 1; the other six units stay at 0.
+    let mut weights = vec![0.0; 768 * 8];
     for input in 0..768 {
         let (unit, role) = (input / 384, (input % 384) / 64);
-        weights[input * 2 + unit] = value(role) / 40.0;
+        weights[input * 8 + unit] = value(role) / 40.0;
     }
     let first = Layer {
         fan_in: 768,
-        fan_out: 2,
+        fan_out: 8,
         weights,
-        bias: vec![0.0, 0.0],
+        bias: vec![0.0; 8],
     };
+    // only the mover's accumulator counts; the opponent's half has no weight
+    let mut output = vec![0.0; 16];
+    output[..2].copy_from_slice(&[2.0, -2.0]);
     let last = Layer {
-        fan_in: 4,
+        fan_in: 16,
         fan_out: 1,
-        // only the mover's accumulator counts; the opponent's half has no weight
-        weights: vec![2.0, -2.0, 0.0, 0.0],
+        weights: output,
         bias: vec![0.0],
     };
     Net::new(FeatureSet::PstCtx(Families::default()), vec![first, last]).unwrap()

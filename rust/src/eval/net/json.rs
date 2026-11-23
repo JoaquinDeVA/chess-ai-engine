@@ -69,12 +69,13 @@ impl Net {
 mod tests {
     use super::*;
 
-    /// The file of a network of two units in the accumulator, with `rows` inputs and an output
+    /// The file of a network of eight units in the accumulator, with `rows` inputs and an output
     /// layer of `last_in` inputs, the `extra` fields before the layers.
     fn net_json(features: &str, extra: &str, rows: usize, last_in: usize) -> String {
         let first = format!(
-            r#"{{"fan_in":{rows},"fan_out":2,"weights":{:?},"bias":[0.5,0.5]}}"#,
-            vec![0.0; rows * 2]
+            r#"{{"fan_in":{rows},"fan_out":8,"weights":{:?},"bias":{:?}}}"#,
+            vec![0.0; rows * 8],
+            [0.5; 8]
         );
         let last = format!(
             r#"{{"fan_in":{last_in},"fan_out":1,"weights":{:?},"bias":[0.0]}}"#,
@@ -89,28 +90,28 @@ mod tests {
 
     #[test]
     fn the_perspective_field_is_absent_or_both() {
-        assert!(loads("pst_ctx", "", 768, 4));
-        assert!(loads("pst_ctx", r#""perspective":"both","#, 768, 4));
+        assert!(loads("pst_ctx", "", 768, 16));
+        assert!(loads("pst_ctx", r#""perspective":"both","#, 768, 16));
         assert!(!loads(
             "pst_ctx",
             r#""perspective":"side_to_move","#,
             768,
-            4
+            16
         ));
-        assert!(!loads("pst_ctx", r#""perspective":"white","#, 768, 4));
+        assert!(!loads("pst_ctx", r#""perspective":"white","#, 768, 16));
     }
 
     #[test]
     fn the_second_layer_must_be_twice_as_wide_as_the_accumulator() {
-        assert!(!loads("pst_ctx", "", 768, 2));
+        assert!(!loads("pst_ctx", "", 768, 8));
         // the dense inputs make the first layer wider than the 768 pieces of this file
-        assert!(!loads("pst_threats", "", 768, 4));
-        assert!(loads("pst_threats", "", 773, 4));
+        assert!(!loads("pst_threats", "", 768, 16));
+        assert!(loads("pst_threats", "", 773, 16));
     }
 
     #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
-        assert!(!loads("pst_ctx", "", 10, 4));
+        assert!(!loads("pst_ctx", "", 10, 16));
     }
 
     #[test]
@@ -120,14 +121,14 @@ mod tests {
             "pst_ctx",
             r#""families":["material","king_buckets"],"#,
             rows,
-            4
+            16
         ));
-        assert!(!loads("pst_ctx", "", rows, 4));
-        assert!(!loads("pst_ctx", r#""families":["nothing"],"#, rows, 4));
+        assert!(!loads("pst_ctx", "", rows, 16));
+        assert!(!loads("pst_ctx", r#""families":["nothing"],"#, rows, 16));
     }
 
     #[test]
     fn the_old_name_of_the_pieces_alone_still_loads() {
-        assert!(loads("pst_slotted", "", 768, 4));
+        assert!(loads("pst_slotted", "", 768, 16));
     }
 }

@@ -1,7 +1,7 @@
 """Training of the sparse network: initial weights and the Keras fit.
 
 The first weight layer is the accumulator: the rows of the active features are summed, and the
-sum is clipped to ``[0, 1]``. The remaining hidden layers use ReLU and the output is linear.
+sum is clipped to ``[0, 1]``. The output is one linear unit over the accumulators of both sides.
 Keras (imported lazily by :func:`fit_stream`) trains the network and its weights are exported
 to NumPy arrays, which are what the saved model stores.
 """
@@ -237,10 +237,10 @@ def _keras_network(
     families: Sequence[str] = (),
     ctx: bool = False,
 ) -> Tuple[Any, List[Any]]:
-    """The training network, with the layers of ``shapes``.
+    """The training network: the accumulator and the output unit of ``shapes``.
 
     :param keras: The ``keras`` module.
-    :param shapes: ``(fan_in, fan_out)`` of every weight layer, accumulator first.
+    :param shapes: ``(fan_in, fan_out)`` of the two weight layers, accumulator first.
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
     :param families: Families of the ``pst_ctx`` inputs the network reads.
@@ -258,44 +258,37 @@ def _keras_network(
     index_in = keras.Input(shape=(width,), dtype="int32")
     value_in = keras.Input(shape=(width,), dtype="float32")
     x = accumulator([index_in, value_in])
-    dense_layers: List[Any] = []
-    last = len(shapes) - 1
-    for position, (_, units) in enumerate(shapes[1:], start=1):
-        activation = "relu" if position < last else None
-        layer = keras.layers.Dense(
-            units, activation=activation, kernel_initializer="he_normal", name=f"dense{position}"
-        )
-        x = layer(x)
-        dense_layers.append(layer)
-    model = keras.Model([index_in, value_in], x)
-    return model, [accumulator, *dense_layers]
+    output = keras.layers.Dense(1, kernel_initializer="he_normal", name="dense1")
+    model = keras.Model([index_in, value_in], output(x))
+    return model, [accumulator, output]
 
 
 def _assign(parts: Sequence[Any], layers: Sequence[Layer]) -> None:
     """Copy NumPy weights into the Keras weight layers (accumulator table without padding row).
 
-    :param parts: Accumulator first, then the dense layers.
+    :param parts: The accumulator and the output layer.
     :param layers: ``(weights, bias)`` per layer, same order.
     """
-    accumulator, dense = parts[0], parts[1:]
-    weights, bias = layers[0]
+    accumulator, output = parts
+    (weights, bias), (output_weights, output_bias) = layers
     table = np.vstack([np.zeros((1, weights.shape[1])), weights])
     accumulator.table.assign(table.astype(np.float32))
     accumulator.bias.assign(bias.astype(np.float32))
-    for layer, (weights, bias) in zip(dense, layers[1:], strict=True):
-        layer.kernel.assign(weights.astype(np.float32))
-        layer.bias.assign(bias.astype(np.float32))
+    output.kernel.assign(output_weights.astype(np.float32))
+    output.bias.assign(output_bias.astype(np.float32))
 
 
 def _export(parts: Sequence[Any]) -> List[Layer]:
     """NumPy copies of the Keras weights, accumulator first (padding row dropped).
 
-    :param parts: Accumulator first, then the dense layers.
+    :param parts: The accumulator and the output layer.
     :return: ``(weights, bias)`` per layer, in float64.
     """
-    accumulator, dense = parts[0], parts[1:]
-    layers = [(np.asarray(accumulator.table)[1:], np.asarray(accumulator.bias))]
-    layers += [(np.asarray(layer.kernel), np.asarray(layer.bias)) for layer in dense]
+    accumulator, output = parts
+    layers = [
+        (np.asarray(accumulator.table)[1:], np.asarray(accumulator.bias)),
+        (np.asarray(output.kernel), np.asarray(output.bias)),
+    ]
     return [(np.asarray(w, dtype=np.float64), np.asarray(b, dtype=np.float64)) for w, b in layers]
 
 

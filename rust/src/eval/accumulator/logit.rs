@@ -1,12 +1,11 @@
 //! What the accumulators say about a position: the logit of the network for the side to move, and
 //! the two readings of it, the integer score of the search and the expected score of the `eval`
-//! command. The dense inputs of the threats are added to the mover's accumulator and the rest of the
-//! network is `Net::finish`.
+//! command. The dense inputs of the threats are added to the mover's accumulator and the output
+//! layer is `Net::output`.
 
 use shakmaty::{Chess, Color, Position};
 
 use super::{slot, NetState};
-use crate::eval::net::add_clipped_lanes;
 
 /// Distance of the lowest and highest expected score from 0 and 1, to stay clear of the terminal
 /// values 0 and 1.
@@ -53,61 +52,29 @@ impl NetState<'_> {
         expected.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP)
     }
 
-    /// Adds the dense inputs of the position (the threats) to the first `width` values of `hidden`,
-    /// which hold the mover's accumulator: they have no opponent view.
-    fn add_dense(&mut self, pos: &Chess) {
-        let net = self.net;
-        self.dense_indices.clear();
-        self.dense_values.clear();
-        net.features()
-            .dense_inputs(pos, &mut self.dense_indices, &mut self.dense_values);
-        for (&index, &value) in self.dense_indices.iter().zip(&self.dense_values) {
-            if value == 0.0 {
-                continue;
-            }
-            for (h, w) in self.hidden[..self.width]
-                .iter_mut()
-                .zip(net.first_row(index))
-            {
-                *h += w * value as f32;
-            }
-        }
-    }
-
     /// Network output before the logistic function, for the side to move in `pos`, the position
-    /// the state is following.
+    /// the state is following. Both views read the same first layer: the mover's accumulator, with
+    /// the dense inputs added (they have no opponent view), and the rival's.
     pub(super) fn logit(&mut self, pos: &Chess) -> f32 {
         let net = self.net;
         let width = self.width;
         let own = (2 * self.top + slot(pos.turn())) * width;
         let rival = (2 * self.top + slot(!pos.turn())) * width;
-        let has_dense = net.features().has_dense();
-        // both views, one shared first layer: the mover's, with the dense inputs, and the rival's
-        if has_dense {
-            self.hidden[..width].copy_from_slice(&self.stack[own..own + width]);
-            self.add_dense(pos);
+        let own = &self.stack[own..own + width];
+        let rival = &self.stack[rival..rival + width];
+        let Some(dense) = net.features().dense_inputs(pos) else {
+            return net.output(own, rival);
+        };
+        self.with_dense.copy_from_slice(own);
+        for (row, value) in dense {
+            if value == 0.0 {
+                continue;
+            }
+            for (h, w) in self.with_dense.iter_mut().zip(net.first_row(row)) {
+                *h += w * value;
+            }
         }
-        if let (Some(out), true) = (net.direct_output(), width.is_multiple_of(8)) {
-            // one output layer straight over the accumulators: no copy of the rival's
-            let mover = if has_dense {
-                &self.hidden[..width]
-            } else {
-                &self.stack[own..own + width]
-            };
-            let mut lanes = [0.0f32; 8];
-            add_clipped_lanes(&mut lanes, mover, &out.weights[..width]);
-            add_clipped_lanes(
-                &mut lanes,
-                &self.stack[rival..rival + width],
-                &out.weights[width..2 * width],
-            );
-            return out.bias[0] + lanes.iter().sum::<f32>();
-        }
-        if !has_dense {
-            self.hidden[..width].copy_from_slice(&self.stack[own..own + width]);
-        }
-        self.hidden[width..2 * width].copy_from_slice(&self.stack[rival..rival + width]);
-        net.finish(&mut self.hidden, &mut self.spare)
+        net.output(&self.with_dense, rival)
     }
 }
 

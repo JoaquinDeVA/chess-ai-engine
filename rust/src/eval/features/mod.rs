@@ -14,7 +14,7 @@ pub(in crate::eval) use pieces::input_index;
 use pieces::PIECE_INPUTS;
 
 use shakmaty::Chess;
-use threats::{push_threats, THREAT_INPUTS};
+use threats::{threats, THREAT_INPUTS};
 
 /// The families of features.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -55,17 +55,21 @@ impl FeatureSet {
         }
     }
 
-    /// Whether the set has dense inputs that are not single pieces (the threats); they are
-    /// computed from the board at every evaluation.
-    pub fn has_dense(self) -> bool {
-        self == FeatureSet::PstThreats
+    /// The families of `pst_ctx` the set reads; none for `pst_threats`.
+    pub(in crate::eval) fn families(self) -> Families {
+        match self {
+            FeatureSet::PstThreats => Families::default(),
+            FeatureSet::PstCtx(families) => families,
+        }
     }
 
-    /// The dense inputs (the threats), appended to the vectors.
-    pub fn dense_inputs(self, pos: &Chess, indices: &mut Vec<usize>, values: &mut Vec<f64>) {
-        if self == FeatureSet::PstThreats {
-            push_threats(pos, PIECE_INPUTS, indices, values);
-        }
+    /// The dense inputs of `pos` (the threats), each with its row of the first layer, if the set
+    /// has them; they are not pieces, so they are computed from the board at every evaluation.
+    pub(in crate::eval) fn dense_inputs(
+        self,
+        pos: &Chess,
+    ) -> Option<impl Iterator<Item = (usize, f32)>> {
+        (self == FeatureSet::PstThreats).then(|| (PIECE_INPUTS..).zip(threats(pos)))
     }
 }
 

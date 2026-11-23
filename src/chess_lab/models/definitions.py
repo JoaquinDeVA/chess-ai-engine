@@ -26,16 +26,18 @@ Layer = Tuple[np.ndarray, np.ndarray]
 class NeuralEvalModel:
     """Feed-forward network over the sparse inputs of ``feature_set``, saved in one ``.npz`` file.
 
-    The first weight layer is the accumulator over the sparse inputs; the output is the logit of
-    the expected score of the player to move.
+    Two weight layers: the accumulator over the sparse inputs, and one output unit over the
+    accumulators of both sides, whose value is the logit of the expected score of the player to
+    move.
 
-    :param layers: ``(weights, bias)`` per weight layer, with shapes ``(inputs, hidden[0])``,
-        ``(hidden[0], hidden[1])``, ..., ``(hidden[-1], 1)``.
+    :param layers: ``(weights, bias)`` per weight layer, with shapes ``(inputs, width)`` and
+        ``(2 * width, 1)``.
     :param rep: Representation of the training target as a plain dictionary, saved untouched.
     :cvar name: Model name, also used for the artifact and card file names.
     :cvar feature_set: Name of the feature set, one of ``chess_lab.models.features.FEATURE_SETS``.
     :cvar architecture: One-line description of the architecture, for the model card.
-    :cvar hidden: Sizes of the hidden layers, the first being the accumulator.
+    :cvar hidden: ``(width,)``: the width of the accumulator, a multiple of 8 (the core reads it
+        eight values at a time); there is no other hidden layer.
     :cvar families: Which families of the ``pst_ctx`` inputs the network reads, among
         :data:`CTX_FAMILIES`; empty for the other feature sets.
     """
@@ -74,13 +76,18 @@ class NeuralEvalModel:
     def layer_shapes(cls) -> List[Tuple[int, int]]:
         """``(fan_in, fan_out)`` of every weight layer, accumulator first.
 
-        :return: One pair per layer; the second layer reads the accumulators of both sides (the
-            mover's, then the rival's, over the same first-layer weights), so it has twice the inputs.
+        :return: The accumulator and the output layer; the output reads the accumulators of both
+            sides (the mover's, then the rival's, over the same first-layer weights), so it has
+            twice the inputs.
+        :raises ValueError: If ``hidden`` is not one width that is a multiple of 8.
         """
-        sizes = (cls.input_rows(), *cls.hidden, 1)
-        shapes = list(zip(sizes[:-1], sizes[1:], strict=True))
-        shapes[1] = (2 * shapes[1][0], shapes[1][1])
-        return shapes
+        if len(cls.hidden) != 1 or cls.hidden[0] % 8:
+            raise ValueError(
+                f"{cls.name}: hidden must be one accumulator width, a multiple of 8, "
+                f"not {cls.hidden}"
+            )
+        width = cls.hidden[0]
+        return [(cls.input_rows(), width), (2 * width, 1)]
 
     def __init__(self, layers: Sequence[Layer], rep: Optional[Dict[str, Any]] = None):
         self.rep: Dict[str, Any] = dict(rep) if rep else {}

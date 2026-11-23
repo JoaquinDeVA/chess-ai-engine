@@ -1,16 +1,17 @@
 //! The accumulator of the network followed move by move during the search. `mod.rs` keeps the
-//! stack of accumulators and the update for the pieces; [`changes`] says which pieces a move
-//! moves, [`ctx`] has the extra update of `pst_ctx` and [`logit`] the output.
+//! stack of accumulators and its update; [`changes`] says which pieces a move moves and [`logit`]
+//! reads the output.
 
 mod changes;
-mod ctx;
 mod logit;
 
 pub use logit::EVAL_LIMIT;
 
-use shakmaty::{Board, Chess, Color, Move, Position};
+use shakmaty::{Board, Chess, Color, Move, Position, Role};
 
-use super::features::{input_index, view_rows, Families, FeatureSet};
+use super::features::{
+    entry_edits, input_index, king_bucket_at, piece_offset, view_rows, Families,
+};
 use super::net::Net;
 use changes::changes;
 
@@ -49,41 +50,32 @@ const STACK_PLIES: usize = 128;
 /// The dense inputs (the threats) are not pieces: they are computed and added at every evaluation.
 ///
 /// The search calls `apply` for every move it plays and `undo` when it takes it back, and `score`
-/// for the position it is in; the result equals [`Net::logit`] scaled by `score` up to the rounding of `f32` sums.
+/// for the position it is in; the result equals that of a state built from scratch for the same
+/// position, up to the rounding of `f32` sums.
 pub struct NetState<'a> {
     net: &'a Net,
     width: usize,
-    /// The input families of a `pst_ctx` network, which `apply` follows with its own update.
-    families: Option<Families>,
+    /// The input families of a `pst_ctx` network (none for `pst_threats`), which `apply` follows.
+    families: Families,
     /// One frame of `2 * width` sums per ply, the white mover's accumulator first.
     stack: Vec<f32>,
     /// Frame of the current position.
     top: usize,
-    /// Buffers of an evaluation: the layers and the dense inputs.
-    hidden: Vec<f32>,
-    spare: Vec<f32>,
-    dense_indices: Vec<usize>,
-    dense_values: Vec<f64>,
+    /// The mover's accumulator with the dense inputs added, for an evaluation that has them.
+    with_dense: Vec<f32>,
 }
 
 impl<'a> NetState<'a> {
     /// The accumulators of `pos`, built from the board.
     pub fn new(net: &'a Net, pos: &Chess) -> NetState<'a> {
         let width = net.width();
-        let families = match net.features() {
-            FeatureSet::PstCtx(families) => Some(families),
-            _ => None,
-        };
         let mut state = NetState {
             net,
             width,
-            families,
+            families: net.features().families(),
             stack: vec![0.0; 2 * width * STACK_PLIES],
             top: 0,
-            hidden: vec![0.0; net.buffer_len()],
-            spare: vec![0.0; net.buffer_len()],
-            dense_indices: Vec::with_capacity(8),
-            dense_values: Vec::with_capacity(8),
+            with_dense: vec![0.0; width],
         };
         for mover in [Color::White, Color::Black] {
             state.refresh(mover, pos.board());
@@ -97,22 +89,13 @@ impl<'a> NetState<'a> {
         &mut self.stack[start..start + self.width]
     }
 
-    /// Rebuild the accumulator of `mover` from the bias and every piece of `board`.
+    /// Rebuild the accumulator of `mover` from the bias and every row `board` reads.
     fn refresh(&mut self, mover: Color, board: &Board) {
         let net = self.net;
         self.acc(mover).copy_from_slice(net.first_bias());
-        if let Some(families) = self.families {
-            let mut rows = Vec::with_capacity(64);
-            view_rows(families, board, mover, &mut rows);
-            for row in rows {
-                add_row(self.acc(mover), net.first_row(row), 1.0);
-            }
-            return;
-        }
-        for (square, piece) in board.clone() {
-            let row = input_index(mover, piece.color, piece.role, square);
-            add_row(self.acc(mover), net.first_row(row), 1.0);
-        }
+        view_rows(self.families, board, mover, |row| {
+            add_row(self.acc(mover), net.first_row(row), 1.0)
+        });
     }
 
     /// Step up one frame, copying the current one into it.
@@ -128,19 +111,46 @@ impl<'a> NetState<'a> {
 }
 
 impl NetState<'_> {
-    /// The side to move in `pos` (the position before the move) plays `m`.
+    /// The side to move in `pos` (the position before the move) plays `m`. Each view adds the
+    /// rows of the pieces that change and, with the families of `pst_ctx`, of the material and
+    /// pawn-file entries whose count changes; a view whose own king changes bucket is rebuilt from
+    /// the board after the move instead (all its piece rows move).
     pub fn apply(&mut self, pos: &Chess, m: &Move) {
         let (pieces, count) = changes(pos.turn(), m);
         let pieces = &pieces[..count];
-        if let Some(families) = self.families {
-            return self.apply_ctx(families, pos, m, pieces);
-        }
+        let families = self.families;
+        let mover = pos.turn();
+        let board = pos.board();
         self.push();
+        let mut rebuilt = false;
+        if families.king_buckets {
+            let king = |put| pieces.iter().find(|p| p.0.role == Role::King && p.2 == put);
+            if let (Some(&(_, from, _)), Some(&(_, to, _))) = (king(false), king(true)) {
+                if king_bucket_at(from, mover) != king_bucket_at(to, mover) {
+                    let mut after = pos.clone();
+                    after.play_unchecked(*m);
+                    self.refresh(mover, after.board());
+                    rebuilt = true;
+                }
+            }
+        }
+        let (edits, edit_count) = entry_edits(families, board, pieces);
         let net = self.net;
-        for side in [Color::White, Color::Black] {
+        for view in [Color::White, Color::Black] {
+            if rebuilt && view == mover {
+                continue;
+            }
+            let offset = piece_offset(families, board, view);
             for &(piece, square, put) in pieces {
-                let row = input_index(side, piece.color, piece.role, square);
-                add_row(self.acc(side), net.first_row(row), sign(put));
+                let row = offset + input_index(view, piece.color, piece.role, square);
+                add_row(self.acc(view), net.first_row(row), sign(put));
+            }
+            for edit in &edits[..edit_count] {
+                add_row(
+                    self.acc(view),
+                    net.first_row(edit.row(families, view)),
+                    edit.sign,
+                );
             }
         }
     }
@@ -160,39 +170,11 @@ impl NetState<'_> {
 mod tests {
     use super::*;
     use crate::board::{legal_moves, position_from_fen};
-    use crate::eval::{FeatureSet, Layer};
+    use crate::eval::net::dummy::net;
+    use crate::eval::FeatureSet;
 
     /// The incremental and the full sums add the same `f32` terms in another order.
     const TOLERANCE: f32 = 1e-4;
-
-    fn layer(fan_in: usize, fan_out: usize, seed: u64) -> Layer {
-        let mut state = seed;
-        let mut next = || {
-            state = state
-                .wrapping_mul(6364136223846793005)
-                .wrapping_add(1442695040888963407);
-            (((state >> 33) as f64 / (1u64 << 31) as f64) - 0.5) as f32
-        };
-        Layer {
-            fan_in,
-            fan_out,
-            weights: (0..fan_in * fan_out).map(|_| next()).collect(),
-            bias: (0..fan_out).map(|_| next() * 0.5).collect(),
-        }
-    }
-
-    /// A network whose second layer reads both sides' accumulators (twice as wide as one).
-    fn net(features: FeatureSet) -> Net {
-        Net::new(
-            features,
-            vec![
-                layer(features.size(), 16, 1),
-                layer(32, 8, 2),
-                layer(8, 1, 3),
-            ],
-        )
-        .unwrap()
-    }
 
     /// Plays random games, checking the incremental value against the full one after every move
     /// and again after taking every move back; returns the moves checked and the castlings.

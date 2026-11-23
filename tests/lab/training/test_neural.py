@@ -1,4 +1,4 @@
-"""Tests of the sparse-input neural evaluation core and of the 3-layer path of the core."""
+"""Tests of the sparse-input neural evaluation core."""
 
 import json
 import subprocess
@@ -27,16 +27,8 @@ from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 
 
-class ThreeLayerModel(NeuralEvalModel):
-    """A 64-16-1 network, only to exercise the core's generic path: no such model is shipped."""
-
-    name = "net_test_x16"
-    feature_set = "pst_slotted"
-    hidden = (64, 16)
-
-
 def random_net(
-    seed: int = 0, rep: Representation | None = None, model_class: type = ThreeLayerModel
+    seed: int = 0, rep: Representation | None = None, model_class: type = NnW64BothModel
 ) -> NeuralEvalModel:
     """A network with random layers, so that scores are not trivially 0.5."""
     model = new_model(model_class, rep or Representation())
@@ -68,13 +60,12 @@ def ctx_table_rows(model: NeuralEvalModel, board: chess.Board) -> list[int]:
 
 def ctx_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     """Reference of a ``pst_ctx`` network: each view is the position with that side to move."""
-    (w0, b0), *rest = model.layers
+    (w0, b0), (w1, b1) = model.layers
     rival = board.copy()
     rival.turn = not board.turn
     views = [ctx_table_rows(model, board), ctx_table_rows(model, rival)]
     h = np.concatenate([np.clip(w0[rows].sum(axis=0) + b0, 0.0, 1.0) for rows in views])
-    last_weights, last_bias = rest[-1]
-    return float((h @ last_weights + last_bias)[0])
+    return float((h @ w1 + b1)[0])
 
 
 def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
@@ -85,7 +76,7 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     x = np.zeros(features_of(model).size())
     for index, value in zip(indices, values, strict=True):
         x[index] += value
-    (w0, b0), *rest = model.layers
+    (w0, b0), (w1, b1) = model.layers
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
     # the rival's view: every piece in the other block of its square; the dense entries have no
     # rival view
@@ -94,22 +85,29 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
         if index < 768:
             rival[(index + 384) % 768] += value
     h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
-    for weights, bias in rest[:-1]:
-        h = np.maximum(h @ weights + bias, 0.0)
-    last_weights, last_bias = rest[-1]
-    return float((h @ last_weights + last_bias)[0])
+    return float((h @ w1 + b1)[0])
 
 
-def test_net_has_the_documented_layer_shapes_and_parameter_count():
-    model = new_model(ThreeLayerModel, Representation())
-    assert [weights.shape for weights, _ in model.layers] == [
-        (768, 64),
-        (128, 16),
-        (16, 1),
-    ]
-    assert [bias.shape for _, bias in model.layers] == [(64,), (16,), (1,)]
-    assert model.count_parameters() == 768 * 64 + 64 + 128 * 16 + 16 + 16 + 1
-    assert ThreeLayerModel.hidden == (64, 16)
+class TwoHiddenModel(NeuralEvalModel):
+    """A 64-16-1 network: a hidden layer after the accumulator, which the core does not have."""
+
+    name = "net_test_x16"
+    feature_set = "pst_slotted"
+    hidden = (64, 16)
+
+
+class NarrowModel(NeuralEvalModel):
+    """An accumulator of 12 units, not a multiple of 8."""
+
+    name = "net_test_w12"
+    feature_set = "pst_slotted"
+    hidden = (12,)
+
+
+@pytest.mark.parametrize("model_class", [TwoHiddenModel, NarrowModel])
+def test_a_network_is_one_accumulator_of_a_multiple_of_8_and_an_output(model_class):
+    with pytest.raises(ValueError, match="multiple of 8"):
+        model_class.layer_shapes()
 
 
 def test_the_second_layer_reads_both_sides_so_its_input_is_twice_the_accumulator():
@@ -122,7 +120,7 @@ BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel]
 CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]
 
 
-@pytest.mark.parametrize("model_class", [ThreeLayerModel, *BOTH_MODELS, *CTX_MODELS])
+@pytest.mark.parametrize("model_class", [*BOTH_MODELS, *CTX_MODELS])
 def test_core_score_matches_a_dense_numpy_reference(model_class):
     model = random_net(seed=6, model_class=model_class)
     evaluator = model.evaluator()
@@ -185,7 +183,7 @@ def test_ctx_without_families_is_the_slotted_network():
     assert logits[0] == pytest.approx(logits[1], abs=1e-5)
 
 
-@pytest.mark.parametrize("model_class", [ThreeLayerModel, NnW64BothModel, CTX_MODELS[-1]])
+@pytest.mark.parametrize("model_class", [NnW64BothModel, CTX_MODELS[-1]])
 def test_mirror_complement_holds_for_random_weights(model_class):
     model = random_net(seed=3, model_class=model_class)
     for board in random_positions(20, seed=11):
@@ -195,7 +193,7 @@ def test_mirror_complement_holds_for_random_weights(model_class):
 
 
 def test_fit_stream_rejects_empty_validation():
-    model = new_model(ThreeLayerModel, Representation())
+    model = new_model(NnW64BothModel, Representation())
     with pytest.raises(ValueError, match="validation set is empty"):
         fit_stream(model, [frame(random_positions(10, seed=1))], frame([]), {})
 
@@ -203,9 +201,9 @@ def test_fit_stream_rejects_empty_validation():
 def test_save_load_round_trip_gives_identical_scores(tmp_path):
     rep = Representation(scale="cp_linear")
     model = random_net(seed=4, rep=rep)
-    path = model.save(tmp_path / "net_test_x16.npz")
+    path = model.save(tmp_path / "net_pst_w64_both.npz")
 
-    loaded = ThreeLayerModel.load(path)
+    loaded = NnW64BothModel.load(path)
 
     assert Representation.from_dict(loaded.rep) == rep
     assert loaded.count_parameters() == model.count_parameters()
@@ -227,17 +225,17 @@ def test_core_rejects_a_mismatching_input_layer(tmp_path):
     meta = {
         "features": "pst_slotted",
         "rep": Representation().to_dict(),
-        "hidden": [64, 16],
+        "hidden": [64],
     }
     arrays = {"W0": np.zeros((10, 64)), "b0": np.zeros(64)}
     for index, (weights, bias) in enumerate(
-        new_model(ThreeLayerModel, Representation()).layers[1:], start=1
+        new_model(NnW64BothModel, Representation()).layers[1:], start=1
     ):
         arrays[f"W{index}"], arrays[f"b{index}"] = weights, bias
     with open(path, "wb") as handle:
         np.savez(handle, meta=np.array(json.dumps(meta)), **arrays)
     with pytest.raises(ValueError, match="768"):
-        ThreeLayerModel.load(path).evaluator()
+        NnW64BothModel.load(path).evaluator()
 
 
 def test_play_path_does_not_import_tensorflow(tmp_path):

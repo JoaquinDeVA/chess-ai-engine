@@ -87,28 +87,23 @@ fn en_prise(board: &Board, attacker: Color, attacks: Bitboard, defences: Bitboar
     (best, count)
 }
 
-/// The threat inputs from `base` on: the mover's best capture, the opponent's, the pieces each side
-/// has en prise to the other, and whether the mover is in check.
-pub(super) fn push_threats(
-    pos: &Chess,
-    base: usize,
-    indices: &mut Vec<usize>,
-    values: &mut Vec<f64>,
-) {
+/// The threat inputs: the mover's best capture, the opponent's, the pieces each side has en prise
+/// to the other, and whether the mover is in check.
+pub(super) fn threats(pos: &Chess) -> [f32; THREAT_INPUTS] {
     let mover = pos.turn();
     let board = pos.board();
     let mover_map = attacked_by(board, mover);
     let opponent_map = attacked_by(board, !mover);
     let (mover_gain, mover_count) = en_prise(board, mover, mover_map, opponent_map);
     let (opponent_gain, opponent_count) = en_prise(board, !mover, opponent_map, mover_map);
-    indices.extend(base..base + THREAT_INPUTS);
-    values.extend([
+    [
         f64::from(mover_gain) / GAIN_SCALE,
         f64::from(opponent_gain) / GAIN_SCALE,
         f64::from(mover_count) / EN_PRISE_SCALE,
         f64::from(opponent_count) / EN_PRISE_SCALE,
         if pos.is_check() { 1.0 } else { 0.0 },
-    ]);
+    ]
+    .map(|value| value as f32)
 }
 
 #[cfg(test)]
@@ -117,43 +112,40 @@ mod tests {
     use crate::board::position_from_fen;
 
     /// The five threat inputs of a position, in order.
-    fn threat_values(fen: &str) -> Vec<f64> {
-        let pos = position_from_fen(fen).unwrap();
-        let (mut indices, mut values) = (Vec::new(), Vec::new());
-        push_threats(&pos, 0, &mut indices, &mut values);
-        assert_eq!(indices, (0..THREAT_INPUTS).collect::<Vec<_>>());
-        values
+    fn threat_values(fen: &str) -> [f32; THREAT_INPUTS] {
+        threats(&position_from_fen(fen).unwrap())
     }
 
-    fn assert_close(actual: &[f64], wanted: &[f64]) {
+    /// The inputs are the values worked out by hand, rounded to `f32`.
+    fn assert_rounded(actual: &[f32], wanted: &[f64]) {
         for (a, w) in actual.iter().zip(wanted) {
-            assert!((a - w).abs() < 1e-12, "{actual:?} != {wanted:?}");
+            assert_eq!(*a, *w as f32, "{actual:?} != {wanted:?}");
         }
     }
 
     #[test]
     fn nothing_is_en_prise_at_the_start() {
         let start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        assert_close(&threat_values(start), &[0.0; 5]);
+        assert_rounded(&threat_values(start), &[0.0; 5]);
     }
 
     #[test]
     fn an_undefended_piece_gains_its_whole_value() {
         // the pawn on e4 takes the queen; the queen takes the pawn
         let values = threat_values("4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1");
-        assert_close(&values, &[1.0, 1.0 / 9.0, 0.25, 0.25, 0.0]);
+        assert_rounded(&values, &[1.0, 1.0 / 9.0, 0.25, 0.25, 0.0]);
     }
 
     #[test]
     fn a_defended_piece_gains_the_difference_with_the_cheapest_attacker() {
         // the pawn takes a rook that a pawn defends: 5 - 1
         let values = threat_values("4k3/8/4p3/3r4/4P3/8/8/4K3 w - - 0 1");
-        assert_close(&values, &[4.0 / 9.0, 0.0, 0.25, 0.0, 0.0]);
+        assert_rounded(&values, &[4.0 / 9.0, 0.0, 0.25, 0.0, 0.0]);
     }
 
     #[test]
     fn a_check_sets_the_flag_and_the_king_can_take_what_is_undefended() {
         let values = threat_values("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1");
-        assert_close(&values, &[5.0 / 9.0, 0.0, 0.25, 0.0, 1.0]);
+        assert_rounded(&values, &[5.0 / 9.0, 0.0, 0.25, 0.0, 1.0]);
     }
 }

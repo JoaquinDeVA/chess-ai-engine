@@ -83,48 +83,64 @@ fn pawn_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ 
 /// Row of the first layer of the material entry `entry` of `side`, seen by `view`: the viewer's
 /// own block first, then its rival's.
 fn material_row(families: Families, view: Color, side: Color, entry: usize) -> usize {
-    families.piece_rows() + if side == view { 0 } else { MATERIAL_PER_SIDE } + entry
+    families.material_start() + if side == view { 0 } else { MATERIAL_PER_SIDE } + entry
 }
 
 /// Row of the pawn-file entry `entry` of `side`, seen by `view`.
 fn pawn_row(families: Families, view: Color, side: Color, entry: usize) -> usize {
-    let first = families.piece_rows()
-        + if families.material {
-            2 * MATERIAL_PER_SIDE
-        } else {
-            0
-        };
-    first + if side == view { 0 } else { PAWN_FILES_PER_SIDE } + entry
+    families.pawn_start() + if side == view { 0 } else { PAWN_FILES_PER_SIDE } + entry
 }
 
 /// A change of an entry of `pst_ctx` that a move causes: the entry of `side` (of the material
-/// block, or of the pawn-file one) that is on or off, `sign` being 1 or -1.
+/// block, or of the pawn-file one) that is on or off, `sign` being 1 or -1. Every move fills an
+/// array of them, so they are kept small: the entry fits in a byte (with a `usize` the array cost
+/// 2 % of the nodes per second of `uci bench`, which moves without entries).
+#[derive(Clone, Copy)]
 pub(in crate::eval) struct EntryEdit {
     side: Color,
     material: bool,
-    entry: usize,
+    entry: u8,
     pub(in crate::eval) sign: f32,
 }
 
+/// Most entry changes a move can cause: at most four pieces that are not kings change (a
+/// castling moves a rook, a capture with promotion takes a pawn off, puts a piece on and takes the
+/// captured one off), each changing the entry of its role and, a pawn, that of its file, and each
+/// change turns one entry off and another on.
+const MAX_EDITS: usize = 16;
+
 impl EntryEdit {
+    const NONE: EntryEdit = EntryEdit {
+        side: Color::White,
+        material: true,
+        entry: 0,
+        sign: 0.0,
+    };
+
     /// The row of the first layer of the entry, seen by `view`.
     pub(in crate::eval) fn row(&self, families: Families, view: Color) -> usize {
         if self.material {
-            material_row(families, view, self.side, self.entry)
+            material_row(families, view, self.side, usize::from(self.entry))
         } else {
-            pawn_row(families, view, self.side, self.entry)
+            pawn_row(families, view, self.side, usize::from(self.entry))
         }
     }
 }
 
 /// The entries that turn on or off when `pieces` (piece, square and whether it is put, as
 /// the accumulator lists them) change `board`, the position before the move.
-/// Only the counts that change an entry matter, and only for the families the network has.
+/// Only the counts that change an entry matter, and only for the families the network has. The
+/// edits are the first ones of the array, as many as the count says.
 pub(in crate::eval) fn entry_edits(
     families: Families,
     board: &Board,
     pieces: &[(Piece, Square, bool)],
-) -> Vec<EntryEdit> {
+) -> ([EntryEdit; MAX_EDITS], usize) {
+    let mut edits = [EntryEdit::NONE; MAX_EDITS];
+    let mut count = 0;
+    if !families.material && !families.pawn_files {
+        return (edits, count);
+    }
     let at = |side: Color| usize::from(side == Color::Black);
     // count changes: [color][role - 1] for the material, [color][file] for the pawns
     let (mut by_role, mut by_file) = ([[0i32; 5]; 2], [[0i32; 8]; 2]);
@@ -138,16 +154,18 @@ pub(in crate::eval) fn entry_edits(
             by_file[at(piece.color)][square.file() as usize] += delta;
         }
     }
-    let mut edits = Vec::with_capacity(16);
     let mut change = |side, material, old: Option<usize>, new: Option<usize>| {
         if old != new {
             for (entry, sign) in [(old, -1.0), (new, 1.0)] {
-                edits.extend(entry.map(|entry| EntryEdit {
-                    side,
-                    material,
-                    entry,
-                    sign,
-                }));
+                if let Some(entry) = entry {
+                    edits[count] = EntryEdit {
+                        side,
+                        material,
+                        entry: entry as u8,
+                        sign,
+                    };
+                    count += 1;
+                }
             }
         }
     };
@@ -172,29 +190,27 @@ pub(in crate::eval) fn entry_edits(
             }
         }
     }
-    edits
+    (edits, count)
 }
 
-/// Rows of the first layer a `pst_ctx` network adds for the position as seen by `view`, as if
-/// `view` were the side to move.
+/// Calls `add` with every row of the first layer that the position adds as seen by `view`, as if
+/// `view` were the side to move: the pieces, then the entries of the families the network has.
 pub(in crate::eval) fn view_rows(
     families: Families,
     board: &Board,
     view: Color,
-    rows: &mut Vec<usize>,
+    mut add: impl FnMut(usize),
 ) {
     let offset = piece_offset(families, board, view);
     for (square, piece) in board.clone() {
-        rows.push(offset + input_index(view, piece.color, piece.role, square));
+        add(offset + input_index(view, piece.color, piece.role, square));
     }
     for side in [view, !view] {
         if families.material {
-            rows.extend(
-                material_entries(board, side).map(|e| material_row(families, view, side, e)),
-            );
+            material_entries(board, side).for_each(|e| add(material_row(families, view, side, e)));
         }
         if families.pawn_files {
-            rows.extend(pawn_entries(board, side).map(|e| pawn_row(families, view, side, e)));
+            pawn_entries(board, side).for_each(|e| add(pawn_row(families, view, side, e)));
         }
     }
 }

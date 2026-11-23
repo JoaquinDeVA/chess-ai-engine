@@ -40,8 +40,8 @@ impl PyEvaluator {
     /// `families` names the inputs of `pst_ctx` the first layer has rows for (`material`,
     /// `pawn_files`, `king_buckets`).
     ///
-    /// The second layer reads the accumulators of both sides, which share the first layer (see
-    /// `Net::new`).
+    /// Two layers: the accumulator, whose width is a multiple of 8, and the output unit, which
+    /// reads the accumulators of both sides, sharing the first layer (see `Net::new`).
     #[staticmethod]
     #[pyo3(signature = (features, layers, families=Vec::new()))]
     fn network(

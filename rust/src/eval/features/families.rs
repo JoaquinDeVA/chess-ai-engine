@@ -37,18 +37,28 @@ impl Families {
     }
 
     /// Rows of the piece block: 768 per king bucket.
-    pub(in crate::eval) fn piece_rows(self) -> usize {
+    fn piece_rows(self) -> usize {
         PIECE_INPUTS * if self.king_buckets { KING_BUCKETS } else { 1 }
     }
 
-    /// Rows of the first layer.
-    pub fn rows(self) -> usize {
+    /// First row of the material block, after the pieces.
+    pub(super) fn material_start(self) -> usize {
         self.piece_rows()
+    }
+
+    /// First row of the pawn-file block, after the material.
+    pub(super) fn pawn_start(self) -> usize {
+        self.material_start()
             + if self.material {
                 2 * MATERIAL_PER_SIDE
             } else {
                 0
             }
+    }
+
+    /// Rows of the first layer.
+    pub fn rows(self) -> usize {
+        self.pawn_start()
             + if self.pawn_files {
                 2 * PAWN_FILES_PER_SIDE
             } else {

@@ -35,6 +35,7 @@ from .effort import (
     fit_config,
     search,
 )
+from .neural import checkpoint_config
 
 MAX_VALIDATION_ROWS = 50_000
 
@@ -83,6 +84,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--raw", type=Path, default=RAW_DIR, help="raw shards directory")
     parser.add_argument("--sidecar", type=Path, default=SIDECAR_DIR, help="sidecar directory")
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="file left after every epoch of the final fit; if it exists the fit resumes from it "
+        "(without the trials) and it is deleted once the model is saved",
+    )
     args = parser.parse_args(argv)
     if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
@@ -140,6 +147,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     """Train a network from the raw shards, sized by ``--effort``.
 
     Prints the configuration and a duration estimate, then runs the trials and the final fit.
+    With an existing ``--checkpoint`` the final fit resumes from it, with its configuration, and
+    the timing and the trials are skipped.
 
     :param args: Parsed arguments (``effort``, ``representation``, ``raw``, ``sidecar``, ...).
     :param model_class: A concrete :class:`NeuralEvalModel` subclass.
@@ -178,17 +187,21 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         quiet_only=True,
         mate_keep=rep.mate_keep,
     )
-    timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, True)
-    estimate = estimated_seconds(plan, timing, cached=not args.no_cache)
-    print(
-        f"Timed: {timing.seconds_per_position * 1e6:.1f} us per position, "
-        f"validation {timing.encode_seconds:.2f} s to featurize and "
-        f"{timing.score_seconds:.2f} s per epoch"
-    )
-    print(f"Estimated duration: {format_duration(estimate)}")
-
-    best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
-    print(f"Final fit with l2={best['l2']:.2e}, lr={best['lr']:.2e}")
+    config = checkpoint_config(args.checkpoint)
+    if config is not None:
+        print(f"Resuming the final fit from {args.checkpoint}")
+    else:
+        timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, True)
+        estimate = estimated_seconds(plan, timing, cached=not args.no_cache)
+        print(
+            f"Timed: {timing.seconds_per_position * 1e6:.1f} us per position, "
+            f"validation {timing.encode_seconds:.2f} s to featurize and "
+            f"{timing.score_seconds:.2f} s per epoch"
+        )
+        print(f"Estimated duration: {format_duration(estimate)}")
+        best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
+        config = fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=plan["patience"])
+    print(f"Final fit with l2={config['l2']:.2e}, lr={config['lr']:.2e}")
     model, summary = fit(
         model_class,
         rep,
@@ -196,13 +209,16 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         args.sidecar,
         validation,
         plan["positions"],
-        fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=plan["patience"]),
+        config,
         True,
         seed=args.seed,
         use_cache=not args.no_cache,
+        checkpoint=args.checkpoint,
     )
 
     path = model.save(args.output or artifact_path(model_spec(args)))
+    if args.checkpoint is not None:
+        args.checkpoint.unlink(missing_ok=True)
     clear_measurements(model_spec(args))
     update_card(
         model_spec(args),

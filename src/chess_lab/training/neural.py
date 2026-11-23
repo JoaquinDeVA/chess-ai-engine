@@ -6,7 +6,9 @@ Keras (imported lazily by :func:`fit_stream`) trains the network and its weights
 to NumPy arrays, which are what the saved model stores.
 """
 
+import json
 import math
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -292,12 +294,60 @@ def _export(parts: Sequence[Any]) -> List[Layer]:
     return [(np.asarray(w, dtype=np.float64), np.asarray(b, dtype=np.float64)) for w, b in layers]
 
 
+def checkpoint_config(path: Optional[Path]) -> Optional[Dict[str, Any]]:
+    """The fit configuration of the run that left the checkpoint ``path``, to resume it as it was.
+
+    :param path: Checkpoint file of :func:`fit_stream`, or None.
+    :return: The configuration, or None if there is no checkpoint there.
+    """
+    if path is None or not Path(path).exists():
+        return None
+    with np.load(path) as data:
+        return json.loads(str(data["loop"]))["config"]
+
+
+def _save_checkpoint(path: Path, network: Any, loop: Dict[str, Any], best: List[Layer]) -> None:
+    """Write the state of the fit after an epoch.
+
+    The loop, the Keras weights and optimizer, and the best layers so far go in one file, replaced
+    at once, so a cut while writing keeps the previous one.
+    """
+    arrays = {"loop": np.array(json.dumps(loop))}
+    for i, weights in enumerate(network.get_weights()):
+        arrays[f"weights{i}"] = weights
+    for i, variable in enumerate(network.optimizer.variables):
+        arrays[f"optimizer{i}"] = np.asarray(variable)
+    for i, (weights, bias) in enumerate(best):
+        arrays[f"best_weights{i}"], arrays[f"best_bias{i}"] = weights, bias
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".partial")
+    with open(partial, "wb") as handle:
+        np.savez(handle, **arrays)
+    os.replace(partial, path)
+
+
+def _load_checkpoint(path: Path, network: Any) -> Tuple[Dict[str, Any], List[Layer]]:
+    """Put back into ``network`` the weights and optimizer of :func:`_save_checkpoint`.
+
+    :return: The state of the loop and the best layers so far.
+    """
+    with np.load(path) as data:
+        loop = json.loads(str(data["loop"]))
+        network.set_weights([data[f"weights{i}"] for i in range(len(network.get_weights()))])
+        network.optimizer.build(network.trainable_variables)
+        for i, variable in enumerate(network.optimizer.variables):
+            variable.assign(data[f"optimizer{i}"])
+        best = [(data[f"best_weights{i}"], data[f"best_bias{i}"]) for i in range(2)]
+    return loop, best
+
+
 def fit_stream(
     model: NeuralEvalModel,
     batches: Iterable[pd.DataFrame],
     validation: pd.DataFrame,
     config: Dict[str, Any],
     cache_dir: Optional[Path] = None,
+    checkpoint: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Train with Keras (Adam, binary cross-entropy against soft targets).
 
@@ -314,6 +364,9 @@ def fit_stream(
     :param config: Keys ``l2``, ``lr``, ``batch_size``, ``max_epochs``, ``patience``,
         ``workers``; missing keys take :data:`DEFAULT_FIT_CONFIG`.
     :param cache_dir: Directory of the encoded frames, or None for no cache.
+    :param checkpoint: File where every epoch leaves the state to resume from, or None. If it
+        exists, the fit goes on after its last epoch (with the same ``config``); the caller
+        deletes it once the model is saved.
     :return: Summary with ``epochs``, ``best_epoch``, ``train_losses``, ``val_losses``,
         ``train_rows``, ``seconds`` and the ``config`` used.
     :raises ValueError: If an epoch yields no rows, the validation set is empty, or a
@@ -341,6 +394,9 @@ def fit_stream(
         loss=keras.losses.BinaryCrossentropy(from_logits=True),
     )
     val_index, val_value, val_y = _padded(encode_frame(features, rep, validation), width)
+    resume, initial_best = None, model.layers
+    if checkpoint is not None and Path(checkpoint).exists():
+        resume, initial_best = _load_checkpoint(Path(checkpoint), network)
 
     def train_batch(padded: Tuple[np.ndarray, np.ndarray, np.ndarray]) -> Tuple[float, int]:
         index, value, targets = padded
@@ -371,7 +427,11 @@ def fit_stream(
         get_lr=lambda: float(network.optimizer.learning_rate.numpy()),
         set_lr=network.optimizer.learning_rate.assign,
         snapshot=lambda: _export(parts),
-        initial_best=model.layers,
+        initial_best=initial_best,
+        resume=resume,
+        save=None
+        if checkpoint is None
+        else lambda loop, best: _save_checkpoint(Path(checkpoint), network, loop, best),
     )
     model.layers = best_layers
     del summary["lr_history"]  # not part of this model's summary

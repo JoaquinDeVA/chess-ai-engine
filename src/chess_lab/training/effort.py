@@ -191,6 +191,7 @@ def fit(
     quiet_only: bool = False,
     seed: int = SAMPLE_SEED,
     use_cache: bool = True,
+    checkpoint: Optional[Path] = None,
 ) -> Tuple[NeuralEvalModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
@@ -204,6 +205,7 @@ def fit(
     :param quiet_only: Train on quiet positions only.
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
     :param use_cache: Keep the encoded batches in ``data/cache`` and reuse them.
+    :param checkpoint: Checkpoint file of :func:`chess_lab.training.neural.fit_stream`, or None.
     :return: The fitted model and the summary of :func:`chess_lab.training.neural.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
@@ -223,7 +225,7 @@ def fit(
     cache = None
     if use_cache:
         cache = cache_path(model_class, rep, positions, seed, quiet_only, config["batch_size"])
-    summary = fit_stream(model, batches, validation, config, cache_dir=cache)
+    summary = fit_stream(model, batches, validation, config, cache_dir=cache, checkpoint=checkpoint)
     return model, summary
 
 

@@ -22,7 +22,7 @@ from chess_lab.models.features import (
     features_of,
 )
 from chess_lab.models.target import Representation
-from chess_lab.training.neural import fit_stream, new_model
+from chess_lab.training.neural import checkpoint_config, fit_stream, new_model
 from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 
@@ -196,6 +196,50 @@ def test_fit_stream_rejects_empty_validation():
     model = new_model(NnW64BothModel, Representation())
     with pytest.raises(ValueError, match="validation set is empty"):
         fit_stream(model, [frame(random_positions(10, seed=1))], frame([]), {})
+
+
+class CutAfterOneEpoch:
+    """Training frames whose second reading fails, as a run killed during its second epoch."""
+
+    def __init__(self, frames):
+        self.frames, self.readings = frames, 0
+
+    def __iter__(self):
+        self.readings += 1
+        if self.readings > 1:
+            raise RuntimeError("cut")
+        return iter(self.frames)
+
+
+def test_a_fit_cut_after_an_epoch_resumes_as_if_it_had_not_stopped(tmp_path):
+    boards = random_positions(64, seed=21)
+    training, validation = [frame(boards[:48])], frame(boards[48:])
+    config = {"max_epochs": 2, "lr_decay": 0.5, "patience": 5, "batch_size": 16}
+    whole = new_model(NnW64BothModel, Representation())
+    expected = fit_stream(whole, training, validation, config)
+
+    checkpoint = tmp_path / "fit.npz"
+    with pytest.raises(RuntimeError, match="cut"):
+        fit_stream(
+            new_model(NnW64BothModel, Representation()),
+            CutAfterOneEpoch(training),
+            validation,
+            config,
+            checkpoint=checkpoint,
+        )
+    assert checkpoint_config(checkpoint)["max_epochs"] == 2
+    resumed = new_model(NnW64BothModel, Representation())
+    summary = fit_stream(resumed, training, validation, config, checkpoint=checkpoint)
+
+    for key in ("epochs", "best_epoch", "train_rows"):
+        assert summary[key] == expected[key]
+    for key in ("train_losses", "val_losses"):
+        assert np.allclose(summary[key], expected[key])
+    for (weights, bias), (want_weights, want_bias) in zip(
+        resumed.layers, whole.layers, strict=True
+    ):
+        assert np.allclose(weights, want_weights, atol=1e-6)
+        assert np.allclose(bias, want_bias, atol=1e-6)
 
 
 def test_save_load_round_trip_gives_identical_scores(tmp_path):

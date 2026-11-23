@@ -147,7 +147,7 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
         splits.append(split)
         return real_iter_batches(raw_dir, sidecar_dir, split, *args, **kwargs)
 
-    def reading_fit_stream(model, batches, validation, config, cache_dir=None):
+    def reading_fit_stream(model, batches, validation, config, cache_dir=None, checkpoint=None):
         list(batches)  # reads the stream as the fit would, without training
         return {"val_losses": [0.5]}
 

@@ -99,6 +99,8 @@ def run_epochs(
     snapshot: Callable[[], Any],
     initial_best: Any,
     prepare: Callable[[EncodedFrame], Any] = lambda encoded: encoded,
+    resume: Optional[Dict[str, Any]] = None,
+    save: Optional[Callable[[Dict[str, Any], Any], None]] = None,
 ) -> Tuple[Dict[str, Any], Any]:
     """Epoch loop shared by the models: encoded frames, decay or patience, best-epoch state.
 
@@ -120,21 +122,29 @@ def run_epochs(
     :param prepare: Turns an encoded frame into what ``train_batch`` takes. It runs, like the
         reading of the frames, in a thread ahead of the training step, so the step does not wait
         for them.
+    :param resume: The state that ``save`` was last given by a run cut short; the loop goes on
+        after its last epoch, with ``initial_best`` as the best state so far.
+    :param save: Called at the end of every epoch with the state of the loop and the best state,
+        so that a cut run can be resumed.
     :return: ``(summary, best_state)``; the summary has ``epochs``, ``best_epoch``,
         ``train_losses``, ``val_losses``, ``lr_history``, ``train_rows``, ``seconds``, ``config``.
     :raises ValueError: If an epoch yields no rows or a validation loss is not finite.
     """
-    best_state, best_loss, best_epoch = initial_best, math.inf, 0
-    train_losses: List[float] = []
-    val_losses: List[float] = []
-    lr_history: List[float] = []
-    bad_epochs = 0
-    train_rows = 0
+    loop = resume or {}
+    best_state = initial_best
+    best_loss, best_epoch = loop.get("best_loss", math.inf), loop.get("best_epoch", 0)
+    train_losses: List[float] = list(loop.get("train_losses", []))
+    val_losses: List[float] = list(loop.get("val_losses", []))
+    lr_history: List[float] = list(loop.get("lr_history", []))
+    bad_epochs = loop.get("bad_epochs", 0)
+    train_rows = loop.get("train_rows", 0)
+    started -= loop.get("seconds", 0.0)
     lr_decay = cfg.get("lr_decay")
     min_lr = float(cfg.get("min_lr", 1e-5))
+    first_epoch = int(cfg["max_epochs"]) + 1 if loop.get("stopped") else len(train_losses) + 1
 
     with _featurization_pool(int(cfg["workers"])) as executor:
-        for epoch in range(1, int(cfg["max_epochs"]) + 1):
+        for epoch in range(first_epoch, int(cfg["max_epochs"]) + 1):
             loss_sum, rows_seen = 0.0, 0
             lr_history.append(get_lr())
             for prepared in _prefetched(frames(executor), prepare):
@@ -155,21 +165,37 @@ def run_epochs(
                 f"val {val_loss:.5f} lr {lr_history[-1]:.2e}",
                 flush=True,
             )
+            stop = False
             if val_loss < best_loss:
                 best_loss, best_epoch, best_state = val_loss, epoch, snapshot()
                 bad_epochs = 0
             elif lr_decay is not None:
                 bad_epochs += 1
                 lr = get_lr() * float(lr_decay)
-                if lr < min_lr or (
+                stop = lr < min_lr or bool(
                     cfg.get("decay_patience") and bad_epochs >= int(cfg["patience"])
-                ):
-                    break
-                set_lr(lr)
+                )
+                if not stop:
+                    set_lr(lr)
             else:
                 bad_epochs += 1
-                if bad_epochs > int(cfg["patience"]):
-                    break
+                stop = bad_epochs > int(cfg["patience"])
+            if save is not None:
+                state = {
+                    "best_loss": best_loss,
+                    "best_epoch": best_epoch,
+                    "bad_epochs": bad_epochs,
+                    "train_losses": train_losses,
+                    "val_losses": val_losses,
+                    "lr_history": lr_history,
+                    "train_rows": train_rows,
+                    "seconds": time.perf_counter() - started,
+                    "stopped": stop,
+                    "config": cfg,
+                }
+                save(state, best_state)
+            if stop:
+                break
 
     summary = {
         "epochs": len(train_losses),

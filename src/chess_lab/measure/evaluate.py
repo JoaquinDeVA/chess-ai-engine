@@ -5,6 +5,11 @@ By default the model is judged on the fixed test sample of the raw shards (``--r
 microseconds per single-position evaluation in the core, from a FEN). Every model can be
 evaluated this way, including the older ones that are not retrained.
 
+With ``--games <file>`` (``datasets.build_game_positions``) the model is judged instead on positions
+of engine games, the kind its search evaluates: the static metrics of :func:`~.judge.static_metrics`
+on all of them and on each quiet slice, saved as the ``games`` section of the card; ``accuracy``
+and ``cost`` are left as they were.
+
 Playing strength is measured with the UCI engine and fastchess instead.
 """
 
@@ -14,19 +19,21 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 
 from chess_engine import _core
 from chess_lab.datasets.build_move_ranking import OUT as RANKING_TABLE
 from chess_lab.datasets.sidecar import load_sample
 from chess_lab.datasets.split import TEST
-from chess_lab.measure.judge import judge
+from chess_lab.measure.judge import judge, static_metrics
 from chess_lab.measure.ranking import judge_ranking
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
 from chess_lab.models.store.loader import artifact_path, split_spec
+from chess_lab.models.target import Representation, white_score
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000
@@ -75,6 +82,25 @@ def sample_benchmark(
     return {"accuracy": accuracy, "cost": cost}
 
 
+def games_benchmark(evaluator: _core.Evaluator, games: Path) -> Dict[str, Any]:
+    """Static metrics of an evaluation on the game-position set, overall and per quiet slice.
+
+    :param evaluator: Evaluation to judge, as the engine plays it.
+    :param games: Parquet file with ``fen``, ``cp``, ``mate`` and ``quiet``.
+    :return: ``{"all", "quiet", "non_quiet"}`` of :func:`~.judge.static_metrics`, plus ``file``.
+    """
+    table = pd.read_parquet(games)
+    pred = np.array([evaluator.evaluate(fen, True) for fen in table["fen"]], dtype=np.float64)
+    truth = white_score(table["cp"].to_numpy(), table["mate"].to_numpy(), Representation())
+    quiet = table["quiet"].to_numpy(dtype=bool)
+    slices = {"all": np.ones(len(table), dtype=bool), "quiet": quiet, "non_quiet": ~quiet}
+    report: Dict[str, Any] = {
+        name: static_metrics(pred[mask], truth[mask]) for name, mask in slices.items()
+    }
+    report["file"] = games.name
+    return report
+
+
 def model_spec_arg(text: str) -> str:
     """Argument type of ``--model``: a registered name or ``name@tag``.
 
@@ -118,6 +144,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=RANKING_TABLE,
         help="move-ranking test set (build_move_ranking); skipped when the file does not exist",
     )
+    parser.add_argument(
+        "--games",
+        type=Path,
+        help="judge only on this game-position set (build_game_positions) instead",
+    )
     return parser.parse_args(argv)
 
 
@@ -130,6 +161,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     model = load_model(args.model, args.path)
     evaluator = model.evaluator()
+    if args.games:
+        games = games_benchmark(evaluator, args.games)
+        update_card(args.model, games=games)
+        for name in ("all", "quiet", "non_quiet"):
+            part = games[name]
+            print(
+                f"  games ({name}, {part['n']} positions): spearman {part['spearman']:.4f}, "
+                f"mae {part['mae']:.4f}, excess {part['excess']:.4f}"
+            )
+        return 0
     sections: Dict[str, Any] = {
         "architecture": model.architecture,
         "features": model.feature_set,
@@ -151,6 +192,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"  sample rows: {accuracy['sample']['rows']:,}")
     print(f"  spearman (all): {accuracy['all']['spearman']:.4f}")
     print(f"  mae (all): {accuracy['all']['mae']:.4f}")
+    print(f"  excess (all): {accuracy['all']['excess']:.4f}")
     print(
         f"  best move (all / non-quiet): {accuracy['all']['best_move_agreement']:.4f}"
         f" / {accuracy['non_quiet']['best_move_agreement']:.4f}"

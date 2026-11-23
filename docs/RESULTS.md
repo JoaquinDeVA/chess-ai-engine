@@ -210,6 +210,12 @@ Earlier matches of the UCI binary against itself, one change at a time, as expla
 |---|---|---|
 | Static | Spearman correlation and error of the model against Stockfish on 200,000 test positions (seed 42), scored by the Rust core as the engine plays it (clipped to 0.01–0.99); µs per eval is the median of one core evaluation from a FEN over 1,000 positions | `python -m chess_lab.measure.evaluate --model net_pst_threats_w64_both@e100` |
 | Match | Games of the UCI binary against itself with fastchess, Elo with a 95 % interval | [Measurement](MEASUREMENT.md) |
+| Game positions | The same static metrics on 12,310 positions of the fixed-node screening games, scored by Stockfish at depth 14, saved as the `games` section of the card | `python -m chess_lab.datasets.build_game_positions --engine /usr/games/stockfish`, then `python -m chess_lab.measure.evaluate --model <name> --games data/results/game_positions.parquet` |
+
+Static accuracy does not rank close networks by strength. Against `net_pst_w128_both@e15` on the game positions
+(paired, 95 %), `net_ctx_m_w128_both` has a lower mean error (−0.0024 ± 0.0010) and `net_ctx_mpk_w128_both` too
+(−0.0017 ± 0.0011), yet they lose −86 ± 54 and −76 ± 43 Elo at fixed nodes; the four `ctx` families do not differ
+from the base in excess (cross-entropy over the label entropy). The fixed-node screening stays the judge.
 
 ## Search techniques in games
 

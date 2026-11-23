@@ -62,8 +62,9 @@ impl NetState<'_> {
         let rival = (2 * self.top + slot(!pos.turn())) * width;
         let own = &self.stack[own..own + width];
         let rival = &self.stack[rival..rival + width];
+        let pieces = pos.board().occupied().count();
         let Some(dense) = net.features().dense_inputs(pos) else {
-            return net.output(own, rival);
+            return net.output(own, rival, pieces);
         };
         self.with_dense.copy_from_slice(own);
         for (row, value) in dense {
@@ -74,7 +75,7 @@ impl NetState<'_> {
                 *h += w * value;
             }
         }
-        net.output(&self.with_dense, rival)
+        net.output(&self.with_dense, rival, pieces)
     }
 }
 

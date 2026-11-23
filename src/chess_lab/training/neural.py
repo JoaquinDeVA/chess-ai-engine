@@ -1,7 +1,9 @@
 """Training of the sparse network: initial weights and the Keras fit.
 
 The first weight layer is the accumulator: the rows of the active features are summed, and the
-sum is clipped to ``[0, 1]``. The output is one linear unit over the accumulators of both sides.
+sum is clipped to ``[0, 1]``. The output is a linear layer over the accumulators of both sides,
+of which each position reads the unit of its piece count (one unit unless the model has output
+buckets).
 Keras (imported lazily by :func:`fit_stream`) trains the network and its weights are exported
 to NumPy arrays, which are what the saved model stores.
 """
@@ -16,7 +18,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from chess_lab.models.definitions import Layer, NeuralEvalModel
+from chess_lab.models.definitions import MAX_OUTPUT_BUCKETS, Layer, NeuralEvalModel
 from chess_lab.models.features import (
     KING_BASE,
     KING_BUCKETS,
@@ -239,7 +241,10 @@ def _keras_network(
     families: Sequence[str] = (),
     ctx: bool = False,
 ) -> Tuple[Any, List[Any]]:
-    """The training network: the accumulator and the output unit of ``shapes``.
+    """The training network: the accumulator and the output layer of ``shapes``.
+
+    With several output units, each row keeps the one of its bucket: its pieces are the entries
+    below ``MATERIAL_BASE`` (the same 768 in every feature set), as the core counts them.
 
     :param keras: The ``keras`` module.
     :param shapes: ``(fan_in, fan_out)`` of the two weight layers, accumulator first.
@@ -260,8 +265,16 @@ def _keras_network(
     index_in = keras.Input(shape=(width,), dtype="int32")
     value_in = keras.Input(shape=(width,), dtype="float32")
     x = accumulator([index_in, value_in])
-    output = keras.layers.Dense(1, kernel_initializer="he_normal", name="dense1")
-    model = keras.Model([index_in, value_in], output(x))
+    buckets = shapes[1][1]
+    output = keras.layers.Dense(buckets, kernel_initializer="he_normal", name="dense1")
+    logits = output(x)
+    if buckets > 1:
+        ops = keras.ops
+        piece = ops.logical_and(index_in > 0, index_in - 1 < MATERIAL_BASE)
+        pieces = ops.sum(ops.cast(piece, "int32"), axis=1)
+        bucket = ops.minimum((pieces - 1) * buckets // MAX_OUTPUT_BUCKETS, buckets - 1)
+        logits = ops.take_along_axis(logits, ops.expand_dims(bucket, -1), axis=1)
+    model = keras.Model([index_in, value_in], logits)
     return model, [accumulator, output]
 
 

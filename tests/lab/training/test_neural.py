@@ -12,7 +12,9 @@ from chess_lab.models.definitions import (
     NeuralEvalModel,
     NnThreatsW64BothModel,
     NnW64BothModel,
+    NnW128Ob8BothModel,
     get_model_class,
+    output_bucket,
 )
 from chess_lab.models.features import (
     KING_BASE,
@@ -65,7 +67,13 @@ def ctx_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     rival.turn = not board.turn
     views = [ctx_table_rows(model, board), ctx_table_rows(model, rival)]
     h = np.concatenate([np.clip(w0[rows].sum(axis=0) + b0, 0.0, 1.0) for rows in views])
-    return float((h @ w1 + b1)[0])
+    return float((h @ w1 + b1)[reference_bucket(model, board)])
+
+
+def reference_bucket(model: NeuralEvalModel, board: chess.Board) -> int:
+    """The output unit of ``board``: its pieces on the board, four counts per bucket of eight."""
+    buckets = model.layers[1][0].shape[1]
+    return (len(board.piece_map()) - 1) * buckets // 32
 
 
 def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
@@ -85,7 +93,7 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
         if index < 768:
             rival[(index + 384) % 768] += value
     h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
-    return float((h @ w1 + b1)[0])
+    return float((h @ w1 + b1)[reference_bucket(model, board)])
 
 
 class TwoHiddenModel(NeuralEvalModel):
@@ -116,7 +124,14 @@ def test_the_second_layer_reads_both_sides_so_its_input_is_twice_the_accumulator
     assert model.count_parameters() == 768 * 64 + 64 + 128 + 1
 
 
-BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel]
+def test_eight_output_buckets_take_four_piece_counts_each():
+    model = new_model(NnW128Ob8BothModel, Representation())
+    assert [weights.shape for weights, _ in model.layers] == [(768, 128), (256, 8)]
+    assert [output_bucket(p, 8) for p in (2, 4, 5, 8, 9, 28, 29, 32)] == [0, 0, 1, 1, 2, 6, 7, 7]
+    assert output_bucket(32, 1) == 0
+
+
+BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel, NnW128Ob8BothModel]
 CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]
 
 
@@ -130,17 +145,15 @@ def test_core_score_matches_a_dense_numpy_reference(model_class):
         )
 
 
-@pytest.mark.parametrize("model_class", [*BOTH_MODELS, *CTX_MODELS])
-def test_the_training_graph_computes_what_the_core_does(model_class):
+def keras_logits(model: NeuralEvalModel, boards: list[chess.Board]) -> np.ndarray:
+    """The logits of the training graph of ``model`` for ``boards``."""
     from chess_lab.training.epochs import encode_frame
     from chess_lab.training.neural import _assign, _keras_network, _padded, _training_keras
 
-    model = random_net(seed=5, model_class=model_class)
     features = features_of(model)
     width = features.max_entries()
-    keras = _training_keras()
     network, parts = _keras_network(
-        keras,
+        _training_keras(),
         [w.shape for w, _ in model.layers],
         width,
         0.0,
@@ -148,11 +161,33 @@ def test_the_training_graph_computes_what_the_core_does(model_class):
         model.feature_set == "pst_ctx",
     )
     _assign(parts, model.layers)
-    boards = random_positions(40, seed=9)
     index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)
-    logits = np.asarray(network.predict([index, value], verbose=0)).reshape(-1)
-    for board, logit in zip(boards, logits, strict=True):
+    return np.asarray(network.predict([index, value], verbose=0)).reshape(-1)
+
+
+@pytest.mark.parametrize("model_class", [*BOTH_MODELS, *CTX_MODELS])
+def test_the_training_graph_computes_what_the_core_does(model_class):
+    model = random_net(seed=5, model_class=model_class)
+    boards = random_positions(40, seed=9)
+    for board, logit in zip(boards, keras_logits(model, boards), strict=True):
         assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
+
+
+def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph():
+    model = random_net(seed=4, model_class=NnW128Ob8BothModel)
+    boards = []
+    for pieces in range(3, 33, 4):  # one position per bucket
+        board = chess.Board()
+        for square in [s for s, p in board.piece_map().items() if p.piece_type != chess.KING][
+            : 32 - pieces
+        ]:
+            board.remove_piece_at(square)
+        boards.append(board)
+    assert [reference_bucket(model, b) for b in boards] == list(range(8))
+    evaluator = model.evaluator()
+    for board, logit in zip(boards, keras_logits(model, boards), strict=True):
+        assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
+        assert evaluator.evaluate(board.fen(), board.turn) == pytest.approx(mover_score(logit))
 
 
 class CtxPlainModel(NeuralEvalModel):

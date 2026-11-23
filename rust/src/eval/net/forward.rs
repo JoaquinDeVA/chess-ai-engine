@@ -5,14 +5,16 @@ use super::Net;
 
 impl Net {
     /// The logit from the accumulators of the mover (with its dense inputs already added) and of
-    /// its rival: each clipped to `[0, 1]` and weighted by its half of the output layer.
-    pub(in crate::eval) fn output(&self, mover: &[f32], rival: &[f32]) -> f32 {
+    /// its rival: each clipped to `[0, 1]` and weighted by its half of the output unit of the
+    /// material bucket of `pieces` (the pieces on the board, kings included).
+    pub(in crate::eval) fn output(&self, mover: &[f32], rival: &[f32], pieces: usize) -> f32 {
         let width = self.width();
-        let weights = &self.output.weights;
+        let bucket = self.bucket(pieces);
+        let weights = &self.columns[2 * width * bucket..2 * width * (bucket + 1)];
         let mut lanes = [0.0f32; 8];
         add_clipped_lanes(&mut lanes, mover, &weights[..width]);
-        add_clipped_lanes(&mut lanes, rival, &weights[width..2 * width]);
-        self.output.bias[0] + lanes.iter().sum::<f32>()
+        add_clipped_lanes(&mut lanes, rival, &weights[width..]);
+        self.output_bias[bucket] + lanes.iter().sum::<f32>()
     }
 }
 

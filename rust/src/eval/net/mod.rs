@@ -7,6 +7,9 @@ mod json;
 
 use super::features::FeatureSet;
 
+/// Most units of the output layer: one per piece count.
+const MAX_BUCKETS: usize = 32;
+
 /// One dense layer: `weights` is row-major `(fan_in, fan_out)`.
 pub struct Layer {
     pub fan_in: usize,
@@ -22,17 +25,23 @@ impl Layer {
     }
 }
 
-/// A network over sparse inputs: the accumulator and one output unit over both sides' accumulators.
+/// A network over sparse inputs: the accumulator and an output layer over both sides'
+/// accumulators, with one unit per material bucket.
 pub struct Net {
     features: FeatureSet,
     accumulator: Layer,
-    output: Layer,
+    /// The output weights by bucket: bucket `b` is `columns[b * fan_in..(b + 1) * fan_in]`, the
+    /// transpose of the row-major layer, so that one evaluation reads contiguous weights.
+    columns: Vec<f32>,
+    /// One bias per bucket.
+    output_bias: Vec<f32>,
 }
 
 impl Net {
-    /// A network of two layers: the accumulator, whose width is a multiple of 8, and one output
-    /// unit that reads both sides' accumulators, which share the accumulator's weights (its
-    /// `fan_in` is twice the accumulator width). The opponent's view of a piece is the other block
+    /// A network of two layers: the accumulator, whose width is a multiple of 8, and an output
+    /// layer that reads both sides' accumulators, which share the accumulator's weights (its
+    /// `fan_in` is twice the accumulator width). The output has one unit per material bucket,
+    /// from 1 to 32 (see [`Net::bucket`]). The opponent's view of a piece is the other block
     /// of the same square; the dense inputs (the threats) are the mover's alone and only reach the
     /// mover's half. The shapes of the layers are checked.
     pub fn new(features: FeatureSet, layers: Vec<Layer>) -> Result<Net, String> {
@@ -59,14 +68,29 @@ impl Net {
                 return Err("a layer has the wrong number of weights".into());
             }
         }
-        if output.fan_out != 1 {
-            return Err("the output layer must have one unit".into());
+        if !(1..=MAX_BUCKETS).contains(&output.fan_out) {
+            return Err(format!(
+                "the output layer must have 1 to {MAX_BUCKETS} units"
+            ));
         }
+        let columns = (0..output.fan_out)
+            .flat_map(|b| (0..output.fan_in).map(move |i| (b, i)))
+            .map(|(b, i)| output.weights[i * output.fan_out + b])
+            .collect();
         Ok(Net {
             features,
             accumulator,
-            output,
+            columns,
+            output_bias: output.bias,
         })
+    }
+
+    /// The output unit for a position with `pieces` pieces on the board (kings included, 2 to
+    /// 32): `(pieces - 1) * buckets / 32`, so that eight buckets take four piece counts each, the
+    /// first from 2 to 4 pieces and the last from 29 to 32; one bucket is always unit 0.
+    pub(in crate::eval) fn bucket(&self, pieces: usize) -> usize {
+        (pieces.saturating_sub(1) * self.output_bias.len() / MAX_BUCKETS)
+            .min(self.output_bias.len() - 1)
     }
 
     /// The feature set of the inputs.
@@ -114,11 +138,11 @@ pub(in crate::eval) mod dummy {
         }
     }
 
-    /// A network of `features` with an accumulator of 16 units.
+    /// A network of `features` with an accumulator of 16 units and eight material buckets.
     pub(in crate::eval) fn net(features: FeatureSet) -> Net {
         Net::new(
             features,
-            vec![layer(features.size(), 16, 1), layer(32, 1, 2)],
+            vec![layer(features.size(), 16, 1), layer(32, 8, 2)],
         )
         .unwrap()
     }
@@ -147,5 +171,34 @@ mod tests {
         let three = vec![layer(768, 8, 1), layer(16, 8, 2), layer(8, 1, 3)];
         assert!(Net::new(PIECES, three).is_err());
         assert!(Net::new(PIECES, vec![layer(768, 1, 1)]).is_err());
+    }
+
+    #[test]
+    fn the_output_has_one_to_32_buckets_of_four_piece_counts_each_with_8() {
+        assert!(Net::new(PIECES, vec![layer(768, 8, 1), layer(16, 33, 2)]).is_err());
+        let net = Net::new(PIECES, vec![layer(768, 8, 1), layer(16, 8, 2)]).unwrap();
+        let buckets: Vec<usize> = [2, 4, 5, 8, 9, 28, 29, 32].map(|p| net.bucket(p)).to_vec();
+        assert_eq!(buckets, [0, 0, 1, 1, 2, 6, 7, 7]);
+        let one = Net::new(PIECES, vec![layer(768, 8, 1), layer(16, 1, 2)]).unwrap();
+        assert_eq!(one.bucket(32), 0);
+    }
+
+    #[test]
+    fn each_bucket_reads_its_column_of_the_row_major_output_layer() {
+        let output = layer(16, 8, 2);
+        let (weights, bias) = (output.weights.clone(), output.bias.clone());
+        let net = Net::new(PIECES, vec![layer(768, 8, 1), output]).unwrap();
+        let mover: Vec<f32> = (0..8).map(|i| i as f32 / 7.0).collect();
+        let rival: Vec<f32> = (0..8).map(|i| 1.5 - i as f32 / 4.0).collect();
+        for pieces in [3, 7, 12, 18, 21, 26, 30, 32] {
+            let b = net.bucket(pieces);
+            let clipped = mover.iter().chain(&rival).map(|x| x.clamp(0.0, 1.0));
+            let expected: f32 = bias[b]
+                + clipped
+                    .enumerate()
+                    .map(|(i, x)| x * weights[i * 8 + b])
+                    .sum::<f32>();
+            assert!((net.output(&mover, &rival, pieces) - expected).abs() < 1e-5);
+        }
     }
 }

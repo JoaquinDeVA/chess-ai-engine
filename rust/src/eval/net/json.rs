@@ -110,6 +110,22 @@ mod tests {
     }
 
     #[test]
+    fn the_output_layer_may_have_one_unit_per_material_bucket() {
+        let file = |units: usize| {
+            net_json("pst_ctx", "", 768, 16).replace(
+                &format!(r#""fan_out":1,"weights":{:?},"bias":[0.0]"#, vec![1.0; 16]),
+                &format!(
+                    r#""fan_out":{units},"weights":{:?},"bias":{:?}"#,
+                    vec![1.0; 16 * units],
+                    vec![0.0; units]
+                ),
+            )
+        };
+        assert!(Net::from_json(&file(8)).is_ok());
+        assert!(Net::from_json(&file(33)).is_err());
+    }
+
+    #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
         assert!(!loads("pst_ctx", "", 10, 16));
     }

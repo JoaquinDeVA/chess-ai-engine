@@ -113,8 +113,13 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 | `sprt_mpk_w128_e15_vs_pst_w128_e15` | `net_ctx_mpk_w128_both@e15` (material, pawn files and king buckets) against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 628 | −104.9 ± 23.7 | −2.96 | H0 (2026-11-22): its lower validation loss (0.62928 against 0.63002) did not carry into play |
 | `sprt_mpk_w128_e100_vs_mpk_w128_e15` | `net_ctx_mpk_w128_both` at effort 100 against effort 15, binary `9f3075cebf16` | 4,600 | +6.2 ± 8.7 | +0.89 | no verdict (stopped 2026-11-23 after the H0 above) |
+| `sprt_pst_w256_e15_vs_pst_w128_e15` | `net_pst_w256_both@e15` against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 4,800 | +6.6 ± 8.3 | +1.06 | no verdict (stopped 2026-11-23); interval includes 0 |
+| `nodes_ctx_mpk_w128_e15_vs_pst_w128_e15` | the first `ctx` row at 135,000 nodes per move | 200 | −75.9 ± 42.9 | −0.72 | worse per node (stopped 2026-11-23: the interval excludes 0) |
+| `nodes_ctx_m_w128_e15_vs_pst_w128_e15` | `net_ctx_m_w128_both@e15` (material only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 176 | −86.4 ± 53.7 | −0.58 | worse per node (stopped 2026-11-23: the interval excludes 0) |
 
-The two `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
+From 2026-11-23 a match stopped by hand counts as a verdict when its 95 % interval excludes 0, and as no verdict otherwise.
+The two fixed-node rows lose per node as well as at 10 s + 0.2 s, so the `ctx` inputs lose on quality, not on the cost of the evaluation.
+The `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
 (`uci ttd 11`), and `net_pst_threats_w64_both` costs 13 % more time than `net_pst_w64_both` over the 20 positions (`uci ttd 11 bench/middlegame.epd 60`, laptop, 2026-11-23: 9.0 s against 8.0 s, 1,559,605 against 1,787,601 nodes/s; the median, 0.42 s against 0.32 s, mixes different trees). Computing the threats twice in `uci bench 20` drops the nodes per second from about 1,555 k to 1,400 k: about 72 ns of the 96 ns a node costs more are the threats themselves.
 

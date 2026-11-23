@@ -116,7 +116,7 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 
 The two `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
-(`uci ttd 11`), and `net_pst_threats_w64_both` still costs about 30 % more time than `net_pst_w64_both`.
+(`uci ttd 11`), and `net_pst_threats_w64_both` costs 13 % more time than `net_pst_w64_both` over the 20 positions (`uci ttd 11 bench/middlegame.epd 60`, laptop, 2026-11-23: 9.0 s against 8.0 s, 1,559,605 against 1,787,601 nodes/s; the median, 0.42 s against 0.32 s, mixes different trees). Computing the threats twice in `uci bench 20` drops the nodes per second from about 1,555 k to 1,400 k: about 72 ns of the 96 ns a node costs more are the threats themselves.
 
 ## Search technique matches
 

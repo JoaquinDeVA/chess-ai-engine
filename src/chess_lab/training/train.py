@@ -189,6 +189,16 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     )
     config = checkpoint_config(args.checkpoint)
     if config is not None:
+        expected = fit_config(
+            plan, config["l2"], config["lr"], args.lr_decay, patience=plan["patience"]
+        )
+        changed = sorted(k for k in expected if k != "workers" and config.get(k) != expected[k])
+        if changed:
+            print(
+                f"{args.checkpoint} was left by a fit with other {', '.join(changed)}: "
+                "remove it to start again"
+            )
+            return 2
         print(f"Resuming the final fit from {args.checkpoint}")
     else:
         timing = calibrate(model_class, rep, args.raw, args.sidecar, validation, plan, True)
@@ -201,6 +211,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         print(f"Estimated duration: {format_duration(estimate)}")
         best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
         config = fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=plan["patience"])
+        # Kept in the checkpoint, so a resumed run still counts the timing and the trials.
+        config["setup_seconds"] = round(time.perf_counter() - started, 3)
     print(f"Final fit with l2={config['l2']:.2e}, lr={config['lr']:.2e}")
     model, summary = fit(
         model_class,
@@ -232,7 +244,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             "date": today(),
             "commit": current_commit(),
             **summary,
-            "seconds": round(time.perf_counter() - started, 3),
+            "seconds": round(config["setup_seconds"] + summary["seconds"], 3),
             "train_samples": summary["train_rows"],
             "effort": args.effort,
             "effort_config": plan,

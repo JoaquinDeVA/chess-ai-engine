@@ -21,6 +21,7 @@ from chess_lab.models import definitions
 from chess_lab.models.store import cards, loader
 from chess_lab.models.target import Representation
 from chess_lab.training import train as train_cli
+from chess_lab.training.effort import effort_config, fit_config
 from tests.conftest import material_cp, random_positions
 
 
@@ -248,7 +249,7 @@ def fake_training(isolated_cards, monkeypatch):
     monkeypatch.setattr(train_cli, "calibrate", lambda *a, **k: timing)
     monkeypatch.setattr(train_cli, "estimated_seconds", lambda *a, **k: 1.0)
     monkeypatch.setattr(train_cli, "search", lambda *a, **k: {"l2": 1e-3, "lr": 1e-2})
-    summary = {"train_rows": 900, "val_mae": 0.1}
+    summary = {"train_rows": 900, "val_mae": 0.1, "seconds": 5.0}
     monkeypatch.setattr(train_cli, "fit", lambda *a, **k: (FakeModel(), dict(summary)))
     return isolated_cards
 
@@ -284,6 +285,21 @@ class TestCommandLineWithDoubles:
         assert self.train("--patience", "3") == 0
         assert "  patience: 3" in capsys.readouterr().out
         assert cards.load_card("net_pst_w64_both@e40")["training"]["effort_config"]["patience"] == 3
+
+    def test_a_resumed_fit_counts_the_setup_before_the_cut(self, fake_training, monkeypatch):
+        plan = effort_config(40, 1000)
+        config = {**fit_config(plan, 1e-3, 1e-2, patience=plan["patience"]), "setup_seconds": 2.0}
+        monkeypatch.setattr(train_cli, "checkpoint_config", lambda path: config)
+        assert self.train("--checkpoint", "c.npz") == 0
+        assert cards.load_card("net_pst_w64_both@e40")["training"]["seconds"] == 7.0
+
+    def test_a_checkpoint_of_another_recipe_is_refused(self, fake_training, monkeypatch, capsys):
+        plan = effort_config(40, 1000)
+        config = {**fit_config(plan, 1e-3, 1e-2, patience=plan["patience"]), "setup_seconds": 2.0}
+        monkeypatch.setattr(train_cli, "checkpoint_config", lambda path: config)
+        assert self.train("--checkpoint", "c.npz", "--epochs", "99") == 2
+        assert "max_epochs" in capsys.readouterr().out
+        assert cards.load_card("net_pst_w64_both@e40").get("training") is None
 
     def test_the_artifact_and_card_carry_the_effort_and_a_variant_goes_after_it(
         self, fake_training

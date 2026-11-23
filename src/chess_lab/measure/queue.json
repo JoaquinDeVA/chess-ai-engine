@@ -1,3 +1,84 @@
 {
- "jobs": []
+ "jobs": [
+  {
+   "name": "nodes_ctx_mpk_w128_e15_vs_pst_w128_e15",
+   "uci": "bin/9f3075cebf16/uci",
+   "a": [
+    "option.Model=models/net_ctx_mpk_w128_both@e15.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w128_both@e15.json"
+   ],
+   "each": [
+    "tc=60+1",
+    "nodes=135000",
+    "proto=uci",
+    "option.Hash=16"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 1000,
+   "chunk_rounds": 100
+  },
+  {
+   "name": "nodes_ctx_m_w128_e15_vs_pst_w128_e15",
+   "uci": "bin/9f3075cebf16/uci",
+   "a": [
+    "option.Model=models/net_ctx_m_w128_both@e15.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w128_both@e15.json"
+   ],
+   "each": [
+    "tc=60+1",
+    "nodes=135000",
+    "proto=uci",
+    "option.Hash=16"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 1000,
+   "chunk_rounds": 100
+  },
+  {
+   "name": "nodes_ctx_p_w128_e15_vs_pst_w128_e15",
+   "uci": "bin/9f3075cebf16/uci",
+   "a": [
+    "option.Model=models/net_ctx_p_w128_both@e15.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w128_both@e15.json"
+   ],
+   "each": [
+    "tc=60+1",
+    "nodes=135000",
+    "proto=uci",
+    "option.Hash=16"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 1000,
+   "chunk_rounds": 100
+  },
+  {
+   "name": "nodes_ctx_k_w128_e15_vs_pst_w128_e15",
+   "uci": "bin/9f3075cebf16/uci",
+   "a": [
+    "option.Model=models/net_ctx_k_w128_both@e15.json"
+   ],
+   "b": [
+    "option.Model=models/net_pst_w128_both@e15.json"
+   ],
+   "each": [
+    "tc=60+1",
+    "nodes=135000",
+    "proto=uci",
+    "option.Hash=16"
+   ],
+   "elo0": 0,
+   "elo1": 5,
+   "max_rounds": 1000,
+   "chunk_rounds": 100
+  }
+ ]
 }

@@ -176,6 +176,16 @@ control includes that cost, and a match at fixed nodes leaves it out (`uci bench
 second of a file). Matches before 2026-11-13 do not compare networks on equal terms: some played without the
 accumulator against networks with it (see [Results](RESULTS.md#retired-models)).
 
+**Screening a new network.** A lower validation loss is not enough: `net_ctx_mpk_w128_both@e15` beat its base on
+validation loss and lost −104.9 ± 23.7 Elo at 10+0.2 ([Results](RESULTS.md#network-matches)). A new input set or
+width passes screening when its validation loss clears the threshold **and**, at a fixed node count, the Elo interval
+is not entirely below 0. Quality (fixed nodes) and cost (`uci bench 5 <file>.json`, `uci ttd`) are reported apart, so
+a network that is good per node but slow is told from one that is simply worse. The node count is the median nodes
+per move of the base at the time control of the SPRT it would face: for `net_pst_w128_both@e15` at 10+0.2 on the
+compute node, 0.22 s per move (median of the last 600 games of `sprt_pst_w256_e15_vs_pst_w128_e15`) × about 615,000
+nodes/s (`uci bench` of the base, median, node loaded with the round robin) ≈ `nodes=135000`. The jobs carry `tc=60+1` as
+well, only so that a game cannot hang; at that budget the clock never decides.
+
 ### Playing one opening book against another
 
 No position of the usual suite is in an opening book (they are random playouts; 0 of the 10,000 positions of

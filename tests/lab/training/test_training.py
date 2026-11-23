@@ -33,7 +33,13 @@ def isolated_cards(tmp_path, monkeypatch):
 
 
 ACCURACY = {
-    "all": {"spearman": 0.912, "mae": 0.083, "best_move_agreement": 0.345, "n": 100},
+    "all": {
+        "spearman": 0.912,
+        "mae": 0.083,
+        "excess": 0.0123,
+        "best_move_agreement": 0.345,
+        "n": 100,
+    },
     "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
     "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
 }
@@ -114,12 +120,12 @@ class TestCardsAndReport:
         )
         text = report.render_tables()
         header = (
-            "| Model | Params | Representation | Effort | Spearman | MAE | "
+            "| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | "
             "Best move, all / non-quiet | µs per eval |"
         )
         row = (
             f"| `net_pst_w64_both` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
-            "34.5% / 28.0% | 12.5 |"
+            "0.0123 | 34.5% / 28.0% | 12.5 |"
         )
         assert header in text and row in text
 
@@ -133,7 +139,7 @@ class TestCardsAndReport:
 
     def test_models_without_sections_show_dashes(self, isolated_cards):
         cards.update_card("fresh", status="current", architecture="A")
-        assert f"| `fresh` |{' — |' * 7}" in report.render_tables()
+        assert f"| `fresh` |{' — |' * 8}" in report.render_tables()
 
     def test_history_file_is_updated_between_markers_only(self, isolated_cards):
         path = report.HISTORY_FILE

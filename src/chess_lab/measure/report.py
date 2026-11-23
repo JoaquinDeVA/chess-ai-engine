@@ -21,10 +21,10 @@ END_MARKER = "<!-- END GENERATED TABLES -->"
 _STATUS_ORDER = {"current": 0, "reference": 1, "retired": 2}
 _DASH = "—"
 _HEADER = (
-    "| Model | Params | Representation | Effort | Spearman | MAE | "
+    "| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | "
     "Best move, all / non-quiet | µs per eval |"
 )
-_ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|"
+_ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|---:|"
 
 
 def _dig(card: Dict[str, Any], *keys: str) -> Any:
@@ -89,6 +89,7 @@ def _row(card: Dict[str, Any]) -> str:
         _DASH if effort is None else str(effort),
         _number(accuracy.get("spearman"), 3),
         _number(accuracy.get("mae"), 3),
+        _number(accuracy.get("excess"), 4),
         best_move,
         _number(_dig(card, "cost", "us_per_eval")),
     ]

@@ -15,6 +15,17 @@ def test_spearman_perfect_and_reversed():
     assert static_metrics(-truth, truth)["spearman"] == pytest.approx(-1.0)
 
 
+def test_excess_is_zero_for_the_label_and_positive_otherwise():
+    # Hard labels (0 and 1) have no entropy; the 0.5 label has ln 2.
+    truth = np.array([0.0, 0.3, 0.5, 1.0])
+    perfect = static_metrics(truth, truth)
+    assert perfect["excess"] == pytest.approx(0.0)
+    assert perfect["label_entropy"] > 0
+    off = static_metrics(np.array([0.1, 0.3, 0.6, 0.9]), truth)
+    assert off["excess"] > 0
+    assert off["cross_entropy"] == pytest.approx(off["label_entropy"] + off["excess"])
+
+
 def test_one_ply_takes_mate_in_one():
     board = chess.Board(MATE_IN_ONE)
     assert one_ply_choice(MaterialStubModel(), board).uci() == "a1a8"

@@ -3,7 +3,8 @@
 Two kinds of agreement are measured on a test sample of :func:`~.sidecar.load_sample`:
 
 * static accuracy: Spearman rank correlation and mean absolute error of the predicted expected
-  score against the Stockfish expected score (Lichess win-probability scale);
+  score against the Stockfish expected score (Lichess win-probability scale), and the excess of
+  the cross-entropy over the entropy of the label, which is 0 only for a perfect prediction;
 * 1-ply best-move agreement: how often the move chosen by the model after one search step equals
   the Stockfish best move.
 """
@@ -41,18 +42,55 @@ def _spearman(pred: np.ndarray, truth: np.ndarray) -> float:
     return float(np.corrcoef(rank_pred, rank_truth)[0, 1])
 
 
+def _cross_entropy(pred: np.ndarray, truth: np.ndarray) -> np.ndarray:
+    """Binary cross-entropy in nats of a predicted score against a soft label, per row.
+
+    With ``pred == truth`` it is the entropy of the label. ``0 * log 0`` counts as 0.
+
+    :param pred: Predicted scores, in ``[0, 1]``.
+    :param truth: Labels, in ``[0, 1]``.
+    :return: Array of the same length.
+    """
+    with np.errstate(divide="ignore", invalid="ignore"):
+        win = np.where(truth > 0, truth * np.log(pred), 0.0)
+        loss = np.where(truth < 1, (1 - truth) * np.log(1 - pred), 0.0)
+    return -(win + loss)
+
+
 def static_metrics(pred_white: np.ndarray, true_white: np.ndarray) -> dict:
     """Static accuracy of predicted expected scores.
 
+    The cross-entropy is the training loss on these rows; it cannot go below the entropy of the
+    label, so ``excess`` (their difference) is what a better model can still gain.
+
     :param pred_white: Predicted expected scores for White, in ``[0, 1]``.
     :param true_white: Stockfish expected scores for White, in ``[0, 1]``.
-    :return: ``{"spearman": ..., "mae": ..., "n": ...}``; mean absolute error in expected-score
-        units, NaN for an empty sample.
+    :return: ``{"spearman", "mae", "cross_entropy", "label_entropy", "excess", "n"}``; mean
+        absolute error in expected-score units, the entropies as means in nats; NaN for an
+        empty sample.
     """
     pred = np.asarray(pred_white, dtype=np.float64)
     truth = np.asarray(true_white, dtype=np.float64)
-    mae = float(np.mean(np.abs(pred - truth))) if pred.size else float("nan")
-    return {"spearman": _spearman(pred, truth), "mae": mae, "n": int(pred.size)}
+    if not pred.size:
+        nan = float("nan")
+        return {
+            "spearman": nan,
+            "mae": nan,
+            "cross_entropy": nan,
+            "label_entropy": nan,
+            "excess": nan,
+            "n": 0,
+        }
+    cross = float(np.mean(_cross_entropy(pred, truth)))
+    entropy = float(np.mean(_cross_entropy(truth, truth)))
+    return {
+        "spearman": _spearman(pred, truth),
+        "mae": float(np.mean(np.abs(pred - truth))),
+        "cross_entropy": cross,
+        "label_entropy": entropy,
+        "excess": cross - entropy,
+        "n": int(pred.size),
+    }
 
 
 def one_ply_choice(evaluator: _core.Evaluator, board: chess.Board) -> chess.Move:

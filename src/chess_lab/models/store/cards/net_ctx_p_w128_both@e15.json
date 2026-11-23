@@ -129,21 +129,30 @@
       "mae": 0.10672026670027622,
       "n": 200000,
       "best_move_agreement": 0.2193,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "cross_entropy": 0.5966236476326763,
+      "label_entropy": 0.5201408817069342,
+      "excess": 0.0764827659257421
     },
     "quiet": {
       "spearman": 0.8091907365875538,
       "mae": 0.08436046641100996,
       "n": 139604,
       "best_move_agreement": 0.06692324139405602,
-      "agreement_n": 14031
+      "agreement_n": 14031,
+      "cross_entropy": 0.5825352040269111,
+      "label_entropy": 0.5336716364495966,
+      "excess": 0.04886356757731447
     },
     "non_quiet": {
       "spearman": 0.6067907330973461,
       "mae": 0.15840444379118837,
       "n": 60396,
       "best_move_agreement": 0.5774836656056291,
-      "agreement_n": 5969
+      "agreement_n": 5969,
+      "cross_entropy": 0.6291887691827663,
+      "label_entropy": 0.4888648454612452,
+      "excess": 0.14032392372152114
     },
     "sample": {
       "rows": 200000,

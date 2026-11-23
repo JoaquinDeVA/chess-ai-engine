@@ -112,7 +112,7 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 | `sp_threats_e100_vs_e30` | `net_pst_threats_w64_both` trained at effort 100 against the same network at effort 30, binary `242475e64e00` | 2,722 | +10.0 ± 11.5 | +1.00 | no verdict (stopped 2026-11-19); interval includes 0; the effort-100 weights play since `4c59054` |
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 | `sprt_mpk_w128_e15_vs_pst_w128_e15` | `net_ctx_mpk_w128_both@e15` (material, pawn files and king buckets) against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 628 | −104.9 ± 23.7 | −2.96 | H0 (2026-11-22): its lower validation loss (0.62928 against 0.63002) did not carry into play |
-| `sprt_mpk_w128_e100_vs_mpk_w128_e15` | `net_ctx_mpk_w128_both` at effort 100 against effort 15, binary `9f3075cebf16` | 4,400 | +5.3 ± 8.9 | +0.66 | no verdict (stopped 2026-11-23 after the H0 above) |
+| `sprt_mpk_w128_e100_vs_mpk_w128_e15` | `net_ctx_mpk_w128_both` at effort 100 against effort 15, binary `9f3075cebf16` | 4,600 | +6.2 ± 8.7 | +0.89 | no verdict (stopped 2026-11-23 after the H0 above) |
 
 The two `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`

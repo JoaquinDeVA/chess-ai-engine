@@ -111,8 +111,10 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 | `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
 | `sp_threats_e100_vs_e30` | `net_pst_threats_w64_both` trained at effort 100 against the same network at effort 30, binary `242475e64e00` | 2,722 | +10.0 ± 11.5 | +1.00 | no verdict (stopped 2026-11-19); interval includes 0; the effort-100 weights play since `4c59054` |
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
+| `sprt_mpk_w128_e15_vs_pst_w128_e15` | `net_ctx_mpk_w128_both@e15` (material, pawn files and king buckets) against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 628 | −104.9 ± 23.7 | −2.96 | H0 (2026-11-22): its lower validation loss (0.62928 against 0.63002) did not carry into play |
+| `sprt_mpk_w128_e100_vs_mpk_w128_e15` | `net_ctx_mpk_w128_both` at effort 100 against effort 15, binary `9f3075cebf16` | 4,400 | +5.3 ± 8.9 | +0.66 | no verdict (stopped 2026-11-23 after the H0 above) |
 
-The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
+The two `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
 (`uci ttd 11`), and `net_pst_threats_w64_both` still costs about 30 % more time than `net_pst_w64_both`.
 
@@ -132,6 +134,9 @@ changelog. Measured on the compute node with `src/chess_lab/measure/roundrobin.p
 | `cont_history` | continuation history (`0f1ac06`) against the build with countermove | 3,400 | +3.0 ± 10.4 | +0.12 | no verdict (stopped 2026-11-19); kept |
 | `history_gravity` | history gravity (`2055295`) against `0f1ac06` | 1,336 | +50.5 ± 16.6 | +2.95 | H1 (2026-11-18) |
 | `futility_margin_90` | futility margin 90 (`940b6d9`) against 120 | 4,010 | +12.9 ± 9.2 | +2.09 | no verdict (stopped 2026-11-19); kept |
+| `legal_after_prune` | legal moves generated after reverse futility and the null move (`82b4f28`) against `7104df4`, with `net_pst_threats_w64_both@e100` | 4,664 | +13.8 ± 7.7 | +2.96 | H1 (2026-11-23) |
+
+`legal_after_prune` (2026-11-22 on) keeps its `llr.csv` in `data/results/roundrobin/legal_after_prune/`.
 
 The binaries of `cont_history`, `history_gravity` and `futility_margin_90` were built on top of countermove ordering and
 a reverse futility margin of 60, both retired in `c3ff94c` after their own SPRTs drifted negative (`countermove`
@@ -235,7 +240,13 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Spearman | MAE | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|
+| `net_ctx_k_w128_both` | 393,601 | winprob-k0.00368-stm-quiet | 15 | 0.741 | 0.106 | 21.6% / 56.9% | 2.2 |
+| `net_ctx_m_w128_both` | 102,529 | winprob-k0.00368-stm-quiet | 15 | 0.740 | 0.105 | 22.1% / 57.7% | 2.6 |
+| `net_ctx_mpk_w128_both` | 401,537 | winprob-k0.00368-stm-quiet | 15 | 0.744 | 0.104 | 21.9% / 57.7% | 3.2 |
+| `net_ctx_p_w128_both` | 102,785 | winprob-k0.00368-stm-quiet | 15 | 0.737 | 0.107 | 21.9% / 57.7% | 2.6 |
 | `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 0.751 | 0.103 | 24.7% / 60.0% | 2.1 |
+| `net_pst_w128_both` | 98,689 | winprob-k0.00368-stm-quiet | 15 | 0.744 | 0.105 | 22.4% / 57.8% | 2.1 |
+| `net_pst_w256_both` | 197,377 | winprob-k0.00368-stm-quiet | 15 | 0.747 | 0.104 | 22.6% / 58.0% | 3.0 |
 | `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 | 0.731 | 0.110 | 22.7% / 58.3% | 2.4 |
 | `h1` | 6 | — | — | 0.561 | 0.149 | 19.6% / 49.8% | 2.8 |
 <!-- END GENERATED TABLES -->

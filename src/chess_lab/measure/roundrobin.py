@@ -6,7 +6,8 @@ python roundrobin.py queue.json --chunk-rounds 100 --concurrency 6
 Runs on the worker (standard library only), from ``~/chessai/roundrobin`` where ``bin/``, ``fastchess`` and ``openings.epd`` are.
 Each turn resumes one match for ``--chunk-rounds`` rounds (or the ``chunk_rounds`` of the job) (2 games per round) and appends a line to
 ``results/<name>/llr.csv``. A match leaves the queue when fastchess ends its SPRT (H0 or H1 accepted) or when it reaches
-``max_rounds`` (no verdict). The queue file is read again before every turn, so jobs can be added while it runs.
+``max_rounds`` (no verdict). The queue file is read again before every pass, so jobs can be added while it runs; a job removed from it
+loses its next turn.
 ``touch results/STOP`` finishes the current turn and exits; SIGTERM does the same at once (fastchess gets SIGINT, which
 keeps the state of its SPRT: never kill it with SIGKILL).
 
@@ -244,7 +245,11 @@ class Queue:
             for job in pending:
                 if self.stopping or stop_file.exists():
                     break
-                self.turn(job)
+                names = {
+                    queued["name"] for queued in json.loads(self.queue_file.read_text())["jobs"]
+                }
+                if job["name"] in names:
+                    self.turn(job)
         self.log("stopped")
 
     def interrupt(self, *_: Any) -> None:

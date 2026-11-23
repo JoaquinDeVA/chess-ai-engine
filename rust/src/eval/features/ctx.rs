@@ -1,7 +1,7 @@
 //! The entries of `pst_ctx` besides the pieces: the material of both sides, the pawns per file and
 //! the bucket of each king, all one-hot, and the rows of the first layer they read. Which of them a
-//! network has rows for is [`Families`](super::Families). Not measured yet: `docs/RESULTS.md` has no
-//! SPRT for these networks.
+//! network has rows for is [`Families`](super::Families). Measured in play: `docs/RESULTS.md`
+//! («Network matches»).
 
 use super::families::{Families, MATERIAL_PER_SIDE, PAWN_FILES_PER_SIDE};
 use super::pieces::{input_index, PIECE_INPUTS};

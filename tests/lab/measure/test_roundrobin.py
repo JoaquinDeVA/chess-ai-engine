@@ -69,3 +69,18 @@ def test_command_first_turn_and_resume(script):
         "file=c.json",
         "outname=c.json",
     ]
+
+
+def test_job_removed_from_the_queue_loses_its_turn(script, tmp_path):
+    queue = tmp_path / "queue.json"
+    queue.write_text('{"jobs": [{"name": "first"}, {"name": "second"}]}')
+    runner = script.Queue(queue, tmp_path, chunk=1, concurrency=1)
+    played = []
+
+    def turn(job):
+        played.append(job["name"])
+        queue.write_text('{"jobs": []}')
+
+    runner.turn = turn
+    runner.run()
+    assert played == ["first"]

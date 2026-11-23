@@ -311,6 +311,20 @@ class TestCommandLineWithDoubles:
             "net_pst_w64_both@e15"
         )
 
+    def test_lr_option_replaces_the_searched_rate_in_the_final_fit(
+        self, fake_training, monkeypatch
+    ):
+        calls = []
+
+        def recording_fit(*args, **kwargs):
+            calls.append(args)
+            return FakeModel(), {"train_rows": 900, "seconds": 5.0}
+
+        monkeypatch.setattr(train_cli, "fit", recording_fit)
+        assert self.train("--lr", "5e-4") == 0
+        config = calls[0][6]
+        assert config["lr"] == 5e-4 and config["l2"] == 1e-3
+
     def test_patience_option_reaches_the_printed_plan_and_the_card(self, fake_training, capsys):
         assert self.train("--patience", "3") == 0
         assert "  patience: 3" in capsys.readouterr().out
@@ -377,6 +391,13 @@ class TestEvaluateNames:
         for name in ("h1", "nope"):
             with pytest.raises(SystemExit):
                 evaluate_cli.parse_args(["--model", name])
+
+
+@pytest.mark.parametrize("value", ["0", "-1e-3"])
+def test_lr_not_positive_exits_with_code_2(value):
+    with pytest.raises(SystemExit) as exit_info:
+        train_cli.parse_args(["--model", "net_pst_w64_both", "--effort", "0", "--lr", value])
+    assert exit_info.value.code == 2
 
 
 @pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])

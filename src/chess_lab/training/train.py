@@ -66,6 +66,12 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         f"(default {DEFAULT_MATE_KEEP}; another value needs --tag)",
     )
     parser.add_argument(
+        "--lr",
+        type=float,
+        help="learning rate of the final fit instead of the one the search picks; e.g. a low "
+        "one with --init, so the first epochs do not undo the source",
+    )
+    parser.add_argument(
         "--lr-decay",
         type=float,
         help="multiply the learning rate by this factor on each epoch without validation "
@@ -101,6 +107,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error("--init needs --tag: the warm start would overwrite the untagged model")
     if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
+    if args.lr is not None and not args.lr > 0:
+        parser.error(f"--lr must be positive: {args.lr}")
     if args.lr_decay is not None and not 0 < args.lr_decay < 1:
         parser.error(f"--lr-decay must be in (0, 1): {args.lr_decay}")
     if args.patience is not None and args.patience < 1:
@@ -226,7 +234,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         )
         print(f"Estimated duration: {format_duration(estimate)}")
         best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
-        config = fit_config(plan, best["l2"], best["lr"], args.lr_decay, patience=plan["patience"])
+        lr = best["lr"] if args.lr is None else args.lr
+        config = fit_config(plan, best["l2"], lr, args.lr_decay, patience=plan["patience"])
         # Kept in the checkpoint, so a resumed run still counts the timing and the trials.
         config["setup_seconds"] = round(time.perf_counter() - started, 3)
     print(f"Final fit with l2={config['l2']:.2e}, lr={config['lr']:.2e}")

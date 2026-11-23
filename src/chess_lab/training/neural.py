@@ -77,6 +77,42 @@ def _initial_layers(shapes: Sequence[Tuple[int, int]]) -> List[Layer]:
     return layers
 
 
+def warm_layers(source: NeuralEvalModel, model_class: type) -> List[Layer]:
+    """Initial layers of ``model_class`` that give exactly the output of a trained ``source``.
+
+    The same class copies its layers (the control continues itself). Otherwise the source is a
+    ``pst_slotted`` network of the same width with one output unit, and the target reads the same
+    768 piece rows: copied into every king bucket with ``king_buckets``, the material and
+    pawn-file rows at 0, and the output column replicated into every output bucket.
+
+    :param source: The trained network to start from.
+    :param model_class: A concrete :class:`NeuralEvalModel` subclass, the network to train.
+    :return: One ``(weights, bias)`` pair per layer, of the shapes of ``model_class``.
+    :raises ValueError: If the pair is not one of those.
+    """
+    if type(source) is model_class:
+        return [(weights.copy(), bias.copy()) for weights, bias in source.layers]
+    if (
+        source.feature_set != "pst_slotted"
+        or model_class.feature_set not in ("pst_slotted", "pst_ctx")
+        or source.output_buckets != 1
+        or source.hidden != model_class.hidden
+    ):
+        raise ValueError(
+            f"cannot start {model_class.name} from {source.name}: the source must be a pst_slotted "
+            "network of the same width with one output unit"
+        )
+    (weights, bias), (output_weights, output_bias) = source.layers
+    table = np.zeros((model_class.input_rows(), weights.shape[1]))
+    copies = KING_BUCKETS if "king_buckets" in model_class.families else 1
+    table[: copies * MATERIAL_BASE] = np.tile(weights, (copies, 1))
+    buckets = model_class.output_buckets
+    return [
+        (table, bias.copy()),
+        (np.tile(output_weights, (1, buckets)), np.tile(output_bias, buckets)),
+    ]
+
+
 def _padded(encoded: EncodedFrame, width: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Turn sparse entries into fixed-width arrays for the accumulator.
 

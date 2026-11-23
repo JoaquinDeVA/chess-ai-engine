@@ -2,6 +2,8 @@
 
 Every model is trained from the raw shards and their sidecars, sized by effort:
 ``python -m chess_lab.training.train --model net_pst_threats_w64_both --effort <0-100>``.
+With ``--init <model@tag> --tag <tag>`` the fit starts from a trained network instead of random
+weights (:func:`~.neural.warm_layers`: the new network starts with its exact output).
 """
 
 import argparse
@@ -21,7 +23,7 @@ from chess_lab.models.defaults import (
     SIDECAR_DIR,
     format_duration,
 )
-from chess_lab.models.definitions import available_models, get_model_class
+from chess_lab.models.definitions import available_models, get_model_class, load_model
 from chess_lab.models.store.cards import clear_measurements, current_commit, today, update_card
 from chess_lab.models.store.loader import artifact_path
 from chess_lab.models.target import Representation
@@ -35,7 +37,7 @@ from .effort import (
     fit_config,
     search,
 )
-from .neural import checkpoint_config
+from .neural import checkpoint_config, warm_layers
 
 MAX_VALIDATION_ROWS = 50_000
 
@@ -90,7 +92,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         help="file left after every epoch of the final fit; if it exists the fit resumes from it "
         "(without the trials) and it is deleted once the model is saved",
     )
+    parser.add_argument(
+        "--init",
+        help="start from this trained network (name@tag) instead of random weights; needs --tag",
+    )
     args = parser.parse_args(argv)
+    if args.init is not None and args.tag is None:
+        parser.error("--init needs --tag: the warm start would overwrite the untagged model")
     if args.tag is not None and not re.fullmatch(r"[A-Za-z0-9._-]+", args.tag):
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
     if args.lr_decay is not None and not 0 < args.lr_decay < 1:
@@ -162,6 +170,14 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             "--mate-keep 1.0 --tag mates100): without it the untagged model would be overwritten"
         )
         return 2
+    initial = None
+    if args.init is not None:
+        source = load_model(args.init)
+        if Representation.from_dict(source.rep) != rep:
+            print(f"{args.init} was trained with another representation: {source.rep}")
+            return 2
+        initial = warm_layers(source, model_class)
+        print(f"Warm start from {args.init}")
     available = available_rows(
         args.sidecar, quiet_only=True, raw_dir=args.raw, mate_keep=rep.mate_keep
     )
@@ -226,6 +242,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         seed=args.seed,
         use_cache=not args.no_cache,
         checkpoint=args.checkpoint,
+        initial=initial,
     )
 
     path = model.save(args.output or artifact_path(model_spec(args)))
@@ -249,6 +266,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             "effort": args.effort,
             "effort_config": plan,
             "representation": rep.to_dict(),
+            **({"init": args.init} if args.init else {}),
         },
     )
     print(f"Saved {path}")

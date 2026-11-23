@@ -24,7 +24,7 @@ from chess_lab.models.features import (
     features_of,
 )
 from chess_lab.models.target import Representation
-from chess_lab.training.neural import checkpoint_config, fit_stream, new_model
+from chess_lab.training.neural import checkpoint_config, fit_stream, new_model, warm_layers
 from tests.conftest import mover_score, random_positions, white_score_of
 from tests.lab.models.positions import frame
 
@@ -216,6 +216,29 @@ def test_ctx_without_families_is_the_slotted_network():
         index, value, _ = _padded(encode_frame(features, Representation(), frame(boards)), width)
         logits.append(np.asarray(network.predict([index, value], verbose=0)).reshape(-1))
     assert logits[0] == pytest.approx(logits[1], abs=1e-5)
+
+
+WARM_TARGETS = [get_model_class("net_pst_w128_both"), NnW128Ob8BothModel, *CTX_MODELS]
+
+
+@pytest.mark.parametrize("model_class", WARM_TARGETS, ids=lambda cls: cls.name)
+def test_a_warm_start_scores_as_its_source_in_the_core(model_class):
+    source = random_net(seed=6, model_class=get_model_class("net_pst_w128_both"))
+    (weights, bias), (output_weights, output_bias) = source.layers
+    source.layers = [(weights, bias), (0.1 * output_weights, output_bias)]  # off the score clip
+    warm = model_class(layers=warm_layers(source, model_class), rep=source.rep)
+    assert [w.shape for w, _ in warm.layers] == [shape for shape in model_class.layer_shapes()]
+    boards = random_positions(40, seed=17)
+    scores = [white_score_of(source, board) for board in boards]
+    assert 0.05 < min(scores) and max(scores) < 0.95
+    assert [white_score_of(warm, board) for board in boards] == pytest.approx(scores, abs=1e-6)
+
+
+@pytest.mark.parametrize("name", ["net_pst_w256_both", "net_pst_threats_w64_both"])
+def test_a_warm_start_refuses_another_width_or_feature_set(name):
+    source = random_net(model_class=get_model_class("net_pst_w128_both"))
+    with pytest.raises(ValueError, match="cannot start"):
+        warm_layers(source, get_model_class(name))
 
 
 @pytest.mark.parametrize("model_class", [NnW64BothModel, CTX_MODELS[-1]])

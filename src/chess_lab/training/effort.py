@@ -10,7 +10,7 @@ import os
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Dict, NamedTuple, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 from chess_lab.datasets.sidecar import iter_batches
 from chess_lab.datasets.split import TRAIN
 from chess_lab.models.defaults import SAMPLE_SEED
-from chess_lab.models.definitions import NeuralEvalModel
+from chess_lab.models.definitions import Layer, NeuralEvalModel
 from chess_lab.models.features import features_of
 from chess_lab.models.target import (
     Representation,
@@ -192,6 +192,7 @@ def fit(
     seed: int = SAMPLE_SEED,
     use_cache: bool = True,
     checkpoint: Optional[Path] = None,
+    initial: Optional[List[Layer]] = None,
 ) -> Tuple[NeuralEvalModel, Dict[str, Any]]:
     """Fit a new model on ``positions`` TRAIN rows of the raw shards.
 
@@ -206,10 +207,13 @@ def fit(
     :param seed: Seed of the TRAIN sample (the same seed gives the same rows).
     :param use_cache: Keep the encoded batches in ``data/cache`` and reuse them.
     :param checkpoint: Checkpoint file of :func:`chess_lab.training.neural.fit_stream`, or None.
+    :param initial: Layers to start from (a warm start), or None for random ones.
     :return: The fitted model and the summary of :func:`chess_lab.training.neural.fit_stream`. The TRAIN
         rows are undersampled in mates by ``rep.mate_keep``.
     """
     model = new_model(model_class, rep)
+    if initial is not None:
+        model.layers = initial
     batches = _Epochs(
         lambda: iter_batches(
             raw_dir,

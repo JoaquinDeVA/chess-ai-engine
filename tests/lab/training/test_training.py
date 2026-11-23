@@ -22,6 +22,7 @@ from chess_lab.models.store import cards, loader
 from chess_lab.models.target import Representation
 from chess_lab.training import train as train_cli
 from chess_lab.training.effort import effort_config, fit_config
+from chess_lab.training.neural import new_model
 from tests.conftest import material_cp, random_positions
 
 
@@ -286,6 +287,29 @@ class TestCommandLineWithDoubles:
         assert training["val_mae"] == 0.1 and "effort_config" in training
         assert "representation" in training and "date" in training and "commit" in training
         assert "Effort 40" in capsys.readouterr().out
+
+    def test_init_needs_a_tag(self, fake_training):
+        with pytest.raises(SystemExit):
+            self.train("--init", "net_pst_w64_both@e15")
+
+    def test_init_starts_the_fit_from_the_source_and_names_it_in_the_card(
+        self, fake_training, monkeypatch
+    ):
+        source = new_model(definitions.get_model_class("net_pst_w64_both"))
+        monkeypatch.setattr(train_cli, "load_model", lambda spec: source)
+        calls = []
+
+        def recording_fit(*args, **kwargs):
+            calls.append(kwargs)
+            return FakeModel(), {"train_rows": 900, "seconds": 5.0}
+
+        monkeypatch.setattr(train_cli, "fit", recording_fit)
+        assert self.train("--init", "net_pst_w64_both@e15", "--tag", "warm") == 0
+        start = calls[0]["initial"]
+        assert all((a == b).all() for (a, _), (b, _) in zip(start, source.layers, strict=True))
+        assert cards.load_card("net_pst_w64_both@e40-warm")["training"]["init"] == (
+            "net_pst_w64_both@e15"
+        )
 
     def test_patience_option_reaches_the_printed_plan_and_the_card(self, fake_training, capsys):
         assert self.train("--patience", "3") == 0

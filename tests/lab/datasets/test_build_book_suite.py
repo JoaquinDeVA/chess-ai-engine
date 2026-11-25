@@ -2,8 +2,8 @@
 
 import chess
 
+from chess_lab.datasets.book import position_key
 from chess_lab.datasets.build_book_suite import suite
-from chess_lab.datasets.build_opening_book import position_key
 
 
 def keys(*lines):

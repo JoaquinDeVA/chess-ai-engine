@@ -12,13 +12,12 @@ there. The positions are written in walk order (fastchess shuffles them with ``o
 """
 
 import argparse
-import json
 from pathlib import Path
 from typing import Dict, List, Sequence
 
 import chess
 
-from chess_lab.datasets.build_opening_book import position_key
+from chess_lab.datasets.book import load_book, position_key
 
 
 def suite(books: Sequence[Dict[str, str]], plies: int) -> List[str]:
@@ -60,10 +59,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     """Write the suite."""
     args = parse_args(argv)
-    books = [
-        {" ".join(fen.split()[:4]): uci for fen, uci in json.loads(p.read_text()).items()}
-        for p in args.book
-    ]
+    books = [load_book(p) for p in args.book]
     fens = suite(books, args.plies)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("".join(fen + "\n" for fen in fens), encoding="utf-8")

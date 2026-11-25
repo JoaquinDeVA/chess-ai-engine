@@ -3,7 +3,7 @@
 import chess
 
 from chess_lab.datasets import book_exits
-from chess_lab.datasets.build_opening_book import position_key
+from chess_lab.datasets.book import position_key
 
 
 def book_of(*lines):

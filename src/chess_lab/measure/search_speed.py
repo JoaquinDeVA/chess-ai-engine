@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from chess_engine.paths import ROOT
+from chess_lab.datasets.book import fen_key
 
 BINARY = ROOT / "rust" / "target" / "release" / "uci"
 POSITIONS = ROOT / "data" / "openings" / "openings.epd"
@@ -66,7 +67,7 @@ def main() -> None:
     parser.add_argument("--hash", type=int, default=256, help="megabytes of the shared table")
     args = parser.parse_args()
     lines = Path(POSITIONS).read_text().splitlines()[: args.positions]
-    fens = [" ".join(line.split()[:4]) + " 0 1" for line in lines]
+    fens = [fen_key(line) + " 0 1" for line in lines]
     print("| threads | seconds to depth", args.depth, "|")
     print("|---|---|")
     for threads in (int(t) for t in args.threads.split(",")):

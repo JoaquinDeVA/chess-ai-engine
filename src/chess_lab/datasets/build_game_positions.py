@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.paths import ROOT
+from chess_lab.datasets.book import fen_key
 from chess_lab.datasets.stockfish import cp_mate, label_parallel
 from chess_lab.models.target import is_quiet
 
@@ -69,7 +70,7 @@ def unique(fens: Iterable[str]) -> List[str]:
     """
     seen, kept = set(), []
     for fen in fens:
-        key = " ".join(fen.split()[:4])
+        key = fen_key(fen)
         if key not in seen:
             seen.add(key)
             kept.append(fen)

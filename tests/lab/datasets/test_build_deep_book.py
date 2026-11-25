@@ -7,7 +7,7 @@ import chess
 import pytest
 
 from chess_lab.datasets import build_deep_book as deep
-from chess_lab.datasets.build_opening_book import position_key
+from chess_lab.datasets.book import position_key
 
 
 def fake_engine(scores=(0.0, -20.0, -200.0)):

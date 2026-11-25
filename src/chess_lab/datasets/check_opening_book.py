@@ -26,11 +26,10 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import chess
 import chess.engine
 
+from chess_lab.datasets.book import MATE_SCORE, append_jsonl, fen_key, read_jsonl
 from chess_lab.datasets.stockfish import open_engine
 
 API = "https://lichess.org/api/cloud-eval"
-#: Score of a forced mate, minus the moves it takes.
-MATE_SCORE = 100_000
 
 Fetch = Callable[[str, int], Optional[dict]]
 
@@ -185,10 +184,7 @@ def load_cache(path: Path) -> Dict[str, Optional[dict]]:
     :param path: JSON-lines file with ``key`` and ``answer`` per line.
     :return: ``{key: answer}`` (empty if the file does not exist).
     """
-    if not path.exists():
-        return {}
-    records = (json.loads(line) for line in path.read_text(encoding="utf-8").splitlines())
-    return {r["key"]: r["answer"] for r in records}
+    return {r["key"]: r["answer"] for r in read_jsonl(path)}
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -254,7 +250,7 @@ def write_report(args: argparse.Namespace, book: Dict[str, str], result: Dict[st
         lines.append(f"  - `{fen}` `{uci}` loses {loss:.0f} cp")
     if args.prune:
         bad = {fen for fen, _, _ in failed}
-        kept = {k: v for k, v in book.items() if " ".join(k.split()[:4]) not in bad}
+        kept = {k: v for k, v in book.items() if fen_key(k) not in bad}
         out = args.out or args.book
         out.write_text(json.dumps(kept, indent=0, sort_keys=True) + "\n", encoding="utf-8")
         lines.append(f"- Pruned book: {len(kept):,} positions -> {out}")
@@ -286,7 +282,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             cache[key] = fetch_cloud_eval(fen, lines, args.pause)
             args.cache.parent.mkdir(parents=True, exist_ok=True)
             with open(args.cache, "a", encoding="utf-8") as handle:
-                handle.write(json.dumps({"key": key, "answer": cache[key]}) + "\n")
+                append_jsonl(handle, {"key": key, "answer": cache[key]})
         return cache[key]
 
     result = check_book(book, args.fraction, args.seed, args.margin, fetch)

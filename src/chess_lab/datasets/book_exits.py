@@ -13,7 +13,6 @@ book's otherwise (the line ends: the book's own move, or a position it never hel
 """
 
 import argparse
-import json
 import re
 import statistics
 from collections import Counter
@@ -22,7 +21,7 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import chess
 
-from chess_lab.datasets.build_opening_book import position_key
+from chess_lab.datasets.book import load_book, position_key
 
 _POSITION = re.compile(r"<< position startpos moves ?(.*)$")
 
@@ -82,12 +81,6 @@ def summary(book: Dict[str, str], games: Sequence[Sequence[str]]) -> Dict[str, o
         "reasons": Counter(reason for _, reason in exits),
         "plies": Counter(plies),
     }
-
-
-def load_book(path: Path) -> Dict[str, str]:
-    """The book with its keys reduced to the first four FEN fields."""
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return {" ".join(fen.split()[:4]): uci for fen, uci in raw.items()}
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

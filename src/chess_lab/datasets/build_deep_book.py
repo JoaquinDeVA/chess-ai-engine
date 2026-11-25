@@ -30,7 +30,7 @@ from typing import Callable, Dict, List, Sequence, Tuple
 import chess
 import chess.engine
 
-from chess_lab.datasets.build_opening_book import MATE_SCORE, position_key
+from chess_lab.datasets.book import MATE_SCORE, append_jsonl, position_key, read_jsonl
 
 #: Lines of an analysis: ``(uci, centipawns for the side to move)``, best first.
 Lines = List[Tuple[str, float]]
@@ -175,15 +175,7 @@ def engine_analyse(path: str, depth: int, multipv: int, hash_mb: int) -> Analyse
 
 def load_cache(path: Path) -> Dict[str, Lines]:
     """Analyses saved by earlier runs (a cut last line is ignored)."""
-    cache: Dict[str, Lines] = {}
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            cache[entry["fen"]] = [(uci, cp) for uci, cp in entry["lines"]]
-    return cache
+    return {entry["fen"]: [(uci, cp) for uci, cp in entry["lines"]] for entry in read_jsonl(path)}
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -221,8 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     with args.cache.open("a", encoding="utf-8") as sink:
 
         def save(key: str, lines: Lines) -> None:
-            sink.write(json.dumps({"fen": key, "lines": lines}) + "\n")
-            sink.flush()
+            append_jsonl(sink, {"fen": key, "lines": lines})
 
         try:
             book = build_book(

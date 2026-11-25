@@ -29,6 +29,8 @@ SIDECAR_SCHEMA = pa.schema(
 #: Columns returned by the samplers; ``depth`` is the raw search depth of the evaluation.
 SAMPLE_COLUMNS = ["fen", "cp", "mate", "best_move", "quiet", "white_to_move", "depth"]
 _RAW_COLUMNS = ["fen", "cp", "mate", "best_move", "depth"]
+#: Columns of the training batches: the ones ``encode_frame`` uses.
+BATCH_COLUMNS = ["fen", "cp", "mate", "white_to_move"]
 
 
 def sidecar_path(shard: Path, out_dir: Path) -> Path:
@@ -158,15 +160,18 @@ def count_rows(
     )
 
 
-def _read_group(pair: tuple[pq.ParquetFile, pq.ParquetFile], group: int) -> pd.DataFrame:
-    """One row group of a shard joined with its sidecar columns."""
+def _read_group(
+    pair: tuple[pq.ParquetFile, pq.ParquetFile],
+    group: int,
+    raw_columns: list[str] = _RAW_COLUMNS,
+    side_columns: tuple[str, ...] = ("split", "quiet", "white_to_move"),
+) -> pd.DataFrame:
+    """One row group of a shard joined with the wanted columns of its sidecar."""
     raw_file, side_file = pair
-    frame = raw_file.read_row_group(group, columns=_RAW_COLUMNS).to_pandas()
-    side = side_file.read_row_group(group, columns=["split", "quiet", "white_to_move"])
-    side = side.to_pandas()
-    frame["split"] = side["split"]
-    frame["quiet"] = side["quiet"]
-    frame["white_to_move"] = side["white_to_move"]
+    frame = raw_file.read_row_group(group, columns=raw_columns).to_pandas()
+    side = side_file.read_row_group(group, columns=list(side_columns)).to_pandas()
+    for column in side_columns:
+        frame[column] = side[column]
     return frame
 
 
@@ -205,17 +210,15 @@ def load_sample(
     """
     validate_mate_keep(mate_keep)
     pairs = _open_pairs(raw_dir, sidecar_dir)
-    sizes = np.array(
-        [len(_eligible(pair, split, quiet_only, mate_keep)) for pair in pairs], dtype=np.int64
-    )
+    eligible = [_eligible(pair, split, quiet_only, mate_keep).astype(np.int32) for pair in pairs]
+    sizes = np.array([len(rows) for rows in eligible], dtype=np.int64)
     total = int(sizes.sum())
     rng = np.random.default_rng(seed)
     wanted = rng.multivariate_hypergeometric(sizes, min(n, total)) if total else sizes
     parts = []
-    for pair, count in zip(pairs, wanted, strict=True):
+    for pair, rows, count in zip(pairs, eligible, wanted, strict=True):
         if not count:
             continue
-        rows = _eligible(pair, split, quiet_only, mate_keep)
         local = np.sort(rng.choice(rows, size=int(count), replace=False))
         bounds = _group_bounds(pair[0])
         groups = np.searchsorted(bounds, local, side="right") - 1
@@ -248,7 +251,7 @@ def iter_batches(
     :param seed: Seed of the shuffling.
     :param quiet_only: Yield only quiet positions.
     :param mate_keep: Share of the mate positions yielded (see :func:`load_sample`).
-    :return: Iterator of DataFrames with columns :data:`SAMPLE_COLUMNS`.
+    :return: Iterator of DataFrames with columns :data:`BATCH_COLUMNS`.
     :raises ValueError: If a sidecar is missing or misaligned with its shard, or ``mate_keep``
         is outside ``(0, 1]``.
     """
@@ -258,11 +261,12 @@ def iter_batches(
     if n == 0:
         return
     remaining = n
-    buffer = pd.DataFrame(columns=SAMPLE_COLUMNS)
+    side_columns = ("split", "white_to_move") + (("quiet",) if quiet_only else ())
+    buffer = pd.DataFrame(columns=BATCH_COLUMNS)
     for shard_index in rng.permutation(len(pairs)):
         pair = pairs[shard_index]
         for group in rng.permutation(pair[0].num_row_groups):
-            frame = _read_group(pair, int(group))
+            frame = _read_group(pair, int(group), ["fen", "cp", "mate"], side_columns)
             keep = frame["split"] == split
             if quiet_only:
                 keep &= frame["quiet"]
@@ -273,7 +277,7 @@ def iter_batches(
                     mate_keep,
                 )
             frame = frame[keep]
-            frame = frame.iloc[rng.permutation(len(frame))][SAMPLE_COLUMNS]
+            frame = frame.iloc[rng.permutation(len(frame))][BATCH_COLUMNS]
             buffer = pd.concat([buffer, frame], ignore_index=True)
             while len(buffer) >= batch_size:
                 batch, buffer = buffer.iloc[:batch_size], buffer.iloc[batch_size:]

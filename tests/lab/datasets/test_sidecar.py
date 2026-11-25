@@ -5,8 +5,15 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from chess_lab.datasets import sidecar
 from chess_lab.datasets.raw_shards import read_metadata, shard_path, write_shard
-from chess_lab.datasets.sidecar import build_sidecar, data_fingerprint, iter_batches, load_sample
+from chess_lab.datasets.sidecar import (
+    BATCH_COLUMNS,
+    build_sidecar,
+    data_fingerprint,
+    iter_batches,
+    load_sample,
+)
 from chess_lab.datasets.split import TEST, TRAIN, VALIDATION, assign_split
 from chess_lab.models.target import is_quiet
 
@@ -121,6 +128,31 @@ def test_iter_batches_yields_n_rows_in_total(dirs):
     assert everything == (assign_split(pd.Series(random_fens(400))) == TRAIN).sum()
 
 
+def test_iter_batches_carry_only_the_columns_the_encoder_uses(dirs):
+    raw, side = dirs
+    for quiet_only in (False, True):
+        batches = list(iter_batches(raw, side, TRAIN, 16, 40, seed=3, quiet_only=quiet_only))
+        assert all(list(b.columns) == BATCH_COLUMNS for b in batches)
+        sample = load_sample(raw, side, TRAIN, 10_000, quiet_only=quiet_only)
+        cp_of = dict(zip(sample["fen"], sample["cp"], strict=True))
+        for batch in batches:
+            assert all(cp_of[fen] == cp for fen, cp in zip(batch["fen"], batch["cp"], strict=True))
+
+
+def test_load_sample_computes_the_eligible_rows_once_per_shard(dirs, monkeypatch):
+    raw, side = dirs
+    calls = []
+    original = sidecar._eligible
+
+    def counting(pair, *args):
+        calls.append(pair)
+        return original(pair, *args)
+
+    monkeypatch.setattr(sidecar, "_eligible", counting)
+    load_sample(raw, side, TRAIN, 100, mate_keep=0.5)
+    assert len(calls) == 2  # two shards, however many are sampled
+
+
 def test_sampled_flags_match_own_fen(dirs):
     raw, side = dirs
     sample = load_sample(raw, side, TRAIN, 10_000)
@@ -209,11 +241,7 @@ def test_samplers_return_the_raw_depth(tmp_path):
     )
 
     streamed = pd.concat(iter_batches(raw, side, TRAIN, 16, None, seed=3))
-    assert list(streamed.columns)[-1] == "depth"
-    assert all(
-        depth_of[fen] == depth
-        for fen, depth in zip(streamed["fen"], streamed["depth"], strict=True)
-    )
+    assert list(streamed.columns) == BATCH_COLUMNS  # the training batches carry no depth
 
 
 def test_data_fingerprint_changes_with_any_shard_or_sidecar(tmp_path):

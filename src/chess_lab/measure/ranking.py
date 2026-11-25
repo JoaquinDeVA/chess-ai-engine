@@ -55,6 +55,8 @@ def judge_scorer(scorer, table: pd.DataFrame) -> dict:
     :return: ``{"all": ..., "quiet": ..., "non_quiet": ...}``, each with ``tau``, ``top1``,
         ``top3`` and ``positions``.
     """
+    # ``cp`` and ``mate`` are the mover's, so the "White" score of ``white_score`` is the mover's
+    # expected score here; only its order matters, and the sigmoid does not change it.
     truth_all = white_score(table["cp"].to_numpy(), table["mate"].to_numpy(), Representation())
     table = table.assign(truth=truth_all)
     taus, top1, top3, quiet = [], [], [], []

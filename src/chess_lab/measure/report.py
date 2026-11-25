@@ -9,11 +9,12 @@ A missing value shows a dash.
 
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from chess_engine.paths import ROOT
 from chess_lab.atomic import atomic_path
 from chess_lab.models.store.cards import load_all_cards
+from chess_lab.models.store.loader import split_spec
 from chess_lab.models.target import Representation
 
 HISTORY_FILE = ROOT / "docs" / "RESULTS.md"
@@ -73,6 +74,16 @@ def _effort(card: Dict[str, Any]) -> int:
     return -1 if effort is None else int(effort)
 
 
+def _is_variant(card: Dict[str, Any]) -> bool:
+    """Whether the card is a labelled variant (``name@e15-warm``) and not the plain ``name@e15``."""
+    return "-" in (split_spec(card["name"])[1] or "")
+
+
+def _best_key(card: Dict[str, Any]) -> Tuple[int, bool]:
+    """Order of the cards of one model: highest effort, and at equal effort the plain one."""
+    return _effort(card), not _is_variant(card)
+
+
 def _sample_hash(card: Dict[str, Any]) -> Optional[str]:
     """Hash of the test sample a card was judged on (``accuracy.sample.hash``), if recorded."""
     return _dig(card, "accuracy", "sample", "hash")
@@ -128,7 +139,8 @@ def _row(card: Dict[str, Any], reference: Optional[str] = None) -> str:
 def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     """The comparison table of all models.
 
-    One row per model, the card of its highest effort.
+    One row per model, the card of its highest effort; at equal effort, the plain ``name@e<effort>``
+    and not a labelled variant, whatever the order the cards are loaded in.
     Models with status ``current``, ``reference`` (the retired heuristic ``h1``, kept as the record
     of the anchor) or ``retired`` are listed, in that order and by name within each status; a
     retired model is marked as such.
@@ -141,7 +153,7 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
         if card.get("status") not in _STATUS_ORDER:
             continue
         base = card["name"].split("@")[0]
-        if base not in best or _effort(card) > _effort(best[base]):
+        if base not in best or _best_key(card) > _best_key(best[base]):
             best[base] = card
     rows = list(best.values())
     rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"].split("@")[0]))

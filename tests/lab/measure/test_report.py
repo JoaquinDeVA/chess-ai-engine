@@ -97,3 +97,20 @@ def test_the_sample_hash_follows_the_sample_order_and_content():
     assert evaluate.sample_hash(fens) != evaluate.sample_hash(fens[::-1])
     assert evaluate.sample_hash(fens) != evaluate.sample_hash(fens[:1])
     assert len(evaluate.sample_hash(fens)) == 16
+
+
+def test_at_equal_effort_the_plain_model_takes_the_row_whatever_the_order(isolated_cards):
+    cards.update_card(
+        "m@e15-warm-lr1e-4", status="current", architecture="A", training={"effort": 15}
+    )
+    cards.update_card(
+        "m@e15", status="current", architecture="A", parameters=7, training={"effort": 15}
+    )
+    cards.update_card("m@e15-zz", status="current", architecture="A", training={"effort": 15})
+    lines = [line for line in report.render_tables().splitlines() if line.startswith("| `m`")]
+    assert len(lines) == 1 and "| 7 |" in lines[0]
+    # the card list is sorted by name, so feed the variant last as well
+    both = [cards.load_card("m@e15"), cards.load_card("m@e15-zz")]
+    for order in (both, both[::-1]):
+        (line,) = [x for x in report.render_tables(order).splitlines() if x.startswith("| `m`")]
+        assert "| 7 |" in line

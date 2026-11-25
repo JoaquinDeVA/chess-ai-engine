@@ -15,7 +15,6 @@ from chess_lab.models.definitions import (
     NnW128Ob8BothModel,
     NnW128Ob8H16BothModel,
     get_model_class,
-    output_bucket,
 )
 from chess_lab.models.features import (
     KING_BASE,
@@ -143,11 +142,9 @@ def test_a_head_gives_every_bucket_its_own_hidden_layer():
     assert model.count_parameters() == 768 * 128 + 128 + 256 * 128 + 128 + 16 * 8 + 8
 
 
-def test_eight_output_buckets_take_four_piece_counts_each():
+def test_eight_output_buckets_add_eight_output_units():
     model = new_model(NnW128Ob8BothModel, Representation())
     assert [weights.shape for weights, _ in model.layers] == [(768, 128), (256, 8)]
-    assert [output_bucket(p, 8) for p in (2, 4, 5, 8, 9, 28, 29, 32)] == [0, 0, 1, 1, 2, 6, 7, 7]
-    assert output_bucket(32, 1) == 0
 
 
 BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel, NnW128Ob8BothModel, NnW128Ob8H16BothModel]

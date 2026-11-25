@@ -10,7 +10,6 @@ from chess_lab.models.target import (
     Representation,
     is_quiet,
     keep_mate_rows,
-    score_to_cp,
     target,
     white_score,
 )
@@ -47,14 +46,6 @@ def test_side_to_move_flips_for_black():
     t = target(cp, mate, np.array([True, False]), Representation())
     assert t[0] == white_pov[0]
     assert t[1] == pytest.approx(1 - white_pov[1])
-
-
-@pytest.mark.parametrize("scale", ["winprob", "cp_linear"])
-def test_score_to_cp_inverts_white_score(scale):
-    rep = Representation(scale=scale)
-    cp = np.linspace(-800, 800, 33)
-    back = score_to_cp(white_score(cp, np.full(cp.shape, np.nan), rep), rep)
-    assert back == pytest.approx(cp, abs=1e-3)
 
 
 def test_is_quiet():

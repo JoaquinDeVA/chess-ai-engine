@@ -125,19 +125,6 @@ def target(
     return np.where(np.asarray(white_to_move, dtype=bool), score, 1.0 - score)
 
 
-def score_to_cp(score: float | np.ndarray, rep: Representation) -> float | np.ndarray:
-    """Inverse of :func:`white_score` for non-mate scores.
-
-    :param score: Score(s) in ``[0, 1]`` (clipped to ``[1e-6, 1 - 1e-6]``).
-    :param rep: Representation that selects the scale.
-    :return: Centipawns.
-    """
-    s = np.clip(score, _SCORE_EPS, 1.0 - _SCORE_EPS)
-    if rep.scale == "winprob":
-        return np.log(s / (1.0 - s)) / rep.k
-    return (2.0 * s - 1.0) * CP_SCALE
-
-
 def is_quiet(board: chess.Board, best_move: str | None) -> bool:
     """Whether a position is quiet.
 

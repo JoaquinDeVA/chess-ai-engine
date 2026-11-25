@@ -38,11 +38,3 @@ def artifact_path(spec: str) -> Path:
     """
     split_spec(spec)
     return ARTIFACTS_DIR / f"{spec}.npz"
-
-
-def installed_models() -> list[str]:
-    """Names of the models that have a saved artifact, whatever its effort or variant.
-
-    :return: Sorted list of names, without the tag.
-    """
-    return sorted({split_spec(path.stem)[0] for path in ARTIFACTS_DIR.glob("*.npz")})

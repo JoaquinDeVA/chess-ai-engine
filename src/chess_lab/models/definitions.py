@@ -27,23 +27,12 @@ Layer = Tuple[np.ndarray, np.ndarray]
 MAX_OUTPUT_BUCKETS = 32
 
 
-def output_bucket(pieces: int, buckets: int) -> int:
-    """The output unit of a position, as the core chooses it.
-
-    :param pieces: Pieces on the board, kings included (2 to 32).
-    :param buckets: Units of the output layer.
-    :return: ``(pieces - 1) * buckets // 32``: with eight buckets, four piece counts each.
-    """
-    return min((pieces - 1) * buckets // MAX_OUTPUT_BUCKETS, buckets - 1)
-
-
 class NeuralEvalModel:
     """Feed-forward network over the sparse inputs of ``feature_set``, saved in one ``.npz`` file.
 
     The accumulator over the sparse inputs, then an output over the accumulators of both sides,
     whose value is the logit of the expected score of the player to move. With several output
-    buckets, the position reads one unit of the output, chosen by its number of pieces (see
-    :func:`output_bucket`). Without a head the output is one linear layer; with one, each bucket
+    buckets, the position reads one unit of the output, chosen by its number of pieces (``(pieces - 1) * buckets // 32``). Without a head the output is one linear layer; with one, each bucket
     has its own hidden layer of ``head`` units, clipped to ``[0, 1]``, and a linear unit over it.
 
     :param layers: ``(weights, bias)`` per weight layer, of the shapes of :meth:`layer_shapes`.

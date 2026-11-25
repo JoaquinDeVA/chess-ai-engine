@@ -5,7 +5,7 @@ import pytest
 
 from chess_lab.models.definitions import get_model_class, load_evaluator
 from chess_lab.models.store import loader
-from chess_lab.models.store.loader import installed_models, split_spec
+from chess_lab.models.store.loader import split_spec
 from chess_lab.training.neural import new_model
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -53,7 +53,6 @@ def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     assert split_spec("net_pst_w64_both") == ("net_pst_w64_both", None)
     with pytest.raises(ValueError):
         split_spec("net_pst_w64_both@")
-    assert installed_models() == ["net_pst_w64_both", "net_pst_w64_w32"]
     assert load_evaluator("net_pst_w64_both@x").evaluate(WHITE_UP_A_QUEEN, True) > 0.5
     assert load_evaluator("net_pst_w64_both").evaluate(WHITE_UP_A_QUEEN, True) == 0.5
     with pytest.raises(FileNotFoundError):

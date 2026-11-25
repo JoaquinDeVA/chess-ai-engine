@@ -14,10 +14,7 @@ has no game identifiers, so a split by game is not possible. The script measures
 Neighbours are counted through the moves of the test position (its children); the positions that lead
 to it are not searched, so the shares are lower bounds.
 
-With ``--models`` the script also measures whether the neighbours flatter the models: it judges each
-model on the fixed test sample of ``measure.evaluate`` twice, on the positions that have a child in
-train and on those that have none, and prints the Spearman correlation and the error of both groups. If
-neighbours inflated the accuracy, the first group would score clearly higher.
+Whether the neighbours flatter the models is measured by ``measure.split_leakage``.
 
 Writes ``data/results/reports/SPLIT_LEAKAGE.md``.
 """
@@ -146,30 +143,6 @@ def has_train_child(hashes: np.ndarray, splits: np.ndarray, fens: Sequence[str])
     return flags
 
 
-def stratified_accuracy(
-    model_names: Sequence[str], sample, flags: np.ndarray
-) -> Dict[str, Dict[str, Dict[str, float]]]:
-    """Static accuracy of each model on the positions with and without a neighbour in train.
-
-    :param model_names: Registered model names (``name@tag`` allowed).
-    :param sample: Test sample (``fen``, ``cp``, ``mate``, ``best_move``, ``quiet``).
-    :param flags: Which rows of the sample have a child in train.
-    :return: ``{model: {"with neighbour": metrics, "without neighbour": metrics}}``.
-    """
-    from chess_lab.measure.judge import judge
-    from chess_lab.models.definitions import load_evaluator
-
-    result = {}
-    for name in model_names:
-        evaluator = load_evaluator(name)
-        groups = {}
-        for label, mask in (("with neighbour", flags), ("without neighbour", ~flags)):
-            part = sample[mask].reset_index(drop=True)
-            groups[label] = {**judge(evaluator, part, agreement_n=0)["all"], "rows": len(part)}
-        result[name] = groups
-    return result
-
-
 def sample_test_fens(raw_dir: Path, sidecar_dir: Path, count: int, seed: int) -> List[str]:
     """Random test positions, spread over the shards.
 
@@ -206,10 +179,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--positions", type=int, default=20_000, help="test positions examined")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED)
     parser.add_argument(
-        "--models", help="comma-separated models to judge on both groups of positions"
-    )
-    parser.add_argument("--sample-rows", type=int, default=200_000, help="size of that test sample")
-    parser.add_argument(
         "--report", type=Path, default=Path("data/results/reports/SPLIT_LEAKAGE.md")
     )
     return parser.parse_args(argv)
@@ -244,26 +213,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"| colour-swapped image | {near['mirror_in_data']:.1%} | {near['mirror_in_train']:.1%} |",
         f"| a position one move away | {near['child_in_data']:.1%} | {near['child_in_train']:.1%} |",
     ]
-    if args.models:
-        from chess_lab.datasets.sidecar import load_sample
-
-        sample = load_sample(args.raw, args.sidecar, TEST, args.sample_rows, seed=SAMPLE_SEED)
-        flags = has_train_child(hashes, splits, sample["fen"].tolist())
-        report = stratified_accuracy([m for m in args.models.split(",") if m], sample, flags)
-        lines += [
-            "",
-            f"## Accuracy with and without a neighbour in train ({len(sample):,} test positions, "
-            f"{flags.mean():.1%} with a neighbour)",
-            "",
-            "| model | Spearman, with | Spearman, without | MAE, with | MAE, without |",
-            "|---|---|---|---|---|",
-        ]
-        for name, groups in report.items():
-            w, wo = groups["with neighbour"], groups["without neighbour"]
-            lines.append(
-                f"| `{name}` | {w['spearman']:.3f} | {wo['spearman']:.3f} | "
-                f"{w['mae']:.4f} | {wo['mae']:.4f} |"
-            )
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))

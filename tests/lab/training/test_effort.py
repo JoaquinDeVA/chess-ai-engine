@@ -60,7 +60,7 @@ def test_effort_is_monotonic():
     for effort_level in range(101):
         config = effort_config(effort_level, 10**9)
         if previous is not None:
-            for key in ("positions", "max_epochs", "trials"):
+            for key in ("positions", "trials"):
                 assert config[key] >= previous[key], (effort_level, key)
         previous = config
 
@@ -73,9 +73,8 @@ def test_effort_caps_positions_at_available_rows():
 def test_effort_fixed_settings():
     low, high = effort_config(0, 10**9), effort_config(100, 10**9)
     assert low["trials"] == 0 and high["trials"] == 5
-    assert low["max_epochs"] == 2 and high["max_epochs"] == 12
-    assert (low["patience"], high["patience"]) == (3, 5)
-    assert effort_config(50, 10**9)["patience"] == 4
+    for plan in (low, effort_config(50, 10**9), high):  # effort does not change the recipe
+        assert (plan["max_epochs"], plan["patience"]) == (100, 3)
     assert low["batch_size"] == high["batch_size"] == 4096
 
 
@@ -108,15 +107,16 @@ def test_estimate_formula_on_fixed_timing():
     # Final fit only: 1000 positions * 1 epoch * 1e-3 s, plus encode 2.0 and one score of 0.5.
     no_trials = {"positions": 1000, "max_epochs": 1, "trials": 0}
     assert estimated_seconds(no_trials, timing) == pytest.approx(1.0 + 2.0 + 0.5)
-    # Two trials on 10% of 10000 positions each: training (1 + 0.2) * 10000 * 3 * 1e-3 = 36 s;
-    # three fits each with encode 2.0 and 3 epochs of 0.5 s scoring: 3 * (2.0 + 1.5) = 10.5 s.
+    # Two random trials and the defaults, each on 10% of 10000 positions: training
+    # (1 + 0.3) * 10000 * 3 * 1e-3 = 39 s; four fits each with encode 2.0 and 3 epochs of
+    # 0.5 s scoring: 4 * (2.0 + 1.5) = 14 s.
     with_trials = {"positions": 10_000, "max_epochs": 3, "trials": 2}
-    assert estimated_seconds(with_trials, timing) == pytest.approx(36.0 + 10.5)
+    assert estimated_seconds(with_trials, timing) == pytest.approx(39.0 + 14.0)
 
 
 def test_search_keeps_the_trial_with_the_lowest_validation_loss(monkeypatch):
     calls = []
-    losses = iter([0.9, 0.4, 0.6])
+    losses = iter([0.9, 0.4, 0.6, 0.5])
 
     def fake_fit(
         model_class, rep, raw_dir, sidecar_dir, validation, positions, config, quiet=False
@@ -128,9 +128,19 @@ def test_search_keeps_the_trial_with_the_lowest_validation_loss(monkeypatch):
     plan = {"positions": 1000, "max_epochs": 1, "patience": 2, "trials": 3, "batch_size": 4096}
     best = search(NnW64BothModel, Representation(), Path("."), Path("."), None, plan,
                   log=lambda line: None)  # fmt: skip
-    assert len(calls) == 3
+    assert len(calls) == 4  # the defaults and three random candidates
+    assert (calls[0]["l2"], calls[0]["lr"]) == (1e-6, 0.01)
     assert best == {"l2": calls[1]["l2"], "lr": calls[1]["lr"]}
-    assert all(1e-7 <= c["l2"] <= 1e-3 and 1e-3 <= c["lr"] <= 3e-2 for c in calls)
+    assert all(1e-7 <= c["l2"] <= 1e-3 and 1e-3 <= c["lr"] <= 3e-2 for c in calls[1:])
+
+
+def test_search_keeps_the_defaults_when_the_only_draw_is_worse(monkeypatch):
+    losses = iter([0.3, 0.8])
+    monkeypatch.setattr(effort, "fit", lambda *a, **k: (None, {"val_losses": [next(losses)]}))
+    plan = {"positions": 1000, "max_epochs": 1, "patience": 2, "trials": 1, "batch_size": 4096}
+    best = search(NnW64BothModel, Representation(), Path("."), Path("."), None, plan,
+                  log=lambda line: None)  # fmt: skip
+    assert best == {"l2": 1e-6, "lr": 0.01}
 
 
 def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
@@ -156,7 +166,7 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
     lines = []
     search(NnW64BothModel, Representation(), raw, side, validation, plan, log=lines.append)
     assert splits and set(splits) == {TRAIN}
-    assert len(lines) == 1 and lines[0].startswith("trial 1/1")
+    assert len(lines) == 2 and lines[1].startswith("trial 2/2")
 
 
 def write_mate_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> None:

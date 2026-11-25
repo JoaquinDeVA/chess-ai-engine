@@ -6,7 +6,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from chess_lab.datasets.raw_shards import read_metadata, shard_path, write_shard
-from chess_lab.datasets.sidecar import build_sidecar, iter_batches, load_sample
+from chess_lab.datasets.sidecar import build_sidecar, data_fingerprint, iter_batches, load_sample
 from chess_lab.datasets.split import TEST, TRAIN, VALIDATION, assign_split
 from chess_lab.models.target import is_quiet
 
@@ -214,3 +214,21 @@ def test_samplers_return_the_raw_depth(tmp_path):
         depth_of[fen] == depth
         for fen, depth in zip(streamed["fen"], streamed["depth"], strict=True)
     )
+
+
+def test_data_fingerprint_changes_with_any_shard_or_sidecar(tmp_path):
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    raw.mkdir()
+    fen = chess.Board().fen()
+    record = {"fen": fen, "cp": 10, "mate": None, "depth": 20, "knodes": 1,
+              "best_move": None, "n_evals": 1, "n_pvs": 1}  # fmt: skip
+    write_shard(shard_path(raw, 0), [record], {"perspective": "white"})
+    build_sidecar(shard_path(raw, 0), side)
+    first = data_fingerprint(raw, side)
+    assert first["shards"] == 1 and data_fingerprint(raw, side) == first
+    write_shard(shard_path(raw, 1), [record, record], {"perspective": "white"})
+    build_sidecar(shard_path(raw, 1), side)
+    second = data_fingerprint(raw, side)
+    assert second["shards"] == 2 and second["sha12"] != first["sha12"]
+    side.joinpath("part-00001.sidecar.parquet").unlink()
+    assert data_fingerprint(raw, side)["sha12"] != second["sha12"]

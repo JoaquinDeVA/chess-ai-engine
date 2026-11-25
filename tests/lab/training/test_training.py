@@ -1,15 +1,17 @@
 """Tests of the training pipeline: targets, dataset split, cards, report and the CLIs."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from chess_lab.datasets import sidecar
 from chess_lab.datasets.raw_shards import shard_path, write_shard
-from chess_lab.datasets.sidecar import build_sidecar
+from chess_lab.datasets.sidecar import build_sidecar, data_fingerprint
 from chess_lab.measure import evaluate as evaluate_cli
 from chess_lab.models import definitions
 from chess_lab.models.store import cards, loader
+from chess_lab.models.target import Representation
 from chess_lab.training import train as train_cli
 from chess_lab.training.effort import effort_config, fit_config
 from chess_lab.training.neural import new_model
@@ -110,7 +112,8 @@ def fake_training(isolated_cards, monkeypatch):
     monkeypatch.setattr(train_cli, "calibrate", lambda *a, **k: timing)
     monkeypatch.setattr(train_cli, "estimated_seconds", lambda *a, **k: 1.0)
     monkeypatch.setattr(train_cli, "search", lambda *a, **k: {"l2": 1e-3, "lr": 1e-2})
-    summary = {"train_rows": 900, "val_mae": 0.1, "seconds": 5.0}
+    monkeypatch.setattr(train_cli, "environment", lambda: {"python": "3"})
+    summary = {"train_rows": 900, "val_mae": 0.1, "seconds": 5.0, "config": {}}
     monkeypatch.setattr(train_cli, "fit", lambda *a, **k: (FakeModel(), dict(summary)))
     return isolated_cards
 
@@ -155,7 +158,7 @@ class TestCommandLineWithDoubles:
 
         def recording_fit(*args, **kwargs):
             calls.append(kwargs)
-            return FakeModel(), {"train_rows": 900, "seconds": 5.0}
+            return FakeModel(), {"train_rows": 900, "seconds": 5.0, "config": {}}
 
         monkeypatch.setattr(train_cli, "fit", recording_fit)
         assert self.train("--init", "net_pst_w64_both@e15", "--tag", "warm") == 0
@@ -172,32 +175,46 @@ class TestCommandLineWithDoubles:
 
         def recording_fit(*args, **kwargs):
             calls.append(args)
-            return FakeModel(), {"train_rows": 900, "seconds": 5.0}
+            return FakeModel(), {"train_rows": 900, "seconds": 5.0, "config": {}}
 
         monkeypatch.setattr(train_cli, "fit", recording_fit)
         assert self.train("--lr", "5e-4") == 0
         config = calls[0][6]
         assert config["lr"] == 5e-4 and config["l2"] == 1e-3
 
-    def test_patience_option_reaches_the_printed_plan_and_the_card(self, fake_training, capsys):
-        assert self.train("--patience", "3") == 0
-        assert "  patience: 3" in capsys.readouterr().out
-        assert cards.load_card("net_pst_w64_both@e40")["training"]["effort_config"]["patience"] == 3
+    def test_the_recipe_is_the_same_at_every_effort_and_reaches_the_card(
+        self, fake_training, capsys
+    ):
+        assert self.train() == 0
+        assert "  max_epochs: 100" in capsys.readouterr().out
+        training = cards.load_card("net_pst_w64_both@e40")["training"]
+        assert training["effort_config"]["patience"] == 3
+        assert training["recipe"]["effort"] == 40 and training["recipe"]["init"] is None
+        assert training["data"]["shards"] == 0 and "environment" in training
+        assert "recipe" not in training["config"]
 
     def test_a_resumed_fit_counts_the_setup_before_the_cut(self, fake_training, monkeypatch):
         plan = effort_config(40, 1000)
-        config = {**fit_config(plan, 1e-3, 1e-2, patience=plan["patience"]), "setup_seconds": 2.0}
+        config = {**fit_config(plan, 1e-3, 1e-2), "setup_seconds": 2.0, "recipe": self.recipe()}
         monkeypatch.setattr(train_cli, "checkpoint_config", lambda path: config)
         assert self.train("--checkpoint", "c.npz") == 0
         assert cards.load_card("net_pst_w64_both@e40")["training"]["seconds"] == 7.0
 
     def test_a_checkpoint_of_another_recipe_is_refused(self, fake_training, monkeypatch, capsys):
         plan = effort_config(40, 1000)
-        config = {**fit_config(plan, 1e-3, 1e-2, patience=plan["patience"]), "setup_seconds": 2.0}
+        config = {**fit_config(plan, 1e-3, 1e-2), "setup_seconds": 2.0, "recipe": self.recipe()}
         monkeypatch.setattr(train_cli, "checkpoint_config", lambda path: config)
-        assert self.train("--checkpoint", "c.npz", "--epochs", "99") == 2
-        assert "max_epochs" in capsys.readouterr().out
+        assert self.train("--checkpoint", "c.npz", "--lr", "5e-4") == 2
+        assert "recipe.lr" in capsys.readouterr().out
         assert cards.load_card("net_pst_w64_both@e40").get("training") is None
+
+    def recipe(self):
+        """The recipe that ``self.train()`` resolves (1000 TRAIN rows available, no shards)."""
+        return {
+            "model": "net_pst_w64_both", "effort": 40, "positions": 1000, "seed": 42,
+            "representation": Representation().to_dict(), "init": None, "lr": None,
+            "data": {"shards": 0, "sha12": data_fingerprint(Path("r"), Path("s"))["sha12"]},
+        }  # fmt: skip
 
     def test_the_artifact_and_card_carry_the_effort_and_a_variant_goes_after_it(
         self, fake_training
@@ -229,11 +246,4 @@ class TestCommandLineWithDoubles:
 def test_lr_not_positive_exits_with_code_2(value):
     with pytest.raises(SystemExit) as exit_info:
         train_cli.parse_args(["--model", "net_pst_w64_both", "--effort", "0", "--lr", value])
-    assert exit_info.value.code == 2
-
-
-@pytest.mark.parametrize("value", ["1.5", "1", "0", "-0.5"])
-def test_lr_decay_outside_zero_one_exits_with_code_2(value):
-    with pytest.raises(SystemExit) as exit_info:
-        train_cli.parse_args(["--model", "net_pst_w64_both", "--effort", "0", "--lr-decay", value])
     assert exit_info.value.code == 2

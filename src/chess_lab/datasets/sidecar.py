@@ -5,6 +5,7 @@ order and the same row-group layout, so a row group of the shard pairs with the 
 its sidecar and the samplers read only what they need.
 """
 
+import hashlib
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -287,6 +288,22 @@ def iter_batches(
 
 
 #: Rows of the test sample that the accuracy and the move ranking are measured on.
+def data_fingerprint(raw_dir: Path, sidecar_dir: Path) -> dict[str, int | str]:
+    """Identity of the data a model is trained on: the shards and their sidecars.
+
+    :param raw_dir: Directory with the raw shards.
+    :param sidecar_dir: Directory with their sidecars.
+    :return: ``{"shards": count, "sha12": first 12 hex digits of the hash of the names and sizes}``.
+    """
+    digest = hashlib.sha256()
+    shards = list_shards(raw_dir)
+    for shard in shards:
+        for path in (shard, sidecar_path(shard, sidecar_dir)):
+            size = path.stat().st_size if path.exists() else -1
+            digest.update(f"{path.name}:{size}\n".encode())
+    return {"shards": len(shards), "sha12": digest.hexdigest()[:12]}
+
+
 TEST_SAMPLE_ROWS = 200_000
 
 

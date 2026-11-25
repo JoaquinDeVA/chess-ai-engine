@@ -1,4 +1,4 @@
-"""Effort-based training of the networks: one number (0-100) sets data size, epochs and search.
+"""Effort-based training of the networks: one number (0-100) sets the data size and the search.
 
 :func:`effort_config` maps the effort to a configuration; :func:`calibrate` times a short fit to
 estimate the duration; :func:`search` runs the random hyper-parameter trials; :func:`fit` streams
@@ -29,14 +29,15 @@ from chess_lab.training.neural import fit_stream, new_model
 from .cache import cache_path
 
 MAX_EFFORT = 100
-#: Extra effort points counted when setting the epoch limit (the limit is a ceiling; early
-#: stopping usually ends the run first).
-EPOCH_MARGIN = 10
+#: Fixed recipe of every fit: effort does not change it. The epoch limit is a ceiling; the run
+#: ends when the rate, cut by ``LR_DECAY`` on each epoch without improvement, falls below
+#: ``MIN_LR`` or after ``PATIENCE`` such epochs in a row.
+MAX_EPOCHS = 100
+PATIENCE = 3
+LR_DECAY = 0.5
+MIN_LR = 1e-5
 #: Floor of the positions, so that effort 0 still trains on a meaningful sample.
 MIN_POSITIONS = 1_000_000
-#: Epochs without improvement tolerated at effort 0 and at effort 100 (linear in between).
-MIN_PATIENCE = 3
-MAX_PATIENCE = 5
 BATCH_SIZE = 4096
 #: Positions of the timed calibration run (one epoch).
 TIMED_POSITIONS = 50_000
@@ -54,8 +55,8 @@ def effort_config(effort: int, available: int) -> Dict[str, int]:
     """Training configuration for an effort level.
 
     The effort is a percentage of ``available``: effort 30 trains on 30 % of the TRAIN rows and
-    effort 100 on all of them, with a floor of ``MIN_POSITIONS``. The epoch limit grows with
-    ``effort + EPOCH_MARGIN`` and patience from MIN_PATIENCE to MAX_PATIENCE; hyper-parameter trials start at effort 40.
+    effort 100 on all of them, with a floor of ``MIN_POSITIONS``. Hyper-parameter trials start at
+    effort 40. Epochs and patience do not depend on the effort (``MAX_EPOCHS``, ``PATIENCE``).
 
     :param effort: Effort level, ``0..100``.
     :param available: Number of TRAIN rows available.
@@ -68,8 +69,8 @@ def effort_config(effort: int, available: int) -> Dict[str, int]:
     trials = 0 if effort < 40 else 1 + (effort - 40) // 15
     return {
         "positions": min(available, max(MIN_POSITIONS, target)),
-        "max_epochs": 1 + (effort + EPOCH_MARGIN) // 10,
-        "patience": MIN_PATIENCE + (MAX_PATIENCE - MIN_PATIENCE) * effort // MAX_EFFORT,
+        "max_epochs": MAX_EPOCHS,
+        "patience": PATIENCE,
         "trials": trials,
         "batch_size": BATCH_SIZE,
     }
@@ -98,37 +99,26 @@ class _Epochs:
         return self._make()
 
 
-def fit_config(
-    plan: Dict[str, int],
-    l2: float,
-    lr: float,
-    lr_decay: Optional[float] = None,
-    min_lr: float = 1e-5,
-    patience: Optional[int] = None,
-) -> Dict[str, Any]:
+def fit_config(plan: Dict[str, int], l2: float, lr: float) -> Dict[str, Any]:
     """Keyword configuration of :func:`chess_lab.training.neural.fit_stream` for a plan.
 
     :param plan: Output of :func:`effort_config`.
     :param l2: L2 penalty.
     :param lr: Adam learning rate.
-    :param lr_decay: Factor applied to the rate on each epoch without improvement (None: stop by
-        patience instead).
-    :param min_lr: With ``lr_decay``, the run stops when the rate falls below this value.
-    :param patience: Epochs without improvement that stop the run; None keeps the plan's. With
-        ``lr_decay`` it also stops the run (``decay_patience``), after that many epochs in a row.
     :return: Keys ``l2, lr, batch_size, max_epochs, patience, workers, lr_decay, min_lr,
-        decay_patience``.
+        decay_patience``: the rate is cut by ``LR_DECAY`` on each epoch without improvement and
+        the run stops after ``patience`` of them in a row or below ``MIN_LR``.
     """
     return {
         "l2": l2,
         "lr": lr,
         "batch_size": plan["batch_size"],
         "max_epochs": plan["max_epochs"],
-        "patience": plan["patience"] if patience is None else patience,
+        "patience": plan["patience"],
         "workers": WORKERS,
-        "lr_decay": lr_decay,
-        "min_lr": min_lr,
-        "decay_patience": patience is not None,
+        "lr_decay": LR_DECAY,
+        "min_lr": MIN_LR,
+        "decay_patience": True,
     }
 
 
@@ -246,6 +236,15 @@ def trial_rows(positions: int) -> int:
     return max(1, min(int(positions * TRIAL_FRACTION), TRIAL_MAX_ROWS))
 
 
+def trial_count(plan: Dict[str, int]) -> int:
+    """Fits of the hyper-parameter search: the defaults and ``plan["trials"]`` random candidates.
+
+    :param plan: Output of :func:`effort_config`.
+    :return: 0 when the plan has no trials.
+    """
+    return plan["trials"] + 1 if plan["trials"] else 0
+
+
 def estimated_seconds(plan: Dict[str, int], timing: Timing, cached: bool = False) -> float:
     """Estimated duration of the trials and the final fit.
 
@@ -258,18 +257,17 @@ def estimated_seconds(plan: Dict[str, int], timing: Timing, cached: bool = False
     :return: Training part ``(positions + trials * trial_rows) * epochs * s_per_position``
         plus validation part ``(1 + trials) * (encode + epochs * score)``.
     """
-    fits = 1 + plan["trials"]
+    trials = trial_count(plan)
+    fits = 1 + trials
     if cached:
         # The first epoch encodes and stores the batches; later epochs only fit on the cache.
         per_position = (
             timing.seconds_per_position + (plan["max_epochs"] - 1) * CACHED_SECONDS_PER_ROW
         )
-        training = (
-            plan["positions"] + plan["trials"] * trial_rows(plan["positions"])
-        ) * per_position
+        training = (plan["positions"] + trials * trial_rows(plan["positions"])) * per_position
     else:
         training = (
-            (plan["positions"] + plan["trials"] * trial_rows(plan["positions"]))
+            (plan["positions"] + trials * trial_rows(plan["positions"]))
             * plan["max_epochs"]
             * timing.seconds_per_position
         )
@@ -289,6 +287,7 @@ def search(
 ) -> Dict[str, float]:
     """Random search over ``l2`` and ``lr``, scored by the best validation loss.
 
+    The first candidate is the defaults, so a random draw replaces them only if it does better.
     Each trial fits on :func:`trial_rows` rows.
 
     :param model_class: A concrete :class:`NeuralEvalModel` subclass.
@@ -306,12 +305,12 @@ def search(
         return best
     rng = np.random.default_rng(SAMPLE_SEED)
     rows = trial_rows(plan["positions"])
+    candidates = [dict(best)] + [
+        {"l2": _log_uniform(rng, *L2_RANGE), "lr": _log_uniform(rng, *LR_RANGE)}
+        for _ in range(plan["trials"])
+    ]
     best_loss = math.inf
-    for trial in range(1, plan["trials"] + 1):
-        candidate = {
-            "l2": _log_uniform(rng, *L2_RANGE),
-            "lr": _log_uniform(rng, *LR_RANGE),
-        }
+    for trial, candidate in enumerate(candidates, 1):
         _, summary = fit(
             model_class,
             rep,
@@ -324,8 +323,8 @@ def search(
         )
         loss = min(summary["val_losses"])
         log(
-            f"trial {trial}/{plan['trials']}: l2={candidate['l2']:.2e} "
-            f"lr={candidate['lr']:.2e} validation loss {loss:.5f}"
+            f"trial {trial}/{len(candidates)}{' (defaults)' if trial == 1 else ''}: "
+            f"l2={candidate['l2']:.2e} lr={candidate['lr']:.2e} validation loss {loss:.5f}"
         )
         if loss < best_loss:
             best, best_loss = candidate, loss

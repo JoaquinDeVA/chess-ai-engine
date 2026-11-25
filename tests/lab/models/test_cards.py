@@ -27,6 +27,8 @@ def test_clear_measurements_keeps_only_the_identity(isolated_cards):
         training={"effort": 1},
         accuracy=ACCURACY,
         cost={"us_per_eval": 1.0},
+        ordering={"all": {"tau": 0.5}},
+        games={"all": {"n": 3}},
     )
     cards.clear_measurements("m")
     assert cards.load_card("m") == {

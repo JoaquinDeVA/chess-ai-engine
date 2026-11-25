@@ -163,11 +163,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                 f"mae {part['mae']:.4f}, excess {part['excess']:.4f}"
             )
         return 0
-    sections: Dict[str, Any] = {
+    card = load_card(args.model)
+    identity = {
         "architecture": model.architecture,
         "features": model.feature_set,
         "parameters": model.count_parameters(),
     }
+    sections: Dict[str, Any] = {key: value for key, value in identity.items() if key not in card}
     print(f"Evaluating {args.model} ...")
     sections.update(sample_benchmark(evaluator, args.raw, args.sidecar, args.agreement_n))
     if args.ranking.exists():
@@ -175,7 +177,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     saved = args.path or artifact_path(args.model)
     if saved.exists():
         sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
-    if "status" not in load_card(args.model):
+    if "status" not in card:
         sections["status"] = "current"
     update_card(args.model, **sections)
 

@@ -14,8 +14,12 @@ from chess_engine.paths import ROOT
 from chess_lab.atomic import atomic_path
 
 CARDS_DIR = Path(__file__).resolve().parent / "cards"
-#: Card sections that hold measurements of one particular trained model.
-MEASUREMENT_SECTIONS = ("training", "accuracy", "cost")
+#: Card sections that hold what belongs to one particular trained model; retraining drops them.
+#: ``training``: written by ``train`` (recipe, data, environment, result). ``accuracy`` and ``cost``:
+#: ``evaluate``, read by ``report``. ``ordering``: ``evaluate --ranking``. ``games``: ``evaluate
+#: --games``. The identity (``name``, ``status``, ``architecture``, ``features``, ``parameters``,
+#: ``size_kb``) is written by ``train``; ``evaluate`` only fills it in when it is missing.
+MEASUREMENT_SECTIONS = ("training", "accuracy", "cost", "ordering", "games")
 
 
 def card_path(name: str) -> Path:
@@ -77,7 +81,7 @@ def update_card(name: str, **sections: Any) -> Dict[str, Any]:
 def clear_measurements(name: str) -> None:
     """Remove the sections that describe a trained model, keeping its identity.
 
-    Used after retraining: ``training``, ``accuracy`` and ``cost`` belong to the previous model
+    Used after retraining: the :data:`MEASUREMENT_SECTIONS` belong to the previous model
     and would otherwise survive the merge of :func:`update_card`.
     Nothing happens if the card does not exist.
 

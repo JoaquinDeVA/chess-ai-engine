@@ -44,6 +44,19 @@ def test_evaluation_with_a_tag_writes_the_tagged_card(isolated_cards, stub_model
     assert cards.load_card("net_pst_w64_both") == {"name": "net_pst_w64_both"}
 
 
+def test_evaluation_keeps_the_identity_that_training_wrote(isolated_cards, stub_model, monkeypatch):
+    metrics = {"accuracy": ACCURACY | {"sample": {"rows": 1}}, "cost": {"us_per_eval": 5.0}}
+    monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
+    monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
+    monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
+    ranking = isolated_cards / "no-ranking.parquet"
+    cards.update_card("net_pst_w64_both", architecture="written-by-train", parameters=7)
+    assert evaluate_cli.main(["--model", "net_pst_w64_both", "--ranking", str(ranking)]) == 0
+    card = cards.load_card("net_pst_w64_both")
+    assert card["architecture"] == "written-by-train" and card["parameters"] == 7
+    assert card["features"] == stub_model.feature_set  # missing, so filled in
+
+
 def test_only_registered_models_are_accepted():
     assert "h1" not in definitions.available_models()
     for name in ("h1", "nope"):

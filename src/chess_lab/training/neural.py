@@ -160,6 +160,28 @@ def _training_keras() -> Any:
     return keras
 
 
+def environment() -> Dict[str, Any]:
+    """Versions and devices of this run, kept in the card: the weights depend on them.
+
+    :return: ``python``, ``numpy``, ``tensorflow``, ``keras`` and the GPUs TensorFlow sees.
+    """
+    import platform
+    import sys
+    from importlib.metadata import version
+
+    import tensorflow as tf
+
+    gpus = [device.name for device in tf.config.list_physical_devices("GPU")]
+    return {
+        "python": platform.python_version(),
+        "numpy": version("numpy"),
+        "tensorflow": version("tensorflow"),
+        "keras": version("keras"),
+        "gpus": gpus,
+        "platform": sys.platform,
+    }
+
+
 def _accumulator_class(keras: Any) -> type:
     """The accumulator layer class, defined once Keras is imported.
 

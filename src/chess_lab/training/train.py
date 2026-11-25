@@ -14,7 +14,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-from chess_lab.datasets.sidecar import count_rows, load_sample
+from chess_engine.paths import ROOT
+from chess_lab.datasets.sidecar import count_rows, data_fingerprint, load_sample
 from chess_lab.datasets.split import TRAIN, VALIDATION
 from chess_lab.defaults import (
     RAW_DIR,
@@ -35,7 +36,7 @@ from .effort import (
     fit_config,
     search,
 )
-from .neural import checkpoint_config, warm_layers
+from .neural import checkpoint_config, environment, warm_layers
 
 MAX_VALIDATION_ROWS = 50_000
 
@@ -49,7 +50,6 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, choices=available_models())
     parser.add_argument("--output", type=Path, help="where to save (default: data/models)")
-    parser.add_argument("--epochs", type=int, help="override the configured number of epochs")
     parser.add_argument("--effort", type=int, help="models: effort level 0-100")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED, help="seed of the TRAIN sample")
     parser.add_argument(
@@ -68,18 +68,6 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         type=float,
         help="learning rate of the final fit instead of the one the search picks; e.g. a low "
         "one with --init, so the first epochs do not undo the source",
-    )
-    parser.add_argument(
-        "--lr-decay",
-        type=float,
-        help="multiply the learning rate by this factor on each epoch without validation "
-        "improvement; e.g. 0.5",
-    )
-    parser.add_argument(
-        "--patience",
-        type=int,
-        help="stop after this many epochs without validation improvement (with --lr-decay, "
-        "that many in a row; the rate is still cut on each of them)",
     )
     parser.add_argument(
         "--tag",
@@ -107,10 +95,6 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
     if args.lr is not None and not args.lr > 0:
         parser.error(f"--lr must be positive: {args.lr}")
-    if args.lr_decay is not None and not 0 < args.lr_decay < 1:
-        parser.error(f"--lr-decay must be in (0, 1): {args.lr_decay}")
-    if args.patience is not None and args.patience < 1:
-        parser.error(f"--patience must be at least 1: {args.patience}")
     return args
 
 
@@ -189,10 +173,17 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         print(f"no TRAIN rows found in {args.sidecar}")
         return 2
     plan = effort_config(args.effort, available)
-    if args.epochs is not None:
-        plan["max_epochs"] = args.epochs
-    if args.patience is not None:
-        plan["patience"] = args.patience
+    data = data_fingerprint(args.raw, args.sidecar)
+    recipe = {
+        "model": args.model,
+        "effort": args.effort,
+        "positions": plan["positions"],
+        "seed": args.seed,
+        "representation": rep.to_dict(),
+        "init": args.init,
+        "lr": args.lr,
+        "data": data,
+    }
     print(f"Effort {args.effort}: {available:,} TRAIN rows available")
     for key, value in plan.items():
         print(f"  {key}: {value:,}")
@@ -209,10 +200,10 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     )
     config = checkpoint_config(args.checkpoint)
     if config is not None:
-        expected = fit_config(
-            plan, config["l2"], config["lr"], args.lr_decay, patience=plan["patience"]
-        )
+        expected = fit_config(plan, config["l2"], config["lr"])
         changed = sorted(k for k in expected if k != "workers" and config.get(k) != expected[k])
+        left = config.get("recipe", {})
+        changed += [f"recipe.{k}" for k in recipe if left.get(k) != recipe[k]]
         if changed:
             print(
                 f"{args.checkpoint} was left by a fit with other {', '.join(changed)}: "
@@ -228,12 +219,16 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             f"validation {timing.encode_seconds:.2f} s to featurize and "
             f"{timing.score_seconds:.2f} s per epoch"
         )
-        print(f"Estimated duration: {format_duration(estimate)}")
+        print(
+            f"Estimated duration (upper bound, early stopping ends sooner): {format_duration(estimate)}"
+        )
         best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
         lr = best["lr"] if args.lr is None else args.lr
-        config = fit_config(plan, best["l2"], lr, args.lr_decay, patience=plan["patience"])
-        # Kept in the checkpoint, so a resumed run still counts the timing and the trials.
+        config = fit_config(plan, best["l2"], lr)
+        # Kept in the checkpoint, so a resumed run still counts the timing and the trials and
+        # refuses to go on under another recipe.
         config["setup_seconds"] = round(time.perf_counter() - started, 3)
+        config["recipe"] = recipe
     print(f"Final fit with l2={config['l2']:.2e}, lr={config['lr']:.2e}")
     model, summary = fit(
         model_class,
@@ -254,6 +249,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
     if args.checkpoint is not None:
         args.checkpoint.unlink(missing_ok=True)
     clear_measurements(model_spec(args))
+    summary["config"] = {k: v for k, v in summary["config"].items() if k != "recipe"}
+    raw = args.raw.resolve()
     update_card(
         model_spec(args),
         status="current",
@@ -262,9 +259,12 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         parameters=model.count_parameters(),
         size_kb=round(path.stat().st_size / 1024, 1),
         training={
-            "dataset": str(args.raw),
+            "dataset": str(raw.relative_to(ROOT) if raw.is_relative_to(ROOT) else raw),
+            "data": data,
             "date": today(),
             "commit": current_commit(),
+            "environment": environment(),
+            "recipe": recipe,
             **summary,
             "seconds": round(config["setup_seconds"] + summary["seconds"], 3),
             "train_samples": summary["train_rows"],

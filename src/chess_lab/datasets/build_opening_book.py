@@ -27,6 +27,8 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from chess_lab.datasets.book import MATE_SCORE, position_key
+from chess_lab.datasets.fen_index import hash_keys, sorted_index
+from chess_lab.datasets.fen_index import lookup as lookup_keys
 from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.models.defaults import RAW_DIR
 
@@ -74,22 +76,17 @@ def load_index(
             continue
         cp = table["cp"].to_numpy(zero_copy_only=False).astype(np.float64)
         mate = table["mate"].to_numpy(zero_copy_only=False).astype(np.float64)
-        hashes.append(np.fromiter((hash(f) for f in table["fen"].to_pylist()), np.int64))
+        hashes.append(hash_keys(table["fen"].to_pylist()))
         scores.append(ranking_scores(cp, mate))
-    all_hashes, all_scores = np.concatenate(hashes), np.concatenate(scores)
-    order = np.argsort(all_hashes, kind="stable")
-    return all_hashes[order], all_scores[order]
+    return sorted_index(hashes, scores)
 
 
 def make_lookup(hashes: np.ndarray, scores: np.ndarray) -> Lookup:
     """Function that gives the White score of a position key, or ``None`` if it is not indexed."""
 
     def lookup(key: str) -> Optional[float]:
-        h = hash(key)
-        i = int(np.searchsorted(hashes, h))
-        if i < len(hashes) and hashes[i] == h:
-            return float(scores[i])
-        return None
+        score = float(lookup_keys(hashes, scores, [key], np.nan)[0])
+        return None if np.isnan(score) else score
 
     return lookup
 

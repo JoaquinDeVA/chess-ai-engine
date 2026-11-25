@@ -31,6 +31,7 @@ import numpy as np
 import pyarrow.parquet as pq
 
 from chess_lab.datasets.book import position_key
+from chess_lab.datasets.fen_index import hash_keys, lookup, sorted_index
 from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.datasets.sidecar import sidecar_path
 from chess_lab.datasets.split import TEST, TRAIN, VALIDATION
@@ -51,11 +52,9 @@ def load_index(raw_dir: Path, sidecar_dir: Path) -> Tuple[np.ndarray, np.ndarray
     for shard in list_shards(raw_dir):
         side = pq.read_table(sidecar_path(shard, sidecar_dir), columns=["split"])
         fens = pq.read_table(shard, columns=["fen"])["fen"].to_pylist()
-        hashes.append(np.fromiter((hash(f) for f in fens), np.int64, count=len(fens)))
+        hashes.append(hash_keys(fens))
         splits.append(side["split"].to_numpy().astype(np.int8))
-    all_hashes, all_splits = np.concatenate(hashes), np.concatenate(splits)
-    order = np.argsort(all_hashes, kind="stable")
-    return all_hashes[order], all_splits[order]
+    return sorted_index(hashes, splits)
 
 
 def duplicate_report(hashes: np.ndarray, splits: np.ndarray) -> Dict[str, int]:
@@ -88,11 +87,7 @@ def splits_of(hashes: np.ndarray, splits: np.ndarray, keys: Sequence[str]) -> Li
     :param keys: Position keys to look up.
     :return: One value per key.
     """
-    wanted = np.fromiter((hash(k) for k in keys), np.int64, count=len(keys))
-    positions = np.searchsorted(hashes, wanted)
-    positions[positions == len(hashes)] = len(hashes) - 1
-    found = hashes[positions] == wanted
-    return np.where(found, splits[positions], -1).tolist()
+    return lookup(hashes, splits, keys, -1).tolist()
 
 
 def neighbour_report(

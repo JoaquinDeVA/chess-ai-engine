@@ -10,7 +10,6 @@ than two legal moves or already finished are skipped.
 """
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import chess
@@ -20,6 +19,7 @@ import pandas as pd
 from chess_engine.paths import ROOT
 from chess_lab.datasets.sidecar import load_sample
 from chess_lab.datasets.split import TEST
+from chess_lab.datasets.stockfish import cp_mate, label_parallel
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 
 #: Rows of the test sample the positions are drawn from (the same sample as ``measure.evaluate``).
@@ -44,27 +44,8 @@ def label_position(
     infos = engine.analyse(board, chess.engine.Limit(depth=depth), multipv=count)
     rows = []
     for info in infos:
-        score = info["score"].pov(board.turn)
-        mate = score.mate()
-        rows.append(
-            (
-                info["pv"][0].uci(),
-                float("nan") if mate is not None else float(score.score()),
-                float("nan") if mate is None else float(mate),
-            )
-        )
+        rows.append((info["pv"][0].uci(), *cp_mate(info["score"].pov(board.turn))))
     return rows
-
-
-def _label_chunk(args: tuple[str, int, list[str]]) -> list[tuple[str, str, float, float]]:
-    """Worker: label a list of positions with its own engine."""
-    engine_path, depth, fens = args
-    engine = chess.engine.SimpleEngine.popen_uci(engine_path)
-    try:
-        engine.configure({"Threads": 1, "Hash": 64})
-        return [(fen, *row) for fen in fens for row in label_position(engine, fen, depth)]
-    finally:
-        engine.quit()
 
 
 def eligible(fens: list[str], rows: int) -> list[str]:
@@ -94,9 +75,8 @@ def main() -> None:
     sample = load_sample(args.raw, args.sidecar, TEST, SAMPLE_ROWS, seed=SAMPLE_SEED)
     quiet = dict(zip(sample["fen"], sample["quiet"], strict=True))
     fens = eligible(sample["fen"].tolist(), args.rows)
-    chunks = [(args.engine, args.depth, fens[i :: args.jobs * 8]) for i in range(args.jobs * 8)]
-    with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        rows = [row for part in pool.map(_label_chunk, chunks) for row in part]
+    labelled = label_parallel(args.engine, args.depth, fens, args.jobs, label_position)
+    rows = [(fen, *row) for fen, moves in labelled for row in moves]
     table = pd.DataFrame(rows, columns=["fen", "move", "cp", "mate"])
     table["quiet"] = table["fen"].map(quiet).astype(bool)
     table = table.sort_values(["fen", "move"], kind="stable", ignore_index=True)

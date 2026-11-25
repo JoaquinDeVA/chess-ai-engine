@@ -12,7 +12,6 @@ White's point of view, and its best move gives the quiet flag, as in the sidecar
 """
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -23,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.paths import ROOT
+from chess_lab.datasets.stockfish import cp_mate, label_parallel
 from chess_lab.models.target import is_quiet
 
 #: Default PGN files: the fixed-node screenings fetched from the node.
@@ -87,26 +87,9 @@ def label_position(engine: chess.engine.SimpleEngine, fen: str, depth: int) -> R
         when the engine gives no line.
     """
     info = engine.analyse(chess.Board(fen), chess.engine.Limit(depth=depth))
-    score = info["score"].white()
-    mate = score.mate()
+    cp, mate = cp_mate(info["score"].white())
     pv = info.get("pv")
-    return (
-        fen,
-        float("nan") if mate is not None else float(score.score()),
-        float("nan") if mate is None else float(mate),
-        pv[0].uci() if pv else None,
-    )
-
-
-def _label_chunk(args: Tuple[str, int, List[str]]) -> List[Row]:
-    """Worker: label a list of positions with its own engine."""
-    engine_path, depth, fens = args
-    engine = chess.engine.SimpleEngine.popen_uci(engine_path)
-    try:
-        engine.configure({"Threads": 1, "Hash": 64})
-        return [label_position(engine, fen, depth) for fen in fens]
-    finally:
-        engine.quit()
+    return fen, cp, mate, pv[0].uci() if pv else None
 
 
 def table_of(rows: List[Row]) -> pd.DataFrame:
@@ -153,9 +136,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     rng = np.random.default_rng(SEED)
     fens = unique(fen for pgn in pgns for fen in game_positions(pgn, args.per_game, rng))
     fens = fens[: args.limit] if args.limit else fens
-    chunks = [(args.engine, args.depth, fens[i :: args.jobs * 8]) for i in range(args.jobs * 8)]
-    with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        rows = [row for part in pool.map(_label_chunk, chunks) for row in part]
+    rows = [
+        row for _, row in label_parallel(args.engine, args.depth, fens, args.jobs, label_position)
+    ]
     table = table_of(rows).sort_values("fen", kind="stable", ignore_index=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     table.to_parquet(args.out, index=False)

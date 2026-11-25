@@ -16,6 +16,8 @@ from typing import List
 import chess
 import chess.engine
 
+from chess_lab.datasets.stockfish import open_engine
+
 MIN_PLY, MAX_PLY = 8, 10
 
 
@@ -81,8 +83,7 @@ def main() -> None:
     """Write one FEN per line, the form fastchess reads as an openings file."""
     args = parse_args()
     fens = playouts(args.pool, args.seed)
-    with chess.engine.SimpleEngine.popen_uci(args.stockfish) as engine:
-        engine.configure({"Threads": 1})
+    with open_engine(args.stockfish, hash_mb=None) as engine:
         passed = balanced(fens, engine, args.depth, args.limit)
     chosen = random.Random(args.seed).sample(passed, min(args.count, len(passed)))
     args.out.parent.mkdir(parents=True, exist_ok=True)

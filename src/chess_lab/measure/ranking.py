@@ -16,6 +16,7 @@ import chess
 import numpy as np
 import pandas as pd
 
+from chess_lab.datasets.stockfish import open_engine
 from chess_lab.models.target import Representation, white_score
 
 #: Score of a mating move: above any evaluation.
@@ -127,9 +128,7 @@ def main() -> int:
     parser.add_argument("--ranking", type=Path, default=OUT, help="move-ranking test set")
     args = parser.parse_args()
     table = pd.read_parquet(args.ranking)
-    engine = chess.engine.SimpleEngine.popen_uci(args.engine)
-    try:
-        engine.configure({"Threads": 1, "Hash": 64})
+    with open_engine(args.engine) as engine:
 
         def scorer(fen: str, moves: list[chess.Move]) -> np.ndarray:
             rows = {m: (cp, mate) for m, cp, mate in label_position(engine, fen, args.depth)}
@@ -138,8 +137,6 @@ def main() -> int:
             return white_score(cp, mate, Representation())
 
         report = judge_scorer(scorer, table)
-    finally:
-        engine.quit()
     for name, part in report.items():
         print(
             f"stockfish depth {args.depth} ({name}, {part['positions']} positions): "

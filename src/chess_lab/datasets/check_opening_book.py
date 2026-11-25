@@ -26,6 +26,8 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import chess
 import chess.engine
 
+from chess_lab.datasets.stockfish import open_engine
+
 API = "https://lichess.org/api/cloud-eval"
 #: Score of a forced mate, minus the moves it takes.
 MATE_SCORE = 100_000
@@ -271,8 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     book = json.loads(args.book.read_text(encoding="utf-8"))
     if args.engine:
-        with chess.engine.SimpleEngine.popen_uci(args.engine) as engine:
-            engine.configure({"Threads": 2})
+        with open_engine(args.engine, threads=2, hash_mb=None) as engine:
             result = check_book(
                 book, args.fraction, args.seed, args.margin, local_engine_fetch(engine, args.depth)
             )

@@ -13,6 +13,7 @@ from chess_lab.models.definitions import (
     NnThreatsW64BothModel,
     NnW64BothModel,
     NnW128Ob8BothModel,
+    NnW128Ob8H16BothModel,
     get_model_class,
     output_bucket,
 )
@@ -62,18 +63,30 @@ def ctx_table_rows(model: NeuralEvalModel, board: chess.Board) -> list[int]:
 
 def ctx_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     """Reference of a ``pst_ctx`` network: each view is the position with that side to move."""
-    (w0, b0), (w1, b1) = model.layers
+    w0, b0 = model.layers[0]
     rival = board.copy()
     rival.turn = not board.turn
     views = [ctx_table_rows(model, board), ctx_table_rows(model, rival)]
     h = np.concatenate([np.clip(w0[rows].sum(axis=0) + b0, 0.0, 1.0) for rows in views])
-    return float((h @ w1 + b1)[reference_bucket(model, board)])
+    return output_logit(model, h, board)
 
 
 def reference_bucket(model: NeuralEvalModel, board: chess.Board) -> int:
     """The output unit of ``board``: its pieces on the board, four counts per bucket of eight."""
-    buckets = model.layers[1][0].shape[1]
+    buckets = model.layers[-1][0].shape[1]
     return (len(board.piece_map()) - 1) * buckets // 32
+
+
+def output_logit(model: NeuralEvalModel, h: np.ndarray, board: chess.Board) -> float:
+    """The output of ``board`` over both accumulators ``h``: linear, or its bucket's head."""
+    bucket = reference_bucket(model, board)
+    w1, b1 = model.layers[1]
+    if len(model.layers) == 2:
+        return float((h @ w1 + b1)[bucket])
+    (w2, b2), head = model.layers[2], model.layers[2][0].shape[0]
+    columns = slice(bucket * head, (bucket + 1) * head)
+    hidden = np.clip(h @ w1[:, columns] + b1[columns], 0.0, 1.0)
+    return float(hidden @ w2[:, bucket] + b2[bucket])
 
 
 def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
@@ -84,7 +97,7 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
     x = np.zeros(features_of(model).size())
     for index, value in zip(indices, values, strict=True):
         x[index] += value
-    (w0, b0), (w1, b1) = model.layers
+    w0, b0 = model.layers[0]
     h = np.clip(x @ w0 + b0, 0.0, 1.0)
     # the rival's view: every piece in the other block of its square; the dense entries have no
     # rival view
@@ -93,7 +106,7 @@ def dense_logit(model: NeuralEvalModel, board: chess.Board) -> float:
         if index < 768:
             rival[(index + 384) % 768] += value
     h = np.concatenate([h, np.clip(rival @ w0 + b0, 0.0, 1.0)])
-    return float((h @ w1 + b1)[reference_bucket(model, board)])
+    return output_logit(model, h, board)
 
 
 class TwoHiddenModel(NeuralEvalModel):
@@ -122,6 +135,12 @@ def test_the_second_layer_reads_both_sides_so_its_input_is_twice_the_accumulator
     model = new_model(NnW64BothModel, Representation())
     assert [weights.shape for weights, _ in model.layers] == [(768, 64), (128, 1)]
     assert model.count_parameters() == 768 * 64 + 64 + 128 + 1
+
+
+def test_a_head_gives_every_bucket_its_own_hidden_layer():
+    model = new_model(NnW128Ob8H16BothModel, Representation())
+    assert [weights.shape for weights, _ in model.layers] == [(768, 128), (256, 128), (16, 8)]
+    assert model.count_parameters() == 768 * 128 + 128 + 256 * 128 + 128 + 16 * 8 + 8
 
 
 def test_eight_output_buckets_take_four_piece_counts_each():
@@ -173,16 +192,30 @@ def test_the_training_graph_computes_what_the_core_does(model_class):
         assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
 
 
-def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph():
-    model = random_net(seed=4, model_class=NnW128Ob8BothModel)
+def one_board_per_bucket() -> list[chess.Board]:
+    """The start position with pieces removed: 3, 7, ..., 31 pieces, one in each of 8 buckets."""
     boards = []
-    for pieces in range(3, 33, 4):  # one position per bucket
+    for pieces in range(3, 33, 4):
         board = chess.Board()
         for square in [s for s, p in board.piece_map().items() if p.piece_type != chess.KING][
             : 32 - pieces
         ]:
             board.remove_piece_at(square)
         boards.append(board)
+    return boards
+
+
+def test_the_training_graph_computes_the_head_of_every_bucket():
+    model = random_net(seed=4, model_class=NnW128Ob8H16BothModel)
+    boards = one_board_per_bucket() + random_positions(20, seed=19)
+    assert [reference_bucket(model, b) for b in boards[:8]] == list(range(8))
+    for board, logit in zip(boards, keras_logits(model, boards), strict=True):
+        assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
+
+
+def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph():
+    model = random_net(seed=4, model_class=NnW128Ob8BothModel)
+    boards = one_board_per_bucket()
     assert [reference_bucket(model, b) for b in boards] == list(range(8))
     evaluator = model.evaluator()
     for board, logit in zip(boards, keras_logits(model, boards), strict=True):
@@ -234,8 +267,10 @@ def test_a_warm_start_scores_as_its_source_in_the_core(model_class):
     assert [white_score_of(warm, board) for board in boards] == pytest.approx(scores, abs=1e-6)
 
 
-@pytest.mark.parametrize("name", ["net_pst_w256_both", "net_pst_threats_w64_both"])
-def test_a_warm_start_refuses_another_width_or_feature_set(name):
+@pytest.mark.parametrize(
+    "name", ["net_pst_w256_both", "net_pst_threats_w64_both", "net_pst_w128_ob8h16_both"]
+)
+def test_a_warm_start_refuses_another_width_feature_set_or_a_head(name):
     source = random_net(model_class=get_model_class("net_pst_w128_both"))
     with pytest.raises(ValueError, match="cannot start"):
         warm_layers(source, get_model_class(name))
@@ -269,24 +304,25 @@ class CutAfterOneEpoch:
         return iter(self.frames)
 
 
-def test_a_fit_cut_after_an_epoch_resumes_as_if_it_had_not_stopped(tmp_path):
+@pytest.mark.parametrize("model_class", [NnW64BothModel, NnW128Ob8H16BothModel])
+def test_a_fit_cut_after_an_epoch_resumes_as_if_it_had_not_stopped(tmp_path, model_class):
     boards = random_positions(64, seed=21)
     training, validation = [frame(boards[:48])], frame(boards[48:])
     config = {"max_epochs": 2, "lr_decay": 0.5, "patience": 5, "batch_size": 16}
-    whole = new_model(NnW64BothModel, Representation())
+    whole = new_model(model_class, Representation())
     expected = fit_stream(whole, training, validation, config)
 
     checkpoint = tmp_path / "fit.npz"
     with pytest.raises(RuntimeError, match="cut"):
         fit_stream(
-            new_model(NnW64BothModel, Representation()),
+            new_model(model_class, Representation()),
             CutAfterOneEpoch(training),
             validation,
             config,
             checkpoint=checkpoint,
         )
     assert checkpoint_config(checkpoint)["max_epochs"] == 2
-    resumed = new_model(NnW64BothModel, Representation())
+    resumed = new_model(model_class, Representation())
     summary = fit_stream(resumed, training, validation, config, checkpoint=checkpoint)
 
     for key in ("epochs", "best_epoch", "train_rows"):

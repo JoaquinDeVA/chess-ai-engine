@@ -18,6 +18,7 @@ def test_every_model_is_in_the_table():
         "net_pst_w64_both",
         "net_pst_w128_both",
         "net_pst_w128_ob8_both",
+        "net_pst_w128_ob8h16_both",
         "net_pst_w256_both",
         "net_pst_threats_w64_both",
         "net_ctx_m_w128_both",
@@ -61,6 +62,19 @@ def test_a_saved_ctx_model_remembers_its_families(tmp_path):
     assert cls.load(path).families == cls.families
     with pytest.raises(ValueError, match="families"):
         get_model_class("net_ctx_k_w128_both").load(path)
+
+
+def test_a_saved_head_loads_back_and_only_into_its_own_class(tmp_path):
+    heads = get_model_class("net_pst_w128_ob8h16_both")
+    linear = get_model_class("net_pst_w128_ob8_both")
+    model = new_model(heads, Representation())
+    loaded = heads.load(model.save(tmp_path / "h.npz"))
+    for (weights, bias), (want_weights, want_bias) in zip(loaded.layers, model.layers, strict=True):
+        assert np.array_equal(weights, want_weights) and np.array_equal(bias, want_bias)
+    with pytest.raises(ValueError, match="has 3 layers, expected 2"):
+        linear.load(tmp_path / "h.npz")
+    with pytest.raises(ValueError, match="has 2 layers, expected 3"):
+        heads.load(new_model(linear, Representation()).save(tmp_path / "l.npz"))
 
 
 def test_unknown_model_lists_the_valid_names():

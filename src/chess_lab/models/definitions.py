@@ -40,13 +40,13 @@ def output_bucket(pieces: int, buckets: int) -> int:
 class NeuralEvalModel:
     """Feed-forward network over the sparse inputs of ``feature_set``, saved in one ``.npz`` file.
 
-    Two weight layers: the accumulator over the sparse inputs, and an output layer over the
-    accumulators of both sides, whose value is the logit of the expected score of the player to
-    move. With several output buckets, the position reads one unit of the output layer, chosen
-    by its number of pieces (see :func:`output_bucket`).
+    The accumulator over the sparse inputs, then an output over the accumulators of both sides,
+    whose value is the logit of the expected score of the player to move. With several output
+    buckets, the position reads one unit of the output, chosen by its number of pieces (see
+    :func:`output_bucket`). Without a head the output is one linear layer; with one, each bucket
+    has its own hidden layer of ``head`` units, clipped to ``[0, 1]``, and a linear unit over it.
 
-    :param layers: ``(weights, bias)`` per weight layer, with shapes ``(inputs, width)`` and
-        ``(2 * width, output_buckets)``.
+    :param layers: ``(weights, bias)`` per weight layer, of the shapes of :meth:`layer_shapes`.
     :param rep: Representation of the training target as a plain dictionary, saved untouched.
     :cvar name: Model name, also used for the artifact and card file names.
     :cvar feature_set: Name of the feature set, one of ``chess_lab.models.features.FEATURE_SETS``.
@@ -56,6 +56,7 @@ class NeuralEvalModel:
     :cvar families: Which families of the ``pst_ctx`` inputs the network reads, among
         :data:`CTX_FAMILIES`; empty for the other feature sets.
     :cvar output_buckets: Units of the output layer, from 1 to :data:`MAX_OUTPUT_BUCKETS`.
+    :cvar head: Width of the hidden layer of each bucket; 0 for a linear output.
     """
 
     name: ClassVar[str]
@@ -64,6 +65,7 @@ class NeuralEvalModel:
     hidden: ClassVar[Tuple[int, ...]] = ()
     families: ClassVar[Tuple[str, ...]] = ()
     output_buckets: ClassVar[int] = 1
+    head: ClassVar[int] = 0
 
     @classmethod
     def input_rows(cls) -> int:
@@ -95,7 +97,10 @@ class NeuralEvalModel:
 
         :return: The accumulator and the output layer; the output reads the accumulators of both
             sides (the mover's, then the rival's, over the same first-layer weights), so it has
-            twice the inputs.
+            twice the inputs. With a head the output is two layers: the hidden units of every
+            bucket, ``(2 * width, output_buckets * head)``, bucket ``b`` in columns
+            ``b * head`` to ``(b + 1) * head - 1``; and ``(head, output_buckets)``, whose column
+            ``b`` reads the hidden units of bucket ``b``.
         :raises ValueError: If ``hidden`` is not one width that is a multiple of 8.
         """
         if len(cls.hidden) != 1 or cls.hidden[0] % 8:
@@ -104,7 +109,13 @@ class NeuralEvalModel:
                 f"not {cls.hidden}"
             )
         width = cls.hidden[0]
-        return [(cls.input_rows(), width), (2 * width, cls.output_buckets)]
+        if not cls.head:
+            return [(cls.input_rows(), width), (2 * width, cls.output_buckets)]
+        return [
+            (cls.input_rows(), width),
+            (2 * width, cls.output_buckets * cls.head),
+            (cls.head, cls.output_buckets),
+        ]
 
     def __init__(self, layers: Sequence[Layer], rep: Optional[Dict[str, Any]] = None):
         self.rep: Dict[str, Any] = dict(rep) if rep else {}
@@ -151,7 +162,7 @@ class NeuralEvalModel:
         :return: The model, with the representation it was trained with.
         :raises FileNotFoundError: If the file does not exist.
         :raises ValueError: If the file was saved with another feature set or hidden sizes, or
-            its layers do not chain.
+            its layers do not have the shapes of :meth:`layer_shapes`.
         """
         path = Path(path) if path else cls.default_path()
         if not path.exists():
@@ -167,16 +178,20 @@ class NeuralEvalModel:
                     f"{path} was saved with hidden sizes {tuple(meta['hidden'])}, "
                     f"expected {cls.hidden}"
                 )
-            layers = [(data[f"W{i}"], data[f"b{i}"]) for i in range(len(cls.hidden) + 1)]
-        fan_outs = (*cls.hidden, cls.output_buckets)
-        for position, ((weights, bias), fan_out) in enumerate(zip(layers, fan_outs, strict=True)):
-            if weights.shape[1] != fan_out or bias.shape != (fan_out,):
+            shapes = cls.layer_shapes()
+            count = sum(name.startswith("W") for name in data.files)
+            if count != len(shapes):
+                raise ValueError(f"{path} has {count} layers, expected {len(shapes)}")
+            layers = [(data[f"W{i}"], data[f"b{i}"]) for i in range(len(shapes))]
+        for position, ((weights, bias), (fan_in, fan_out)) in enumerate(
+            zip(layers, shapes, strict=True)
+        ):
+            rows = weights.shape[0] if position == 0 else fan_in  # the core checks the inputs
+            if weights.shape != (rows, fan_out) or bias.shape != (fan_out,):
                 raise ValueError(
                     f"{path}: layer {position} has shapes {weights.shape} and {bias.shape}, "
-                    f"expected {fan_out} outputs"
+                    f"expected {(rows, fan_out)}"
                 )
-        if layers[1][0].shape[0] != 2 * cls.hidden[0]:
-            raise ValueError(f"{path}: the second layer must read both perspectives")
         return cls(layers=layers, rep=meta["rep"])
 
     def save(self, path: Optional[Path] = None) -> Path:
@@ -236,6 +251,20 @@ class NnW128Ob8BothModel(NeuralEvalModel):
     architecture = (
         "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
         "128 accumulator, 256-8 with one output unit per 4 piece counts (2 layers)"
+    )
+
+
+class NnW128Ob8H16BothModel(NeuralEvalModel):
+    """As ``net_pst_w128_ob8_both``, with a hidden layer of 16 units in every bucket."""
+
+    name = "net_pst_w128_ob8h16_both"
+    feature_set = "pst_slotted"
+    hidden = (128,)
+    output_buckets = 8
+    head = 16
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides over one shared "
+        "128 accumulator, 256-16-1 in each of 8 buckets of 4 piece counts (3 layers)"
     )
 
 
@@ -300,6 +329,7 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnW64BothModel,
         NnW128BothModel,
         NnW128Ob8BothModel,
+        NnW128Ob8H16BothModel,
         NnW256BothModel,
         NnThreatsW64BothModel,
         *(_ctx_model(letters, 128) for letters in ("m", "p", "k", "mpk")),

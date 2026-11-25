@@ -3,7 +3,7 @@
 The first weight layer is the accumulator: the rows of the active features are summed, and the
 sum is clipped to ``[0, 1]``. The output is a linear layer over the accumulators of both sides,
 of which each position reads the unit of its piece count (one unit unless the model has output
-buckets).
+buckets); with a head, every bucket first has its own hidden layer, clipped to ``[0, 1]``.
 Keras (imported lazily by :func:`fit_stream`) trains the network and its weights are exported
 to NumPy arrays, which are what the saved model stores.
 """
@@ -97,10 +97,11 @@ def warm_layers(source: NeuralEvalModel, model_class: type) -> List[Layer]:
         or model_class.feature_set not in ("pst_slotted", "pst_ctx")
         or source.output_buckets != 1
         or source.hidden != model_class.hidden
+        or model_class.head
     ):
         raise ValueError(
             f"cannot start {model_class.name} from {source.name}: the source must be a pst_slotted "
-            "network of the same width with one output unit"
+            "network of the same width with one output unit, and the target have no head"
         )
     (weights, bias), (output_weights, output_bias) = source.layers
     table = np.zeros((model_class.input_rows(), weights.shape[1]))
@@ -269,6 +270,34 @@ def _accumulator_class(keras: Any) -> type:
     return SparseAccumulator
 
 
+def _heads_class(keras: Any) -> type:
+    """The layer of the bucket heads, defined once Keras is imported.
+
+    :param keras: The ``keras`` module.
+    :return: A Keras layer class.
+    """
+
+    class BucketHeads(keras.layers.Layer):
+        """One linear unit per bucket over that bucket's block of ``head`` hidden units."""
+
+        def __init__(self, head: int, buckets: int, **kwargs: Any):
+            super().__init__(**kwargs)
+            self.head, self.buckets = head, buckets
+
+        def build(self, _input_shape: Any) -> None:
+            self.kernel = self.add_weight(
+                name="kernel", shape=(self.head, self.buckets), initializer="he_normal"
+            )
+            self.bias = self.add_weight(name="bias", shape=(self.buckets,), initializer="zeros")
+
+        def call(self, hidden: Any) -> Any:
+            # Hidden unit ``b * head + k`` is unit ``k`` of bucket ``b``.
+            blocks = keras.ops.reshape(hidden, (-1, self.buckets, self.head))
+            return keras.ops.einsum("nbk,kb->nb", blocks, self.kernel) + self.bias
+
+    return BucketHeads
+
+
 def _keras_network(
     keras: Any,
     shapes: Sequence[Tuple[int, int]],
@@ -277,13 +306,16 @@ def _keras_network(
     families: Sequence[str] = (),
     ctx: bool = False,
 ) -> Tuple[Any, List[Any]]:
-    """The training network: the accumulator and the output layer of ``shapes``.
+    """The training network: the accumulator and the output layers of ``shapes``.
 
     With several output units, each row keeps the one of its bucket: its pieces are the entries
-    below ``MATERIAL_BASE`` (the same 768 in every feature set), as the core counts them.
+    below ``MATERIAL_BASE`` (the same 768 in every feature set), as the core counts them. Three
+    layers are a head per bucket: every bucket's hidden units and output are computed, and the
+    row keeps its bucket's.
 
     :param keras: The ``keras`` module.
-    :param shapes: ``(fan_in, fan_out)`` of the two weight layers, accumulator first.
+    :param shapes: ``(fan_in, fan_out)`` of the weight layers, accumulator first (see
+        :meth:`~chess_lab.models.definitions.NeuralEvalModel.layer_shapes`).
     :param width: Slots per input row.
     :param l2: Weight decay of the accumulator.
     :param families: Families of the ``pst_ctx`` inputs the network reads.
@@ -301,9 +333,14 @@ def _keras_network(
     index_in = keras.Input(shape=(width,), dtype="int32")
     value_in = keras.Input(shape=(width,), dtype="float32")
     x = accumulator([index_in, value_in])
-    buckets = shapes[1][1]
-    output = keras.layers.Dense(buckets, kernel_initializer="he_normal", name="dense1")
+    buckets = shapes[-1][1]
+    output = keras.layers.Dense(shapes[1][1], kernel_initializer="he_normal", name="dense1")
+    parts = [accumulator, output]
     logits = output(x)
+    if len(shapes) == 3:
+        heads = _heads_class(keras)(head=shapes[2][0], buckets=buckets, name="heads")
+        parts.append(heads)
+        logits = heads(keras.ops.clip(logits, 0.0, 1.0))
     if buckets > 1:
         ops = keras.ops
         piece = ops.logical_and(index_in > 0, index_in - 1 < MATERIAL_BASE)
@@ -311,35 +348,33 @@ def _keras_network(
         bucket = ops.minimum((pieces - 1) * buckets // MAX_OUTPUT_BUCKETS, buckets - 1)
         logits = ops.take_along_axis(logits, ops.expand_dims(bucket, -1), axis=1)
     model = keras.Model([index_in, value_in], logits)
-    return model, [accumulator, output]
+    return model, parts
 
 
 def _assign(parts: Sequence[Any], layers: Sequence[Layer]) -> None:
     """Copy NumPy weights into the Keras weight layers (accumulator table without padding row).
 
-    :param parts: The accumulator and the output layer.
+    :param parts: The accumulator and the output layers.
     :param layers: ``(weights, bias)`` per layer, same order.
     """
-    accumulator, output = parts
-    (weights, bias), (output_weights, output_bias) = layers
+    (accumulator, *outputs), ((weights, bias), *output_layers) = parts, layers
     table = np.vstack([np.zeros((1, weights.shape[1])), weights])
     accumulator.table.assign(table.astype(np.float32))
     accumulator.bias.assign(bias.astype(np.float32))
-    output.kernel.assign(output_weights.astype(np.float32))
-    output.bias.assign(output_bias.astype(np.float32))
+    for output, (output_weights, output_bias) in zip(outputs, output_layers, strict=True):
+        output.kernel.assign(output_weights.astype(np.float32))
+        output.bias.assign(output_bias.astype(np.float32))
 
 
 def _export(parts: Sequence[Any]) -> List[Layer]:
     """NumPy copies of the Keras weights, accumulator first (padding row dropped).
 
-    :param parts: The accumulator and the output layer.
+    :param parts: The accumulator and the output layers.
     :return: ``(weights, bias)`` per layer, in float64.
     """
-    accumulator, output = parts
-    layers = [
-        (np.asarray(accumulator.table)[1:], np.asarray(accumulator.bias)),
-        (np.asarray(output.kernel), np.asarray(output.bias)),
-    ]
+    accumulator, *outputs = parts
+    layers = [(np.asarray(accumulator.table)[1:], np.asarray(accumulator.bias))]
+    layers += [(np.asarray(output.kernel), np.asarray(output.bias)) for output in outputs]
     return [(np.asarray(w, dtype=np.float64), np.asarray(b, dtype=np.float64)) for w, b in layers]
 
 
@@ -386,7 +421,8 @@ def _load_checkpoint(path: Path, network: Any) -> Tuple[Dict[str, Any], List[Lay
         network.optimizer.build(network.trainable_variables)
         for i, variable in enumerate(network.optimizer.variables):
             variable.assign(data[f"optimizer{i}"])
-        best = [(data[f"best_weights{i}"], data[f"best_bias{i}"]) for i in range(2)]
+        count = sum(name.startswith("best_weights") for name in data.files)
+        best = [(data[f"best_weights{i}"], data[f"best_bias{i}"]) for i in range(count)]
     return loop, best
 
 

@@ -16,6 +16,17 @@ def test_network_payload_is_row_major():
     assert payload["features"] == model.feature_set
 
 
+def test_a_head_is_written_as_a_third_layer():
+    model_class = get_model_class("net_pst_w128_ob8h16_both")
+    layers = [(np.zeros(shape), np.zeros(shape[1])) for shape in model_class.layer_shapes()]
+    payload = export_payload(model_class(layers))
+    assert [(layer["fan_in"], layer["fan_out"]) for layer in payload["layers"]] == [
+        (768, 128),
+        (256, 128),
+        (16, 8),
+    ]
+
+
 def test_both_perspectives_are_written_in_the_payload():
     layers = [(np.zeros((768, 4)), np.zeros(4)), (np.zeros((8, 1)), np.zeros(1))]
     assert export_payload(NnW64BothModel(layers))["perspective"] == "both"

@@ -3,7 +3,8 @@
 The file is hand-written except for the block between the ``BEGIN``/``END`` markers, which
 this module regenerates: ``python -m chess_lab.measure.report``.
 
-Each row reads the card sections ``accuracy`` and ``cost``, written by ``measure.evaluate``.
+Each row reads the card sections ``accuracy`` and ``cost``, written by ``measure.evaluate``, and the
+positions and epochs the model was really trained with (``training.effort_config``).
 A missing value shows a dash.
 """
 
@@ -24,15 +25,24 @@ END_MARKER = "<!-- END GENERATED TABLES -->"
 _STATUS_ORDER = {"current": 0, "reference": 1, "retired": 2}
 _DASH = "—"
 _HEADER = (
-    "| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | "
+    "| Model | Params | Representation | Effort | Positions (M) | Max epochs | Spearman | MAE | "
+    "Excess (nats) | "
     "Best move, all / non-quiet | µs per eval |"
 )
-_ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|---:|"
+_ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|"
 _OTHER_SAMPLE = "†"
+_OLD_EFFORT = "‡"
+#: Training date from which ``effort`` is a share of the TRAIN rows; before it, millions of positions.
+EFFORT_CHANGE_DATE = "2026-11-16"
 _NOTES = {
     _OTHER_SAMPLE: (
         "† Judged on another test sample than most rows, or before the sample hash was recorded: "
         "its accuracy columns are not comparable with the unmarked rows."
+    ),
+    _OLD_EFFORT: (
+        "‡ Effort of the old meaning (millions of positions, until 2026-11-16); since then it is a "
+        "share of the TRAIN rows, so the number of positions behind it depends on the data. "
+        "Compare the Positions column, not the Effort one."
     ),
 }
 
@@ -100,6 +110,22 @@ def _reference_sample(cards: List[Dict[str, Any]]) -> Optional[str]:
     return counts.most_common(1)[0][0] if counts else None
 
 
+def _positions(card: Dict[str, Any]) -> Optional[int]:
+    """Positions the model was trained on, as the card recorded them (None on old cards)."""
+    positions = _dig(card, "training", "effort_config", "positions")
+    return _dig(card, "training", "recipe", "positions") if positions is None else positions
+
+
+def _old_effort(card: Dict[str, Any]) -> bool:
+    """Whether the effort of a card has the meaning it had before :data:`EFFORT_CHANGE_DATE`."""
+    date = _dig(card, "training", "date")
+    return (
+        _dig(card, "training", "effort") is not None
+        and date is not None
+        and date < EFFORT_CHANGE_DATE
+    )
+
+
 def _row(card: Dict[str, Any], reference: Optional[str] = None) -> str:
     """One line of the history table.
 
@@ -122,11 +148,14 @@ def _row(card: Dict[str, Any], reference: Optional[str] = None) -> str:
         else _DASH
     )
     effort = _dig(card, "training", "effort")
+    positions = _positions(card)
     cells = [
         name,
         _number(card.get("parameters"), 0),
         _representation(card),
-        _DASH if effort is None else str(effort),
+        _DASH if effort is None else f"{effort}{' ' + _OLD_EFFORT if _old_effort(card) else ''}",
+        _DASH if positions is None else f"{positions / 1e6:,.1f}",
+        _number(_dig(card, "training", "effort_config", "max_epochs"), 0),
         _number(accuracy.get("spearman"), 3),
         _number(accuracy.get("mae"), 3),
         _number(accuracy.get("excess"), 4),
@@ -159,8 +188,13 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
     rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"].split("@")[0]))
     reference = _reference_sample(rows)
     lines = [_HEADER, _ALIGNMENT, *(_row(card, reference) for card in rows)]
+    notes = []
     if reference is not None and any(_sample_hash(card) != reference for card in rows):
-        lines += ["", _NOTES[_OTHER_SAMPLE]]
+        notes.append(_NOTES[_OTHER_SAMPLE])
+    if any(_old_effort(card) for card in rows):
+        notes.append(_NOTES[_OLD_EFFORT])
+    for note in notes:
+        lines += ["", note]
     return "\n".join(lines)
 
 

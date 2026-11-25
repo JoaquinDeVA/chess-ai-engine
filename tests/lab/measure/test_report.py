@@ -13,17 +13,22 @@ def test_report_renders_the_columns(isolated_cards):
         status="current",
         architecture="PST",
         parameters=1234,
-        training={"effort": 40, "representation": representation},
+        training={
+            "effort": 40,
+            "date": "2026-11-20",
+            "effort_config": {"positions": 29_280_737, "max_epochs": 40},
+            "representation": representation,
+        },
         accuracy=ACCURACY,
         cost={"us_per_eval": 12.5},
     )
     text = report.render_tables()
     header = (
-        "| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | "
-        "Best move, all / non-quiet | µs per eval |"
+        "| Model | Params | Representation | Effort | Positions (M) | Max epochs | Spearman | MAE | "
+        "Excess (nats) | Best move, all / non-quiet | µs per eval |"
     )
     row = (
-        f"| `net_pst_w64_both` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
+        f"| `net_pst_w64_both` | 1,234 | {Representation().name} | 40 | 29.3 | 40 | 0.912 | 0.083 | "
         "0.0123 | 34.5% / 28.0% | 12.5 |"
     )
     assert header in text and row in text
@@ -40,7 +45,7 @@ def test_a_model_trained_twice_shows_only_its_highest_effort(isolated_cards):
 
 def test_models_without_sections_show_dashes(isolated_cards):
     cards.update_card("fresh", status="current", architecture="A")
-    assert f"| `fresh` |{' — |' * 8}" in report.render_tables()
+    assert f"| `fresh` |{' — |' * 10}" in report.render_tables()
 
 
 def test_history_file_is_updated_between_markers_only(isolated_cards):
@@ -114,3 +119,25 @@ def test_at_equal_effort_the_plain_model_takes_the_row_whatever_the_order(isolat
     for order in (both, both[::-1]):
         (line,) = [x for x in report.render_tables(order).splitlines() if x.startswith("| `m`")]
         assert "| 7 |" in line
+
+
+def test_old_effort_is_marked_and_the_real_positions_are_shown(isolated_cards):
+    cards.update_card(
+        "old@e30",
+        status="current",
+        architecture="A",
+        training={"effort": 30, "date": "2026-11-14", "effort_config": {"positions": 30_000_000}},
+    )
+    cards.update_card(
+        "new@e15",
+        status="current",
+        architecture="A",
+        training={"effort": 15, "date": "2026-11-20", "recipe": {"positions": 29_280_737}},
+    )
+    text = report.render_tables()
+    old, new = (
+        next(x for x in text.splitlines() if x.startswith(f"| `{n}`")) for n in ("old", "new")
+    )
+    assert "| 30 ‡ | 30.0 |" in old and "‡" not in new
+    assert "| 15 | 29.3 |" in new  # positions fall back to the recipe
+    assert "‡ Effort of the old meaning" in text

@@ -71,6 +71,41 @@ How many games a test needs grows with the square of the precision: the A/A matc
 about ±25 Elo after 500 games, so ±5 Elo takes roughly 25 times as many, about 12,000 games. That is why the
 `[−5, 0]` tests are capped at 6,000 rounds (12,000 games).
 
+## Stopping before the verdict
+
+The 95 % interval that fastchess prints is the one of a fixed number of games: it is right if it is read once, at a size
+chosen in advance. Read at every turn and used to stop the match as soon as it excludes 0, it is a different test, and it
+rejects equal engines far more often than 5 %. The SPRT exists to avoid exactly that.
+
+**Worked example (a simulation, no games played).** Two equal engines (Elo 0, H0), 40 % draws, a round is two games scored
+as two independent games, the interval is the normal one of the mean round score with its sample variance, and a match
+is stopped at the first look whose interval excludes 0 (two-sided, from 20 rounds on). 10,000 matches per row, seed 0:
+
+| `max_rounds` | one look, at the end | a look every 100 rounds (a `roundrobin.py` turn) | a look every 10 rounds |
+|---|---|---|---|
+| 500 | 5.4 % | 18.0 % | 32.3 % |
+| 1,000 | 4.9 % | 23.5 % | 37.8 % |
+| 3,000 | 5.0 % | 32.3 % | 45.8 % |
+| 6,000 | 5.4 % | 37.6 % | 50.6 % |
+
+With 70 % draws the figures are the same within 1 point (4.9 to 5.4 % at one look, 18.1 to 37.4 % every 100 rounds, 32.7 to 49.6 % every 10).
+The single look keeps its 5 %; every extra look adds false positives, and the more rounds the match may last the more
+it adds. Of the matches that stop, the mean stop is at 306 games (cap 500 rounds) to 2,457 games (cap 6,000).
+Commands: a numpy script (`np.random.default_rng(0)`, `rng.choice` of half-points per game, cumulative sums per round, variance of
+the round scores) kept outside the repository, run as `python alpha_ic.py`; it is an estimate with a binomial error of
+±0.4 points at 10,000 matches (±1.0 on 50 %), and it ignores that fastchess pairs the games of a round, which
+changes the variance but not the argument.
+
+So a match has a verdict only in two cases:
+
+- the SPRT reaches H0 or H1 (`roundrobin.py` records no other verdict: a job leaves the queue on `H0`, `H1`, `cap` or `error`);
+- a `max_rounds` written in the job **before** the match starts, read once at the cap. A match that reaches it has the
+  interval of a fixed size, and its verdict is "the interval excludes 0" or "it does not".
+
+A match stopped by hand with its interval excluding 0 is **no verdict**: it is a hint that justifies a longer match or a
+new one with a fixed cap, not a result. The figures of [Results](RESULTS.md) closed that way before this rule are marked
+*interval at stop* and are not reopened, nor are they counted as evidence at the 5 % level.
+
 ## The A/A check
 
 Before trusting the instrument, the same engine plays itself (A and B identical) under the conditions of a real

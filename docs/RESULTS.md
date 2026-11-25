@@ -44,7 +44,7 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
 | `lmp`, `aspiration`, `history_malus` and `qs_tt` help on top of `lmr,rfp,iir` | Same SPRTs, 200 to 600 games each | Rust | Not shown: LLR −0.48 to 0.07, stopped; retired |
 | The network plays better than the logistic model (retired) | SPRT [0, 5] of 504 games at 10 s + 0.1 s, +165.1 ± 32.9 Elo | Rust | Orientative (measured before 2026-11-13); H1 accepted |
 | Adding the classical terms to the network makes it weaker (retired) | SPRT [0, 5] of 672 games at 10 s + 0.1 s, −105.5 ± 25.5 Elo | Rust | Orientative: H0 accepted, but it mixes quality and speed (the hybrids had no accumulator) |
-| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0 (the same match with the binary before the speed-ups: 4,300 games, +12.1 ± 9.4, LLR 1.93). `sp_threats_both_vs_w64` against the older network reached H1 (+62.1 ± 18.5) |
+| The threat inputs make the network stronger | `sp_threats_both_vs_both_opt`, SPRT [0, 5], 1,200 games at 10 s + 0.2 s, +40.7 ± 18.5 Elo | Rust | Measured; LLR 2.02, no bound reached, interval excludes 0 (interval at stop; the same match with the binary before the speed-ups: 4,300 games, +12.1 ± 9.4, LLR 1.93). `sp_threats_both_vs_w64` against the older network reached H1 (+62.1 ± 18.5) |
 | The effort-100 weights play better than the effort-30 ones | `sp_threats_e100_vs_e30`, SPRT [0, 5], 2,722 games at 10 s + 0.2 s, +10.0 ± 11.5 Elo | Rust | Not shown: LLR +1.00, interval includes 0; the weights that play, with the lower error of their card |
 | Late move reductions made the engine weaker (removed) | SPRT of 10,244 games at 20,000 nodes per move: 48.76 %, −8.6 ± 6.1 Elo | Rust | Measured at 20,000 nodes; H0 accepted. Applying it only in null-window nodes later reached H1 at 10 s + 0.2 s ("Search technique matches") |
 | The integer search of `345c3ff` is faster than 4.0.0 | `uci ttd 11 bench/middlegame.epd 60` (one thread, desktop, alternated with the build before the change): median 5.06 s to 4.19 s, 919,477 to 1,268,761 nodes/s; `uci bench 5` 0.127 s to 0.105 s | Rust | Measured speed; the tree changed (branching factor 2.12 to 2.38), so strength was judged by `rust_cleanup_vs_v4`, SPRT [−5, 0] against `v4.0.0`, 896 games at 10 s + 0.1 s: +73.6 ± 21.0 Elo, LLR +2.97, H1 accepted |
@@ -108,22 +108,22 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 | `sp_both_vs_w64` | `net_pst_w64_both` against the retired `net_pst_w64` | 1,486 | +45.1 ± 15.7 | +2.95 | H1 (2026-11-16) |
 | `sp_threats_both_vs_w64` | `net_pst_threats_w64_both` against the retired `net_pst_w64` | 1,092 | +62.1 ± 18.5 | +2.97 | H1 (2026-11-16) |
 | `sp_threats_both_vs_both` | `net_pst_threats_w64_both` against `net_pst_w64_both` | 4,300 | +12.1 ± 9.4 | +1.93 | no verdict (stopped 2026-11-19); the next row repeats it with the binary after the speed-ups of the threat inputs |
-| `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid |
+| `sp_threats_both_vs_both_opt` | the same, with the binary `5d862f1d7451` (`2272d51`) | 1,200 | +40.7 ± 18.5 | +2.02 | stopped by hand; accepted as valid; interval at stop |
 | `sp_threats_e100_vs_e30` | `net_pst_threats_w64_both` trained at effort 100 against the same network at effort 30, binary `242475e64e00` | 2,722 | +10.0 ± 11.5 | +1.00 | no verdict (stopped 2026-11-19); interval includes 0; the effort-100 weights play since `4c59054` |
 | `sp_threats_both_vs_w64_nodes` | `net_pst_threats_w64_both` against the retired `net_pst_w64` at 250,000 nodes per move | 652 | +112.5 ± 25.7 | +2.96 | H1: stronger per node |
 | `sprt_mpk_w128_e15_vs_pst_w128_e15` | `net_ctx_mpk_w128_both@e15` (material, pawn files and king buckets) against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 628 | −104.9 ± 23.7 | −2.96 | H0 (2026-11-22): its lower validation loss (0.62928 against 0.63002) did not carry into play |
 | `sprt_mpk_w128_e100_vs_mpk_w128_e15` | `net_ctx_mpk_w128_both` at effort 100 against effort 15, binary `9f3075cebf16` | 4,600 | +6.2 ± 8.7 | +0.89 | no verdict (stopped 2026-11-23 after the H0 above) |
 | `sprt_pst_w256_e15_vs_pst_w128_e15` | `net_pst_w256_both@e15` against `net_pst_w128_both@e15`, binary `9f3075cebf16` | 4,800 | +6.6 ± 8.3 | +1.06 | no verdict (stopped 2026-11-23); interval includes 0 |
-| `nodes_ctx_mpk_w128_e15_vs_pst_w128_e15` | the first `ctx` row at 135,000 nodes per move | 200 | −75.9 ± 42.9 | −0.72 | worse per node (stopped 2026-11-23: the interval excludes 0) |
-| `nodes_ctx_m_w128_e15_vs_pst_w128_e15` | `net_ctx_m_w128_both@e15` (material only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 176 | −86.4 ± 53.7 | −0.58 | worse per node (stopped 2026-11-23: the interval excludes 0) |
-| `nodes_ctx_p_w128_e15_vs_pst_w128_e15` | `net_ctx_p_w128_both@e15` (pawn files only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 1,000 | −30.7 ± 18.0 | −1.61 | worse per node (stopped 2026-11-23: the interval excludes 0) |
-| `nodes_ctx_k_w128_e15_vs_pst_w128_e15` | `net_ctx_k_w128_both@e15` (king buckets only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 920 | −53.7 ± 20.0 | −2.36 | worse per node (stopped 2026-11-23: the interval excludes 0) |
+| `nodes_ctx_mpk_w128_e15_vs_pst_w128_e15` | the first `ctx` row at 135,000 nodes per move | 200 | −75.9 ± 42.9 | −0.72 | worse per node (stopped 2026-11-23: the interval excludes 0; interval at stop) |
+| `nodes_ctx_m_w128_e15_vs_pst_w128_e15` | `net_ctx_m_w128_both@e15` (material only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 176 | −86.4 ± 53.7 | −0.58 | worse per node (stopped 2026-11-23: the interval excludes 0; interval at stop) |
+| `nodes_ctx_p_w128_e15_vs_pst_w128_e15` | `net_ctx_p_w128_both@e15` (pawn files only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 1,000 | −30.7 ± 18.0 | −1.61 | worse per node (stopped 2026-11-23: the interval excludes 0; interval at stop) |
+| `nodes_ctx_k_w128_e15_vs_pst_w128_e15` | `net_ctx_k_w128_both@e15` (king buckets only) against `net_pst_w128_both@e15` at 135,000 nodes per move | 920 | −53.7 ± 20.0 | −2.36 | worse per node (stopped 2026-11-23: the interval excludes 0; interval at stop) |
 | `nodes_ob8_w128_e15_vs_pst_w128_e15` | `net_pst_w128_ob8_both@e15` (eight output buckets by piece count, binary `b425eef37187`) against `net_pst_w128_both@e15` at 135,000 nodes per move | 600 | −15.7 ± 23.7 | −0.52 | no verdict (stopped 2026-11-23 before its 2,000-game cap); interval includes 0 |
 | `nodes_warm_ob8_vs_warm_ctl` | `net_pst_w128_ob8_both@e15-warm-lr1e-4-ep100` against the warm control `net_pst_w128_both@e15-warm-lr1e-4-ep100` at 135,000 nodes per move; both started from `net_pst_w128_both@e15` (`train.py --init`, lr 1e-4, halved on every epoch without improvement, patience 3, 100-epoch cap), binary `b425eef37187` | 2,000 | +7.3 ± 12.6 | +0.53 | no verdict (2,000-game cap, 2026-11-24); interval includes 0 |
 | `nodes_warm_k_vs_warm_ctl` | `net_ctx_k_w128_both@e15-warm-lr1e-4-ep100` against the same warm control, same recipe | 2,000 | +1.9 ± 12.9 | −0.02 | no verdict (cap, 2026-11-24); interval includes 0 |
 | `nodes_warm_mpk_vs_warm_ctl` | `net_ctx_mpk_w128_both@e15-warm-lr1e-4-ep100` against the same warm control, same recipe | 2,000 | +11.0 ± 12.8 | +0.88 | no verdict (cap, 2026-11-24); interval includes 0 |
 
-From 2026-11-23 a match stopped by hand counts as a verdict when its 95 % interval excludes 0, and as no verdict otherwise.
+Only H0, H1 or a `max_rounds` fixed before the match is a verdict ([Measurement](MEASUREMENT.md#stopping-before-the-verdict)): stopping when the 95 % interval first excludes 0 is a repeated look, which at these sizes rejects equal engines in 18 % to 38 % of the matches, not 5 %. The rows marked *interval at stop* were closed that way (up to 2026-11-23); they are kept as measured, with the interval as the evidence of the day, and are not reopened. A match stopped by hand without a bound or a preset cap is no verdict.
 All four `ctx` families lose per node (and `mpk` at 10 s + 0.2 s as well), so the `ctx` inputs lose on quality, not on the cost of the evaluation.
 The `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
@@ -255,18 +255,20 @@ Generated by `python -m chess_lab.measure.report` from the model cards; do not e
 be measured again today (accuracy and cost); the model cards carried depth and search-agreement figures until 2026-11-01.
 
 <!-- BEGIN GENERATED TABLES -->
-| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | Best move, all / non-quiet | µs per eval |
-|---|---:|---|---:|---:|---:|---:|---:|---:|
-| `net_ctx_k_w128_both` | 393,601 | winprob-k0.00368-stm-quiet | 15 | 0.741 | 0.106 | 0.0760 | 21.6% / 56.9% | 2.2 |
-| `net_ctx_m_w128_both` | 102,529 | winprob-k0.00368-stm-quiet | 15 | 0.740 | 0.105 | 0.0748 | 22.1% / 57.7% | 2.6 |
-| `net_ctx_mpk_w128_both` | 401,537 | winprob-k0.00368-stm-quiet | 15 | 0.744 | 0.104 | 0.0741 | 21.9% / 57.7% | 3.2 |
-| `net_ctx_p_w128_both` | 102,785 | winprob-k0.00368-stm-quiet | 15 | 0.737 | 0.107 | 0.0765 | 21.9% / 57.7% | 2.6 |
-| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 0.751 | 0.103 | — | 24.7% / 60.0% | 2.1 |
-| `net_pst_w128_both` | 98,689 | winprob-k0.00368-stm-quiet | 15 | 0.744 | 0.105 | 0.0748 | 22.4% / 57.8% | 2.1 |
-| `net_pst_w128_ob8_both` | 100,488 | winprob-k0.00368-stm-quiet | 15 | 0.739 | 0.106 | 0.0755 | 22.2% / 58.5% | 4.5 |
-| `net_pst_w256_both` | 197,377 | winprob-k0.00368-stm-quiet | 15 | 0.747 | 0.104 | 0.0742 | 22.6% / 58.0% | 3.0 |
-| `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 | 0.731 | 0.110 | — | 22.7% / 58.3% | 2.4 |
-| `h1` | 6 | — | — | 0.561 | 0.149 | — | 19.6% / 49.8% | 2.8 |
+| Model | Params | Representation | Effort | Positions (M) | Max epochs | Spearman | MAE | Excess (nats) | Best move, all / non-quiet | µs per eval |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `net_ctx_k_w128_both` | 393,601 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.741 | 0.106 | 0.0760 | 21.6% / 56.9% | 2.2 |
+| `net_ctx_m_w128_both` | 102,529 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.740 | 0.105 | 0.0748 | 22.1% / 57.7% | 2.6 |
+| `net_ctx_mpk_w128_both` | 401,537 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.744 | 0.104 | 0.0741 | 21.9% / 57.7% | 3.2 |
+| `net_ctx_p_w128_both` | 102,785 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.737 | 0.107 | 0.0765 | 21.9% / 57.7% | 2.6 |
+| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 12 | 0.751 | 0.103 | — | 24.7% / 60.0% | 2.1 |
+| `net_pst_w128_both` | 98,689 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.744 | 0.105 | 0.0748 | 22.4% / 57.8% | 2.1 |
+| `net_pst_w128_ob8_both` | 100,488 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.739 | 0.106 | 0.0755 | 22.2% / 58.5% | 4.5 |
+| `net_pst_w256_both` | 197,377 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.747 | 0.104 | 0.0742 | 22.6% / 58.0% | 3.0 |
+| `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 ‡ | 30.0 | 40 | 0.731 | 0.110 | — | 22.7% / 58.3% | 2.4 |
+| `h1` | 6 | — | — | — | — | 0.561 | 0.149 | — | 19.6% / 49.8% | 2.8 |
+
+‡ Effort of the old meaning (millions of positions, until 2026-11-16); since then it is a share of the TRAIN rows, so the number of positions behind it depends on the data. Compare the Positions column, not the Effort one.
 <!-- END GENERATED TABLES -->
 
 ## Reproduce

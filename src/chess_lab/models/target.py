@@ -2,7 +2,7 @@
 
 Raw evaluations (``cp`` / ``mate``) are always from **White's point of view**; a row has either
 ``cp`` or ``mate`` (the other is NaN). A :class:`Representation` fixes the scale of the target
-(win probability or clipped linear centipawns) and which positions are kept; the target is always
+(win probability) and which positions are kept; the target is always
 the score of the player to move.
 """
 
@@ -15,12 +15,10 @@ import pandas as pd
 
 from chess_lab.defaults import SPLIT_SEED
 
-from .definitions import CP_SCALE
-
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
 LICHESS_K = 0.00368208
 
-_SCALES = ("winprob", "cp_linear")
+_SCALES = ("winprob",)
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
@@ -53,8 +51,9 @@ def validate_mate_keep(mate_keep: float) -> None:
 class Representation:
     """Choice of target scale, seen from the player to move. Training always uses the quiet positions (see :func:`is_quiet`).
 
-    :param scale: ``"winprob"`` (logistic of centipawns) or ``"cp_linear"`` (clipped linear).
-    :param k: Slope of the logistic curve (only used by ``"winprob"``).
+    :param scale: only ``"winprob"`` (logistic of centipawns).
+    :param k: Slope of the logistic curve. It is the scale of the targets, not the one of the engine's
+        centipawns (``400 / ln 10`` per logit, see ``SCORE_PER_LOGIT`` in ``rust/src/eval/accumulator/logit.rs``).
     :param mate_keep: Share of the mate positions kept in the training data, in ``(0, 1]``
         (see :func:`keep_mate_rows`); 1 keeps them all. Defaults to :data:`DEFAULT_MATE_KEEP`.
     """
@@ -76,8 +75,7 @@ class Representation:
         ``stm`` (side to move) part is kept so that the names of the saved caches and models stay
         valid.
         """
-        scale = f"winprob-k{self.k:.5f}" if self.scale == "winprob" else self.scale
-        return f"{scale}-stm-quiet{mates_suffix(self.mate_keep)}"
+        return f"winprob-k{self.k:.5f}-stm-quiet{mates_suffix(self.mate_keep)}"
 
     def to_dict(self) -> dict:
         """Fields as a plain dictionary.
@@ -116,10 +114,7 @@ def white_score(cp: np.ndarray, mate: np.ndarray, rep: Representation) -> np.nda
     mate = np.asarray(mate, dtype=np.float64)
     is_mate = ~np.isnan(mate)
     safe_cp = np.where(np.isnan(cp), 0.0, cp)
-    if rep.scale == "winprob":
-        score = 1.0 / (1.0 + np.exp(-rep.k * safe_cp))
-    else:
-        score = 0.5 + 0.5 * np.clip(safe_cp / CP_SCALE, -1.0, 1.0)
+    score = 1.0 / (1.0 + np.exp(-rep.k * safe_cp))
     return np.where(is_mate, (mate > 0).astype(np.float64), score)
 
 

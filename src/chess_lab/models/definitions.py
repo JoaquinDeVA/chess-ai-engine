@@ -17,10 +17,6 @@ from chess_lab.atomic import atomic_path
 
 from .store.loader import artifact_path, split_spec
 
-#: Centipawns that correspond to a normalized target of ``1.0``. It is the 0.5% quantile of the
-#: course dataset: evaluations beyond it are clipped, so the target covers ~99% of the data.
-CP_SCALE = 1267.0
-
 Layer = Tuple[np.ndarray, np.ndarray]
 
 

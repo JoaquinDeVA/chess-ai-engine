@@ -12,7 +12,9 @@ use super::{slot, NetState};
 const PROBABILITY_CLIP: f64 = 1e-2;
 
 /// Units of the score per unit of log-odds: the score is in centipawns of the usual logistic scale
-/// (`400 / ln 10`), so a pawn up is about 100 and the margins of the techniques read as such.
+/// (`400 / ln 10`), so a pawn up is about 100 and the margins of the techniques read as such. It is
+/// not the scale of the training targets (the Lichess curve, about 271.6 per logit): the margins of
+/// the search were tuned by SPRT on this one, so it only changes with a new SPRT of all of them.
 const SCORE_PER_LOGIT: f32 = 173.717_8;
 
 /// Highest score of an evaluation, so that a mate is always beyond it. It is its own bound of the
@@ -89,6 +91,12 @@ mod tests {
         assert_eq!(centipawns(-1.0), -174);
         assert_eq!(centipawns(10.0), EVAL_LIMIT);
         assert_eq!(centipawns(-10.0), -EVAL_LIMIT);
+    }
+
+    #[test]
+    fn the_score_per_logit_is_the_elo_scale() {
+        let elo_scale = 400.0 / std::f64::consts::LN_10;
+        assert!((f64::from(SCORE_PER_LOGIT) - elo_scale).abs() < 1e-4);
     }
 
     #[test]

@@ -179,7 +179,7 @@ def test_a_fit_cut_after_an_epoch_resumes_as_if_it_had_not_stopped(tmp_path, mod
 
 
 def test_save_load_round_trip_gives_identical_scores(tmp_path):
-    rep = Representation(scale="cp_linear")
+    rep = Representation(k=0.005)
     model = random_net(seed=4, rep=rep)
     path = model.save(tmp_path / "net_pst_w64_both.npz")
 

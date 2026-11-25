@@ -26,16 +26,8 @@ def test_winprob_matches_lichess_curve():
     assert s == pytest.approx(1 / (1 + np.exp(-0.00368208 * 300)))
 
 
-def test_cp_linear_clips_at_1267():
-    rep = Representation(scale="cp_linear")
-    s = white_score(np.array([5000.0, -1267.0]), np.full(2, np.nan), rep)
-    assert s[0] == 1.0
-    assert s[1] == 0.0
-
-
-@pytest.mark.parametrize("scale", ["winprob", "cp_linear"])
-def test_mates_are_one_or_zero_without_nan(scale):
-    rep = Representation(scale=scale)
+def test_mates_are_one_or_zero_without_nan():
+    rep = Representation()
     s = white_score(np.array([np.nan, np.nan]), np.array([3.0, -1.0]), rep)
     assert s.tolist() == [1.0, 0.0]
 
@@ -61,7 +53,7 @@ def test_is_quiet():
 
 
 def test_representation_round_trips_through_dict():
-    rep = Representation(scale="cp_linear")
+    rep = Representation(k=0.005)
     assert Representation.from_dict(rep.to_dict()) == rep
     assert Representation.from_dict({**rep.to_dict(), "perspective": "side_to_move"}) == rep
     with pytest.raises(ValueError):

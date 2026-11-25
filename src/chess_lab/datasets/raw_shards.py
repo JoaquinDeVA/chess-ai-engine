@@ -227,6 +227,15 @@ def write_shard(path: Path, records: list[dict[str, Any]], metadata: dict[str, A
     writer.close(metadata)
 
 
+def list_shards(directory: Path) -> list[Path]:
+    """The shards of a directory, in order.
+
+    :param directory: Folder with the ``part-NNNNN.parquet`` shards (see :func:`shard_path`).
+    :return: Their paths, sorted (empty if there are none).
+    """
+    return sorted(directory.glob("part-*.parquet"))
+
+
 def shard_path(directory: Path, index: int) -> Path:
     """Path of the ``index``-th shard.
 

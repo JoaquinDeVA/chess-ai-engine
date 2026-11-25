@@ -18,6 +18,7 @@ import pyarrow.parquet as pq
 from chess_lab.models.defaults import SAMPLE_SEED
 from chess_lab.models.target import is_quiet, keep_mate_rows, validate_mate_keep
 
+from .raw_shards import list_shards
 from .split import assign_split
 
 SIDECAR_SCHEMA = pa.schema(
@@ -77,7 +78,7 @@ def _open_pairs(raw_dir: Path, sidecar_dir: Path) -> list[tuple[pq.ParquetFile, 
     :raises ValueError: If a sidecar is missing or its rows or row groups differ from the shard's.
     """
     pairs = []
-    for shard in sorted(raw_dir.glob("part-*.parquet")):
+    for shard in list_shards(raw_dir):
         side = sidecar_path(shard, sidecar_dir)
         if not side.exists():
             raise ValueError(f"missing sidecar for {shard.name}: {side}")
@@ -129,6 +130,29 @@ def _eligible(
         is_mate = raw["mate"].notna().to_numpy()
         mask &= _kept_mates(raw["fen"].to_numpy(dtype=object), is_mate, mate_keep)
     return np.flatnonzero(mask)
+
+
+def count_rows(
+    raw_dir: Path, sidecar_dir: Path, split: int, quiet_only: bool = False, mate_keep: float = 1.0
+) -> int:
+    """Number of rows of ``split`` the streams yield: the same selection as :func:`load_sample`.
+
+    Only the ``split`` and ``quiet`` columns of the sidecars are read; with ``mate_keep < 1`` the
+    ``fen`` and ``mate`` columns of the raw shards are read too.
+
+    :param raw_dir: Folder with the raw shards.
+    :param sidecar_dir: Folder with their sidecars.
+    :param split: ``TRAIN``, ``VALIDATION`` or ``TEST``.
+    :param quiet_only: Count only the quiet positions.
+    :param mate_keep: Share of the mate positions kept, in ``(0, 1]``.
+    :return: The row count (0 if there are no shards).
+    :raises ValueError: If ``mate_keep`` is outside ``(0, 1]`` or a shard and its sidecar differ.
+    """
+    validate_mate_keep(mate_keep)
+    return sum(
+        len(_eligible(pair, split, quiet_only, mate_keep))
+        for pair in _open_pairs(raw_dir, sidecar_dir)
+    )
 
 
 def _read_group(pair: tuple[pq.ParquetFile, pq.ParquetFile], group: int) -> pd.DataFrame:

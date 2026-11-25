@@ -103,7 +103,7 @@ class FakeModel:
 def fake_training(isolated_cards, monkeypatch):
     """Replaces the data reading, calibration, search and fit of ``train_by_effort``."""
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
-    monkeypatch.setattr(train_cli, "available_rows", lambda *a, **k: 1000)
+    monkeypatch.setattr(train_cli, "count_rows", lambda *a, **k: 1000)
     monkeypatch.setattr(train_cli, "load_sample", lambda *a, **k: None)
     timing = SimpleNamespace(seconds_per_position=1e-5, encode_seconds=0.1, score_seconds=0.1)
     monkeypatch.setattr(train_cli, "calibrate", lambda *a, **k: timing)

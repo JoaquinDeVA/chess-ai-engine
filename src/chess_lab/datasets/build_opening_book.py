@@ -27,6 +27,7 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from chess_lab.datasets.book import MATE_SCORE, position_key
+from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.models.defaults import RAW_DIR
 
 Lookup = Callable[[str], Optional[float]]
@@ -60,7 +61,7 @@ def load_index(
     """
     hashes: List[np.ndarray] = []
     scores: List[np.ndarray] = []
-    for path in sorted(raw_dir.glob("part-*.parquet"))[:max_shards]:
+    for path in list_shards(raw_dir)[:max_shards]:
         table = pq.read_table(path, columns=["fen", "cp", "mate", "depth"])
         placement = pc.list_element(pc.split_pattern(table["fen"], " "), 0)
         pieces = pc.count_substring_regex(placement, "[A-Za-z]")

@@ -31,6 +31,8 @@ import numpy as np
 import pyarrow.parquet as pq
 
 from chess_lab.datasets.book import position_key
+from chess_lab.datasets.raw_shards import list_shards
+from chess_lab.datasets.sidecar import sidecar_path
 from chess_lab.datasets.split import TEST, TRAIN, VALIDATION
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 
@@ -46,8 +48,8 @@ def load_index(raw_dir: Path, sidecar_dir: Path) -> Tuple[np.ndarray, np.ndarray
         this process.
     """
     hashes, splits = [], []
-    for shard in sorted(raw_dir.glob("part-*.parquet")):
-        side = pq.read_table(sidecar_dir / f"{shard.stem}.sidecar.parquet", columns=["split"])
+    for shard in list_shards(raw_dir):
+        side = pq.read_table(sidecar_path(shard, sidecar_dir), columns=["split"])
         fens = pq.read_table(shard, columns=["fen"])["fen"].to_pylist()
         hashes.append(np.fromiter((hash(f) for f in fens), np.int64, count=len(fens)))
         splits.append(side["split"].to_numpy().astype(np.int8))
@@ -183,11 +185,11 @@ def sample_test_fens(raw_dir: Path, sidecar_dir: Path, count: int, seed: int) ->
     :return: FEN strings of test rows.
     """
     rng = np.random.default_rng(seed)
-    shards = sorted(raw_dir.glob("part-*.parquet"))
+    shards = list_shards(raw_dir)
     per_shard = max(1, count // len(shards))
     fens: List[str] = []
     for shard in shards:
-        split = pq.read_table(sidecar_dir / f"{shard.stem}.sidecar.parquet", columns=["split"])
+        split = pq.read_table(sidecar_path(shard, sidecar_dir), columns=["split"])
         rows = np.flatnonzero(split["split"].to_numpy() == TEST)
         if len(rows) == 0:
             continue

@@ -10,6 +10,7 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.datasets.sidecar import build_sidecar, sidecar_path
 from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
 
@@ -22,7 +23,7 @@ def main() -> None:
     parser.add_argument("--jobs", type=int, default=5, help="worker processes")
     args = parser.parse_args()
 
-    shards = sorted(args.raw.glob("part-*.parquet"))
+    shards = list_shards(args.raw)
     todo = [s for s in shards if not sidecar_path(s, args.out).exists()]
     print(f"{len(shards)} shards, {len(shards) - len(todo)} already done, {len(todo)} to build")
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:

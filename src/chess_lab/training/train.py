@@ -14,8 +14,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional
 
-from chess_lab.datasets.sidecar import load_sample
-from chess_lab.datasets.split import VALIDATION
+from chess_lab.datasets.sidecar import count_rows, load_sample
+from chess_lab.datasets.split import TRAIN, VALIDATION
 from chess_lab.models.defaults import (
     DEFAULT_MATE_KEEP,
     RAW_DIR,
@@ -29,7 +29,6 @@ from chess_lab.models.store.loader import artifact_path
 from chess_lab.models.target import Representation
 
 from .effort import (
-    available_rows,
     calibrate,
     effort_config,
     estimated_seconds,
@@ -186,9 +185,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
             return 2
         initial = warm_layers(source, model_class)
         print(f"Warm start from {args.init}")
-    available = available_rows(
-        args.sidecar, quiet_only=True, raw_dir=args.raw, mate_keep=rep.mate_keep
-    )
+    available = count_rows(args.raw, args.sidecar, TRAIN, quiet_only=True, mate_keep=rep.mate_keep)
     if available == 0:
         print(f"no TRAIN rows found in {args.sidecar}")
         return 2

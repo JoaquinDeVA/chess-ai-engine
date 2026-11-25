@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from chess_lab.datasets.raw_shards import shard_path, write_shard
-from chess_lab.datasets.sidecar import build_sidecar, load_sample
+from chess_lab.datasets.sidecar import build_sidecar, count_rows, load_sample
 from chess_lab.datasets.split import TRAIN, VALIDATION, assign_split
 from chess_lab.models.definitions import NnW64BothModel
 from chess_lab.models.target import Representation
@@ -16,7 +16,6 @@ from chess_lab.training.effort import (
     MIN_POSITIONS,
     TRIAL_MAX_ROWS,
     Timing,
-    available_rows,
     effort_config,
     estimated_seconds,
     search,
@@ -92,15 +91,16 @@ def test_effort_rejects_out_of_range(effort_level):
         effort_config(effort_level, 10**6)
 
 
-def test_available_rows_counts_exact_train_rows_from_sidecars(tmp_path):
+def test_count_rows_counts_exact_train_rows_from_sidecars(tmp_path):
     fens = write_fixture_shards(tmp_path / "raw", tmp_path / "side", 150, seed=5)
     train = [
         f for f, split in zip(fens, assign_split(pd.Series(fens)), strict=True) if split == TRAIN
     ]
     quiet = [f for f in train if not chess.Board(f).is_check()]
-    assert available_rows(tmp_path / "side") == len(train) > 0
-    assert available_rows(tmp_path / "side", quiet_only=True) == len(quiet)
-    assert available_rows(tmp_path / "empty") == 0
+    raw, side = tmp_path / "raw", tmp_path / "side"
+    assert count_rows(raw, side, TRAIN) == len(train) > 0
+    assert count_rows(raw, side, TRAIN, quiet_only=True) == len(quiet)
+    assert count_rows(tmp_path / "empty", side, TRAIN) == 0
 
 
 def test_estimate_formula_on_fixed_timing():
@@ -137,7 +137,7 @@ def test_trial_path_reads_only_the_train_split(tmp_path, monkeypatch):
     raw, side = tmp_path / "raw", tmp_path / "side"
     write_fixture_shards(raw, side, 900, seed=4)
     validation = load_sample(raw, side, VALIDATION, 500, seed=42)
-    plan = effort_config(40, available_rows(side))
+    plan = effort_config(40, count_rows(raw, side, TRAIN))
     assert plan["trials"] == 1
 
     splits = []
@@ -174,14 +174,12 @@ def write_mate_fixture_shards(raw: Path, side: Path, count: int, seed: int) -> N
     build_sidecar(shard_path(raw, 0), side)
 
 
-def test_available_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
+def test_count_rows_counts_mates_after_the_mate_keep_filter(tmp_path):
     raw, side = tmp_path / "raw", tmp_path / "side"
     write_mate_fixture_shards(raw, side, 300, seed=4)
-    full = available_rows(side)
-    kept = available_rows(side, raw_dir=raw, mate_keep=0.2)
+    full = count_rows(raw, side, TRAIN)
+    kept = count_rows(raw, side, TRAIN, mate_keep=0.2)
     assert 0 < kept < full
     # The planned count is the number of rows the TRAIN stream yields.
     assert kept == len(load_sample(raw, side, TRAIN, 10**6, mate_keep=0.2))
-    assert available_rows(side, raw_dir=raw, mate_keep=1.0) == full
-    with pytest.raises(ValueError):
-        available_rows(side, mate_keep=0.2)
+    assert count_rows(raw, side, TRAIN, mate_keep=1.0) == full

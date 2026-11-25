@@ -62,3 +62,14 @@ def test_only_registered_models_are_accepted():
     for name in ("h1", "nope"):
         with pytest.raises(SystemExit):
             evaluate_cli.parse_args(["--model", name])
+
+
+def test_the_sample_section_records_the_hash_of_the_sample(stub_model, monkeypatch):
+    boards = random_positions(6, seed=5)
+    sample = pd.DataFrame({"fen": [b.fen() for b in boards]})
+    monkeypatch.setattr(evaluate_cli, "load_test_sample", lambda *a: sample)
+    monkeypatch.setattr(evaluate_cli, "judge", lambda *a: {})
+    result = evaluate_cli.sample_benchmark(stub_model, None, None, 3)
+    recorded = result["accuracy"]["sample"]
+    assert recorded["hash"] == evaluate_cli.sample_hash(sample["fen"])
+    assert recorded["rows"] == 6

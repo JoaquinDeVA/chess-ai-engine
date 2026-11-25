@@ -1,6 +1,6 @@
 """Tests of the models table and the history file."""
 
-from chess_lab.measure import report
+from chess_lab.measure import evaluate, report
 from chess_lab.models.store import cards
 from chess_lab.models.target import Representation
 from tests.conftest import ACCURACY
@@ -62,3 +62,38 @@ def test_history_file_without_markers_is_left_alone(isolated_cards):
     assert not report.update_history_file()
     assert report.HISTORY_FILE.read_text() == "no markers here"
     assert not report.update_history_file(isolated_cards / "does-not-exist.md")
+
+
+def _judged_on(name, sample_hash):
+    sample = {} if sample_hash is None else {"hash": sample_hash}
+    cards.update_card(
+        name, status="current", architecture="A", accuracy=ACCURACY | {"sample": sample}
+    )
+
+
+def test_rows_judged_on_another_sample_are_marked(isolated_cards):
+    for name in ("a", "b", "c"):
+        _judged_on(name, "same")
+    _judged_on("d", "other")
+    _judged_on("e", None)
+    text = report.render_tables()
+    rows = {
+        line.split("|")[1].strip(): line for line in text.splitlines() if line.startswith("| `")
+    }
+    assert [name for name, line in rows.items() if "†" in name] == ["`d` †", "`e` †"]
+    assert "† Judged on another test sample" in text
+
+
+def test_nothing_is_marked_while_no_card_records_its_sample(isolated_cards):
+    _judged_on("a", None)
+    _judged_on("b", None)
+    text = report.render_tables()
+    assert "†" not in text
+
+
+def test_the_sample_hash_follows_the_sample_order_and_content():
+    fens = ["8/8/8/8/8/8/8/K6k w - - 0 1", "8/8/8/8/8/8/8/k6K w - - 0 1"]
+    assert evaluate.sample_hash(fens) == evaluate.sample_hash(iter(fens))
+    assert evaluate.sample_hash(fens) != evaluate.sample_hash(fens[::-1])
+    assert evaluate.sample_hash(fens) != evaluate.sample_hash(fens[:1])
+    assert len(evaluate.sample_hash(fens)) == 16

@@ -7,6 +7,7 @@ Each row reads the card sections ``accuracy`` and ``cost``, written by ``measure
 A missing value shows a dash.
 """
 
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,13 @@ _HEADER = (
     "Best move, all / non-quiet | µs per eval |"
 )
 _ALIGNMENT = "|---|---:|---|---:|---:|---:|---:|---:|---:|"
+_OTHER_SAMPLE = "†"
+_NOTES = {
+    _OTHER_SAMPLE: (
+        "† Judged on another test sample than most rows, or before the sample hash was recorded: "
+        "its accuracy columns are not comparable with the unmarked rows."
+    ),
+}
 
 
 def _dig(card: Dict[str, Any], *keys: str) -> Any:
@@ -65,15 +73,35 @@ def _effort(card: Dict[str, Any]) -> int:
     return -1 if effort is None else int(effort)
 
 
-def _row(card: Dict[str, Any]) -> str:
+def _sample_hash(card: Dict[str, Any]) -> Optional[str]:
+    """Hash of the test sample a card was judged on (``accuracy.sample.hash``), if recorded."""
+    return _dig(card, "accuracy", "sample", "hash")
+
+
+def _reference_sample(cards: List[Dict[str, Any]]) -> Optional[str]:
+    """The test sample most rows were judged on.
+
+    :param cards: Cards of the table rows (in table order).
+    :return: The most common recorded hash (the first one of the table on a tie), or None when no
+        card has one, in which case nothing can be told apart.
+    """
+    counts = Counter(h for h in map(_sample_hash, cards) if h is not None)
+    return counts.most_common(1)[0][0] if counts else None
+
+
+def _row(card: Dict[str, Any], reference: Optional[str] = None) -> str:
     """One line of the history table.
 
     :param card: Model card.
+    :param reference: Hash of the reference test sample; a card with another one (or none) is
+        marked.
     :return: Markdown table row.
     """
     name = f"`{card['name'].split('@')[0]}`"
     if card.get("status") == "retired":
         name += " (retired)"
+    if reference is not None and _sample_hash(card) != reference:
+        name += f" {_OTHER_SAMPLE}"
     accuracy = _dig(card, "accuracy", "all") or {}
     non_quiet = _dig(card, "accuracy", "non_quiet") or {}
     best_move = (
@@ -117,7 +145,11 @@ def render_tables(cards: Optional[List[Dict[str, Any]]] = None) -> str:
             best[base] = card
     rows = list(best.values())
     rows.sort(key=lambda card: (_STATUS_ORDER[card["status"]], card["name"].split("@")[0]))
-    return "\n".join([_HEADER, _ALIGNMENT, *(_row(card) for card in rows)])
+    reference = _reference_sample(rows)
+    lines = [_HEADER, _ALIGNMENT, *(_row(card, reference) for card in rows)]
+    if reference is not None and any(_sample_hash(card) != reference for card in rows):
+        lines += ["", _NOTES[_OTHER_SAMPLE]]
+    return "\n".join(lines)
 
 
 def update_history_file(path: Optional[Path] = None) -> bool:

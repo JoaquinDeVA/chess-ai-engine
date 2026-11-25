@@ -14,10 +14,11 @@ Playing strength is measured with the UCI engine and fastchess instead.
 """
 
 import argparse
+import hashlib
 import statistics
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
@@ -50,6 +51,24 @@ def _median_us(evaluator: _core.Evaluator, fens: List[str], warmup: int) -> floa
     return statistics.median(timings)
 
 
+def sample_hash(fens: Iterable[str]) -> str:
+    """Fingerprint of a test sample: the first 16 hex digits of the SHA-256 of its FENs, in order.
+
+    The sample is the first rows of a seeded draw, so its identity is the list of positions and
+    their order (``agreement_n`` and the cost section read the leading rows). It reads only the
+    sample already in memory (0.03 s for 200,000 rows), and two cards with the same value were
+    judged on the same positions however many shards the raw had.
+
+    :param fens: Positions of the sample, in sample order.
+    :return: 16 hex digits.
+    """
+    digest = hashlib.sha256()
+    for fen in fens:
+        digest.update(fen.encode())
+        digest.update(b"\n")
+    return digest.hexdigest()[:16]
+
+
 def sample_benchmark(
     evaluator: _core.Evaluator,
     raw: Path,
@@ -66,7 +85,12 @@ def sample_benchmark(
     """
     sample = load_test_sample(raw, sidecar)
     accuracy = judge(evaluator, sample, agreement_n)
-    accuracy["sample"] = {"rows": len(sample), "seed": SAMPLE_SEED, "agreement_n": agreement_n}
+    accuracy["sample"] = {
+        "rows": len(sample),
+        "seed": SAMPLE_SEED,
+        "agreement_n": agreement_n,
+        "hash": sample_hash(sample["fen"]),
+    }
     cost_fens = sample["fen"].head(COST_SAMPLES).tolist()
     cost = {
         "us_per_eval": round(_median_us(evaluator, cost_fens, 20), 2),

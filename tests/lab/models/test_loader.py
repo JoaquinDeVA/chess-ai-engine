@@ -6,7 +6,7 @@ import pytest
 from chess_lab.models.definitions import get_model_class, load_evaluator
 from chess_lab.models.store import loader
 from chess_lab.models.store.loader import split_spec
-from chess_lab.training.neural import new_model
+from tests.conftest import untrained_model
 
 WHITE_UP_A_QUEEN = "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 BLACK_UP_A_QUEEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1"
@@ -20,7 +20,7 @@ needs_trained_models = pytest.mark.skipif(
 
 def save_network(path, output_bias=0.0):
     """An untrained ``net_pst_w64_both`` file whose output bias is ``output_bias``."""
-    model = new_model(get_model_class("net_pst_w64_both"))
+    model = untrained_model(get_model_class("net_pst_w64_both"))
     weights, _ = model.layers[-1]
     model.layers[-1] = (np.zeros_like(weights), np.full(1, output_bias))
     return model.save(path)

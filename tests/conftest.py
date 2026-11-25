@@ -7,6 +7,11 @@ import chess
 import numpy as np
 import pytest
 
+from chess_lab.measure import report
+from chess_lab.models.definitions import NeuralEvalModel, NnW64BothModel, get_model_class
+from chess_lab.models.store import cards
+from chess_lab.models.target import Representation
+
 PIECE_CP = {
     chess.PAWN: 100,
     chess.KNIGHT: 300,
@@ -117,3 +122,49 @@ def pytest_sessionfinish(session, exitstatus):
     if changed:
         print(f"\nERROR: a test overwrote shipped artifacts: {changed}")
         session.exitstatus = 1
+
+
+@pytest.fixture
+def isolated_cards(tmp_path, monkeypatch):
+    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
+    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "RESULTS.md")
+    return tmp_path
+
+
+ACCURACY = {
+    "all": {
+        "spearman": 0.912,
+        "mae": 0.083,
+        "excess": 0.0123,
+        "best_move_agreement": 0.345,
+        "n": 100,
+    },
+    "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
+    "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
+}
+
+
+def untrained_model(model_class: type, rep: Representation | None = None) -> NeuralEvalModel:
+    """A model with random He-normal layers and zero biases, built without the training package."""
+    rng = np.random.default_rng(0)
+    layers = [
+        (rng.normal(0.0, np.sqrt(2.0 / fan_in), size=(fan_in, fan_out)), np.zeros(fan_out))
+        for fan_in, fan_out in model_class.layer_shapes()
+    ]
+    return model_class(layers=layers, rep=(rep or Representation()).to_dict())
+
+
+def random_net(
+    seed: int = 0, rep: Representation | None = None, model_class: type = NnW64BothModel
+) -> NeuralEvalModel:
+    """A network with random layers, so that scores are not trivially 0.5."""
+    model = untrained_model(model_class, rep or Representation())
+    rng = np.random.default_rng(seed)
+    model.layers = [
+        (rng.normal(0.0, 0.3, size=weights.shape), rng.normal(0.0, 0.1, size=bias.shape))
+        for weights, bias in model.layers
+    ]
+    return model
+
+
+CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]

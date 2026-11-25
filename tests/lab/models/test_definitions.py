@@ -10,7 +10,7 @@ from chess_lab.models.definitions import (
 )
 from chess_lab.models.store import loader
 from chess_lab.models.target import Representation
-from chess_lab.training.neural import new_model
+from tests.conftest import untrained_model
 
 
 def test_every_model_is_in_the_table():
@@ -36,7 +36,8 @@ def test_wider_models_share_the_inputs_and_double_the_output_layer(width):
     assert cls.feature_set == get_model_class("net_pst_w64_both").feature_set
     assert cls.layer_shapes() == [(768, width), (2 * width, 1)]
     assert (
-        new_model(cls, Representation()).count_parameters() == 768 * width + width + 2 * width + 1
+        untrained_model(cls, Representation()).count_parameters()
+        == 768 * width + width + 2 * width + 1
     )
 
 
@@ -58,7 +59,7 @@ def test_ctx_models_read_the_families_they_name(letters, families, rows):
 
 def test_a_saved_ctx_model_remembers_its_families(tmp_path):
     cls = get_model_class("net_ctx_mpk_w128_both")
-    path = new_model(cls, Representation()).save(tmp_path / "net_ctx_mpk_w128_both.npz")
+    path = untrained_model(cls, Representation()).save(tmp_path / "net_ctx_mpk_w128_both.npz")
     assert cls.load(path).families == cls.families
     with pytest.raises(ValueError, match="families"):
         get_model_class("net_ctx_k_w128_both").load(path)
@@ -67,14 +68,14 @@ def test_a_saved_ctx_model_remembers_its_families(tmp_path):
 def test_a_saved_head_loads_back_and_only_into_its_own_class(tmp_path):
     heads = get_model_class("net_pst_w128_ob8h16_both")
     linear = get_model_class("net_pst_w128_ob8_both")
-    model = new_model(heads, Representation())
+    model = untrained_model(heads, Representation())
     loaded = heads.load(model.save(tmp_path / "h.npz"))
     for (weights, bias), (want_weights, want_bias) in zip(loaded.layers, model.layers, strict=True):
         assert np.array_equal(weights, want_weights) and np.array_equal(bias, want_bias)
     with pytest.raises(ValueError, match="has 3 layers, expected 2"):
         linear.load(tmp_path / "h.npz")
     with pytest.raises(ValueError, match="has 2 layers, expected 3"):
-        heads.load(new_model(linear, Representation()).save(tmp_path / "l.npz"))
+        heads.load(untrained_model(linear, Representation()).save(tmp_path / "l.npz"))
 
 
 def test_unknown_model_lists_the_valid_names():
@@ -89,7 +90,7 @@ def test_missing_artifact_raises_file_not_found(tmp_path):
 
 def test_a_saved_model_keeps_its_representation(tmp_path):
     cls = get_model_class("net_pst_w64_both")
-    model = new_model(cls, Representation())
+    model = untrained_model(cls, Representation())
     model.rep = {"x": 1}
     loaded = cls.load(model.save(tmp_path / "m.npz"))
     assert loaded.rep == {"x": 1}
@@ -99,7 +100,7 @@ def test_a_saved_model_keeps_its_representation(tmp_path):
 
 
 def test_a_file_of_another_feature_set_is_refused(tmp_path):
-    path = new_model(get_model_class("net_pst_threats_w64_both"), Representation()).save(
+    path = untrained_model(get_model_class("net_pst_threats_w64_both"), Representation()).save(
         tmp_path / "m.npz"
     )
     with pytest.raises(ValueError, match="features"):
@@ -109,9 +110,9 @@ def test_a_file_of_another_feature_set_is_refused(tmp_path):
 def test_tagged_spec_round_trip(tmp_path, monkeypatch):
     monkeypatch.setattr(loader, "ARTIFACTS_DIR", tmp_path)
     cls = get_model_class("net_pst_w64_both")
-    plain = new_model(cls, Representation())
+    plain = untrained_model(cls, Representation())
     plain.save(tmp_path / "net_pst_w64_both.npz")
-    tagged_model = new_model(cls, Representation())
+    tagged_model = untrained_model(cls, Representation())
     tagged_model.layers[-1] = (tagged_model.layers[-1][0], np.full(1, 0.5))
     tagged_model.save(tmp_path / "net_pst_w64_both@x.npz")
 

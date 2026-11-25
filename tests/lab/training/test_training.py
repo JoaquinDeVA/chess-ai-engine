@@ -1,165 +1,18 @@
 """Tests of the training pipeline: targets, dataset split, cards, report and the CLIs."""
 
-import json
 from types import SimpleNamespace
 
-import numpy as np
-import pandas as pd
 import pytest
 
 from chess_lab.datasets.raw_shards import shard_path, write_shard
 from chess_lab.datasets.sidecar import build_sidecar
-from chess_lab.datasets.split import (
-    TEST,
-    TRAIN,
-    VALIDATION,
-    assign_split,
-)
 from chess_lab.measure import evaluate as evaluate_cli
-from chess_lab.measure import report
 from chess_lab.models import definitions
 from chess_lab.models.store import cards, loader
-from chess_lab.models.target import Representation
 from chess_lab.training import train as train_cli
 from chess_lab.training.effort import effort_config, fit_config
 from chess_lab.training.neural import new_model
-from tests.conftest import material_cp, random_positions
-
-
-@pytest.fixture
-def isolated_cards(tmp_path, monkeypatch):
-    monkeypatch.setattr(cards, "CARDS_DIR", tmp_path / "cards")
-    monkeypatch.setattr(report, "HISTORY_FILE", tmp_path / "RESULTS.md")
-    return tmp_path
-
-
-ACCURACY = {
-    "all": {
-        "spearman": 0.912,
-        "mae": 0.083,
-        "excess": 0.0123,
-        "best_move_agreement": 0.345,
-        "n": 100,
-    },
-    "quiet": {"spearman": 0.9, "mae": 0.07, "best_move_agreement": 0.4, "n": 60},
-    "non_quiet": {"spearman": 0.8, "mae": 0.1, "best_move_agreement": 0.28, "n": 40},
-}
-
-
-class TestDatasetSplit:
-    def fens(self, n):
-        return pd.Series([f"fen-{i} w - -" for i in range(n)])
-
-    def test_split_is_deterministic_and_disjoint(self):
-        fens = self.fens(5000)
-        first, second = assign_split(fens), assign_split(fens)
-        assert (first == second).all()
-        assert set(np.unique(first)) == {TRAIN, VALIDATION, TEST}
-
-    def test_fractions_are_respected(self):
-        split = assign_split(self.fens(20_000))
-        assert 0.08 < (split == TEST).mean() < 0.12
-        assert 0.08 < (split == VALIDATION).mean() < 0.12
-
-    def test_a_position_stays_in_its_split_whatever_the_sample(self):
-        """The benchmark must not change with row order or ``max_rows``."""
-        fens = self.fens(3000)
-        full = dict(zip(fens, assign_split(fens), strict=True))
-        shuffled = fens.sample(frac=0.5, random_state=3)
-        for fen, assigned in zip(shuffled, assign_split(shuffled), strict=True):
-            assert full[fen] == assigned
-
-    def test_different_seeds_give_different_splits(self):
-        fens = self.fens(2000)
-        assert (assign_split(fens, seed=1) != assign_split(fens, seed=2)).any()
-
-
-class TestCardsAndReport:
-    def test_update_merges_dictionaries_and_replaces_scalars(self, isolated_cards):
-        cards.update_card("m", architecture="a", training={"epochs": 3, "dataset": "x"})
-        card = cards.update_card("m", architecture="b", training={"epochs": 4})
-        assert card["architecture"] == "b"
-        assert card["training"] == {"epochs": 4, "dataset": "x"}
-        assert json.loads(cards.card_path("m").read_text())["training"]["epochs"] == 4
-
-    def test_clear_measurements_keeps_only_the_identity(self, isolated_cards):
-        cards.update_card(
-            "m",
-            status="current",
-            architecture="a",
-            features="f",
-            parameters=3,
-            size_kb=1.5,
-            training={"effort": 1},
-            accuracy=ACCURACY,
-            cost={"us_per_eval": 1.0},
-        )
-        cards.clear_measurements("m")
-        assert cards.load_card("m") == {
-            "name": "m", "status": "current", "architecture": "a", "features": "f",
-            "parameters": 3, "size_kb": 1.5,
-        }  # fmt: skip
-        assert json.loads(cards.card_path("m").read_text()) == cards.load_card("m")
-
-    def test_clear_measurements_of_a_missing_card_does_nothing(self, isolated_cards):
-        cards.clear_measurements("ghost")
-        assert not cards.card_path("ghost").exists()
-
-    def test_missing_card_is_an_empty_skeleton(self, isolated_cards):
-        assert cards.load_card("ghost") == {"name": "ghost"}
-
-    def test_report_renders_the_columns(self, isolated_cards):
-        representation = Representation().to_dict()
-        cards.update_card(
-            "net_pst_w64_both",
-            status="current",
-            architecture="PST",
-            parameters=1234,
-            training={"effort": 40, "representation": representation},
-            accuracy=ACCURACY,
-            cost={"us_per_eval": 12.5},
-        )
-        text = report.render_tables()
-        header = (
-            "| Model | Params | Representation | Effort | Spearman | MAE | Excess (nats) | "
-            "Best move, all / non-quiet | µs per eval |"
-        )
-        row = (
-            f"| `net_pst_w64_both` | 1,234 | {Representation().name} | 40 | 0.912 | 0.083 | "
-            "0.0123 | 34.5% / 28.0% | 12.5 |"
-        )
-        assert header in text and row in text
-
-    def test_a_model_trained_twice_shows_only_its_highest_effort(self, isolated_cards):
-        for effort in (30, 100):
-            cards.update_card(
-                f"m@e{effort}", status="current", architecture="A", training={"effort": effort}
-            )
-        lines = [line for line in report.render_tables().splitlines() if line.startswith("| `m`")]
-        assert len(lines) == 1 and "| 100 |" in lines[0]
-
-    def test_models_without_sections_show_dashes(self, isolated_cards):
-        cards.update_card("fresh", status="current", architecture="A")
-        assert f"| `fresh` |{' — |' * 8}" in report.render_tables()
-
-    def test_history_file_is_updated_between_markers_only(self, isolated_cards):
-        path = report.HISTORY_FILE
-        path.write_text(f"intro\n{report.BEGIN_MARKER}\nSTALE\n{report.END_MARKER}\noutro\n")
-        cards.update_card("m", status="current", architecture="A")
-        assert report.update_history_file()
-        text = path.read_text()
-        assert (
-            text.startswith("intro\n")
-            and text.endswith("\noutro\n")
-            and "STALE" not in text
-            and "`m`" in text
-        )
-
-    def test_history_file_without_markers_is_left_alone(self, isolated_cards):
-        report.HISTORY_FILE.write_text("no markers here")
-        assert not report.update_history_file()
-        assert report.HISTORY_FILE.read_text() == "no markers here"
-        assert not report.update_history_file(isolated_cards / "does-not-exist.md")
+from tests.conftest import ACCURACY, material_cp, random_positions
 
 
 class TestEffortCommandLine:
@@ -356,20 +209,6 @@ class TestCommandLineWithDoubles:
             "name": "net_pst_w64_both@e40", "status": "current", "parameters": 99
         }  # fmt: skip
 
-    def test_evaluation_with_a_tag_writes_the_tagged_card(
-        self, isolated_cards, stub_model, monkeypatch
-    ):
-        metrics = {
-            "accuracy": ACCURACY | {"sample": {"rows": 100, "seed": 1, "agreement_n": 10}},
-            "cost": {"us_per_eval": 5.0},
-        }
-        monkeypatch.setattr(loader, "ARTIFACTS_DIR", isolated_cards / "artifacts")
-        monkeypatch.setattr(evaluate_cli, "load_model", lambda *a, **k: stub_model)
-        monkeypatch.setattr(evaluate_cli, "sample_benchmark", lambda *a, **k: metrics)
-        assert evaluate_cli.main(["--model", "net_pst_w64_both@x"]) == 0
-        assert cards.load_card("net_pst_w64_both@x")["accuracy"]["all"]["spearman"] == 0.912
-        assert cards.load_card("net_pst_w64_both") == {"name": "net_pst_w64_both"}
-
     def test_retraining_drops_the_measurements_of_the_previous_model(self, fake_training):
         cards.update_card(
             "net_pst_w64_both@e40",
@@ -383,14 +222,6 @@ class TestCommandLineWithDoubles:
         assert not {"accuracy", "cost"} & set(card)
         assert card["training"]["effort"] == 40 and "old_key" not in card["training"]
         assert card["parameters"] == 7
-
-
-class TestEvaluateNames:
-    def test_only_registered_models_are_accepted(self):
-        assert "h1" not in definitions.available_models()
-        for name in ("h1", "nope"):
-            with pytest.raises(SystemExit):
-                evaluate_cli.parse_args(["--model", name])
 
 
 @pytest.mark.parametrize("value", ["0", "-1e-3"])

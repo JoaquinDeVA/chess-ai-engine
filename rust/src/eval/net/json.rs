@@ -1,15 +1,31 @@
-//! Reading a network from the JSON of `chess_lab.models.export_uci`: its `features`, its
-//! `families` and its `layers`, with the weights rounded to `f32` as they are read.
+//! Reading a network from the JSON of `chess_lab.models.export_uci`: its `schema`, its `features`,
+//! its `families` and its `layers`, with the weights rounded to `f32` as they are read. The `name`
+//! and the `source_sha256` of the file say where it comes from and are not read.
 
 use super::{Layer, Net};
 use crate::eval::features::{Families, FeatureSet};
 
+/// Version of the file format that this reader knows. A file without `schema`, or with a greater
+/// one, is rejected: the same shapes could mean something else (another bucket rule, another
+/// activation) and would load and play badly. Raise it with every change of meaning, and
+/// `export_uci` writes this number.
+pub const SCHEMA: u64 = 1;
+
 impl Net {
-    /// A network from the JSON of `chess_lab.models.export_uci`: its `features` and its `layers`,
-    /// each with `fan_in`, `fan_out`, row-major `weights` and `bias`. The `"perspective"` field may
-    /// be absent or `"both"`: the networks of the side to move alone are no longer read.
+    /// A network from the JSON of `chess_lab.models.export_uci`: its `schema` and `features` and its
+    /// `layers`, each with `fan_in`, `fan_out`, row-major `weights` and `bias`. The `"perspective"`
+    /// field may be absent or `"both"`: the networks of the side to move alone are no longer read.
     pub fn from_json(text: &str) -> Result<Net, String> {
         let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        match value["schema"].as_u64() {
+            None => return Err("model: the file has no schema".into()),
+            Some(schema) if schema > SCHEMA => {
+                return Err(format!(
+                    "model: schema {schema} is newer than the {SCHEMA} this engine reads"
+                ))
+            }
+            Some(_) => {}
+        }
         let features = value["features"]
             .as_str()
             .and_then(FeatureSet::from_name)
@@ -81,11 +97,39 @@ mod tests {
             r#"{{"fan_in":{last_in},"fan_out":1,"weights":{:?},"bias":[0.0]}}"#,
             vec![1.0; last_in]
         );
-        format!(r#"{{"features":"{features}",{extra}"layers":[{first},{last}]}}"#)
+        format!(r#"{{"schema":{SCHEMA},"features":"{features}",{extra}"layers":[{first},{last}]}}"#)
     }
 
     fn loads(features: &str, extra: &str, rows: usize, last_in: usize) -> bool {
         Net::from_json(&net_json(features, extra, rows, last_in)).is_ok()
+    }
+
+    #[test]
+    fn the_schema_is_required_and_not_newer_than_the_reader() {
+        let file = net_json("pst_ctx", "", 768, 16);
+        assert!(Net::from_json(&file).is_ok());
+        let without = file.replace(&format!(r#""schema":{SCHEMA},"#), "");
+        assert!(Net::from_json(&without)
+            .err()
+            .unwrap()
+            .contains("no schema"));
+        let newer = file.replace(
+            &format!(r#""schema":{SCHEMA},"#),
+            &format!(r#""schema":{},"#, SCHEMA + 1),
+        );
+        assert!(Net::from_json(&newer).err().unwrap().contains("newer"));
+        let text = file.replace(&format!(r#""schema":{SCHEMA},"#), r#""schema":"1","#);
+        assert!(Net::from_json(&text).is_err());
+    }
+
+    #[test]
+    fn the_provenance_fields_are_ignored() {
+        assert!(loads(
+            "pst_ctx",
+            r#""name":"some_net","source_sha256":"abc","#,
+            768,
+            16
+        ));
     }
 
     #[test]

@@ -6,6 +6,8 @@
 mod forward;
 mod json;
 
+pub use json::SCHEMA;
+
 use super::features::FeatureSet;
 
 /// Most units of the output layer: one per piece count.

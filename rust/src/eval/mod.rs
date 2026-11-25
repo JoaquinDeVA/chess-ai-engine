@@ -7,4 +7,4 @@ mod net;
 
 pub use accumulator::{NetState, EVAL_LIMIT};
 pub use features::{encode, Encoding, Families, FeatureSet};
-pub use net::{Layer, Net};
+pub use net::{Layer, Net, SCHEMA};

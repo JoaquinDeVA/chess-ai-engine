@@ -68,6 +68,14 @@ impl PyEvaluator {
         Ok(PyEvaluator { net })
     }
 
+    /// Read the JSON file of `chess_lab.models.export_uci`, as the UCI binary does.
+    #[staticmethod]
+    fn from_json(text: &str) -> PyResult<PyEvaluator> {
+        Ok(PyEvaluator {
+            net: Net::from_json(text).map_err(value_error)?,
+        })
+    }
+
     /// Evaluate a FEN position from White's or Black's perspective.
     ///
     /// `white=True` evaluates for White; `white=False` evaluates for Black. The returned score is
@@ -131,6 +139,7 @@ mod _core {
         // Keep these values sourced from Rust so Python tooling uses the same defaults as the
         // engine instead of maintaining a second copy.
         module.add("MAX_DEPTH", crate::search::MAX_DEPTH)?;
+        module.add("MODEL_SCHEMA", crate::eval::SCHEMA)?;
         Ok(())
     }
 }

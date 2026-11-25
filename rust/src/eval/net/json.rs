@@ -126,6 +126,29 @@ mod tests {
     }
 
     #[test]
+    fn a_third_layer_is_a_head_per_bucket() {
+        let head = format!(
+            r#",{{"fan_in":2,"fan_out":8,"weights":{:?},"bias":{:?}}}]"#,
+            vec![1.0; 16],
+            vec![0.0; 8]
+        );
+        let file = |hidden: usize| {
+            net_json("pst_ctx", "", 768, 16)
+                .replace(
+                    &format!(r#""fan_out":1,"weights":{:?},"bias":[0.0]"#, vec![1.0; 16]),
+                    &format!(
+                        r#""fan_out":{hidden},"weights":{:?},"bias":{:?}"#,
+                        vec![1.0; 16 * hidden],
+                        vec![0.0; hidden]
+                    ),
+                )
+                .replacen("}]}", &format!("}}{head}}}"), 1)
+        };
+        assert!(Net::from_json(&file(16)).is_ok());
+        assert!(Net::from_json(&file(15)).is_err());
+    }
+
+    #[test]
     fn a_network_with_the_wrong_input_size_is_rejected() {
         assert!(!loads("pst_ctx", "", 10, 16));
     }

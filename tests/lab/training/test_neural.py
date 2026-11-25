@@ -150,7 +150,7 @@ def test_eight_output_buckets_take_four_piece_counts_each():
     assert output_bucket(32, 1) == 0
 
 
-BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel, NnW128Ob8BothModel]
+BOTH_MODELS = [NnW64BothModel, NnThreatsW64BothModel, NnW128Ob8BothModel, NnW128Ob8H16BothModel]
 CTX_MODELS = [get_model_class(f"net_ctx_{letters}_w128_both") for letters in ("m", "p", "k", "mpk")]
 
 
@@ -205,16 +205,9 @@ def one_board_per_bucket() -> list[chess.Board]:
     return boards
 
 
-def test_the_training_graph_computes_the_head_of_every_bucket():
-    model = random_net(seed=4, model_class=NnW128Ob8H16BothModel)
-    boards = one_board_per_bucket() + random_positions(20, seed=19)
-    assert [reference_bucket(model, b) for b in boards[:8]] == list(range(8))
-    for board, logit in zip(boards, keras_logits(model, boards), strict=True):
-        assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
-
-
-def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph():
-    model = random_net(seed=4, model_class=NnW128Ob8BothModel)
+@pytest.mark.parametrize("model_class", [NnW128Ob8BothModel, NnW128Ob8H16BothModel])
+def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph(model_class):
+    model = random_net(seed=4, model_class=model_class)
     boards = one_board_per_bucket()
     assert [reference_bucket(model, b) for b in boards] == list(range(8))
     evaluator = model.evaluator()

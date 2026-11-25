@@ -170,7 +170,7 @@ impl NetState<'_> {
 mod tests {
     use super::*;
     use crate::board::{legal_moves, position_from_fen};
-    use crate::eval::net::dummy::net;
+    use crate::eval::net::dummy::{heads_net, net};
     use crate::eval::FeatureSet;
 
     /// The incremental and the full sums add the same `f32` terms in another order.
@@ -233,6 +233,11 @@ mod tests {
     #[test]
     fn incremental_equals_full_threats() {
         check_net(&net(FeatureSet::PstThreats));
+    }
+
+    #[test]
+    fn incremental_equals_full_with_a_head_per_bucket() {
+        check_net(&heads_net(FeatureSet::PstThreats));
     }
 
     /// Every combination of the families, alone and together.

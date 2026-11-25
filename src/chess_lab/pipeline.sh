@@ -61,7 +61,7 @@ present_models() {
 join() { local IFS=,; echo "$*"; }
 
 step_sidecars() {
-  run "$PYTHON" src/chess_lab/datasets/build_sidecars.py --raw "$RAW" --out "$SIDECAR"
+  run "$PYTHON" -m chess_lab.datasets.build_sidecars --raw "$RAW" --out "$SIDECAR"
 }
 
 step_train() {

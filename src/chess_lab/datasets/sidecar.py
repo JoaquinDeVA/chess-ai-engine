@@ -15,6 +15,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from chess_lab.atomic import atomic_path
 from chess_lab.defaults import SAMPLE_SEED
 from chess_lab.models.target import is_quiet, keep_mate_rows, validate_mate_keep
 
@@ -48,27 +49,28 @@ def build_sidecar(shard: Path, out_dir: Path) -> Path:
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     path = sidecar_path(shard, out_dir)
-    temporary = path.with_suffix(".tmp")
     source = pq.ParquetFile(shard)
     rows = 0
-    with pq.ParquetWriter(temporary, SIDECAR_SCHEMA, compression="zstd") as writer:
-        for group in range(source.num_row_groups):
-            table = source.read_row_group(group, columns=["fen", "best_move"])
-            fens, moves = table["fen"].to_pylist(), table["best_move"].to_pylist()
-            boards = [chess.Board(fen) for fen in fens]
-            writer.write_table(
-                pa.table(
-                    {
-                        "split": assign_split(pd.Series(fens)),
-                        "quiet": [is_quiet(b, m) for b, m in zip(boards, moves, strict=True)],
-                        "white_to_move": [b.turn == chess.WHITE for b in boards],
-                    },
-                    schema=SIDECAR_SCHEMA,
+    with atomic_path(path) as temporary:
+        with pq.ParquetWriter(temporary, SIDECAR_SCHEMA, compression="zstd") as writer:
+            for group in range(source.num_row_groups):
+                table = source.read_row_group(group, columns=["fen", "best_move"])
+                fens, moves = table["fen"].to_pylist(), table["best_move"].to_pylist()
+                boards = [chess.Board(fen) for fen in fens]
+                writer.write_table(
+                    pa.table(
+                        {
+                            "split": assign_split(pd.Series(fens)),
+                            "quiet": [is_quiet(b, m) for b, m in zip(boards, moves, strict=True)],
+                            "white_to_move": [b.turn == chess.WHITE for b in boards],
+                        },
+                        schema=SIDECAR_SCHEMA,
+                    )
                 )
+                rows += table.num_rows
+            writer.add_key_value_metadata(
+                {"rows": json.dumps(rows), "source": json.dumps(shard.name)}
             )
-            rows += table.num_rows
-        writer.add_key_value_metadata({"rows": json.dumps(rows), "source": json.dumps(shard.name)})
-    temporary.replace(path)
     return path
 
 

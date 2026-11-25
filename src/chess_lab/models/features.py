@@ -77,7 +77,7 @@ def _threat_entries(board: chess.Board, base: int) -> Tuple[List[int], List[floa
 
 
 #: Offset of the opponent's piece block in :class:`SlottedPstFeatures`.
-_OPPONENT_PIECE_BLOCK = 6 * 64
+OPPONENT_PIECE_BLOCK = 6 * 64
 
 
 class SlottedPstFeatures:
@@ -107,7 +107,7 @@ class SlottedPstFeatures:
 
         :return: ``768``.
         """
-        return 2 * _OPPONENT_PIECE_BLOCK
+        return 2 * OPPONENT_PIECE_BLOCK
 
     def active(self, board: chess.Board) -> Tuple[List[int], List[float]]:
         """Index of every piece, all values ``1.0``.
@@ -120,7 +120,7 @@ class SlottedPstFeatures:
         for square, piece in board.piece_map().items():
             offset = (piece.piece_type - 1) * 64
             if piece.color != mover:
-                offset += _OPPONENT_PIECE_BLOCK
+                offset += OPPONENT_PIECE_BLOCK
             oriented = chess.square_mirror(square) if piece.color == chess.BLACK else square
             indices.append(offset + oriented)
         return indices, [1.0] * len(indices)
@@ -175,6 +175,8 @@ KING_BUCKETS = 4
 #: First index of each block of :class:`CtxPstFeatures`: the pieces come first, then the
 #: material entries, the pawn files and the king buckets (the mover's, then the rival's).
 MATERIAL_BASE = 768
+#: Piece-square inputs of one side: the same 768 in every feature set, before the other families.
+PIECE_INPUTS = MATERIAL_BASE
 PAWN_FILES_BASE = MATERIAL_BASE + 2 * MATERIAL_PER_SIDE
 KING_BASE = PAWN_FILES_BASE + 2 * PAWN_FILES_PER_SIDE
 

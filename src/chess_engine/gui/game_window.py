@@ -99,7 +99,7 @@ class GamePage(QWidget):
         self._build()
         self.board.set_orientation(self.humans[0] if self.humans else chess.WHITE)
         self._place_bars()
-        self._refresh()
+        self.refresh()
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(100)
@@ -205,7 +205,8 @@ class GamePage(QWidget):
             board.pop()
         return board
 
-    def _refresh(self) -> None:
+    def refresh(self) -> None:
+        """Redraw the board, the move list and the clocks for the position the model shows."""
         board = self._position()
         last = board.peek() if board.move_stack else None
         self.board.set_board(board, last)
@@ -268,7 +269,7 @@ class GamePage(QWidget):
     def _play(self, move: chess.Move) -> None:
         self.model.make_move(move)
         self._view = None
-        self._refresh()
+        self.refresh()
         self._next()
 
     def _next(self) -> None:
@@ -322,7 +323,7 @@ class GamePage(QWidget):
             self._finish_with(lambda: self.model.resign(self.model.turn))
             return
         if self.model.outcome() is not None:  # flagged while thinking
-            self._refresh()
+            self.refresh()
             return
         self._play(move)
 
@@ -334,7 +335,7 @@ class GamePage(QWidget):
         self._token += 1
         self.model.undo(2 if len(self.model.board.move_stack) >= 2 else 1)
         self._view = None
-        self._refresh()
+        self.refresh()
         self._next()
 
     def _offer_draw(self) -> None:
@@ -356,7 +357,7 @@ class GamePage(QWidget):
     def _finish_with(self, action) -> None:
         self._token += 1
         action()
-        self._refresh()
+        self.refresh()
 
     def _flip(self) -> None:
         self.board.set_orientation(not self.board.orientation)
@@ -375,7 +376,7 @@ class GamePage(QWidget):
         target = {"start": 0, "back": now - 1, "forward": now + 1, "end": total}[where]
         target = max(0, min(total, target))
         self._view = None if target == total else target
-        self._refresh()
+        self.refresh()
 
     def _cell_clicked(self, row: int, column: int) -> None:
         if column == 0:
@@ -383,7 +384,7 @@ class GamePage(QWidget):
         ply = row * 2 + column  # ply count after the clicked move
         if ply <= len(self.model.san_moves):
             self._view = None if ply == len(self.model.san_moves) else ply
-            self._refresh()
+            self.refresh()
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
         """Left/right/Home/End walk through the game."""

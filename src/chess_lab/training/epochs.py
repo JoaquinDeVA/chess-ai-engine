@@ -22,6 +22,7 @@ import chess
 import numpy as np
 import pandas as pd
 
+from chess_lab.atomic import atomic_path
 from chess_lab.models.features import SlottedPstFeatures
 from chess_lab.models.target import Representation, target
 
@@ -280,11 +281,9 @@ def _load_encoded(cache_dir: Optional[Path], index: int) -> Optional[EncodedFram
 def _save_encoded(cache_dir: Path, index: int, encoded: EncodedFrame) -> None:
     """Write an encoded frame to the cache, atomically (temporary name, then rename)."""
     path = cache_dir / f"{index:07d}.npz"
-    tmp = cache_dir / f"{index:07d}.tmp"
     rows, cols, values, targets = encoded
-    with open(tmp, "wb") as handle:
+    with atomic_path(path) as temporary, open(temporary, "wb") as handle:
         np.savez(handle, rows=rows, cols=cols, values=values, targets=targets)
-    os.replace(tmp, path)
 
 
 def encode_frame(

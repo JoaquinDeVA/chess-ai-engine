@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 
 from chess_engine.paths import ROOT
+from chess_lab.atomic import atomic_path
 from chess_lab.datasets.book import fen_key
 from chess_lab.datasets.stockfish import cp_mate, label_parallel
 from chess_lab.models.target import is_quiet
@@ -142,7 +143,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ]
     table = table_of(rows).sort_values("fen", kind="stable", ignore_index=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    table.to_parquet(args.out, index=False)
+    with atomic_path(args.out) as temporary:
+        table.to_parquet(temporary, index=False)
     print(
         f"{len(pgns)} PGN files, {len(table)} positions ({int(table['quiet'].sum())} quiet), "
         f"depth {args.depth} -> {args.out}"

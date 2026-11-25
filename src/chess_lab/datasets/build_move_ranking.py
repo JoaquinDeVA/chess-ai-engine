@@ -17,6 +17,7 @@ import chess.engine
 import pandas as pd
 
 from chess_engine.paths import ROOT
+from chess_lab.atomic import atomic_path
 from chess_lab.datasets.sidecar import load_test_sample
 from chess_lab.datasets.stockfish import cp_mate, label_parallel
 from chess_lab.defaults import RAW_DIR, SIDECAR_DIR
@@ -79,7 +80,8 @@ def main() -> None:
     table["quiet"] = table["fen"].map(quiet).astype(bool)
     table = table.sort_values(["fen", "move"], kind="stable", ignore_index=True)
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    table.to_parquet(args.out, index=False)
+    with atomic_path(args.out) as temporary:
+        table.to_parquet(temporary, index=False)
     print(f"{len(fens)} positions, {len(table)} moves, depth {args.depth} -> {args.out}")
 
 

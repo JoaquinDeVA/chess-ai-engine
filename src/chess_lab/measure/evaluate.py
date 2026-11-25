@@ -27,7 +27,6 @@ from chess_lab.datasets.sidecar import load_test_sample
 from chess_lab.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.measure.judge import by_quiet, judge, predictions, static_metrics
 from chess_lab.measure.ranking import judge_ranking
-from chess_lab.measure.report import update_history_file
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
 from chess_lab.models.store.loader import artifact_path, split_spec
@@ -176,10 +175,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     saved = args.path or artifact_path(args.model)
     if saved.exists():
         sections["size_kb"] = round(saved.stat().st_size / 1024, 1)
-    if "status" not in sections and "status" not in load_card(args.model):
+    if "status" not in load_card(args.model):
         sections["status"] = "current"
     update_card(args.model, **sections)
-    update_history_file()
 
     accuracy, cost = sections["accuracy"], sections["cost"]
     print(f"  sample rows: {accuracy['sample']['rows']:,}")

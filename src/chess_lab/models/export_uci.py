@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from chess_engine.paths import ROOT
+from chess_lab.atomic import atomic_path
 from chess_lab.models.definitions import NeuralEvalModel, load_model
 
 DEFAULT_OUT = ROOT / "rust" / "models"
@@ -65,7 +66,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     payload = export_payload(model)
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / f"{args.model}.json"
-    target.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with atomic_path(target) as temporary:
+        temporary.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     print(f"{target} ({model.count_parameters()} parameters)")
     return 0
 

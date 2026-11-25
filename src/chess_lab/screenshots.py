@@ -61,7 +61,7 @@ def make_game() -> GamePage:
         game_window.UciBot = real_bot
     for uci in GAME_MOVES:
         page.model.make_move(chess.Move.from_uci(uci))
-    page._refresh()
+    page.refresh()
     return page
 
 

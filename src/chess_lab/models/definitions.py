@@ -13,6 +13,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Sequence, Tuple, Type
 import numpy as np
 
 from chess_engine import _core
+from chess_lab.atomic import atomic_path
 
 from .store.loader import artifact_path, split_spec
 
@@ -203,7 +204,7 @@ class NeuralEvalModel:
             "families": list(self.families),
         }
         # A file object keeps numpy from appending ".npz" to the requested name.
-        with open(path, "wb") as handle:
+        with atomic_path(path) as temporary, open(temporary, "wb") as handle:
             np.savez(handle, meta=np.array(json.dumps(meta)), **arrays)
         return path
 

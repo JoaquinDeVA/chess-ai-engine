@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from chess_engine.paths import ROOT
+from chess_lab.atomic import atomic_path
 
 CARDS_DIR = Path(__file__).resolve().parent / "cards"
 #: Card sections that hold measurements of one particular trained model.
@@ -47,7 +48,10 @@ def save_card(name: str, card: Dict[str, Any]) -> Path:
     """
     CARDS_DIR.mkdir(parents=True, exist_ok=True)
     path = card_path(name)
-    path.write_text(json.dumps(card, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    with atomic_path(path) as temporary:
+        temporary.write_text(
+            json.dumps(card, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
     return path
 
 

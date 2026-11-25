@@ -10,7 +10,6 @@ to NumPy arrays, which are what the saved model stores.
 
 import json
 import math
-import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -18,14 +17,17 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+from chess_lab.atomic import atomic_path
 from chess_lab.models.definitions import MAX_OUTPUT_BUCKETS, Layer, NeuralEvalModel
 from chess_lab.models.features import (
     KING_BASE,
     KING_BUCKETS,
     MATERIAL_BASE,
     MATERIAL_PER_SIDE,
+    OPPONENT_PIECE_BLOCK,
     PAWN_FILES_BASE,
     PAWN_FILES_PER_SIDE,
+    PIECE_INPUTS,
     features_of,
 )
 from chess_lab.models.target import Representation
@@ -46,8 +48,6 @@ _INIT_SEED = 0
 #: Intra-op threads of the training process; the other cores feed the featurization pool.
 _INTRA_OP_THREADS = 2
 #: Inputs of one side of the slotted features, and the offset between the two sides' blocks.
-_INPUTS_PER_SIDE = 768
-_OPPONENT_BLOCK = 384
 #: Rows per call of the validation forward pass.
 _PREDICT_BATCH = 4096
 
@@ -261,8 +261,8 @@ def _accumulator_class(keras: Any) -> type:
             # (past the pieces) have no rival view. Feature ``i`` is index ``i + 1`` and index 0
             # is padding.
             feature = index - 1
-            piece = keras.ops.logical_and(index > 0, feature < _INPUTS_PER_SIDE)
-            swapped = keras.ops.mod(feature + _OPPONENT_BLOCK, _INPUTS_PER_SIDE)
+            piece = keras.ops.logical_and(index > 0, feature < PIECE_INPUTS)
+            swapped = keras.ops.mod(feature + OPPONENT_PIECE_BLOCK, PIECE_INPUTS)
             rival_index = keras.ops.where(piece, swapped + 1, 0)
             rival = self._sum(rival_index, keras.ops.where(piece, value, 0.0))
             return keras.ops.concatenate([mover, rival], axis=-1)
@@ -403,11 +403,8 @@ def _save_checkpoint(path: Path, network: Any, loop: Dict[str, Any], best: List[
         arrays[f"optimizer{i}"] = np.asarray(variable)
     for i, (weights, bias) in enumerate(best):
         arrays[f"best_weights{i}"], arrays[f"best_bias{i}"] = weights, bias
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_name(path.name + ".partial")
-    with open(partial, "wb") as handle:
+    with atomic_path(path) as temporary, open(temporary, "wb") as handle:
         np.savez(handle, **arrays)
-    os.replace(partial, path)
 
 
 def _load_checkpoint(path: Path, network: Any) -> Tuple[Dict[str, Any], List[Layer]]:

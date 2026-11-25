@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from chess_engine.paths import ROOT
+from chess_lab.atomic import atomic_path
 from chess_lab.models.store.cards import load_all_cards
 from chess_lab.models.target import Representation
 
@@ -133,9 +134,10 @@ def update_history_file(path: Optional[Path] = None) -> bool:
         return False
     head, rest = text.split(BEGIN_MARKER, 1)
     _, tail = rest.split(END_MARKER, 1)
-    path.write_text(
-        f"{head}{BEGIN_MARKER}\n{render_tables()}\n{END_MARKER}{tail}", encoding="utf-8"
-    )
+    with atomic_path(path) as temporary:
+        temporary.write_text(
+            f"{head}{BEGIN_MARKER}\n{render_tables()}\n{END_MARKER}{tail}", encoding="utf-8"
+        )
     return True
 
 

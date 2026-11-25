@@ -25,6 +25,7 @@ to the screening control; ``openings`` (an EPD file in ``~/chessai/roundrobin``)
 import argparse
 import csv
 import json
+import os
 import re
 import signal
 import subprocess
@@ -131,6 +132,17 @@ def command(
     ]
 
 
+def write_atomic(path: Path, text: str) -> None:
+    """Write a file whole or not at all (this script is copied alone, so it keeps its own copy).
+
+    :param path: Final file.
+    :param text: Its contents.
+    """
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text)
+    os.replace(temporary, path)
+
+
 def utcnow() -> datetime:
     """Current UTC time (``datetime.UTC`` does not exist in the Python 3.10 of the worker)."""
     return datetime.now(timezone.utc)  # noqa: UP017
@@ -162,7 +174,7 @@ class Queue:
         """Write the state of a job."""
         path = self.state_file(name)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, indent=1))
+        write_atomic(path, json.dumps(state, indent=1))
 
     def log(self, message: str) -> None:
         """Print a line with the UTC time."""
@@ -187,7 +199,7 @@ class Queue:
         if resume:
             data = json.loads(config.read_text())
             data["rounds"] = target
-            config.write_text(json.dumps(data))
+            write_atomic(config, json.dumps(data))
         with log.open("ab") as out:
             self.child = subprocess.Popen(
                 command(job, target, self.concurrency, config, pgn, resume),

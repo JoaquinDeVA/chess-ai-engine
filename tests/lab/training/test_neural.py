@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from chess_lab import atomic
 from chess_lab.models.definitions import (
     NeuralEvalModel,
     NnW64BothModel,
@@ -245,7 +246,7 @@ def test_a_cut_between_writing_and_renaming_a_checkpoint_keeps_the_previous_one(
     def cut(*_):
         raise OSError("cut")
 
-    monkeypatch.setattr(neural.os, "replace", cut)
+    monkeypatch.setattr(atomic.os, "replace", cut)
     with pytest.raises(OSError):
         neural._save_checkpoint(path, network, {"epoch": 2}, best)
     with np.load(path) as data:

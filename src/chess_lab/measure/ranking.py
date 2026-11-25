@@ -17,10 +17,8 @@ import numpy as np
 import pandas as pd
 
 from chess_lab.datasets.stockfish import open_engine
+from chess_lab.measure.judge import by_quiet, move_scores
 from chess_lab.models.target import Representation, white_score
-
-#: Score of a mating move: above any evaluation.
-_MATE_SCORE = 2.0
 
 
 def kendall_tau(pred: np.ndarray, truth: np.ndarray) -> float:
@@ -37,30 +35,6 @@ def kendall_tau(pred: np.ndarray, truth: np.ndarray) -> float:
     if pairs_pred == 0 or pairs_truth == 0:
         return float("nan")
     return float((sign_pred * sign_truth).sum() / np.sqrt(pairs_pred * pairs_truth))
-
-
-def move_scores(evaluator, board: chess.Board, moves: list[chess.Move]) -> np.ndarray:
-    """Score of each move for the mover: the evaluation of the position after it.
-
-    A mating move scores above everything; stalemate and other draws count as ``0.5``.
-
-    :param evaluator: Evaluation as the engine plays it.
-    :param board: Position to move in; it is not modified.
-    :param moves: Legal moves to score.
-    :return: One score per move.
-    """
-    mover = board.turn
-    scores = []
-    for move in moves:
-        child = board.copy(stack=False)
-        child.push(move)
-        if child.is_checkmate():
-            scores.append(_MATE_SCORE)
-        elif child.is_game_over():
-            scores.append(0.5)
-        else:
-            scores.append(evaluator.evaluate(child.fen(), mover == chess.WHITE))
-    return np.array(scores, dtype=np.float64)
 
 
 def judge_ranking(evaluator, table: pd.DataFrame) -> dict:
@@ -106,11 +80,7 @@ def judge_scorer(scorer, table: pd.DataFrame) -> dict:
             "positions": int(mask.sum()),
         }
 
-    return {
-        "all": report(np.ones(len(taus), dtype=bool)),
-        "quiet": report(quiet),
-        "non_quiet": report(~quiet),
-    }
+    return by_quiet(report, quiet)
 
 
 def main() -> int:

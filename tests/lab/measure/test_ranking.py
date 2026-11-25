@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from chess_lab.measure.ranking import judge_ranking, kendall_tau, move_scores
+from chess_lab.measure.judge import move_scores
+from chess_lab.measure.ranking import judge_ranking, kendall_tau
 from tests.conftest import MATE_IN_ONE, MaterialStubModel
 
 # White queen takes the hanging black queen, or a quiet king move, or a rook move that loses nothing.

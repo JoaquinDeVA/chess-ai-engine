@@ -19,21 +19,19 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 
 from chess_engine import _core
 from chess_lab.datasets.build_move_ranking import OUT as RANKING_TABLE
 from chess_lab.datasets.sidecar import load_sample
 from chess_lab.datasets.split import TEST
-from chess_lab.measure.judge import judge, static_metrics
+from chess_lab.measure.judge import by_quiet, judge, predictions, static_metrics
 from chess_lab.measure.ranking import judge_ranking
 from chess_lab.measure.report import update_history_file
 from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
 from chess_lab.models.store.loader import artifact_path, split_spec
-from chess_lab.models.target import Representation, white_score
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
 TEST_SAMPLE_ROWS = 200_000
@@ -90,13 +88,10 @@ def games_benchmark(evaluator: _core.Evaluator, games: Path) -> Dict[str, Any]:
     :return: ``{"all", "quiet", "non_quiet"}`` of :func:`~.judge.static_metrics`, plus ``file``.
     """
     table = pd.read_parquet(games)
-    pred = np.array([evaluator.evaluate(fen, True) for fen in table["fen"]], dtype=np.float64)
-    truth = white_score(table["cp"].to_numpy(), table["mate"].to_numpy(), Representation())
-    quiet = table["quiet"].to_numpy(dtype=bool)
-    slices = {"all": np.ones(len(table), dtype=bool), "quiet": quiet, "non_quiet": ~quiet}
-    report: Dict[str, Any] = {
-        name: static_metrics(pred[mask], truth[mask]) for name, mask in slices.items()
-    }
+    pred, truth = predictions(evaluator, table)
+    report: Dict[str, Any] = by_quiet(
+        lambda mask: static_metrics(pred[mask], truth[mask]), table["quiet"].to_numpy(dtype=bool)
+    )
     report["file"] = games.name
     return report
 

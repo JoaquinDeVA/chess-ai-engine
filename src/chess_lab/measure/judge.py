@@ -9,6 +9,8 @@ Two kinds of agreement are measured on a test sample of :func:`~.sidecar.load_sa
   the Stockfish best move.
 """
 
+from collections.abc import Callable
+
 import chess
 import numpy as np
 import pandas as pd
@@ -93,31 +95,74 @@ def static_metrics(pred_white: np.ndarray, true_white: np.ndarray) -> dict:
     }
 
 
-def one_ply_choice(evaluator: _core.Evaluator, board: chess.Board) -> chess.Move:
-    """Best move of the mover after one ply, judged by the evaluation.
+#: Score of a mating move: above any evaluation.
+MATE_SCORE = 2.0
 
-    A mating move ranks first; stalemate and other draws count as an even score.
 
-    :param evaluator: Evaluation of the resulting positions, as the engine plays it.
+def move_scores(
+    evaluator: _core.Evaluator, board: chess.Board, moves: list[chess.Move]
+) -> np.ndarray:
+    """Score of each move for the mover: the evaluation of the position after it.
+
+    A mating move scores above everything; stalemate and other draws count as ``0.5``.
+
+    :param evaluator: Evaluation as the engine plays it.
     :param board: Position to move in; it is not modified.
-    :return: The legal move with the highest evaluation for the side to move.
-    :raises ValueError: If the position has no legal move.
+    :param moves: Legal moves to score.
+    :return: One score per move.
     """
-    moves = list(board.legal_moves)
-    if not moves:
-        raise ValueError("the position has no legal move")
     mover = board.turn
     scores = []
     for move in moves:
         child = board.copy(stack=False)
         child.push(move)
         if child.is_checkmate():
-            scores.append(float("inf"))
+            scores.append(MATE_SCORE)
         elif child.is_game_over():
             scores.append(0.5)
         else:
             scores.append(evaluator.evaluate(child.fen(), mover == chess.WHITE))
-    return moves[max(range(len(moves)), key=lambda i: scores[i])]
+    return np.array(scores, dtype=np.float64)
+
+
+def one_ply_choice(evaluator: _core.Evaluator, board: chess.Board) -> chess.Move:
+    """Best move of the mover after one ply, judged by the evaluation.
+
+    :param evaluator: Evaluation of the resulting positions, as the engine plays it.
+    :param board: Position to move in; it is not modified.
+    :return: The legal move with the highest :func:`move_scores` (the first one on a tie).
+    :raises ValueError: If the position has no legal move.
+    """
+    moves = list(board.legal_moves)
+    if not moves:
+        raise ValueError("the position has no legal move")
+    return moves[int(np.argmax(move_scores(evaluator, board, moves)))]
+
+
+def predictions(evaluator: _core.Evaluator, table: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """The evaluation of every position of a table and its Stockfish truth, both White's score.
+
+    :param evaluator: Evaluation to judge, as the engine plays it.
+    :param table: Rows with ``fen``, ``cp`` and ``mate``.
+    :return: ``(pred, truth)``, one value per row.
+    """
+    pred = np.array([evaluator.evaluate(fen, True) for fen in table["fen"]], dtype=np.float64)
+    truth = white_score(table["cp"].to_numpy(), table["mate"].to_numpy(), Representation())
+    return pred, truth
+
+
+def by_quiet(report: Callable[[np.ndarray], dict], quiet: np.ndarray) -> dict:
+    """A report on all rows, on the quiet ones and on the rest.
+
+    :param report: Function of a boolean row mask.
+    :param quiet: Boolean array, True on the quiet rows.
+    :return: ``{"all": ..., "quiet": ..., "non_quiet": ...}``.
+    """
+    return {
+        "all": report(np.ones(len(quiet), dtype=bool)),
+        "quiet": report(quiet),
+        "non_quiet": report(~quiet),
+    }
 
 
 def judge(evaluator: _core.Evaluator, test: pd.DataFrame, agreement_n: int = 20_000) -> dict:
@@ -135,8 +180,7 @@ def judge(evaluator: _core.Evaluator, test: pd.DataFrame, agreement_n: int = 20_
         ``agreement_n`` (rows with a best move that were compared).
     """
     fens = test["fen"].tolist()
-    pred = np.array([evaluator.evaluate(fen, True) for fen in fens], dtype=np.float64)
-    truth = white_score(test["cp"].to_numpy(), test["mate"].to_numpy(), Representation())
+    pred, truth = predictions(evaluator, test)
     quiet = test["quiet"].to_numpy(dtype=bool)
 
     head = min(agreement_n, len(fens))
@@ -157,9 +201,4 @@ def judge(evaluator: _core.Evaluator, test: pd.DataFrame, agreement_n: int = 20_
         report["agreement_n"] = int(compared.size)
         return report
 
-    everything = np.ones(len(fens), dtype=bool)
-    return {
-        "all": slice_report(everything),
-        "quiet": slice_report(quiet),
-        "non_quiet": slice_report(~quiet),
-    }
+    return by_quiet(slice_report, quiet)

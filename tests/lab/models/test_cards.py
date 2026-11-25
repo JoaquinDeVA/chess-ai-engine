@@ -1,6 +1,8 @@
 """Tests of the model cards."""
 
 import json
+import re
+import subprocess
 
 from chess_lab.models.store import cards
 from tests.conftest import ACCURACY
@@ -41,3 +43,25 @@ def test_clear_measurements_of_a_missing_card_does_nothing(isolated_cards):
 
 def test_missing_card_is_an_empty_skeleton(isolated_cards):
     assert cards.load_card("ghost") == {"name": "ghost"}
+
+
+def test_current_commit_marks_a_dirty_tree_and_is_unknown_outside_git(tmp_path, monkeypatch):
+    def git(*args):
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    (tmp_path / "a.txt").write_text("a")
+    git("add", "a.txt")
+    git("commit", "-q", "-m", "first")
+    monkeypatch.setattr(cards, "ROOT", tmp_path)
+    clean = cards.current_commit()
+    assert re.fullmatch(r"[0-9a-f]{7,}", clean)
+    (tmp_path / "a.txt").write_text("changed")
+    assert cards.current_commit() == clean + "+dirty"
+    monkeypatch.setattr(cards, "ROOT", tmp_path / "nowhere")
+    assert cards.current_commit() == "unknown"

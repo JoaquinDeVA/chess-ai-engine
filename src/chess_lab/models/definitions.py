@@ -32,8 +32,10 @@ class NeuralEvalModel:
 
     The accumulator over the sparse inputs, then an output over the accumulators of both sides,
     whose value is the logit of the expected score of the player to move. With several output
-    buckets, the position reads one unit of the output, chosen by its number of pieces (``(pieces - 1) * buckets // 32``). Without a head the output is one linear layer; with one, each bucket
-    has its own hidden layer of ``head`` units, clipped to ``[0, 1]``, and a linear unit over it.
+    buckets, the position reads one unit of the output, chosen by its number of pieces
+    (``(pieces - 1) * buckets // 32``). Without a head the output is one linear layer; with one,
+    each bucket has its own hidden layer of ``head`` units, clipped to ``[0, 1]``, and a linear
+    unit over it.
 
     :param layers: ``(weights, bias)`` per weight layer, of the shapes of :meth:`layer_shapes`.
     :param rep: Representation of the training target as a plain dictionary, saved untouched.

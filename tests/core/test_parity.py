@@ -152,3 +152,65 @@ def test_every_output_bucket_is_read_alike_by_the_core_and_the_training_graph(mo
     for board, logit in zip(boards, keras_logits(model, boards), strict=True):
         assert logit == pytest.approx(dense_logit(model, board), abs=1e-4)
         assert evaluator.evaluate(board.fen(), board.turn) == pytest.approx(mover_score(logit))
+
+
+def boards_by_piece_count() -> list[chess.Board]:
+    """From the start position, one board for each count of pieces from 32 down to the two kings."""
+    boards, board = [], chess.Board()
+    for _ in range(30):
+        boards.append(board.copy())
+        victim = next(s for s, p in board.piece_map().items() if p.piece_type != chess.KING)
+        board.remove_piece_at(victim)
+    boards.append(board.copy())
+    return boards
+
+
+@pytest.mark.parametrize("buckets", [1, 2, 4, 16, 32])
+def test_the_core_picks_the_output_unit_by_pieces_for_any_number_of_buckets(buckets):
+    model_class = type("Buckets", (NnW64BothModel,), {"output_buckets": buckets})
+    model = random_net(seed=2, model_class=model_class)
+    evaluator = model.evaluator()
+    boards = boards_by_piece_count()
+    assert len({reference_bucket(model, b) for b in boards}) == min(buckets, len(boards))
+    for board in boards:
+        assert evaluator.evaluate(board.fen(), board.turn) == pytest.approx(
+            mover_score(dense_logit(model, board))
+        )
+
+
+#: Rare cases of every input rule: the bare ones are the ones a random game seldom reaches.
+EDGE_FENS = [
+    "8/P6k/8/8/8/8/6p1/K7 w - - 0 1",  # a promotion ahead for each side
+    "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1",  # en passant available
+    "4k3/8/8/8/8/8/8/QQQQKQQQ w - - 0 1",  # seven queens on the board
+    "7k/8/8/8/8/8/QQQQQQQQ/QQQQKQQQ b - - 0 1",  # fifteen queens, past the material cap
+    "4k3/8/8/8/8/8/8/NNN1K3 b - - 0 1",  # three knights, black to move
+    "k7/8/8/8/8/8/8/7K w - - 0 1",  # kings in the corners
+    "4k3/8/8/8/8/8/8/4K3 b - - 0 1",  # bare kings, black to move
+    "4k3/pppp4/8/8/8/8/PPPPPPPP/4K3 w - - 0 1",  # columns with 0, 1 and 2 pawns
+    "4k3/8/8/8/PPPP4/PPPP4/PPPP4/4K3 w - - 0 1",  # columns with 3 pawns
+    "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",  # castling rights
+    "r3k2r/8/8/8/8/8/8/R3K2R b Kq - 0 1",  # half of them, black to move
+    "7k/8/8/8/8/8/8/K6R b - - 0 1",  # black in check, the king on the edge
+]
+
+
+@pytest.mark.parametrize("model_class", [*BOTH_MODELS, *CTX_MODELS])
+def test_the_core_agrees_with_the_reference_on_the_rare_cases_of_every_input_rule(model_class):
+    model = random_net(seed=7, model_class=model_class)
+    evaluator = model.evaluator()
+    for fen in EDGE_FENS:
+        board = chess.Board(fen)
+        assert evaluator.evaluate(fen, board.turn) == pytest.approx(
+            mover_score(dense_logit(model, board)), abs=1e-6
+        ), fen
+
+
+@pytest.mark.parametrize("model_class", [NnW64BothModel, CTX_MODELS[-1]])
+def test_the_two_sides_score_a_position_as_complements(model_class):
+    model = random_net(seed=3, model_class=model_class)
+    evaluator = model.evaluator()
+    for board in random_positions(20, seed=5):
+        white = evaluator.evaluate(board.fen(), True)
+        black = evaluator.evaluate(board.fen(), False)
+        assert white + black == pytest.approx(1.0, abs=1e-6)

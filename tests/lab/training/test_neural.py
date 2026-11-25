@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ from chess_lab.models.features import (
     features_of,
 )
 from chess_lab.models.target import Representation
+from chess_lab.training import neural
 from chess_lab.training.neural import checkpoint_config, fit_stream, new_model, warm_layers
 from tests.conftest import CTX_MODELS, random_net, random_positions, white_score_of
 from tests.lab.models.positions import frame
@@ -228,3 +230,23 @@ def test_play_path_does_not_import_tensorflow(tmp_path):
         [sys.executable, "-c", script], capture_output=True, text=True, check=True, timeout=120
     )
     assert result.stdout.split() == ["True", "False", "False"]
+
+
+def test_a_cut_between_writing_and_renaming_a_checkpoint_keeps_the_previous_one(
+    tmp_path, monkeypatch
+):
+    network = SimpleNamespace(
+        get_weights=lambda: [np.ones(2)], optimizer=SimpleNamespace(variables=[np.zeros(1)])
+    )
+    path = tmp_path / "fit.npz"
+    best = [(np.ones((1, 1)), np.ones(1))]
+    neural._save_checkpoint(path, network, {"epoch": 1}, best)
+
+    def cut(*_):
+        raise OSError("cut")
+
+    monkeypatch.setattr(neural.os, "replace", cut)
+    with pytest.raises(OSError):
+        neural._save_checkpoint(path, network, {"epoch": 2}, best)
+    with np.load(path) as data:
+        assert json.loads(str(data["loop"])) == {"epoch": 1}

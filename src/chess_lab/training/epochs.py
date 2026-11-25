@@ -22,9 +22,10 @@ import numpy as np
 import pandas as pd
 
 from chess_engine import _core
-from chess_lab.atomic import atomic_path
 from chess_lab.models.features import SlottedPstFeatures
 from chess_lab.models.target import Representation, target
+
+from .cache import EncodedFrame, load_frame, save_frame
 
 #: Hyper-parameters used when the training configuration leaves a key out.
 DEFAULT_FIT_CONFIG: Dict[str, Any] = {
@@ -41,8 +42,6 @@ _THREAD_ENV = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
 
 #: Frames the reading thread keeps ready ahead of the training step.
 _PREFETCH_DEPTH = 3
-
-EncodedFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
 def encoded_frames(
@@ -72,13 +71,13 @@ def encoded_frames(
     window = 2 * workers
     pending: deque = deque()  # (index, future)
     for index, frame in enumerate(batches):
-        cached = _load_encoded(cache_dir, index)
+        cached = load_frame(cache_dir, index)
         if cached is not None:
             pending.append((index, cached))
         elif executor is None:
             encoded = encode(frame)
             if cache_dir is not None:
-                _save_encoded(cache_dir, index, encoded)
+                save_frame(cache_dir, index, encoded)
             pending.append((index, encoded))
         else:
             pending.append((index, executor.submit(encode, frame)))
@@ -263,27 +262,8 @@ def _resolve(item: Tuple[int, Any], cache_dir: Optional[Path]) -> EncodedFrame:
         return value
     encoded = value.result()
     if cache_dir is not None:
-        _save_encoded(cache_dir, index, encoded)
+        save_frame(cache_dir, index, encoded)
     return encoded
-
-
-def _load_encoded(cache_dir: Optional[Path], index: int) -> Optional[EncodedFrame]:
-    """Encoded frame ``index`` read from the cache, or None if it is not there."""
-    if cache_dir is None:
-        return None
-    path = cache_dir / f"{index:07d}.npz"
-    if not path.exists():
-        return None
-    with np.load(path) as data:
-        return data["rows"], data["cols"], data["values"], data["targets"]
-
-
-def _save_encoded(cache_dir: Path, index: int, encoded: EncodedFrame) -> None:
-    """Write an encoded frame to the cache, atomically (temporary name, then rename)."""
-    path = cache_dir / f"{index:07d}.npz"
-    rows, cols, values, targets = encoded
-    with atomic_path(path) as temporary, open(temporary, "wb") as handle:
-        np.savez(handle, rows=rows, cols=cols, values=values, targets=targets)
 
 
 def encode_frame(

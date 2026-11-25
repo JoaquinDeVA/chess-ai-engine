@@ -163,17 +163,3 @@ def test_prefetched_thread_ends_when_the_consumer_stops_early():
     assert next(items) == 0
     items.close()
     assert threading.active_count() == before
-
-
-def test_a_cut_between_writing_and_renaming_an_encoded_frame_leaves_no_frame(tmp_path, monkeypatch):
-    encoded = (np.zeros(1, int), np.zeros(1, int), np.ones(1), np.ones(1))
-
-    def cut(*_):
-        raise OSError("cut")
-
-    monkeypatch.setattr(epochs.os, "replace", cut)
-    with pytest.raises(OSError):
-        epochs._save_encoded(tmp_path, 0, encoded)
-    (tmp_path / "0000001.tmp").write_bytes(b"half a file")
-    assert epochs._load_encoded(tmp_path, 0) is None
-    assert epochs._load_encoded(tmp_path, 1) is None

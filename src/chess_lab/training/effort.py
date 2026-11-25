@@ -170,7 +170,16 @@ def fit(
     )
     cache = None
     if use_cache:
-        cache = cache_path(model_class, rep, positions, seed, quiet_only, config["batch_size"])
+        cache = cache_path(
+            model_class,
+            rep,
+            positions,
+            seed,
+            quiet_only,
+            config["batch_size"],
+            raw_dir,
+            sidecar_dir,
+        )
     summary = fit_stream(model, batches, validation, config, cache_dir=cache, checkpoint=checkpoint)
     return model, summary
 

@@ -13,7 +13,8 @@ import chess
 import numpy as np
 import pandas as pd
 
-from .defaults import DEFAULT_MATE_KEEP, SPLIT_SEED, mates_suffix
+from chess_lab.defaults import SPLIT_SEED
+
 from .definitions import CP_SCALE
 
 #: Slope of the Lichess win-probability curve (``1 / (1 + exp(-k * cp))``).
@@ -23,6 +24,19 @@ _SCALES = ("winprob", "cp_linear")
 _SCORE_EPS = 1e-6
 #: Salt of the hash that picks the mates kept by :func:`keep_mate_rows`.
 _MATE_SALT = "mate-keep"
+
+#: Default share of the mate positions kept in training (the 100 % variant needs ``--tag``).
+DEFAULT_MATE_KEEP = 0.10
+
+
+def mates_suffix(mate_keep: float) -> str:
+    """Name suffix of a representation whose mate share is not the default, e.g. ``"-mates5"``.
+
+    :param mate_keep: Share of the mates kept, in ``(0, 1]``; 1 keeps them all.
+    :return: ``""`` when ``mate_keep`` is :data:`DEFAULT_MATE_KEEP`; otherwise
+        ``"-mates{100 * mate_keep}"`` (``"-mates100"`` when every mate is kept).
+    """
+    return "" if mate_keep == DEFAULT_MATE_KEEP else f"-mates{100 * mate_keep:g}"
 
 
 def validate_mate_keep(mate_keep: float) -> None:

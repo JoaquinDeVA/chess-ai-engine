@@ -16,8 +16,7 @@ from typing import List, Optional
 
 from chess_lab.datasets.sidecar import count_rows, load_sample
 from chess_lab.datasets.split import TRAIN, VALIDATION
-from chess_lab.models.defaults import (
-    DEFAULT_MATE_KEEP,
+from chess_lab.defaults import (
     RAW_DIR,
     SAMPLE_SEED,
     SIDECAR_DIR,
@@ -26,7 +25,7 @@ from chess_lab.models.defaults import (
 from chess_lab.models.definitions import available_models, get_model_class, load_model
 from chess_lab.models.store.cards import clear_measurements, current_commit, today, update_card
 from chess_lab.models.store.loader import artifact_path
-from chess_lab.models.target import Representation
+from chess_lab.models.target import DEFAULT_MATE_KEEP, Representation
 
 from .effort import (
     calibrate,

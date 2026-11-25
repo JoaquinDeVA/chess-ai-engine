@@ -30,6 +30,7 @@ from typing import Callable, Dict, List, Sequence, Tuple
 import chess
 import chess.engine
 
+from chess_engine.paths import ROOT
 from chess_lab.datasets.book import MATE_SCORE, append_jsonl, position_key, read_jsonl
 
 #: Lines of an analysis: ``(uci, centipawns for the side to move)``, best first.
@@ -194,10 +195,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=1, help="engine processes, one thread each")
     parser.add_argument("--hash", type=int, default=64, help="MB of hash per engine process")
     parser.add_argument(
-        "--cache", type=Path, default=Path("data/knowledge/opening_book/deep_cache.jsonl")
+        "--cache", type=Path, default=ROOT / "data/knowledge/opening_book/deep_cache.jsonl"
     )
     parser.add_argument(
-        "--out", type=Path, default=Path("data/knowledge/opening_book/opening_book_deep.json")
+        "--out", type=Path, default=ROOT / "data/knowledge/opening_book/opening_book_deep.json"
     )
     parser.add_argument("--log-every", type=int, default=1000)
     return parser.parse_args(argv)

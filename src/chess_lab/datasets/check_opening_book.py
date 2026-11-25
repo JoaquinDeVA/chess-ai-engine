@@ -26,6 +26,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import chess
 import chess.engine
 
+from chess_engine.paths import ROOT
 from chess_lab.datasets.book import MATE_SCORE, append_jsonl, fen_key, read_jsonl
 from chess_lab.datasets.stockfish import open_engine
 
@@ -210,11 +211,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--cache",
         type=Path,
-        default=Path("data/results/reports/opening_book_check_cache.jsonl"),
+        default=ROOT / "data/results/reports/opening_book_check_cache.jsonl",
         help="answers already received (the check resumes from them)",
     )
     parser.add_argument(
-        "--report", type=Path, default=Path("data/results/reports/OPENING_BOOK_CHECK.md")
+        "--report", type=Path, default=ROOT / "data/results/reports/OPENING_BOOK_CHECK.md"
     )
     return parser.parse_args(argv)
 

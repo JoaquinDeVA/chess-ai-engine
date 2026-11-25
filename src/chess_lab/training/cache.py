@@ -8,11 +8,11 @@ it, whatever its width or perspective: the encoding depends only on the inputs.
 import hashlib
 from pathlib import Path
 
+from chess_lab.defaults import CACHE_ROOT
 from chess_lab.models.target import Representation
 
 #: Version of the encoded-batch cache; bump it when the encoding changes without a visible key.
 CACHE_VERSION = 1
-CACHE_ROOT = Path("data/cache")
 
 
 def cache_path(

@@ -27,12 +27,13 @@ import chess
 import numpy as np
 import pyarrow.parquet as pq
 
+from chess_engine.paths import ROOT
 from chess_lab.datasets.book import position_key
 from chess_lab.datasets.fen_index import hash_keys, lookup, sorted_index
 from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.datasets.sidecar import sidecar_path
 from chess_lab.datasets.split import TEST, TRAIN, VALIDATION
-from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
+from chess_lab.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 
 SPLIT_NAMES = {TRAIN: "train", VALIDATION: "validation", TEST: "test"}
 
@@ -179,7 +180,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--positions", type=int, default=20_000, help="test positions examined")
     parser.add_argument("--seed", type=int, default=SAMPLE_SEED)
     parser.add_argument(
-        "--report", type=Path, default=Path("data/results/reports/SPLIT_LEAKAGE.md")
+        "--report", type=Path, default=ROOT / "data/results/reports/SPLIT_LEAKAGE.md"
     )
     return parser.parse_args(argv)
 

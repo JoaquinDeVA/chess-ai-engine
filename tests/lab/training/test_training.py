@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from chess_lab.datasets import sidecar
 from chess_lab.datasets.raw_shards import shard_path, write_shard
 from chess_lab.datasets.sidecar import build_sidecar
 from chess_lab.measure import evaluate as evaluate_cli
@@ -59,7 +60,7 @@ class TestMateKeepAndTags:
             calls.append(kwargs)
             raise StopAfterCallError
 
-        monkeypatch.setattr(evaluate_cli, "load_sample", recording_load_sample)
+        monkeypatch.setattr(sidecar, "load_sample", recording_load_sample)
         with pytest.raises(StopAfterCallError):
             evaluate_cli.sample_benchmark(stub_model, tmp_path, tmp_path)
         assert calls and calls[0].get("mate_keep", 1.0) == 1.0

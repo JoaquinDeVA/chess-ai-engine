@@ -12,7 +12,7 @@ from pathlib import Path
 
 from chess_lab.datasets.raw_shards import list_shards
 from chess_lab.datasets.sidecar import build_sidecar, sidecar_path
-from chess_lab.models.defaults import RAW_DIR, SIDECAR_DIR
+from chess_lab.defaults import RAW_DIR, SIDECAR_DIR
 
 
 def main() -> None:

@@ -17,7 +17,7 @@ import pandas as pd
 
 from chess_lab.datasets.sidecar import iter_batches
 from chess_lab.datasets.split import TRAIN
-from chess_lab.models.defaults import SAMPLE_SEED
+from chess_lab.defaults import SAMPLE_SEED
 from chess_lab.models.definitions import Layer, NeuralEvalModel
 from chess_lab.models.features import features_of
 from chess_lab.models.target import (

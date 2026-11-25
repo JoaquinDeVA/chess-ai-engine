@@ -35,7 +35,7 @@ from chess_lab.datasets.raw_shards import (
     read_metadata,
     shard_path,
 )
-from chess_lab.models.defaults import RAW_DIR, format_duration
+from chess_lab.defaults import RAW_DIR, format_duration
 
 DEFAULT_URL = "https://database.lichess.org/lichess_db_eval.jsonl.zst"
 #: Database lines per unit of work sent to a worker process.

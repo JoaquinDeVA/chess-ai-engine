@@ -17,11 +17,12 @@ from pathlib import Path
 
 import numpy as np
 
+from chess_engine.paths import ROOT
 from chess_lab.datasets.check_split_leakage import has_train_child, load_index
 from chess_lab.datasets.sidecar import load_sample
 from chess_lab.datasets.split import TEST
+from chess_lab.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.measure.judge import judge
-from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import load_evaluator
 
 
@@ -82,7 +83,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--models", required=True, help="comma-separated models to judge")
     parser.add_argument("--sample-rows", type=int, default=200_000, help="size of the test sample")
     parser.add_argument(
-        "--report", type=Path, default=Path("data/results/reports/SPLIT_LEAKAGE_MODELS.md")
+        "--report", type=Path, default=ROOT / "data/results/reports/SPLIT_LEAKAGE_MODELS.md"
     )
     return parser.parse_args(argv)
 

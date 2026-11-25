@@ -26,11 +26,12 @@ import numpy as np
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from chess_engine.uci import BOOK
 from chess_lab.datasets.book import MATE_SCORE, position_key
 from chess_lab.datasets.fen_index import hash_keys, sorted_index
 from chess_lab.datasets.fen_index import lookup as lookup_keys
 from chess_lab.datasets.raw_shards import list_shards
-from chess_lab.models.defaults import RAW_DIR
+from chess_lab.defaults import RAW_DIR
 
 Lookup = Callable[[str], Optional[float]]
 
@@ -151,9 +152,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=Path, default=RAW_DIR)
-    parser.add_argument(
-        "--out", type=Path, default=Path("data/knowledge/opening_book/opening_book.json")
-    )
+    parser.add_argument("--out", type=Path, default=BOOK)
     parser.add_argument("--plies", type=int, default=16, help="half-moves followed")
     parser.add_argument("--margin", type=float, default=30.0, help="centipawns within the best")
     parser.add_argument("--top", type=int, default=3, help="moves followed from a position")

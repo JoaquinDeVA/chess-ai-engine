@@ -7,14 +7,15 @@ Run it on an otherwise idle machine; the numbers of a busy one mean nothing.
 
 import argparse
 import statistics
-import subprocess
 import time
 from pathlib import Path
 
+import chess
+
 from chess_engine.paths import ROOT
+from chess_engine.uci import UciEngine
 from chess_lab.datasets.book import fen_key
 
-BINARY = ROOT / "rust" / "target" / "release" / "uci"
 POSITIONS = ROOT / "data" / "openings" / "openings.epd"
 
 
@@ -27,34 +28,15 @@ def seconds_to_depth(threads: int, fens: list[str], depth: int, hash_mb: int) ->
     :param hash_mb: Value of the ``Hash`` option.
     :return: Mean wall-clock seconds per position.
     """
-    engine = subprocess.Popen(
-        [str(BINARY)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1
-    )
-    assert engine.stdin is not None and engine.stdout is not None
-
-    def send(line: str) -> None:
-        engine.stdin.write(line + "\n")
-        engine.stdin.flush()
-
-    def wait_for(prefix: str) -> None:
-        for line in engine.stdout:
-            if line.startswith(prefix):
-                return
-
-    send(f"setoption name Threads value {threads}")
-    send(f"setoption name Hash value {hash_mb}")
-    send("isready")
-    wait_for("readyok")
+    engine = UciEngine(threads, hash_mb=hash_mb)
     times = []
     for fen in fens:
-        send("ucinewgame")
-        send(f"position fen {fen}")
+        engine.new_game()
+        board = chess.Board(fen)
         start = time.perf_counter()
-        send(f"go depth {depth}")
-        wait_for("bestmove")
+        engine.bestmove(board, f"depth {depth}")
         times.append(time.perf_counter() - start)
-    send("quit")
-    engine.wait()
+    engine.close()
     return statistics.fmean(times)
 
 

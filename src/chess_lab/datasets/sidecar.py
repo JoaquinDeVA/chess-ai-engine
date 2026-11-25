@@ -15,11 +15,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from chess_lab.models.defaults import SAMPLE_SEED
+from chess_lab.defaults import SAMPLE_SEED
 from chess_lab.models.target import is_quiet, keep_mate_rows, validate_mate_keep
 
 from .raw_shards import list_shards
-from .split import assign_split
+from .split import TEST, assign_split
 
 SIDECAR_SCHEMA = pa.schema(
     [("split", pa.int8()), ("quiet", pa.bool_()), ("white_to_move", pa.bool_())]
@@ -282,3 +282,17 @@ def iter_batches(
                     return
     if len(buffer):
         yield buffer.iloc[:remaining].reset_index(drop=True)
+
+
+#: Rows of the test sample that the accuracy and the move ranking are measured on.
+TEST_SAMPLE_ROWS = 200_000
+
+
+def load_test_sample(raw_dir: Path, sidecar_dir: Path) -> pd.DataFrame:
+    """The fixed test sample: ``TEST_SAMPLE_ROWS`` positions of the test split, seeded.
+
+    :param raw_dir: Directory with the raw shards.
+    :param sidecar_dir: Directory with their sidecars.
+    :return: DataFrame with columns :data:`SAMPLE_COLUMNS`.
+    """
+    return load_sample(raw_dir, sidecar_dir, TEST, TEST_SAMPLE_ROWS, seed=SAMPLE_SEED)

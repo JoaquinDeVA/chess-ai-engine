@@ -17,6 +17,7 @@ from typing import Dict, List, Sequence
 
 import chess
 
+from chess_engine.paths import ROOT
 from chess_lab.datasets.book import load_book, position_key
 
 
@@ -52,7 +53,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--book", type=Path, nargs="+", required=True, help="books (JSON)")
     parser.add_argument("--plies", type=int, default=4)
-    parser.add_argument("--out", type=Path, default=Path("data/openings/book_suite.epd"))
+    parser.add_argument("--out", type=Path, default=ROOT / "data/openings/book_suite.epd")
     return parser.parse_args(argv)
 
 

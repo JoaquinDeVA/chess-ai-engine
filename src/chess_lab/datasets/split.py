@@ -5,7 +5,7 @@ import zlib
 import numpy as np
 import pandas as pd
 
-from chess_lab.models.defaults import SPLIT_SEED
+from chess_lab.defaults import SPLIT_SEED
 
 TRAIN, VALIDATION, TEST = 0, 1, 2
 

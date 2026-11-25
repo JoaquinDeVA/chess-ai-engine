@@ -8,8 +8,7 @@
 # training: a failed model is logged and the loop continues. Per-model training logs go to
 # $STATE_DIR/logs/. DRY_RUN=1 prints every command (one per line, prefixed "+ ") and writes nothing.
 #
-# Variables (defaults): RAW (data/LichessPositions/raw), SIDECAR (data/LichessPositions/sidecar), EFFORT (30),
-# AGREEMENT_N (20000), MODELS (every registered model, from chess_lab.models.definitions),
+# Variables (defaults): RAW and SIDECAR (chess_lab.defaults), EFFORT (30), MODELS (every registered model, from chess_lab.models.definitions),
 # STEPS (all of the above), FORCE (0), DRY_RUN (0), STATE_DIR (data/results/pipeline),
 # PYTHON (.venv/bin/python if it exists, else python).
 #
@@ -18,10 +17,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-RAW="${RAW:-data/LichessPositions/raw}"
-SIDECAR="${SIDECAR:-data/LichessPositions/sidecar}"
 EFFORT="${EFFORT:-30}"
-AGREEMENT_N="${AGREEMENT_N:-20000}"
 STEPS="${STEPS:-sidecars train evaluate report}"
 FORCE="${FORCE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -32,7 +28,8 @@ fi
 
 # The model list and the folders come from the registry, not from copies here.
 MODELS="${MODELS:-$("$PYTHON" -c "from chess_lab.models.definitions import available_models as a; print(' '.join(a()))")}"
-ARTIFACTS=$("$PYTHON" -c "from chess_lab.models.store.loader import ARTIFACTS_DIR; print(ARTIFACTS_DIR)")
+RAW="${RAW:-$("$PYTHON" -c "from chess_lab.defaults import RAW_DIR; print(RAW_DIR)")}"
+SIDECAR="${SIDECAR:-$("$PYTHON" -c "from chess_lab.defaults import SIDECAR_DIR; print(SIDECAR_DIR)")}"
 CARDS=$("$PYTHON" -c "from chess_lab.models.store.cards import CARDS_DIR; print(CARDS_DIR)")
 
 log() { echo "=== $*"; }
@@ -40,6 +37,11 @@ log() { echo "=== $*"; }
 # Run a command, or only print it when DRY_RUN=1.
 run() {
   if [ "$DRY_RUN" = 1 ]; then echo "+ $*"; else "$@"; fi
+}
+
+# Whether the artifact of a model at the effort of this run exists.
+trained() {
+  "$PYTHON" -c "import sys; from chess_lab.models.store.loader import artifact_path as a; sys.exit(0 if a('$1@e$EFFORT').exists() else 1)" 2>/dev/null
 }
 
 registered() {
@@ -51,7 +53,7 @@ present_models() {
   local m out=()
   for m in $MODELS; do
     if [ "$DRY_RUN" = 1 ]; then out+=("$m")
-    elif registered "$m" && [ -f "$ARTIFACTS/$m@e$EFFORT.npz" ]; then out+=("$m"); fi
+    elif registered "$m" && trained "$m"; then out+=("$m"); fi
   done
   echo "${out[*]:-}"
 }
@@ -82,7 +84,7 @@ step_evaluate() {
   for model in $(present_models); do
     log "evaluate $model"
     run "$PYTHON" -m chess_lab.measure.evaluate --model "$model@e$EFFORT" \
-      --raw "$RAW" --sidecar "$SIDECAR" --agreement-n "$AGREEMENT_N"
+      --raw "$RAW" --sidecar "$SIDECAR"
   done
 }
 

@@ -23,18 +23,16 @@ import pandas as pd
 
 from chess_engine import _core
 from chess_lab.datasets.build_move_ranking import OUT as RANKING_TABLE
-from chess_lab.datasets.sidecar import load_sample
-from chess_lab.datasets.split import TEST
+from chess_lab.datasets.sidecar import load_test_sample
+from chess_lab.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.measure.judge import by_quiet, judge, predictions, static_metrics
 from chess_lab.measure.ranking import judge_ranking
 from chess_lab.measure.report import update_history_file
-from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
 from chess_lab.models.definitions import available_models, load_model
 from chess_lab.models.store.cards import current_commit, load_card, today, update_card
 from chess_lab.models.store.loader import artifact_path, split_spec
 
 #: Positions of the fixed test sample (the first rows of a seeded sample of the test split).
-TEST_SAMPLE_ROWS = 200_000
 #: Leading sample rows used for best-move agreement (each costs one search step).
 AGREEMENT_ROWS = 20_000
 #: Positions timed for the cost section.
@@ -67,7 +65,7 @@ def sample_benchmark(
     :param agreement_n: Leading sample rows used for best-move agreement.
     :return: ``accuracy`` (judge output plus the sample description) and ``cost``.
     """
-    sample = load_sample(raw, sidecar, TEST, TEST_SAMPLE_ROWS, seed=SAMPLE_SEED)
+    sample = load_test_sample(raw, sidecar)
     accuracy = judge(evaluator, sample, agreement_n)
     accuracy["sample"] = {"rows": len(sample), "seed": SAMPLE_SEED, "agreement_n": agreement_n}
     cost_fens = sample["fen"].head(COST_SAMPLES).tolist()

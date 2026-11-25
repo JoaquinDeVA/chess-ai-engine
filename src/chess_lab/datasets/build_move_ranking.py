@@ -17,13 +17,11 @@ import chess.engine
 import pandas as pd
 
 from chess_engine.paths import ROOT
-from chess_lab.datasets.sidecar import load_sample
-from chess_lab.datasets.split import TEST
+from chess_lab.datasets.sidecar import load_test_sample
 from chess_lab.datasets.stockfish import cp_mate, label_parallel
-from chess_lab.models.defaults import RAW_DIR, SAMPLE_SEED, SIDECAR_DIR
+from chess_lab.defaults import RAW_DIR, SIDECAR_DIR
 
 #: Rows of the test sample the positions are drawn from (the same sample as ``measure.evaluate``).
-SAMPLE_ROWS = 200_000
 #: Default output file.
 OUT = ROOT / "data" / "LichessPositions" / "move_ranking" / "test.parquet"
 
@@ -72,7 +70,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=OUT)
     args = parser.parse_args()
 
-    sample = load_sample(args.raw, args.sidecar, TEST, SAMPLE_ROWS, seed=SAMPLE_SEED)
+    sample = load_test_sample(args.raw, args.sidecar)
     quiet = dict(zip(sample["fen"], sample["quiet"], strict=True))
     fens = eligible(sample["fen"].tolist(), args.rows)
     labelled = label_parallel(args.engine, args.depth, fens, args.jobs, label_position)

@@ -27,6 +27,7 @@ class UciEngine:
     :param threads: Threads that search.
     :param book: Opening book the engine follows, or None for none.
     :param tablebase: Folder of the endgame tablebases the engine plays, or None for none.
+    :param hash_mb: Megabytes of the transposition table, or None for the engine's default.
     """
 
     def __init__(
@@ -34,6 +35,7 @@ class UciEngine:
         threads: int,
         book: Optional[Path] = None,
         tablebase: Optional[Path] = None,
+        hash_mb: Optional[int] = None,
     ):
         if not ENGINE.exists():
             raise FileNotFoundError(
@@ -45,6 +47,8 @@ class UciEngine:
         self._send("uci")
         self._wait_for("uciok")
         self._send(f"setoption name Threads value {threads}")
+        if hash_mb is not None:
+            self._send(f"setoption name Hash value {hash_mb}")
         if book is not None:
             self._send(f"setoption name Book value {book}")
         if tablebase is not None:

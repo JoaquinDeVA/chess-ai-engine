@@ -145,6 +145,7 @@ def run_epochs(
 
     with _featurization_pool(int(cfg["workers"])) as executor:
         for epoch in range(first_epoch, int(cfg["max_epochs"]) + 1):
+            epoch_started = time.perf_counter()
             loss_sum, rows_seen = 0.0, 0
             lr_history.append(get_lr())
             for prepared in _prefetched(frames(executor), prepare):
@@ -162,7 +163,8 @@ def run_epochs(
             val_losses.append(val_loss)
             print(
                 f"epoch {epoch}/{int(cfg['max_epochs'])}: train {train_losses[-1]:.5f} "
-                f"val {val_loss:.5f} lr {lr_history[-1]:.2e}",
+                f"val {val_loss:.5f} lr {lr_history[-1]:.2e} "
+                f"in {time.perf_counter() - epoch_started:.0f} s",
                 flush=True,
             )
             stop = False

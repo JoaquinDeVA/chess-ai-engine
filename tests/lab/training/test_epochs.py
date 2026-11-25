@@ -1,6 +1,7 @@
 """Tests of the shared fit plumbing: encoding, its cache, the workers and the epoch loop."""
 
 import os
+import re
 import threading
 import time
 
@@ -107,6 +108,13 @@ def test_lr_decay_stops_when_the_rate_falls_below_min_lr():
     # Epoch 2 does not improve: 0.1 * 0.5 = 0.05 < 0.06, and the run ends there.
     assert summary["epochs"] == 2
     assert summary["lr_history"] == [0.1, 0.1]
+
+
+def test_each_epoch_line_ends_with_its_seconds(capsys):
+    _run([0.5, 0.4])
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split(":")[0] for line in lines] == ["epoch 1/2", "epoch 2/2"]
+    assert all(re.search(r" lr \S+ in \d+ s$", line) for line in lines)
 
 
 def test_without_lr_decay_patience_stops_and_the_rate_is_constant():

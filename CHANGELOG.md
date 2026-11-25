@@ -21,6 +21,7 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
+| 2026-11-25 | `ad8abe4` | fix | models, cards, exports, reports and parquet files are written to a temporary file and renamed, so a cut leaves the previous file whole; `evaluate` no longer rewrites `RESULTS.md` (only `report` does) | not measurable | — | — |
 | 2026-11-23 | `9dad1a7` | feat | `train --checkpoint F` saves the final fit after every epoch (weights, Adam state, best layers, loop) and resumes from it after a cut, without repeating the calibration or the hyper-parameter trials; the file is removed once the model is saved | not measured (tooling) | — | — |
 | 2026-11-19 | `82b4f28` | perf | generate the legal moves after reverse futility and the null move | nodes, ttd 11 (same tree)<br>nodes/s, ttd 11 (median of 6 alternated runs, `9fb4faa` → `82b4f28`, together with the commit below)<br>Elo SPRT [0,5] vs `7104df4`, 4,664 games 10+0.2 | 14,067,315 → 14,067,315<br>1,369,453 → 1,587,209<br>+13.8 ± 7.7 (LLR +2.96, H1) | +0.0 %<br>+15.9 %<br>— |
 | 2026-11-19 | `7104df4` | perf | pass the move list to the quiescence by reference; with it `233d849` (compute `move_id` once per move in the picker), `a0f69fa` (reuse the zobrist key that `play` computes) and `94cc8c7` (skip defended pawns and zero rows in the threat features) | nodes, bench 5 | 70,408 → 70,408 | +0.0 % (speed: row above) |

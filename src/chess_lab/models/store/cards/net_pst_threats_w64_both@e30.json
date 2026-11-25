@@ -125,47 +125,57 @@
   },
   "accuracy": {
     "all": {
-      "spearman": 0.7461532343816727,
-      "mae": 0.1054018342128912,
+      "spearman": 0.7488986976093093,
+      "mae": 0.10400978672818366,
+      "cross_entropy": 0.5902855486604753,
+      "label_entropy": 0.5201408817069342,
+      "excess": 0.07014466695354116,
       "n": 200000,
-      "best_move_agreement": 0.25335,
+      "best_move_agreement": 0.247,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.8056496365868161,
-      "mae": 0.08599178852198192,
-      "n": 138657,
-      "best_move_agreement": 0.09844484629294756,
-      "agreement_n": 13825
+      "spearman": 0.8069660095376748,
+      "mae": 0.08511152918088656,
+      "cross_entropy": 0.5828253543749335,
+      "label_entropy": 0.5336716364495966,
+      "excess": 0.04915371792533696,
+      "n": 139604,
+      "best_move_agreement": 0.09685695958948044,
+      "agreement_n": 14031
     },
     "non_quiet": {
-      "spearman": 0.6408619183300881,
-      "mae": 0.1492754417209102,
-      "n": 61343,
-      "best_move_agreement": 0.6001619433198381,
-      "agreement_n": 6175
+      "spearman": 0.6435995261972055,
+      "mae": 0.14769268537433344,
+      "cross_entropy": 0.6075296205036232,
+      "label_entropy": 0.4888648454612452,
+      "excess": 0.11866477504237805,
+      "n": 60396,
+      "best_move_agreement": 0.5999329871000167,
+      "agreement_n": 5969
     },
     "sample": {
       "rows": 200000,
       "seed": 42,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "hash": "e104181c1bb6b7df"
     }
   },
   "cost": {
-    "us_per_eval": 2.22,
+    "us_per_eval": 3.35,
     "samples": 1000,
-    "date": "2026-11-14",
-    "commit": "unknown"
+    "date": "2026-11-25",
+    "commit": "fc77344+dirty"
   },
   "ordering": {
     "all": {
-      "tau": 0.29221882558268714,
+      "tau": 0.29221926408448234,
       "top1": 0.2786,
       "top3": 0.5098,
       "positions": 5000
     },
     "quiet": {
-      "tau": 0.27762098811160757,
+      "tau": 0.2776216144130477,
       "top1": 0.1599086236436322,
       "top3": 0.37150199885779556,
       "positions": 3502

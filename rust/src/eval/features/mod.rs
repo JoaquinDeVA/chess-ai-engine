@@ -4,11 +4,13 @@
 //! (`pst_ctx`).
 
 mod ctx;
+mod encode;
 mod families;
 mod pieces;
 mod threats;
 
 pub(in crate::eval) use ctx::{entry_edits, king_bucket_at, piece_offset, view_rows};
+pub use encode::{encode, Encoding};
 pub use families::Families;
 pub(in crate::eval) use pieces::input_index;
 use pieces::PIECE_INPUTS;

@@ -4,13 +4,13 @@
 //! The search, opening book and endgame tablebases run only in the UCI binary
 //! (`src/bin/uci/`); Python reads the corresponding defaults from this module.
 
-use numpy::{PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{PyArray1, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use shakmaty::Color;
 
 use crate::board::position_from_fen;
-use crate::eval::{Families, FeatureSet};
+use crate::eval::{encode, Encoding, Families, FeatureSet};
 use crate::eval::{Layer, Net, NetState};
 
 fn value_error<E: std::fmt::Display>(error: E) -> PyErr {
@@ -79,6 +79,42 @@ impl PyEvaluator {
     }
 }
 
+/// The active inputs of many positions, as the laboratory stores them in its caches.
+///
+/// `features` is the name of the saved models (`pst_slotted`, `pst_threats`, `pst_ctx`). Returns
+/// `(rows, cols, values)`: the entries of every position, in the order of `features.py`, `rows`
+/// being the position of the entry in `fens`.
+#[pyfunction]
+#[allow(clippy::type_complexity)]
+fn encode_many<'py>(
+    py: Python<'py>,
+    fens: Vec<String>,
+    features: &str,
+) -> PyResult<(
+    Bound<'py, PyArray1<i64>>,
+    Bound<'py, PyArray1<i64>>,
+    Bound<'py, PyArray1<f32>>,
+)> {
+    let encoding = Encoding::from_name(features)
+        .ok_or_else(|| value_error(format!("unknown feature set {features:?}")))?;
+    let (rows, cols, values) = py
+        .detach(|| -> Result<_, String> {
+            let (mut rows, mut cols, mut values) = (Vec::new(), Vec::new(), Vec::new());
+            for (row, fen) in fens.iter().enumerate() {
+                let before = cols.len();
+                encode(encoding, &position_from_fen(fen)?, &mut cols, &mut values);
+                rows.resize(rows.len() + cols.len() - before, row as i64);
+            }
+            Ok((rows, cols, values))
+        })
+        .map_err(value_error)?;
+    Ok((
+        PyArray1::from_vec(py, rows),
+        PyArray1::from_vec(py, cols),
+        PyArray1::from_vec(py, values),
+    ))
+}
+
 /// Register the Rust evaluator and search metadata in `chess_engine._core`.
 #[pymodule]
 mod _core {
@@ -86,6 +122,9 @@ mod _core {
 
     #[pymodule_export]
     use super::PyEvaluator;
+
+    #[pymodule_export]
+    use super::encode_many;
 
     #[pymodule_init]
     fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -68,7 +68,7 @@ fn count_of(board: &Board, side: Color, role: Role) -> usize {
 }
 
 /// Entries of a side's material block that are active.
-fn material_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ {
+pub(super) fn material_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ {
     MATERIAL_ROLES
         .into_iter()
         .enumerate()
@@ -76,7 +76,7 @@ fn material_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> +
 }
 
 /// Entries of a side's pawn-file block that are active.
-fn pawn_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ {
+pub(super) fn pawn_entries(board: &Board, side: Color) -> impl Iterator<Item = usize> + '_ {
     (0..8).filter_map(move |file| pawn_entry(file, pawns_on(board, side, file)))
 }
 

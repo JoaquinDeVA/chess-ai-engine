@@ -18,10 +18,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import chess
 import numpy as np
 import pandas as pd
 
+from chess_engine import _core
 from chess_lab.atomic import atomic_path
 from chess_lab.models.features import SlottedPstFeatures
 from chess_lab.models.target import Representation, target
@@ -291,6 +291,7 @@ def encode_frame(
 ) -> EncodedFrame:
     """Sparse features of the rows of a frame, with their soft targets.
 
+    The features come from the core (``_core.encode_many``); ``features.py`` is its reference.
     Module-level so that featurization workers can run it.
 
     :param features: Feature set.
@@ -298,14 +299,7 @@ def encode_frame(
     :param frame: Rows with ``fen, cp, mate, white_to_move``.
     :return: ``(rows, cols, values, targets)``; ``rows`` is sorted and indexes ``targets``.
     """
-    rows: List[int] = []
-    cols: List[int] = []
-    vals: List[float] = []
-    for row, fen in enumerate(frame["fen"]):
-        indices, values = features.active(chess.Board(fen))
-        rows.extend([row] * len(indices))
-        cols.extend(indices)
-        vals.extend(values)
+    rows, cols, vals = _core.encode_many(frame["fen"].tolist(), features.name)
     y = target(
         np.asarray(frame["cp"], dtype=np.float64),
         np.asarray(frame["mate"], dtype=np.float64),
@@ -313,9 +307,9 @@ def encode_frame(
         rep,
     )
     return (
-        np.asarray(rows, dtype=np.intp),
-        np.asarray(cols, dtype=np.intp),
-        np.asarray(vals, dtype=np.float64),
+        rows.astype(np.intp),
+        cols.astype(np.intp),
+        vals.astype(np.float64),
         np.asarray(y, dtype=np.float64),
     )
 

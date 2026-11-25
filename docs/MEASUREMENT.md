@@ -196,4 +196,4 @@ suite, `data/openings/book_suite.epd`, written by
 books hold. A job of the round robin names it with `"openings": "book_suite.epd"` (the default is `openings.epd`), runs
 the same binary on both sides and gives each engine its book with `option.Book=<file>`. Where a book leaves the engine in
 real games is measured without playing, by replaying the Lichess bot's logged games:
-`python -m chess_lab.datasets.book_exits --book <books> --log <bot logs>`.
+`python -m chess_lab.measure.book_exits --book <books> --log <bot logs>`.

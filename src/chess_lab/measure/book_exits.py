@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Where and why the engine leaves the opening book, replaying the games of the Lichess bot.
 
-python -m chess_lab.datasets.book_exits --book data/knowledge/opening_book/opening_book.json \
+python -m chess_lab.measure.book_exits --book data/knowledge/opening_book/opening_book.json \
     --log data/results/lichess/lichess-bot.log*
 
 The bot's debug log holds every ``position startpos moves ...`` command it sent to the engine; the

@@ -1,9 +1,9 @@
-"""Tests of src/chess_lab/datasets/book_exits.py with tiny books and logs."""
+"""Tests of src/chess_lab/measure/book_exits.py with tiny books and logs."""
 
 import chess
 
-from chess_lab.datasets import book_exits
 from chess_lab.datasets.book import position_key
+from chess_lab.measure import book_exits
 
 
 def book_of(*lines):

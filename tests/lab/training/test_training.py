@@ -168,7 +168,7 @@ class TestCommandLineWithDoubles:
             "net_pst_w64_both@e15"
         )
 
-    def test_lr_option_replaces_the_searched_rate_in_the_final_fit(
+    def test_lr_and_l2_options_replace_the_searched_values_in_the_final_fit(
         self, fake_training, monkeypatch
     ):
         calls = []
@@ -181,6 +181,9 @@ class TestCommandLineWithDoubles:
         assert self.train("--lr", "5e-4") == 0
         config = calls[0][6]
         assert config["lr"] == 5e-4 and config["l2"] == 1e-3
+        assert self.train("--l2", "2e-5") == 0
+        config = calls[1][6]
+        assert config["lr"] == 1e-2 and config["l2"] == 2e-5
 
     def test_the_recipe_is_the_same_at_every_effort_and_reaches_the_card(
         self, fake_training, capsys
@@ -217,7 +220,7 @@ class TestCommandLineWithDoubles:
         """The recipe that ``self.train()`` resolves (1000 TRAIN rows available, no shards)."""
         return {
             "model": "net_pst_w64_both", "effort": 40, "positions": 1000, "seed": 42,
-            "representation": Representation().to_dict(), "init": None, "lr": None, "trials": 1,
+            "representation": Representation().to_dict(), "init": None, "lr": None, "l2": None, "trials": 1,
             "data": {"shards": 0, "sha12": data_fingerprint(Path("r"), Path("s"))["sha12"]},
         }  # fmt: skip
 

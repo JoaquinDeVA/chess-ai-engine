@@ -70,6 +70,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "one with --init, so the first epochs do not undo the source",
     )
     parser.add_argument(
+        "--l2",
+        type=float,
+        help="L2 penalty of the final fit instead of the one the search picks",
+    )
+    parser.add_argument(
         "--trials",
         type=int,
         help="random hyper-parameter trials instead of the ones the effort sets (0 skips the search)",
@@ -100,6 +105,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
     if args.lr is not None and not args.lr > 0:
         parser.error(f"--lr must be positive: {args.lr}")
+    if args.l2 is not None and not args.l2 >= 0:
+        parser.error(f"--l2 must not be negative: {args.l2}")
     if args.trials is not None and args.trials < 0:
         parser.error(f"--trials must not be negative: {args.trials}")
     return args
@@ -191,6 +198,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         "representation": rep.to_dict(),
         "init": args.init,
         "lr": args.lr,
+        "l2": args.l2,
         "trials": plan["trials"],
         "data": data,
     }
@@ -234,7 +242,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         )
         best = search(model_class, rep, args.raw, args.sidecar, validation, plan, True)
         lr = best["lr"] if args.lr is None else args.lr
-        config = fit_config(plan, best["l2"], lr)
+        l2 = best["l2"] if args.l2 is None else args.l2
+        config = fit_config(plan, l2, lr)
         # Kept in the checkpoint, so a resumed run still counts the timing and the trials and
         # refuses to go on under another recipe.
         config["setup_seconds"] = round(time.perf_counter() - started, 3)

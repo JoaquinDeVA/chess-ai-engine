@@ -193,6 +193,11 @@ class TestCommandLineWithDoubles:
         assert training["data"]["shards"] == 0 and "environment" in training
         assert "recipe" not in training["config"]
 
+    def test_trials_option_replaces_the_trials_of_the_effort(self, fake_training, capsys):
+        assert self.train("--trials", "12") == 0
+        assert "  trials: 12" in capsys.readouterr().out
+        assert cards.load_card("net_pst_w64_both@e40")["training"]["recipe"]["trials"] == 12
+
     def test_a_resumed_fit_counts_the_setup_before_the_cut(self, fake_training, monkeypatch):
         plan = effort_config(40, 1000)
         config = {**fit_config(plan, 1e-3, 1e-2), "setup_seconds": 2.0, "recipe": self.recipe()}
@@ -212,7 +217,7 @@ class TestCommandLineWithDoubles:
         """The recipe that ``self.train()`` resolves (1000 TRAIN rows available, no shards)."""
         return {
             "model": "net_pst_w64_both", "effort": 40, "positions": 1000, "seed": 42,
-            "representation": Representation().to_dict(), "init": None, "lr": None,
+            "representation": Representation().to_dict(), "init": None, "lr": None, "trials": 1,
             "data": {"shards": 0, "sha12": data_fingerprint(Path("r"), Path("s"))["sha12"]},
         }  # fmt: skip
 

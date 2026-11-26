@@ -280,6 +280,20 @@ class NnThreatsW64BothModel(NeuralEvalModel):
     )
 
 
+class NnThreatsW128Ob8BothModel(NeuralEvalModel):
+    """As ``net_pst_w128_ob8_both``, with the five threat inputs of ``net_pst_threats_w64_both``."""
+
+    name = "net_pst_threats_w128_ob8_both"
+    feature_set = "pst_threats"
+    hidden = (128,)
+    output_buckets = 8
+    architecture = (
+        "Sparse network: 768 slotted piece-square inputs seen from both sides plus 5 threat "
+        "inputs of the mover, one shared 128 accumulator, 256-8 with one output unit per 4 "
+        "piece counts (2 layers)"
+    )
+
+
 #: Families of the ``pst_ctx`` inputs by the letter of the model names.
 CTX_FAMILIES = {"m": "material", "p": "pawn_files", "k": "king_buckets"}
 
@@ -320,6 +334,7 @@ MODELS: Dict[str, Type[NeuralEvalModel]] = {
         NnW128Ob8H16BothModel,
         NnW256BothModel,
         NnThreatsW64BothModel,
+        NnThreatsW128Ob8BothModel,
         *(_ctx_model(letters, 128) for letters in ("m", "p", "k", "mpk")),
         *(_ctx_model(letters, 256) for letters in ("m", "mpk")),
     )

@@ -70,6 +70,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         "one with --init, so the first epochs do not undo the source",
     )
     parser.add_argument(
+        "--trials",
+        type=int,
+        help="random hyper-parameter trials instead of the ones the effort sets (0 skips the search)",
+    )
+    parser.add_argument(
         "--tag",
         help="name a variant: artifact and card <model>@e<effort>-<tag> (letters, digits, ._-)",
     )
@@ -95,6 +100,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         parser.error(f"--tag must contain only letters, digits, '.', '_' or '-': {args.tag!r}")
     if args.lr is not None and not args.lr > 0:
         parser.error(f"--lr must be positive: {args.lr}")
+    if args.trials is not None and args.trials < 0:
+        parser.error(f"--trials must not be negative: {args.trials}")
     return args
 
 
@@ -173,6 +180,8 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         print(f"no TRAIN rows found in {args.sidecar}")
         return 2
     plan = effort_config(args.effort, available)
+    if args.trials is not None:
+        plan["trials"] = args.trials
     data = data_fingerprint(args.raw, args.sidecar)
     recipe = {
         "model": args.model,
@@ -182,6 +191,7 @@ def train_by_effort(args: argparse.Namespace, model_class: type) -> int:
         "representation": rep.to_dict(),
         "init": args.init,
         "lr": args.lr,
+        "trials": plan["trials"],
         "data": data,
     }
     print(f"Effort {args.effort}: {available:,} TRAIN rows available")

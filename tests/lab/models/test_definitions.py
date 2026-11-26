@@ -21,6 +21,7 @@ def test_every_model_is_in_the_table():
         "net_pst_w128_ob8h16_both",
         "net_pst_w256_both",
         "net_pst_threats_w64_both",
+        "net_pst_threats_w128_ob8_both",
         "net_ctx_m_w128_both",
         "net_ctx_p_w128_both",
         "net_ctx_k_w128_both",

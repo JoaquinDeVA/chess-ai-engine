@@ -164,8 +164,8 @@
   "cost": {
     "us_per_eval": 3.35,
     "samples": 1000,
-    "date": "2026-11-25",
-    "commit": "fc77344+dirty"
+    "date": "2026-11-27",
+    "commit": "a077da3+dirty"
   },
   "ordering": {
     "all": {
@@ -186,5 +186,32 @@
       "top3": 0.8331108144192256,
       "positions": 1498
     }
+  },
+  "games": {
+    "all": {
+      "spearman": 0.8354634096892775,
+      "mae": 0.0872538280188211,
+      "cross_entropy": 0.5488706551680579,
+      "label_entropy": 0.504738641275897,
+      "excess": 0.044132013892160926,
+      "n": 12310
+    },
+    "quiet": {
+      "spearman": 0.8651596798888408,
+      "mae": 0.07536903635367806,
+      "cross_entropy": 0.5446901769180368,
+      "label_entropy": 0.5122898676715054,
+      "excess": 0.03240030924653137,
+      "n": 8668
+    },
+    "non_quiet": {
+      "spearman": 0.7781179260238731,
+      "mae": 0.11553976271224775,
+      "cross_entropy": 0.5588202393172021,
+      "label_entropy": 0.4867666395194078,
+      "excess": 0.07205359979779435,
+      "n": 3642
+    },
+    "file": "game_positions.parquet"
   }
 }

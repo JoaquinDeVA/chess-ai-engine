@@ -69,22 +69,31 @@
   },
   "accuracy": {
     "all": {
-      "spearman": 0.7507237824880294,
-      "mae": 0.10331636830964772,
+      "spearman": 0.7507237846486671,
+      "mae": 0.1033163680626397,
+      "cross_entropy": 0.5897212964939306,
+      "label_entropy": 0.5201408817069342,
+      "excess": 0.06958041478699639,
       "n": 200000,
       "best_move_agreement": 0.24715,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.8090204619506978,
-      "mae": 0.08430530388711598,
+      "spearman": 0.8090204647186449,
+      "mae": 0.08430530370378454,
+      "cross_entropy": 0.5822224037371245,
+      "label_entropy": 0.5336716364495966,
+      "excess": 0.04855076728752794,
       "n": 139604,
       "best_move_agreement": 0.09699950110469674,
       "agreement_n": 14031
     },
     "non_quiet": {
-      "spearman": 0.6440375211257495,
-      "mae": 0.14726001751891854,
+      "spearman": 0.6440375017224474,
+      "mae": 0.14726001712472356,
+      "cross_entropy": 0.6070548189858364,
+      "label_entropy": 0.4888648454612452,
+      "excess": 0.11818997352459115,
       "n": 60396,
       "best_move_agreement": 0.6001005193499749,
       "agreement_n": 5969
@@ -92,14 +101,15 @@
     "sample": {
       "rows": 200000,
       "seed": 42,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "hash": "e104181c1bb6b7df"
     }
   },
   "cost": {
-    "us_per_eval": 2.15,
+    "us_per_eval": 3.28,
     "samples": 1000,
-    "date": "2026-11-17",
-    "commit": "unknown"
+    "date": "2026-11-27",
+    "commit": "a077da3+dirty"
   },
   "ordering": {
     "all": {
@@ -120,5 +130,32 @@
       "top3": 0.8344459279038718,
       "positions": 1498
     }
+  },
+  "games": {
+    "all": {
+      "spearman": 0.8367370105094829,
+      "mae": 0.08576858516867297,
+      "cross_entropy": 0.5479996856790709,
+      "label_entropy": 0.504738641275897,
+      "excess": 0.04326104440317391,
+      "n": 12310
+    },
+    "quiet": {
+      "spearman": 0.8667917180899657,
+      "mae": 0.07349129554980706,
+      "cross_entropy": 0.5436648335241568,
+      "label_entropy": 0.5122898676715054,
+      "excess": 0.031374965852651426,
+      "n": 8668
+    },
+    "non_quiet": {
+      "spearman": 0.7778922117975281,
+      "mae": 0.11498866930275584,
+      "cross_entropy": 0.5583166814173453,
+      "label_entropy": 0.4867666395194078,
+      "excess": 0.07155004189793746,
+      "n": 3642
+    },
+    "file": "game_positions.parquet"
   }
 }

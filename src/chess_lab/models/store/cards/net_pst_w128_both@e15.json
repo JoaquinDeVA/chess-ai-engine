@@ -125,50 +125,51 @@
   },
   "accuracy": {
     "all": {
-      "spearman": 0.744044336476773,
-      "mae": 0.10530099203164624,
-      "n": 200000,
-      "best_move_agreement": 0.2238,
-      "agreement_n": 20000,
+      "spearman": 0.7440443226842696,
+      "mae": 0.10530099268512909,
       "cross_entropy": 0.5949559737728684,
       "label_entropy": 0.5201408817069342,
-      "excess": 0.07481509206593417
+      "excess": 0.07481509206593417,
+      "n": 200000,
+      "best_move_agreement": 0.2238,
+      "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.8146339406385773,
-      "mae": 0.08334485368375469,
-      "n": 139604,
-      "best_move_agreement": 0.0729099850331409,
-      "agreement_n": 14031,
+      "spearman": 0.8146339320624009,
+      "mae": 0.08334485404237327,
       "cross_entropy": 0.5816419766418969,
       "label_entropy": 0.5336716364495966,
-      "excess": 0.04797034019230029
+      "excess": 0.04797034019230029,
+      "n": 139604,
+      "best_move_agreement": 0.0729099850331409,
+      "agreement_n": 14031
     },
     "non_quiet": {
-      "spearman": 0.6162584109274485,
-      "mae": 0.15605211359464793,
-      "n": 60396,
-      "best_move_agreement": 0.5784888591053778,
-      "agreement_n": 5969,
+      "spearman": 0.616258386870329,
+      "mae": 0.15605211492970297,
       "cross_entropy": 0.6257309796585584,
       "label_entropy": 0.4888648454612452,
-      "excess": 0.1368661341973132
+      "excess": 0.1368661341973132,
+      "n": 60396,
+      "best_move_agreement": 0.5784888591053778,
+      "agreement_n": 5969
     },
     "sample": {
       "rows": 200000,
       "seed": 42,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "hash": "e104181c1bb6b7df"
     }
   },
   "cost": {
-    "us_per_eval": 2.14,
+    "us_per_eval": 3.84,
     "samples": 1000,
-    "date": "2026-11-20",
-    "commit": "unknown"
+    "date": "2026-11-27",
+    "commit": "a077da3+dirty"
   },
   "ordering": {
     "all": {
-      "tau": 0.20085422069601266,
+      "tau": 0.2008557645266295,
       "top1": 0.2542,
       "top3": 0.4708,
       "positions": 5000
@@ -180,7 +181,7 @@
       "positions": 3502
     },
     "non_quiet": {
-      "tau": 0.25246501360793894,
+      "tau": 0.25247016683756035,
       "top1": 0.5333778371161548,
       "top3": 0.8337783711615487,
       "positions": 1498

@@ -220,6 +220,39 @@ Static accuracy does not rank close networks by strength. Against `net_pst_w128_
 (−0.0017 ± 0.0011), yet they lose −86 ± 54 and −76 ± 43 Elo at fixed nodes; the four `ctx` families do not differ
 from the base in excess (cross-entropy over the label entropy). The fixed-node screening stays the judge.
 
+## What each change adds (2026-11-27)
+
+Fifteen store networks, judged on the same 200,000 test positions (sample hash `e104181c1bb6b7df`) and on the game
+positions (model table below; `python -m chess_lab.measure.evaluate --model <name@tag>`). Static figures do not
+rank close networks (above), and none of the effort-100 networks with output buckets has played a match.
+
+| Change | Static evidence (Spearman; excess in nats, lower is better) | Games | Reading |
+|---|---|---|---|
+| Threat inputs | width 64, 30 M, same recipe: 0.7340 → 0.7489, excess 0.0776 → 0.0701. Width 128 with `ob8`, 195 M: 0.7579 → 0.7715, 0.0714 → 0.0654 (different learning rate); quiet excess unchanged (0.0444 → 0.0445), non-quiet 0.134 → 0.114 | +12.1 ± 9.4 and +40.7 ± 18.5 (no SPRT bound) | helps, on non-quiet positions |
+| Hidden head per bucket (`h16`) | against `ob8`: 0.7579 → 0.7678, quiet excess 0.0444 → 0.0415 (different learning rate and trials; a first run with a searched L2 got 0.7244) | none | promising, sensitive to the recipe, and the slowest |
+| Output buckets (`ob8`) | 29 M, same recipe, against `net_pst_w128_both`: 0.7440 → 0.7389. There is no effort-100 network without buckets to compare with | −15.7 ± 23.7 per node; +7.3 ± 12.6 warm-started | no gain shown |
+| Width 128 → 256 | 29 M: 0.7440 → 0.7475, excess 0.0748 → 0.0742 | +6.6 ± 8.3 | little, at a lower speed |
+| Material, pawn-file and king inputs (`ctx_*`) | 29 M: 0.7372 to 0.7439 against 0.7440 | −31 to −86 per node from scratch; +1.9 and +11.0 warm-started, intervals include 0 | no gain shown |
+| More positions | 30 M → 195 M: +0.0018 (`threats_w64`), 29 M → 195 M: +0.0022 (`ctx_mpk_w128`); both long runs ended at their 12-epoch cap | +10.0 ± 11.5 and +6.2 ± 8.7 | small at these widths; the epoch cap may hide part of it |
+
+`net_pst_threats_w128_ob8_both@e100-lr1e-3` was stopped by hand after epoch 50 of 100 (best 49, validation loss
+0.62689, learning rate down to 3.1e-5); its weights are the best epoch of the checkpoint. It has the best Spearman
+and excess on both position sets; `ob8h16` has the lowest validation loss (0.62503) and quiet excess.
+
+Search speed (`uci bench 5 <exported model.json>`, laptop, median of 3 alternated passes; each network searches its
+own tree, so the node mix differs too):
+
+| Network | nodes/s | against the playing network |
+|---|---:|---:|
+| `net_pst_threats_w64_both@e100` (plays) | 1,557,648 | — |
+| `net_pst_threats_w128_ob8_both@e100-lr1e-3` | 1,437,260 | −8 % |
+| `net_pst_w128_ob8h16_both@e100-lr1e-3` | 1,063,544 | −32 % |
+| `net_pst_w128_ob8_both@e100` | 1,684,584 | +8 % |
+| `net_pst_w128_both@e15` | 1,711,430 | +10 % |
+| `net_pst_w256_both@e15` | 1,409,421 | −10 % |
+| `net_ctx_mpk_w128_both@e100` | 1,404,048 | −10 % |
+| `net_pst_w64_both@e30` | 1,818,981 | +17 % |
+
 ## Search techniques in games
 
 The Rust engine reaches 2 to 3 plies more than the Python one in the same time (the changelog has its speed-ups). The six techniques on by default before
@@ -257,16 +290,21 @@ be measured again today (accuracy and cost); the model cards carried depth and s
 <!-- BEGIN GENERATED TABLES -->
 | Model | Params | Representation | Effort | Positions (M) | Max epochs | Spearman | MAE | Excess (nats) | Best move, all / non-quiet | µs per eval |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| `net_ctx_k_w128_both` | 393,601 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.741 | 0.106 | 0.0760 | 21.6% / 56.9% | 2.2 |
-| `net_ctx_m_w128_both` | 102,529 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.740 | 0.105 | 0.0748 | 22.1% / 57.7% | 2.6 |
-| `net_ctx_mpk_w128_both` | 401,537 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.744 | 0.104 | 0.0741 | 21.9% / 57.7% | 3.2 |
-| `net_ctx_p_w128_both` | 102,785 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.737 | 0.107 | 0.0765 | 21.9% / 57.7% | 2.6 |
-| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 12 | 0.751 | 0.103 | — | 24.7% / 60.0% | 2.1 |
-| `net_pst_w128_both` | 98,689 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.744 | 0.105 | 0.0748 | 22.4% / 57.8% | 2.1 |
-| `net_pst_w128_ob8_both` | 100,488 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.739 | 0.106 | 0.0755 | 22.2% / 58.5% | 4.5 |
-| `net_pst_w256_both` | 197,377 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.747 | 0.104 | 0.0742 | 22.6% / 58.0% | 3.0 |
-| `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 ‡ | 30.0 | 40 | 0.731 | 0.110 | — | 22.7% / 58.3% | 2.4 |
-| `h1` | 6 | — | — | — | — | 0.561 | 0.149 | — | 19.6% / 49.8% | 2.8 |
+| `net_ctx_k_w128_both` | 393,601 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.741 | 0.106 | 0.0760 | 21.6% / 56.9% | 3.8 |
+| `net_ctx_m_w128_both` | 102,529 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.740 | 0.105 | 0.0748 | 22.1% / 57.7% | 4.3 |
+| `net_ctx_mpk_w128_both` | 401,537 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 12 | 0.746 | 0.103 | 0.0738 | 21.7% / 56.9% | 4.8 |
+| `net_ctx_mpk_w256_both` | 803,073 | winprob-k0.00368-stm-quiet | 30 | 58.6 | 40 | 0.742 | 0.105 | 0.0747 | 21.8% / 56.9% | 7.5 |
+| `net_ctx_p_w128_both` | 102,785 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.737 | 0.107 | 0.0765 | 21.9% / 57.7% | 4.3 |
+| `net_pst_threats_w128_ob8_both` | 101,128 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 100 | 0.772 | 0.098 | 0.0654 | 26.0% / 61.1% | 4.3 |
+| `net_pst_threats_w64_both` | 49,665 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 12 | 0.751 | 0.103 | 0.0696 | 24.7% / 60.0% | 3.3 |
+| `net_pst_w128_both` | 98,689 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.744 | 0.105 | 0.0748 | 22.4% / 57.8% | 3.8 |
+| `net_pst_w128_ob8_both` | 100,488 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 100 | 0.758 | 0.101 | 0.0714 | 23.3% / 58.4% | 4.2 |
+| `net_pst_w128_ob8h16_both` | 131,464 | winprob-k0.00368-stm-quiet | 100 | 195.2 | 100 | 0.768 | 0.096 | 0.0694 | 23.2% / 58.7% | 4.3 |
+| `net_pst_w256_both` | 197,377 | winprob-k0.00368-stm-quiet | 15 | 29.3 | 40 | 0.747 | 0.104 | 0.0742 | 22.6% / 58.0% | 5.8 |
+| `net_pst_w64_both` | 49,345 | winprob-k0.00368-stm-quiet | 30 ‡ | 30.0 | 40 | 0.734 | 0.108 | 0.0776 | 22.2% / 58.2% | 3.4 |
+| `h1` † | 6 | — | — | — | — | 0.561 | 0.149 | — | 19.6% / 49.8% | 2.8 |
+
+† Judged on another test sample than most rows, or before the sample hash was recorded: its accuracy columns are not comparable with the unmarked rows.
 
 ‡ Effort of the old meaning (millions of positions, until 2026-11-16); since then it is a share of the TRAIN rows, so the number of positions behind it depends on the data. Compare the Positions column, not the Effort one.
 <!-- END GENERATED TABLES -->

@@ -125,56 +125,93 @@
   },
   "accuracy": {
     "all": {
-      "spearman": 0.7306204218412202,
-      "mae": 0.10960555601874397,
+      "spearman": 0.7339499795795548,
+      "mae": 0.10804321255397459,
+      "cross_entropy": 0.5977362584224679,
+      "label_entropy": 0.5201408817069342,
+      "excess": 0.07759537671553374,
       "n": 200000,
-      "best_move_agreement": 0.22685,
+      "best_move_agreement": 0.22155,
       "agreement_n": 20000
     },
     "quiet": {
-      "spearman": 0.8016954119970343,
-      "mae": 0.08712945926292893,
-      "n": 138657,
-      "best_move_agreement": 0.06799276672694395,
-      "agreement_n": 13825
+      "spearman": 0.8028780861691264,
+      "mae": 0.08635382392611649,
+      "cross_entropy": 0.5840818146773075,
+      "label_entropy": 0.5336716364495966,
+      "excess": 0.05041017822771088,
+      "n": 139604,
+      "best_move_agreement": 0.06834865654621909,
+      "agreement_n": 14031
     },
     "non_quiet": {
-      "spearman": 0.6056543245868777,
-      "mae": 0.16040952954255347,
-      "n": 61343,
-      "best_move_agreement": 0.5825101214574899,
-      "agreement_n": 6175
+      "spearman": 0.6091532079872994,
+      "mae": 0.15817774811930183,
+      "cross_entropy": 0.629298199024484,
+      "label_entropy": 0.4888648454612452,
+      "excess": 0.14043335356323883,
+      "n": 60396,
+      "best_move_agreement": 0.581671971854582,
+      "agreement_n": 5969
     },
     "sample": {
       "rows": 200000,
       "seed": 42,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "hash": "e104181c1bb6b7df"
     }
   },
   "cost": {
-    "us_per_eval": 2.44,
+    "us_per_eval": 3.35,
     "samples": 1000,
-    "date": "2026-11-14",
-    "commit": "b9f62a3+dirty"
+    "date": "2026-11-27",
+    "commit": "a077da3+dirty"
   },
   "ordering": {
     "all": {
-      "tau": 0.17287269643773354,
+      "tau": 0.17287146216212665,
       "top1": 0.2526,
       "top3": 0.456,
       "positions": 5000
     },
     "quiet": {
-      "tau": 0.14597912753056164,
+      "tau": 0.1459780309116517,
       "top1": 0.125642490005711,
       "top3": 0.29754426042261567,
       "positions": 3502
     },
     "non_quiet": {
-      "tau": 0.2356429173100976,
+      "tau": 0.23564136174052985,
       "top1": 0.5493991989319092,
       "top3": 0.8264352469959947,
       "positions": 1498
     }
+  },
+  "games": {
+    "all": {
+      "spearman": 0.8205522149742324,
+      "mae": 0.09145707757469951,
+      "cross_entropy": 0.5547543269993953,
+      "label_entropy": 0.504738641275897,
+      "excess": 0.05001568572349835,
+      "n": 12310
+    },
+    "quiet": {
+      "spearman": 0.8552584314636301,
+      "mae": 0.07753538737855346,
+      "cross_entropy": 0.546135663609279,
+      "label_entropy": 0.5122898676715054,
+      "excess": 0.03384579593777359,
+      "n": 8668
+    },
+    "non_quiet": {
+      "spearman": 0.7522724771822401,
+      "mae": 0.12459085314312178,
+      "cross_entropy": 0.5752668405264486,
+      "label_entropy": 0.4867666395194078,
+      "excess": 0.08850020100704081,
+      "n": 3642
+    },
+    "file": "game_positions.parquet"
   }
 }

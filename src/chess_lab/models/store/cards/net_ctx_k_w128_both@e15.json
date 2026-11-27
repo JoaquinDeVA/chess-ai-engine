@@ -127,44 +127,45 @@
     "all": {
       "spearman": 0.7411424071875939,
       "mae": 0.10581432493890419,
-      "n": 200000,
-      "best_move_agreement": 0.2159,
-      "agreement_n": 20000,
       "cross_entropy": 0.5961015038607159,
       "label_entropy": 0.5201408817069342,
-      "excess": 0.07596062215378174
+      "excess": 0.07596062215378174,
+      "n": 200000,
+      "best_move_agreement": 0.2159,
+      "agreement_n": 20000
     },
     "quiet": {
       "spearman": 0.812572279726734,
       "mae": 0.08365894360086498,
-      "n": 139604,
-      "best_move_agreement": 0.06564036775710926,
-      "agreement_n": 14031,
       "cross_entropy": 0.5819626751699452,
       "label_entropy": 0.5336716364495966,
-      "excess": 0.04829103872034857
+      "excess": 0.04829103872034857,
+      "n": 139604,
+      "best_move_agreement": 0.06564036775710926,
+      "agreement_n": 14031
     },
     "non_quiet": {
       "spearman": 0.6114832967249254,
       "mae": 0.15702599220686272,
-      "n": 60396,
-      "best_move_agreement": 0.5691070531077232,
-      "agreement_n": 5969,
       "cross_entropy": 0.6287830894052279,
       "label_entropy": 0.4888648454612452,
-      "excess": 0.13991824394398267
+      "excess": 0.13991824394398267,
+      "n": 60396,
+      "best_move_agreement": 0.5691070531077232,
+      "agreement_n": 5969
     },
     "sample": {
       "rows": 200000,
       "seed": 42,
-      "agreement_n": 20000
+      "agreement_n": 20000,
+      "hash": "e104181c1bb6b7df"
     }
   },
   "cost": {
-    "us_per_eval": 2.23,
+    "us_per_eval": 3.84,
     "samples": 1000,
-    "date": "2026-11-20",
-    "commit": "bcb6386"
+    "date": "2026-11-27",
+    "commit": "a077da3+dirty"
   },
   "ordering": {
     "all": {

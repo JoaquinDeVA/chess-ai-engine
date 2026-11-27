@@ -253,6 +253,11 @@ own tree, so the node mix differs too):
 | `net_ctx_mpk_w128_both@e100` | 1,404,048 | −10 % |
 | `net_pst_w64_both@e30` | 1,818,981 | +17 % |
 
+Since `e887258` the core computes the hidden units of a head eight at a time, with the same node counts: `ob8h16` goes
+from 1,052,029 to 1,330,735 nodes/s (+26 %), 12 % below the playing network and 20 % below `ob8` in that run
+(median of 3 alternated passes, binaries before and after; the other networks do not change beyond 1 %). The table
+above is the speed before it.
+
 ## Search techniques in games
 
 The Rust engine reaches 2 to 3 plies more than the Python one in the same time (the changelog has its speed-ups). The six techniques on by default before

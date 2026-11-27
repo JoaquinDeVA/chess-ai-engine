@@ -1,7 +1,7 @@
 //! The five dense threat inputs of `pst_threats`: the best capture of each side, the pieces en prise
 //! of each side and whether the mover is in check. They are computed from the board at every
 //! evaluation and only reach the mover's half of the accumulator. They are the inputs of the model
-//! that plays, `net_pst_threats_w64_both`: `docs/RESULTS.md` has the SPRT that decided it
+//! that plays (`net_pst_threats_w128_ob8_both`): `docs/RESULTS.md` has the SPRT that decided them
 //! (`sp_threats_both_vs_both_opt`).
 
 use crate::board::piece_value;

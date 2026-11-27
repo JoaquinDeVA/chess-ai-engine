@@ -97,6 +97,7 @@ PROTECTED_ARTIFACTS = (
     "net_pst_w64_both@e30.npz",
     "net_pst_threats_w64_both@e30.npz",
     "net_pst_threats_w64_both@e100.npz",
+    "net_pst_threats_w128_ob8_both@e100-lr1e-3.npz",
 )
 _PROTECTED_HASHES: dict = {}
 

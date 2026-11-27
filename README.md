@@ -27,10 +27,11 @@ Every figure has its command or file in [Results](docs/RESULTS.md).
 | Four techniques each won an SPRT against the search without them | null move +97, static exchange evaluation +64, table move first +57, incremental accumulator +35 Elo | [Round robin](docs/RESULTS.md#round-robin-rust-engine-fastchess) |
 | The network beat the logistic model that played before it | +165.1 ± 32.9 Elo, 504 games (before the 2026-11-13 binary: orientative) | [Results](docs/RESULTS.md#retired-models) |
 | Threat inputs and both sides' views each made the network stronger | `net_pst_threats_w64_both` against the retired `net_pst_w64`: +62.1 ± 18.5 Elo (1,092 games, H1); against `net_pst_w64_both`: +40.7 ± 18.5 (1,200 games) | [Results](docs/RESULTS.md#network-matches) |
+| A wider network with output buckets replaced the playing one | `net_pst_threats_w128_ob8_both` against `net_pst_threats_w64_both`: +166.7 ± 29.0 Elo (464 games, H1) | [Results](docs/RESULTS.md#network-matches) |
 | Four search techniques reached no verdict and were retired | `lmp`, `aspiration`, `history_malus`, `qs_tt` | [Results](docs/RESULTS.md#the-short-answer) |
 
 The engine that plays is the Rust UCI binary with the **Piece-square network with threat inputs and both sides' views,
-width 64** (`net_pst_threats_w64_both`) and eight search techniques, all fixed: see
+width 128 and eight output buckets** (`net_pst_threats_w128_ob8_both`) and eight search techniques, all fixed: see
 [Results](docs/RESULTS.md#the-short-answer).
 
 ## Quick start
@@ -60,7 +61,7 @@ option name Hash type spin default 64 min 1 max 65536
 option name Threads type spin default 1 min 1 max 64
 option name Book type string default
 option name Tablebase type string default
-option name Model type string default net_pst_threats_w64_both@e100
+option name Model type string default net_pst_threats_w128_ob8_both@e100-lr1e-3
 uciok
 readyok
 info depth 8 nodes 1070725 time 1000

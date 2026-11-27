@@ -19,14 +19,17 @@ one. Scripts under `scripts/bench/` and `play_tournament` were removed in `6162d
   60 s + 1 s" below). An earlier `lmr` lost 8.6 ± 6.1 Elo at 20,000 nodes per move (`lmr_nodes` below), so that
   conflict is still open. Four others (`lmp`, `aspiration`, `history_malus`, `qs_tt`) reached no verdict and were
   retired.
-- **The model that plays is `net_pst_threats_w64_both`**: piece-square inputs plus five threat inputs, width 64, and a
-  second layer that reads the accumulators of both sides over the same weights. It is the default of the binary
-  since `4e82cc7`, and the weights are the effort-100 ones since `4c59054`. Against the previous default `net_pst_w64`
-  (retired) it scored +62.1 ± 18.5 Elo (H1), and against `net_pst_w64_both` (the same network without the threat
-  inputs) +12.1 ± 9.4 in 4,300 games and +40.7 ± 18.5 with the optimised binary ("Network matches" below). Neither
-  of those two matches reached an SPRT bound (LLR 1.93 and 2.02 of 2.94); the intervals exclude 0, and the threats are
-  kept on that evidence. The effort-100 weights against the effort-30 ones: +10.0 ± 11.5 in 2,722 games, LLR +1.00,
-  no verdict and an interval that includes 0.
+- **The model that plays is `net_pst_threats_w128_ob8_both`** (effort 100, tag `lr1e-3`): piece-square inputs plus five threat inputs,
+  width 128, a second layer that reads the accumulators of both sides over the same weights and eight output buckets by
+  piece count. It is the default of the binary since `14493f6`. Against the previous default
+  `net_pst_threats_w64_both@e100` it scored +166.7 ± 29.0 Elo in 464 games at 10 s + 0.2 s (H1, "Network matches"
+  below); an estimate taken when the SPRT stops tends to be high. The match changes the width, the output buckets and
+  the training recipe at once, so it does not say how much each gives.
+- **The previous default `net_pst_threats_w64_both`** (since `4e82cc7`, effort-100 weights since `4c59054`) scored
+  +62.1 ± 18.5 Elo (H1) against `net_pst_w64` (retired), and against `net_pst_w64_both` (the same network without the
+  threat inputs) +12.1 ± 9.4 in 4,300 games and +40.7 ± 18.5 with the optimised binary. Neither of those two matches
+  reached an SPRT bound (LLR 1.93 and 2.02 of 2.94); the intervals exclude 0, and the threats are kept on that
+  evidence. Its effort-100 weights against the effort-30 ones: +10.0 ± 11.5 in 2,722 games, LLR +1.00, no verdict.
 - **Retired networks.** The width-32 network, the hybrids (classical terms as inputs), the king-bucket networks, the
   three-layer network and the logistic model were retired on 2026-11-15 and their weights deleted. Their figures
   are in "Retired models" below; those measured before 2026-11-13 are orientative (some played without the
@@ -122,10 +125,11 @@ is the first network. Measured on the compute node with `src/chess_lab/measure/r
 | `nodes_warm_ob8_vs_warm_ctl` | `net_pst_w128_ob8_both@e15-warm-lr1e-4-ep100` against the warm control `net_pst_w128_both@e15-warm-lr1e-4-ep100` at 135,000 nodes per move; both started from `net_pst_w128_both@e15` (`train.py --init`, lr 1e-4, halved on every epoch without improvement, patience 3, 100-epoch cap), binary `b425eef37187` | 2,000 | +7.3 ± 12.6 | +0.53 | no verdict (2,000-game cap, 2026-11-24); interval includes 0 |
 | `nodes_warm_k_vs_warm_ctl` | `net_ctx_k_w128_both@e15-warm-lr1e-4-ep100` against the same warm control, same recipe | 2,000 | +1.9 ± 12.9 | −0.02 | no verdict (cap, 2026-11-24); interval includes 0 |
 | `nodes_warm_mpk_vs_warm_ctl` | `net_ctx_mpk_w128_both@e15-warm-lr1e-4-ep100` against the same warm control, same recipe | 2,000 | +11.0 ± 12.8 | +0.88 | no verdict (cap, 2026-11-24); interval includes 0 |
+| `sprt_threats_w128_ob8_e100_vs_threats_w64_e100` | `net_pst_threats_w128_ob8_both@e100-lr1e-3` against `net_pst_threats_w64_both@e100`, binary `4e5ee36b8107` (`1311ef8`) | 464 | +166.7 ± 29.0 | +2.95 | H1 (2026-11-27): 279 wins, 72 losses, 113 draws; the new network plays since `14493f6` |
 
 Only H0, H1 or a `max_rounds` fixed before the match is a verdict ([Measurement](MEASUREMENT.md#stopping-before-the-verdict)): stopping when the 95 % interval first excludes 0 is a repeated look, which at these sizes rejects equal engines in 18 % to 38 % of the matches, not 5 %. The rows marked *interval at stop* were closed that way (up to 2026-11-23); they are kept as measured, with the interval as the evidence of the day, and are not reopened. A match stopped by hand without a bound or a preset cap is no verdict.
 All four `ctx` families lose per node (and `mpk` at 10 s + 0.2 s as well), so the `ctx` inputs lose on quality, not on the cost of the evaluation.
-The `ctx` rows (2026-11-22 on) keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because the binary is the one that plays; the speed-up of the threats
+The `ctx` rows (2026-11-22 on) and `sprt_threats_w128_ob8_e100_vs_threats_w64_e100` keep their `llr.csv` in `data/results/roundrobin/<job>/`. The row with the optimised binary has its own file because that binary was then the one that played; the speed-up of the threats
 (`2272d51`, `8402069`) is in the changelog. `net_pst_w64_both` reaches depth 11 in 20 % less time than `net_pst_w64`
 (`uci ttd 11`), and `net_pst_threats_w64_both` costs 13 % more time than `net_pst_w64_both` over the 20 positions (`uci ttd 11 bench/middlegame.epd 60`, laptop, 2026-11-23: 9.0 s against 8.0 s, 1,559,605 against 1,787,601 nodes/s; the median, 0.42 s against 0.32 s, mixes different trees). Computing the threats twice in `uci bench 20` drops the nodes per second from about 1,555 k to 1,400 k: about 72 ns of the 96 ns a node costs more are the threats themselves.
 
@@ -224,7 +228,7 @@ from the base in excess (cross-entropy over the label entropy). The fixed-node s
 
 Fifteen store networks, judged on the same 200,000 test positions (sample hash `e104181c1bb6b7df`) and on the game
 positions (model table below; `python -m chess_lab.measure.evaluate --model <name@tag>`). Static figures do not
-rank close networks (above), and none of the effort-100 networks with output buckets has played a match.
+rank close networks (above), and of the effort-100 networks with output buckets only `threats_w128_ob8` has played a match.
 
 | Change | Static evidence (Spearman; excess in nats, lower is better) | Games | Reading |
 |---|---|---|---|
@@ -242,10 +246,10 @@ and excess on both position sets; `ob8h16` has the lowest validation loss (0.625
 Search speed (`uci bench 5 <exported model.json>`, laptop, median of 3 alternated passes; each network searches its
 own tree, so the node mix differs too):
 
-| Network | nodes/s | against the playing network |
+| Network | nodes/s | against `threats_w64` |
 |---|---:|---:|
-| `net_pst_threats_w64_both@e100` (plays) | 1,557,648 | — |
-| `net_pst_threats_w128_ob8_both@e100-lr1e-3` | 1,437,260 | −8 % |
+| `net_pst_threats_w64_both@e100` (played then) | 1,557,648 | — |
+| `net_pst_threats_w128_ob8_both@e100-lr1e-3` (plays) | 1,437,260 | −8 % |
 | `net_pst_w128_ob8h16_both@e100-lr1e-3` | 1,063,544 | −32 % |
 | `net_pst_w128_ob8_both@e100` | 1,684,584 | +8 % |
 | `net_pst_w128_both@e15` | 1,711,430 | +10 % |
@@ -254,7 +258,7 @@ own tree, so the node mix differs too):
 | `net_pst_w64_both@e30` | 1,818,981 | +17 % |
 
 Since `e887258` the core computes the hidden units of a head eight at a time, with the same node counts: `ob8h16` goes
-from 1,052,029 to 1,330,735 nodes/s (+26 %), 12 % below the playing network and 20 % below `ob8` in that run
+from 1,052,029 to 1,330,735 nodes/s (+26 %), 12 % below `threats_w64` and 20 % below `ob8` in that run
 (median of 3 alternated passes, binaries before and after; the other networks do not change beyond 1 %). The table
 above is the speed before it.
 

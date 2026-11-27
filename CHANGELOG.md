@@ -21,6 +21,7 @@ How the numbers were measured (all single thread unless stated; `docs/MEASUREMEN
 
 | Date | Commit | Type | Change | Metric | Before → after | Δ |
 |---|---|---|---|---|---|---|
+| 2026-11-27 | `14493f6` | feat | the engine plays `net_pst_threats_w128_ob8_both@e100-lr1e-3` (width 128, eight output buckets) instead of `net_pst_threats_w64_both@e100` | SPRT [0, 5] at 10 s + 0.2 s, 464 games, binary `4e5ee36b8107` (H1) | — → +166.7 ± 29.0 Elo | +166.7 Elo |
 | 2026-11-27 | `e887258` | perf | the core computes the hidden units of an output head eight at a time instead of one by one; same node counts | `uci bench 5` nodes/s with `net_pst_w128_ob8h16_both@e100-lr1e-3` (laptop, median of 3 alternated passes) | 1,052,029 → 1,330,735 | +26 % |
 | 2026-11-26 | `5202248` | feat | `train --l2 X` fixes the L2 penalty of the final fit instead of the searched one (with `--trials 0`, the values of an earlier run are reused without a search) | not measured | — | — |
 | 2026-11-26 | `cb3ea82` | feat | `train --trials N` replaces the hyper-parameter trials the effort sets; new model `net_pst_threats_w128_ob8_both` (eight output buckets with the threat inputs) | not measured | — | — |
